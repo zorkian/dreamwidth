@@ -55,11 +55,18 @@ sub render_body {
 
     }
 
-    # fill text if it's totally empty.
-    my $custom_text_title =
-          $u->prop('customtext_title') ne ''
-        ? $u->prop('customtext_title')
-        : "Custom Text";
+    # an intentionally blank heading stays blank; otherwise fill text if
+    # it's totally empty.
+    my $custom_text_title;
+    if ( $u->prop('customtext_title_blank') ) {
+        $custom_text_title = '';
+    }
+    else {
+        $custom_text_title =
+              $u->prop('customtext_title') ne ''
+            ? $u->prop('customtext_title')
+            : "Custom Text";
+    }
     my $custom_text_url = $u->prop('customtext_url') || $module_custom_text_url{override};
     my $custom_text_content =
         $u->prop('customtext_content') || $module_custom_text_content{override};
@@ -88,12 +95,23 @@ sub handle_post {
     my $post_fields_of_parent = LJ::Widget->post_fields_of_widget("CustomizeTheme");
     my ( $given_control_strip_color, $props );
     if ( $post_fields_of_parent->{reset} ) {
-        $u->set_prop( 'customtext_title', "Custom Text" );
+        $u->clear_prop('customtext_title');
+        $u->clear_prop('customtext_title_blank');
         $u->clear_prop('customtext_url');
         $u->clear_prop('customtext_content');
     }
     else {
-        $u->set_prop( 'customtext_title',   $post->{module_customtext_title} );
+        my $title = $post->{module_customtext_title};
+        if ( defined $title && $title ne '' ) {
+            $u->set_prop( 'customtext_title', $title );
+            $u->clear_prop('customtext_title_blank');
+        }
+        else {
+            # heading deliberately left blank: record that choice so the
+            # default heading doesn't get substituted back in later
+            $u->clear_prop('customtext_title');
+            $u->set_prop( 'customtext_title_blank', 1 );
+        }
         $u->set_prop( 'customtext_url',     $post->{module_customtext_url} );
         $u->set_prop( 'customtext_content', $post->{module_customtext_content} );
     }
