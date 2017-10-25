@@ -1,0 +1,23 @@
+#
+# Dreamwidth production Dockerfile.
+#
+# This constructs the Apache2 web server container that runs Dreamwidth.
+#
+
+FROM dreamwidth/base:latest
+
+# Install the Dreamwidth source code
+COPY cgi-bin/ cgi-bin/
+COPY etc/     etc/
+COPY ext/     ext/
+COPY htdocs/  htdocs/
+COPY schemes/ schemes/
+COPY src/s2/  src/s2/
+COPY views/   views/
+
+# Install other configuration
+COPY etc/docker/apache-site.conf /etc/apache2/conf-enabled/dreamwidth.conf
+
+# Kick off Apache and wait around in a Bash shell (?)
+EXPOSE 80
+ENTRYPOINT apache2ctl -d /etc/apache2 -f apache2.conf -e info -DFOREGROUND

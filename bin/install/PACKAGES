@@ -1,0 +1,17 @@
+apache2
+cpanminus
+g++
+libapache2-mod-perl2
+libapache2-request-perl
+libdbd-mysql-perl
+libdbi-perl
+libexpat1-dev
+libgd-gd2-perl
+libgd-graph-perl
+libgmp3-dev
+libgtop2-dev
+libssl-dev
+libxml2-dev
+make
+perlmagick
+vim

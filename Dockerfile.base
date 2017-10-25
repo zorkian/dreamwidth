@@ -1,0 +1,27 @@
+#
+# Dreamwidth production Dockerfile.
+#
+# This is a the base recipe, this constructs a container that contains all of
+# packages and Perl modules we need for Dreamwidth.
+#
+
+FROM ubuntu:16.04
+
+ENV LJHOME=/dw
+WORKDIR ${LJHOME}
+
+# Map in the minimum files we need for installation of packages and modules. We do
+# this so that we can snapshot the build later and not have to rebuild all of the
+# modules every time.
+COPY bin/checkconfig.pl bin/checkconfig.pl
+COPY bin/install/       bin/install/
+
+# Install prerequisite Debian packages
+RUN apt-get update; apt-get install -y $(bin/checkconfig.pl --show-packages) \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fix up Apache2 modules and configuration
+RUN a2dismod mpm_event; a2enmod mpm_prefork; a2dissite 000-default
+
+# Install cpanm modules and clean up the build directory
+RUN cpanm -n -L extlib $(bin/checkconfig.pl --show-modules) && rm -rf .cpanm
