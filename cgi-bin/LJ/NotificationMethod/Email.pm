@@ -98,6 +98,12 @@ sub notify {
             $plain_body .= $footer if $ev->is_visible;
         }
 
+        # Record stats about how long it has been since this user was active; we're doing
+        # some introspection on how much money we're spending sending emails to users who
+        # haven't used the site in a long time. Age in 30 day periods since login.
+        my $user_idle_since = int( ( time() - $u->get_timeactive ) / 86400 / 180 );
+        DW::Stats::increment( 'dw.mail.user_idle_since', 1, [ 'sixmonths:' . $user_idle_since ]);
+
         # run transform hook on plain body
         LJ::Hooks::run_hook("esn_email_text_transform", event => $ev, rcpt_u => $u, bodyref => \$plain_body);
 
