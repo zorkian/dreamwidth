@@ -602,9 +602,9 @@ sub do_authed_comment_fetch {
     my $response = $ua->request( $request );
     return if $response->is_error;
 
-    # now get the content
+    # now get the content, ensure it's actually XML
     my $xml = $response->content;
-    if ( $xml ) {
+    if ( $xml && $xml =~ m!^<\?xml ! ) {
         $log->( 'Writing cache file %s.xml', $md5 );
 
         open FILE, ">$fn";
