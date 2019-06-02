@@ -130,7 +130,7 @@ sub check_modules {
         print "\n# curl -L http://cpanmin.us | sudo perl - --self-upgrade\n";
         print "# cpanm -L \$LJHOME/extlib/ " . join(' ', @mods) . "\n\n";
         if ($opt_install) {
-            system("cpanm", "-L", "$ENV{LJHOME}/extlib/", @mods);
+            system("cpanm", "-n", "-L", "$ENV{LJHOME}/extlib/", @mods);
         }
     }
 
