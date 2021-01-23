@@ -2031,24 +2031,6 @@ CREATE TABLE notifytypelist (
 )
 EOC
 
-# partitioned:  ESN subscriptions:  flag on event target (a journal) saying
-#               whether there are known listeners out there.
-#
-# verifytime is unixtime we last checked that this has_subs caching row
-# is still accurate and people do in fact still subscribe to this.
-# then maintenance tasks can background prune this table and fix
-# up verifytimes.
-register_tablecreate( "has_subs", <<'EOC');
-CREATE TABLE has_subs (
-    journalid  INT UNSIGNED NOT NULL,
-    etypeid    INT UNSIGNED NOT NULL,
-    arg1       INT UNSIGNED NOT NULL,
-    arg2       INT UNSIGNED NOT NULL,
-    PRIMARY KEY (journalid, etypeid, arg1, arg2),
-    verifytime   INT UNSIGNED NOT NULL
-)
-EOC
-
 # partitioned:  ESN subscriptions:  details of a user's subscriptions
 #  subid: alloc_user_counter
 #  is_dirty:  either 1 (indexed) or NULL (not in index).  means we have
