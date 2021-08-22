@@ -2,7 +2,7 @@ Authen::OATH
 Authen::Passphrase::BlowfishCrypt
 Authen::Passphrase::Clear
 Business::CreditCard
-CGI::Cookie
+CGI::Cookie@4.50
 CGI@4.50
 Cache::Memcached
 Captcha::reCAPTCHA@0.99
@@ -11,13 +11,15 @@ Class::Data::Inheritable
 Class::Trigger
 Compress::Zlib@2.212
 Convert::Base32
-CryptX
+CryptX@0.080
 Danga::Socket
 Data::ObjectDriver
+DBIx::Class
 Digest::HMAC_SHA1
 Digest::SHA1
 File::Type
-GTop
+GD::Graph
+GTop?
 Gearman::Client
 GnuPG::Interface
 Hash::MultiValue@0.16
@@ -37,7 +39,7 @@ MIME::Base64::URLSafe
 MIME::Lite
 MIME::Words
 Mail::GnuPG
-Math::BigInt::GMP
+Math::BigInt::GMP?
 Math::Random::Secure
 MogileFS::Client@1.17
 Moose
@@ -51,6 +53,8 @@ Net::Subnet
 Params::Classify@0.015
 Paws::S3
 Perl::Tidy@20190601
+Plack
+Plack::Middleware::Options
 Proc::ProcessTable
 RPC::XML
 SOAP::Lite@1.27
