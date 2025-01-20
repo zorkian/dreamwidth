@@ -26,6 +26,9 @@ BEGIN {
     die "No \$LJ::HOME set, or not a directory!\n"
         unless $LJ::HOME && -d $LJ::HOME;
 
+    # allow setting dev server mode from environment
+    $LJ::IS_DEV_SERVER = 1 if $ENV{LJ_IS_DEV_SERVER};
+
     use lib ( $LJ::HOME || $ENV{LJHOME} ) . "/extlib/lib/perl5";
 
     # Please do not change this to "LJ::Directories"
@@ -77,7 +80,6 @@ log4perl.appender.DevNull.layout=Log::Log4perl::Layout::SimpleLayout
     }
 }
 
-use Apache2::Connection ();
 use Carp;
 use DBI;
 use DBI::Role;
@@ -104,7 +106,6 @@ use LJ::ModuleCheck;
 use IO::Socket::INET;
 use IO::Socket::SSL;
 use Mozilla::CA;
-use GTop;
 
 use LJ::UniqCookie;
 use LJ::WorkerResultStorage;
@@ -141,8 +142,13 @@ BEGIN {
         foreach my $minifile ( "GIF89a", "\x89PNG\x0d\x0a\x1a\x0a", "\xFF\xD8" ) {
             Image::Size::imgsize( \$minifile );
         }
-        DBI->install_driver("mysql");
         LJ::CleanHTML::helper_preload();
+
+        # load drivers depending on what we have available
+        eval "use DBD::mysql;";
+        unless ($@) {
+            DBI->install_driver("mysql");
+        }
     }
 }
 
@@ -310,6 +316,11 @@ sub theschwartz {
 }
 
 sub gtop {
+    unless ( $LJ::GTOP_LOADED ) {
+        eval "use GTop;";
+        die "Couldn't load GTop: $@" if $@;
+        $LJ::GTOP_LOADED = 1;
+    }
     return $GTop ||= GTop->new;
 }
 

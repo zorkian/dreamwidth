@@ -30,6 +30,7 @@ use DW::Routing;
 # change from request to request, so only put things here that never change
 BEGIN {
     # If we're a DEV server, do some configuration
+    $LJ::IS_DEV_SERVER = 1 if $ENV{LJ_IS_DEV_SERVER};
     $^W = 1 if $LJ::IS_DEV_SERVER;
 
     # Configure S2
@@ -46,7 +47,7 @@ BEGIN {
 }
 
 my $app = sub {
-    my $r = DW::Request->get;
+    my $r = DW::Request->get( plack_env => $_[0] );
 
     # Main request dispatch; this will determine what kind of request we're getting
     # and then pass it to the appropriate handler. In the future, this should just

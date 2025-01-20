@@ -24,12 +24,13 @@ my $log = Log::Log4perl->get_logger(__PACKAGE__);
 
 use parent qw/ Plack::Middleware /;
 
+use DW::Request;
 use URI;
 
 sub call {
     my ( $self, $env ) = @_;
 
-    my $r = DW::Request->get;
+    my $r = DW::Request->get( plack_env => $env );
     my $host = $r->host;
     my $path = $r->path;
     my $args = $r->query_parameters;

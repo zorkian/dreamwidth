@@ -128,7 +128,11 @@ CLUSTER: foreach my $cluster (@clusters) {
     @alters = ();
 
     ## figure out what tables already exist (but not details of their structure)
-    $sth = $dbh->prepare("SHOW TABLES");
+    if ( $LJ::IS_DEV_SERVER ) {
+        $sth = $dbh->prepare("SELECT name FROM sqlite_master WHERE type='table'");
+    } else {
+        $sth = $dbh->prepare("SHOW TABLES");
+    }
     $sth->execute;
     while ( my ($table) = $sth->fetchrow_array ) {
         next if $table =~ /^(access|errors)\d+$/;
@@ -158,6 +162,7 @@ CLUSTER: foreach my $cluster (@clusters) {
     foreach my $fn ( LJ::get_all_files("bin/upgrading/update-db-local.pl") ) {
         $load_datfile->( $fn, 1 );
     }
+
     foreach my $fn ( LJ::get_all_files("bin/upgrading/update-db-general.pl") ) {
         $load_datfile->($fn);
     }
@@ -516,7 +521,7 @@ sub populate_basedata {
         while ( my $q = <BD> ) {
             chomp $q;    # remove newline
             next unless ( $q =~ /^(REPLACE|INSERT|UPDATE)/ );
-            chop $q;     # remove semicolon
+            $q = process_sql($q);
             $dbh->do($q);
             if ( $dbh->err ) {
                 print "$q\n";
@@ -741,9 +746,23 @@ sub skip_opt {
     return $opt_skip;
 }
 
-sub do_sql {
+sub process_sql {
     my $sql = shift;
     chomp $sql;
+
+    my $nothing = '-- nothing';
+
+    if ( $LJ::IS_DEV_SERVER ) {
+        $sql =~ s/INSERT IGNORE/INSERT/gi;
+        return $nothing if $sql =~ /(UN)?LOCK TABLES/i;
+    }
+
+    return $sql;
+}
+
+sub do_sql {
+    my $sql = process_sql( shift );
+
     my $disp_sql = $sql;
     $disp_sql =~ s/\bIN \(.+\)/IN (...)/g;
     print "$disp_sql;\n";
@@ -766,8 +785,9 @@ sub do_code {
 }
 
 sub try_sql {
-    my $sql = shift;
+    my $sql = process_sql(shift);
     print "$sql;\n";
+
     if ($opt_sql) {
         print "# Non-critical SQL (upgrading only... it might fail)...\n";
         $dbh->do($sql);
@@ -791,6 +811,11 @@ sub do_alter {
     my ( $table, $sql ) = @_;
     return if $cluster && !defined $clustered_table{$table};
 
+    if ( $LJ::IS_DEV_SERVER ) {
+        warn "Skipping alter: unsupported on SQLite!\n";
+        return;
+    }
+
     do_sql($sql);
 
     # columns will have changed, so clear cache:
@@ -805,6 +830,25 @@ sub create_table {
     if ( $opt_innodb && $create_sql !~ /engine=myisam/i ) {
         $create_sql .= " ENGINE=INNODB";
     }
+
+    # convert to sqlite if needed
+    if ( $LJ::IS_DEV_SERVER ) {
+        $create_sql =~ s/^\s+(\w+)\s+\w*int(\(\d+\))?/  $1 INTEGER/mgi;
+        $create_sql =~ s/AUTO_INCREMENT/AUTOINCREMENT/gi;
+        $create_sql =~ s/ENGINE=(INNODB|myisam)//gi;
+        $create_sql =~ s/unsigned//ig; # unsupported
+        $create_sql =~ s/^\s*(INDEX|UNIQUE|KEY).+$//mgi; # indexes have to come later, but don't care for dev
+        $create_sql =~ s/ENUM\(.+?\)/TEXT/gi; # we lose enum support
+        $create_sql =~ s/#.+$//mg; # comments not supported
+        $create_sql =~ s/BINARY//ig;
+        $create_sql =~ s/max_rows=\d+//gi;
+        $create_sql =~ s/CHARACTER SET \w+//gi;
+        $create_sql =~ s/PACK_KEYS=\d+//gi;
+
+        # write a regex that removes the last comma before the closing parenthesis
+        $create_sql =~ s/,\s*\)/\)/g;
+    }
+
     do_sql($create_sql);
 
     foreach my $pc ( @{ $post_create{$table} } ) {
@@ -879,6 +923,52 @@ sub clear_table_info {
 }
 
 sub load_table_info {
+    if ( $LJ::IS_DEV_SERVER ) {
+        return load_table_info_sqlite(@_);
+    } else {
+        return load_table_info_mysql(@_);
+    }
+}
+
+sub load_table_info_sqlite {
+    my $table = shift;
+
+    clear_table_info($table);
+
+    my $sth = $dbh->prepare("PRAGMA table_info($table)");
+    $sth->execute;
+    while ( my $row = $sth->fetchrow_hashref ) {
+        my $type = $row->{'type'};
+        $coltype{$table}->{ $row->{'name'} }    = lc($type);
+        $coldefault{$table}->{ $row->{'name'} } = $row->{'dflt_value'};
+    }
+
+    # current physical table properties
+    $table_status{$table} = $dbh->selectrow_hashref("PRAGMA table_info($table)");
+
+    $sth = $dbh->prepare("PRAGMA index_list($table)");
+    $sth->execute;
+    my %idx_type;     # name -> "UNIQUE"|"INDEX"
+    my %idx_parts;    # name -> []
+    while ( my $ir = $sth->fetchrow_hashref ) {
+        $idx_type{ $ir->{'name'} } = $ir->{'unique'} ? "UNIQUE" : "INDEX";
+
+        my $index_name = $ir->{'name'};
+        my $sub_sth = $dbh->prepare("PRAGMA index_info($index_name)");
+        $sub_sth->execute;
+
+        while ( my $index_column = $sub_sth->fetchrow_hashref ) {
+            push @{ $idx_parts{$index_name} }, $index_column->{'name'};
+        }
+    }
+
+    foreach my $idx ( keys %idx_type ) {
+        my $val = "$idx_type{$idx}:" . join( "-", @{ $idx_parts{$idx} } );
+        $indexname{$table}->{$val} = $idx;
+    }
+}
+
+sub load_table_info_mysql {
     my $table = shift;
 
     clear_table_info($table);
@@ -969,4 +1059,3 @@ sub check_dbnote {
 
     return $dbh->selectrow_array( "SELECT value FROM dbnotes WHERE dbnote=?", undef, $key );
 }
-

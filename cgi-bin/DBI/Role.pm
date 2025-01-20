@@ -154,6 +154,16 @@ sub get_dbh {
     my $role  = shift @roles;
     return undef unless $role;
 
+    # if we're a dev server, just use sqlite
+    if ( $LJ::IS_DEV_SERVER ) {
+        $role = 'master' if $role eq 'slave';
+        $role =~ s/slave$// if $role =~ /^cluster\d+/;
+
+        my $dbh = DBI->connect("dbi:SQLite:dbname=$LJ::HOME/var/db-$role.sqlite", "", "")
+            or die "unable to connect to sqlite db: $DBI::errstr";
+        return $dbh;
+    }
+
     my $now = time();
 
     # if 'nocache' flag is passed, clear caches now so we won't return
@@ -437,4 +447,3 @@ Brad Fitzparick, E<lt>brad@danga.comE<gt>
 =head1 SEE ALSO
 
 L<DBI>.
-

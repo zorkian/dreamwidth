@@ -20,9 +20,9 @@ mark_clustered(@LJ::USER_TABLES);
 
 register_tablecreate( "vgift_ids", <<'EOC');
 CREATE TABLE vgift_ids (
-    vgiftid      INT UNSIGNED NOT NULL PRIMARY KEY,
+    vgiftid      INT UNSIGNED NOT NULL,
     name         VARCHAR(255) NOT NULL,
-    created_t    INT UNSIGNED NOT NULL,   #unixtime
+    created_t    INT UNSIGNED NOT NULL,
     creatorid    INT UNSIGNED NOT NULL DEFAULT 0,
     active       ENUM('Y','N') NOT NULL DEFAULT 'N',
     featured     ENUM('Y','N') NOT NULL DEFAULT 'N',
@@ -35,6 +35,7 @@ CREATE TABLE vgift_ids (
     mime_small   VARCHAR(255),
     mime_large   VARCHAR(255),
 
+    PRIMARY KEY (vgiftid),
     UNIQUE KEY (name)
 )
 EOC
@@ -54,8 +55,7 @@ CREATE TABLE vgift_tags (
     vgiftid    INT UNSIGNED NOT NULL,
 
     PRIMARY KEY (tagid, vgiftid),
-    INDEX (vgiftid),
-    INDEX (tagid)
+    INDEX (vgiftid)
 )
 EOC
 
@@ -66,7 +66,6 @@ CREATE TABLE vgift_tagpriv (
     arg        VARCHAR(40),
 
     PRIMARY KEY (tagid, prlid, arg),
-    INDEX (tagid)
 )
 EOC
 
@@ -90,14 +89,12 @@ EOC
 
 register_tablecreate( "authactions", <<'EOC');
 CREATE TABLE authactions (
-    aaid int(10) unsigned NOT NULL auto_increment,
+    aaid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     userid int(10) unsigned NOT NULL default '0',
     datecreate datetime NOT NULL default CURRENT_TIMESTAMP,
     authcode varchar(20) default NULL,
     action varchar(50) default NULL,
-    arg1 varchar(255) default NULL,
-
-    PRIMARY KEY  (aaid)
+    arg1 varchar(255) default NULL
 )
 EOC
 
@@ -113,10 +110,9 @@ EOC
 
 register_tablecreate( "clients", <<'EOC');
 CREATE TABLE clients (
-    clientid smallint(5) unsigned NOT NULL auto_increment,
+    clientid smallint(5) unsigned NOT NULL PRIMARY KEY auto_increment,
     client varchar(40) default NULL,
 
-    PRIMARY KEY  (clientid),
     KEY (client)
 )
 EOC
@@ -169,15 +165,13 @@ EOC
 
 register_tablecreate( "faq", <<'EOC');
 CREATE TABLE faq (
-    faqid mediumint(8) unsigned NOT NULL auto_increment,
+    faqid mediumint(8) unsigned NOT NULL PRIMARY KEY auto_increment,
     question text,
     answer text,
     sortorder int(11) default NULL,
     faqcat varchar(20) default NULL,
     lastmodtime datetime default NULL,
-    lastmoduserid int(10) unsigned NOT NULL default '0',
-
-    PRIMARY KEY  (faqid)
+    lastmoduserid int(10) unsigned NOT NULL default '0'
 )
 EOC
 
@@ -222,13 +216,13 @@ CREATE TABLE interests (
     intid int(10) unsigned NOT NULL,
     intcount mediumint(8) unsigned default NULL,
 
-    PRIMARY KEY  (intid)
+    PRIMARY KEY (intid)
 )
 EOC
 
 register_tablecreate( "logproplist", <<'EOC');
 CREATE TABLE logproplist (
-    propid tinyint(3) unsigned NOT NULL auto_increment,
+    propid tinyint(3) unsigned NOT NULL PRIMARY KEY auto_increment,
     name varchar(50) default NULL,
     prettyname varchar(60) default NULL,
     sortorder mediumint(8) unsigned default NULL,
@@ -237,19 +231,17 @@ CREATE TABLE logproplist (
     ownership ENUM('system', 'user') NOT NULL default 'user',
     des varchar(255) default NULL,
 
-    PRIMARY KEY  (propid),
     UNIQUE KEY name (name)
 )
 EOC
 
 register_tablecreate( "moods", <<'EOC');
 CREATE TABLE moods (
-    moodid int(10) unsigned NOT NULL auto_increment,
+    moodid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     mood varchar(40) default NULL,
     parentmood int(10) unsigned NOT NULL default '0',
     weight tinyint unsigned default NULL,
 
-    PRIMARY KEY  (moodid),
     UNIQUE KEY mood (mood)
 )
 EOC
@@ -268,13 +260,12 @@ EOC
 
 register_tablecreate( "moodthemes", <<'EOC');
 CREATE TABLE moodthemes (
-    moodthemeid int(10) unsigned NOT NULL auto_increment,
+    moodthemeid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     ownerid int(10) unsigned NOT NULL default '0',
     name varchar(50) default NULL,
     des varchar(100) default NULL,
     is_public enum('Y','N') NOT NULL default 'N',
 
-    PRIMARY KEY  (moodthemeid),
     KEY (is_public),
     KEY (ownerid)
 )
@@ -305,25 +296,23 @@ EOC
 
 register_tablecreate( "priv_list", <<'EOC');
 CREATE TABLE priv_list (
-    prlid smallint(5) unsigned NOT NULL auto_increment,
+    prlid smallint(5) unsigned NOT NULL PRIMARY KEY auto_increment,
     privcode varchar(20) NOT NULL default '',
     privname varchar(40) default NULL,
     des varchar(255) default NULL,
     is_public ENUM('1', '0') DEFAULT '1' NOT NULL,
 
-    PRIMARY KEY  (prlid),
     UNIQUE KEY privcode (privcode)
 )
 EOC
 
 register_tablecreate( "priv_map", <<'EOC');
 CREATE TABLE priv_map (
-    prmid mediumint(8) unsigned NOT NULL auto_increment,
+    prmid mediumint(8) unsigned NOT NULL PRIMARY KEY auto_increment,
     userid int(10) unsigned NOT NULL default '0',
     prlid smallint(5) unsigned NOT NULL default '0',
     arg varchar(40) default NULL,
 
-    PRIMARY KEY  (prmid),
     KEY (userid),
     KEY (prlid)
 )
@@ -342,24 +331,24 @@ EOC
 
 register_tablecreate( "statkeylist", <<'EOC');
 CREATE TABLE statkeylist (
-    statkeyid  int unsigned NOT NULL auto_increment,
+    statkeyid  int unsigned NOT NULL PRIMARY KEY auto_increment,
     name       varchar(255) default NULL,
 
-    PRIMARY KEY (statkeyid),
     UNIQUE KEY (name)
 )
 EOC
 
 register_tablecreate( "site_stats", <<'EOC');
 CREATE TABLE site_stats (
+    -- FIXME: This is good for retrieving data for a single category+key, but
+    -- maybe not as good if we want all keys for the category, with a limit on
+    -- time (ie, last 5 entries, or last 2 weeks). Do we need an extra index?
+
     category_id INT UNSIGNED NOT NULL,
     key_id INT UNSIGNED NOT NULL,
     insert_time INT UNSIGNED NOT NULL,
     value INT UNSIGNED NOT NULL,
 
-    -- FIXME: This is good for retrieving data for a single category+key, but
-    -- maybe not as good if we want all keys for the category, with a limit on
-    -- time (ie, last 5 entries, or last 2 weeks). Do we need an extra index?
     INDEX (category_id, key_id, insert_time)
 )
 EOC
@@ -377,15 +366,16 @@ EOC
 register_tablecreate( "blobcache", <<'EOC');
 CREATE TABLE blobcache (
     bckey VARCHAR(40) NOT NULL,
-    PRIMARY KEY (bckey),
     dateupdate  DATETIME,
-    value    MEDIUMBLOB
+    value    MEDIUMBLOB,
+
+    PRIMARY KEY (bckey)
 )
 EOC
 
 register_tablecreate( "support", <<'EOC');
 CREATE TABLE support (
-    spid int(10) unsigned NOT NULL auto_increment,
+    spid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     reqtype enum('user','email') default NULL,
     requserid int(10) unsigned NOT NULL default '0',
     reqname varchar(50) default NULL,
@@ -399,7 +389,6 @@ CREATE TABLE support (
     timemodified int(10) unsigned default NULL,
     timeclosed int(10) unsigned default NULL,
 
-    PRIMARY KEY  (spid),
     INDEX (state),
     INDEX (requserid),
     INDEX (reqemail)
@@ -408,7 +397,7 @@ EOC
 
 register_tablecreate( "supportcat", <<'EOC');
 CREATE TABLE supportcat (
-    spcatid int(10) unsigned NOT NULL auto_increment,
+    spcatid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     catkey VARCHAR(25) NOT NULL,
     catname varchar(80) default NULL,
     sortorder mediumint(8) unsigned NOT NULL default '0',
@@ -423,14 +412,13 @@ CREATE TABLE supportcat (
     no_autoreply ENUM('1', '0') NOT NULL DEFAULT '0',
     scope ENUM('general', 'local') NOT NULL DEFAULT 'general',
 
-    PRIMARY KEY  (spcatid),
     UNIQUE (catkey)
 )
 EOC
 
 register_tablecreate( "supportlog", <<'EOC');
 CREATE TABLE supportlog (
-    splid int(10) unsigned NOT NULL auto_increment,
+    splid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     spid int(10) unsigned NOT NULL default '0',
     timelogged int(10) unsigned NOT NULL default '0',
     type enum('req','custom','faqref') default NULL,
@@ -438,7 +426,6 @@ CREATE TABLE supportlog (
     userid int(10) unsigned NOT NULL default '0',
     message text,
 
-    PRIMARY KEY  (splid),
     KEY (spid)
 )
 EOC
@@ -469,10 +456,10 @@ EOC
 register_tablecreate( "supportpointsum", <<'EOC');
 CREATE TABLE supportpointsum (
     userid INT UNSIGNED NOT NULL DEFAULT '0',
-    PRIMARY KEY (userid),
     totpoints MEDIUMINT UNSIGNED DEFAULT 0,
     lastupdate  INT UNSIGNED NOT NULL,
 
+    PRIMARY KEY (userid),
     INDEX (totpoints, lastupdate),
     INDEX (lastupdate)
 )
@@ -484,7 +471,7 @@ post_create( "supportpointsum",
 
 register_tablecreate( "talkproplist", <<'EOC');
 CREATE TABLE talkproplist (
-    tpropid smallint(5) unsigned NOT NULL auto_increment,
+    tpropid smallint(5) unsigned NOT NULL PRIMARY KEY auto_increment,
     name varchar(50) default NULL,
     prettyname varchar(60) default NULL,
     datatype enum('char','num','bool') NOT NULL default 'char',
@@ -492,14 +479,13 @@ CREATE TABLE talkproplist (
     ownership ENUM('system', 'user') NOT NULL default 'user',
     des varchar(255) default NULL,
 
-    PRIMARY KEY  (tpropid),
     UNIQUE KEY name (name)
 )
 EOC
 
 register_tablecreate( "user", <<'EOC');
 CREATE TABLE user (
-    userid int(10) unsigned NOT NULL auto_increment,
+    userid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     user char(25) default NULL,
     caps SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     email char(50) default NULL,
@@ -527,7 +513,6 @@ CREATE TABLE user (
     journaltype char(1) NOT NULL default 'P',
     lang char(2) NOT NULL default 'EN',
 
-    PRIMARY KEY  (userid),
     UNIQUE KEY user (user),
     KEY (email),
     KEY (status),
@@ -609,14 +594,13 @@ EOC
 
 register_tablecreate( "userproplist", <<'EOC');
 CREATE TABLE userproplist (
-    upropid smallint(5) unsigned NOT NULL auto_increment,
+    upropid smallint(5) unsigned NOT NULL PRIMARY KEY auto_increment,
     name varchar(50) default NULL,
     indexed enum('1','0') NOT NULL default '1',
     prettyname varchar(60) default NULL,
     datatype enum('char','num','bool') NOT NULL default 'char',
     des varchar(255) default NULL,
 
-    PRIMARY KEY  (upropid),
     UNIQUE KEY name (name)
 )
 EOC
@@ -674,7 +658,6 @@ register_tablecreate( "log2", <<'EOC');
 CREATE TABLE log2 (
     journalid INT UNSIGNED NOT NULL default '0',
     jitemid MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY  (journalid, jitemid),
     posterid int(10) unsigned NOT NULL default '0',
     eventtime datetime default NULL,
     logtime datetime default NULL,
@@ -689,6 +672,7 @@ CREATE TABLE log2 (
     rlogtime int(10) unsigned NOT NULL default '0',
     revttime int(10) unsigned NOT NULL default '0',
 
+    PRIMARY KEY  (journalid, jitemid),
     KEY (journalid,year,month,day),
     KEY `rlogtime` (`journalid`,`rlogtime`),
     KEY `revttime` (`journalid`,`revttime`),
@@ -939,11 +923,11 @@ post_create( "useridmap",
 register_tablecreate( "userusage", <<'EOC');
 CREATE TABLE userusage (
     userid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid),
     timecreate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     timeupdate DATETIME,
     lastitemid INT UNSIGNED NOT NULL DEFAULT '0',
 
+    PRIMARY KEY (userid),
     INDEX (timeupdate)
 )
 EOC
@@ -957,7 +941,7 @@ post_create(
 
 register_tablecreate( "acctcode", <<'EOC');
 CREATE TABLE acctcode (
-    acid    INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    acid    INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     userid  INT UNSIGNED NOT NULL,
     rcptid  INT UNSIGNED NOT NULL DEFAULT 0,
     auth    CHAR(13) NOT NULL,
@@ -973,7 +957,7 @@ EOC
 
 register_tablecreate( "acctcode_request", <<'EOC');
 CREATE TABLE acctcode_request (
-    reqid   INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    reqid   INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     userid  INT UNSIGNED NOT NULL,
     status ENUM('accepted','rejected', 'outstanding') NOT NULL DEFAULT 'outstanding',
     reason VARCHAR(255),
@@ -1001,10 +985,11 @@ EOC
 
 register_tablecreate( "includetext", <<'EOC');
 CREATE TABLE includetext (
-    incname  VARCHAR(80) NOT NULL PRIMARY KEY,
+    incname  VARCHAR(80) NOT NULL,
     inctext  TEXT,
     updatetime   INT UNSIGNED NOT NULL,
 
+    PRIMARY KEY (incname),
     INDEX (updatetime)
 )
 EOC
@@ -1037,17 +1022,16 @@ register_tablecreate( "dbweights", <<'EOC');
 CREATE TABLE dbweights (
     dbid    TINYINT UNSIGNED NOT NULL,
     role    VARCHAR(25) NOT NULL,
-    PRIMARY KEY (dbid, role),
     norm    TINYINT UNSIGNED NOT NULL,
-    curr    TINYINT UNSIGNED NOT NULL
+    curr    TINYINT UNSIGNED NOT NULL,
+    PRIMARY KEY (dbid, role)
 )
 EOC
 
 # Begin S2 Stuff
 register_tablecreate( "s2layers", <<'EOC');    # global
 CREATE TABLE s2layers (
-    s2lid INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (s2lid),
+    s2lid INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     b2lid INT UNSIGNED NOT NULL,
     userid INT UNSIGNED NOT NULL,
     type ENUM('core','i18nc','layout','theme','i18n','user') NOT NULL,
@@ -1070,16 +1054,18 @@ EOC
 register_tablecreate( "s2source_inno", <<'EOC');    # global
 CREATE TABLE s2source_inno (
     s2lid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (s2lid),
-    s2code MEDIUMBLOB
+    s2code MEDIUMBLOB,
+
+    PRIMARY KEY (s2lid)
 ) ENGINE=InnoDB
 EOC
 
 register_tablecreate( "s2checker", <<'EOC');        # global
 CREATE TABLE s2checker (
     s2lid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (s2lid),
-    checker MEDIUMBLOB
+    checker MEDIUMBLOB,
+
+    PRIMARY KEY (s2lid)
 )
 EOC
 
@@ -1087,9 +1073,10 @@ EOC
 register_tablecreate( "s2compiled", <<'EOC');       # global (compdata is not gzipped)
 CREATE TABLE s2compiled (
     s2lid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (s2lid),
     comptime INT UNSIGNED NOT NULL,
-    compdata MEDIUMBLOB
+    compdata MEDIUMBLOB,
+
+    PRIMARY KEY (s2lid)
 )
 EOC
 
@@ -1100,17 +1087,16 @@ register_tablecreate( "s2compiled2", <<'EOC');    # clustered (compdata is gzipp
 CREATE TABLE s2compiled2 (
     userid INT UNSIGNED NOT NULL,
     s2lid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid, s2lid),
-
     comptime INT UNSIGNED NOT NULL,
-    compdata MEDIUMBLOB
+    compdata MEDIUMBLOB,
+
+    PRIMARY KEY (userid, s2lid)
 )
 EOC
 
 register_tablecreate( "s2styles", <<'EOC');       # global
 CREATE TABLE s2styles (
-    styleid INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (styleid),
+    styleid INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     userid  INT UNSIGNED NOT NULL,
     name    VARCHAR(255),
     modtime INT UNSIGNED NOT NULL,
@@ -1124,8 +1110,9 @@ CREATE TABLE s2stylelayers2 (
     userid  INT UNSIGNED NOT NULL,
     styleid INT UNSIGNED NOT NULL,
     type ENUM('core','i18nc','layout','theme','i18n','user') NOT NULL,
-    PRIMARY KEY (userid, styleid, type),
-    s2lid INT UNSIGNED NOT NULL
+    s2lid INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (userid, styleid, type)
 )
 EOC
 
@@ -1142,10 +1129,10 @@ EOC
 register_tablecreate( "ml_domains", <<'EOC');
 CREATE TABLE ml_domains (
     dmid TINYINT UNSIGNED NOT NULL,
-    PRIMARY KEY (dmid),
     type VARCHAR(30) NOT NULL,
     args VARCHAR(255) NOT NULL DEFAULT '',
 
+    PRIMARY KEY (dmid),
     UNIQUE (type,args)
 )
 EOC
@@ -1154,28 +1141,30 @@ register_tablecreate( "ml_items", <<'EOC');
 CREATE TABLE ml_items (
     dmid    TINYINT UNSIGNED NOT NULL,
     itid    MEDIUMINT UNSIGNED AUTO_INCREMENT NOT NULL,
-    PRIMARY KEY (dmid, itid),
     itcode  VARCHAR(120) CHARACTER SET ascii NOT NULL,
-    UNIQUE  (dmid, itcode),
     proofed TINYINT NOT NULL DEFAULT 0, -- boolean, really
-    INDEX   (proofed),
     updated TINYINT NOT NULL DEFAULT 0, -- boolean, really
-    INDEX   (updated),
     visible TINYINT NOT NULL DEFAULT 0, -- also boolean
-    notes   MEDIUMTEXT
+    notes   MEDIUMTEXT,
+
+    PRIMARY KEY (dmid, itid),
+    UNIQUE  (dmid, itcode),
+    INDEX   (proofed),
+    INDEX   (updated)
 ) ENGINE=MYISAM
 EOC
 
 register_tablecreate( "ml_langs", <<'EOC');
 CREATE TABLE ml_langs (
     lnid      SMALLINT UNSIGNED NOT NULL,
-    UNIQUE (lnid),
     lncode   VARCHAR(16) NOT NULL,
-    UNIQUE (lncode),
     lnname   VARCHAR(60) NOT NULL,
     parenttype   ENUM('diff','sim') NOT NULL,
     parentlnid   SMALLINT UNSIGNED NOT NULL,
-    lastupdate  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    lastupdate  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (lnid),
+    UNIQUE (lncode)
 )
 EOC
 
@@ -1183,12 +1172,13 @@ register_tablecreate( "ml_langdomains", <<'EOC');
 CREATE TABLE ml_langdomains (
     lnid   SMALLINT UNSIGNED NOT NULL,
     dmid   TINYINT UNSIGNED NOT NULL,
-    PRIMARY KEY (lnid, dmid),
     dmmaster ENUM('0','1') NOT NULL,
     lastgetnew DATETIME,
     lastpublish DATETIME,
     countokay    SMALLINT UNSIGNED NOT NULL,
-    counttotal   SMALLINT UNSIGNED NOT NULL
+    counttotal   SMALLINT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (lnid, dmid)
 )
 EOC
 
@@ -1197,10 +1187,11 @@ CREATE TABLE ml_latest (
     lnid     SMALLINT UNSIGNED NOT NULL,
     dmid     TINYINT UNSIGNED NOT NULL,
     itid     SMALLINT UNSIGNED NOT NULL,
-    PRIMARY KEY (lnid, dmid, itid),
     txtid    INT UNSIGNED NOT NULL,
     chgtime  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     staleness  TINYINT UNSIGNED DEFAULT 0 NOT NULL, # better than ENUM('0','1','2');
+
+    PRIMARY KEY (lnid, dmid, itid),
     INDEX (lnid, staleness),
     INDEX (dmid, itid),
     INDEX (lnid, dmid, chgtime),
@@ -1212,19 +1203,19 @@ register_tablecreate( "ml_text", <<'EOC');
 CREATE TABLE ml_text (
     dmid  TINYINT UNSIGNED NOT NULL,
     txtid  INT UNSIGNED AUTO_INCREMENT NOT NULL,
-    PRIMARY KEY (dmid, txtid),
     lnid   SMALLINT UNSIGNED NOT NULL,
     itid   SMALLINT UNSIGNED NOT NULL,
-    INDEX (lnid, dmid, itid),
     text    TEXT NOT NULL,
-    userid  INT UNSIGNED NOT NULL
+    userid  INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (dmid, txtid),
+    INDEX (lnid, dmid, itid)
 ) ENGINE=MYISAM
 EOC
 
 register_tablecreate( "procnotify", <<'EOC');
 CREATE TABLE procnotify (
-    nid   INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (nid),
+    nid   INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     cmd   VARCHAR(50),
     args  VARCHAR(255)
 )
@@ -1260,11 +1251,10 @@ EOC
 
 register_tablecreate( "ratelist", <<'EOC');
 CREATE TABLE ratelist (
-    rlid TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    rlid TINYINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name  varchar(50) not null,
     des varchar(255) not null,
 
-    PRIMARY KEY (rlid),
     UNIQUE KEY (name)
 )
 EOC
@@ -1313,12 +1303,13 @@ register_tablecreate( "sessions", <<'EOC');    # user cluster
 CREATE TABLE sessions (
     userid     MEDIUMINT UNSIGNED NOT NULL,
     sessid     MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid, sessid),
     auth       CHAR(10) NOT NULL,
     exptype    ENUM('short','long') NOT NULL,  # browser closed or "infinite"
     timecreate INT UNSIGNED NOT NULL,
     timeexpire INT UNSIGNED NOT NULL,
-    ipfixed    CHAR(15)  # if null, not fixed at IP.
+    ipfixed    CHAR(15),  # if null, not fixed at IP.
+
+    PRIMARY KEY (userid, sessid)
 )
 EOC
 
@@ -1327,8 +1318,9 @@ CREATE TABLE sessions_data (
     userid     MEDIUMINT UNSIGNED NOT NULL,
     sessid     MEDIUMINT UNSIGNED NOT NULL,
     skey       VARCHAR(30) NOT NULL,
-    PRIMARY KEY (userid, sessid, skey),
-    sval       VARCHAR(255)
+    sval       VARCHAR(255),
+
+    PRIMARY KEY (userid, sessid, skey)
 )
 EOC
 
@@ -1336,15 +1328,15 @@ EOC
 # emailnopay means don't allow payments from that email
 register_tablecreate( "sysban", <<'EOC');
 CREATE TABLE sysban (
-    banid     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (banid),
+    banid     MEDIUMINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     status    ENUM('active','expired') NOT NULL DEFAULT 'active',
-    INDEX     (status),
     bandate   DATETIME,
     banuntil  DATETIME,
     what      VARCHAR(20) NOT NULL,
     value     VARCHAR(80),
-    note      VARCHAR(255)
+    note      VARCHAR(255),
+
+    INDEX     (status)
 )
 EOC
 
@@ -1421,15 +1413,14 @@ post_create(
 
 register_tablecreate( "clustermove", <<'EOC');
 CREATE TABLE clustermove (
-    cmid      INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY (cmid),
+    cmid      INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     userid    INT UNSIGNED NOT NULL,
     KEY (userid),
     sclust    TINYINT UNSIGNED NOT NULL,
     dclust    TINYINT UNSIGNED NOT NULL,
     timestart INT UNSIGNED,
     timedone  INT UNSIGNED,
-    sdeleted  ENUM('1','0')
+    sdeleted  ENUM('1','0'),
 )
 EOC
 
@@ -1438,11 +1429,11 @@ register_tablecreate( "modlog", <<'EOC');
 CREATE TABLE modlog (
     journalid  INT UNSIGNED NOT NULL,
     modid      MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY (journalid, modid),
     posterid   INT UNSIGNED NOT NULL,
     subject    CHAR(30),
     logtime    DATETIME,
 
+    PRIMARY KEY (journalid, modid),
     KEY (journalid, logtime)
 )
 EOC
@@ -1452,8 +1443,9 @@ register_tablecreate( "modblob", <<'EOC');
 CREATE TABLE modblob (
     journalid  INT UNSIGNED NOT NULL,
     modid      INT UNSIGNED NOT NULL,
-    PRIMARY KEY (journalid, modid),
-    request_stor    MEDIUMBLOB
+    request_stor    MEDIUMBLOB,
+
+    PRIMARY KEY (journalid, modid)
 )
 EOC
 
@@ -1462,8 +1454,8 @@ register_tablecreate( "counter", <<'EOC');
 CREATE TABLE counter (
     journalid  INT UNSIGNED NOT NULL,
     area       CHAR(1) NOT NULL,
-    PRIMARY KEY (journalid, area),
-    max        INT UNSIGNED NOT NULL
+    max        INT UNSIGNED NOT NULL,
+    PRIMARY KEY (journalid, area)
 )
 EOC
 
@@ -1472,8 +1464,9 @@ register_tablecreate( "usercounter", <<'EOC');
 CREATE TABLE usercounter (
     journalid  INT UNSIGNED NOT NULL,
     area       CHAR(1) NOT NULL,
-    PRIMARY KEY (journalid, area),
-    max        INT UNSIGNED NOT NULL
+    max        INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (journalid, area)
 )
 EOC
 
@@ -1550,12 +1543,12 @@ post_create(
 register_tablecreate( "clustertrack2", <<'EOC');    # clustered
 CREATE TABLE clustertrack2 (
     userid INT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid),
     timeactive INT UNSIGNED NOT NULL,
     clusterid SMALLINT UNSIGNED,
     accountlevel SMALLINT UNSIGNED,
     journaltype char(1),
 
+    PRIMARY KEY (userid),
     INDEX (timeactive, clusterid)
 )
 EOC
@@ -1793,11 +1786,12 @@ EOC
 # using indexes)
 register_tablecreate( "extuser", <<'EOC');
 CREATE TABLE extuser (
-    userid  INT UNSIGNED NOT NULL PRIMARY KEY,
+    userid  INT UNSIGNED NOT NULL,
     siteid  INT UNSIGNED NOT NULL,
     extuser    VARCHAR(50),
     extuserid  INT UNSIGNED,
 
+    PRIMARY KEY (userid),
     UNIQUE KEY `extuser` (siteid, extuser),
     UNIQUE KEY `extuserid` (siteid, extuserid)
 )
@@ -1885,11 +1879,10 @@ EOC
 
 register_tablecreate( "openid_endpoint", <<'EOC');
 CREATE TABLE openid_endpoint (
-    endpoint_id int(10) unsigned NOT NULL auto_increment,
+    endpoint_id int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     url varchar(255) BINARY NOT NULL default '',
     last_assert_time int(10) unsigned default NULL,
 
-    PRIMARY KEY  (endpoint_id),
     UNIQUE KEY url (url),
     KEY last_assert_time (last_assert_time)
 )
@@ -1932,7 +1925,7 @@ CREATE TABLE oauth_access_token (
     createtime INT UNSIGNED NOT NULL,
     lastaccess INT UNSIGNED,
 
-    PRIMARY KEY consumer_user (consumer_id, userid),
+    PRIMARY KEY (consumer_id, userid),
     UNIQUE KEY (token),
     KEY (userid)
 )
@@ -1940,19 +1933,18 @@ EOC
 
 register_tablecreate( "priv_packages", <<'EOC');
 CREATE TABLE priv_packages (
-    pkgid int(10) unsigned NOT NULL auto_increment,
+    pkgid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     name varchar(255) NOT NULL default '',
     lastmoduserid int(10) unsigned NOT NULL default 0,
     lastmodtime int(10) unsigned NOT NULL default 0,
 
-    PRIMARY KEY (pkgid),
     UNIQUE KEY (name)
 )
 EOC
 
 register_tablecreate( "priv_packages_content", <<'EOC');
 CREATE TABLE priv_packages_content (
-    pkgid int(10) unsigned NOT NULL auto_increment,
+    pkgid int(10) unsigned NOT NULL PRIMARY KEY auto_increment,
     privname varchar(20) NOT NULL,
     privarg varchar(40),
 
@@ -2043,8 +2035,9 @@ CREATE TABLE has_subs (
     etypeid    INT UNSIGNED NOT NULL,
     arg1       INT UNSIGNED NOT NULL,
     arg2       INT UNSIGNED NOT NULL,
-    PRIMARY KEY (journalid, etypeid, arg1, arg2),
-    verifytime   INT UNSIGNED NOT NULL
+    verifytime   INT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (journalid, etypeid, arg1, arg2)
 )
 EOC
 
@@ -2064,10 +2057,8 @@ register_tablecreate( "subs", <<'EOC');
 CREATE TABLE subs (
     userid   INT UNSIGNED NOT NULL,
     subid    INT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid, subid),
 
     is_dirty   TINYINT UNSIGNED NULL,
-    INDEX (is_dirty),
 
     journalid  INT UNSIGNED NOT NULL,
     etypeid    SMALLINT UNSIGNED NOT NULL,
@@ -2078,17 +2069,19 @@ CREATE TABLE subs (
 
     createtime INT UNSIGNED NOT NULL,
     expiretime INT UNSIGNED NOT NULL DEFAULT 0,
-    flags      SMALLINT UNSIGNED NOT NULL DEFAULT 0
+    flags      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (userid, subid),
+    INDEX (is_dirty)
 )
 EOC
 
 # unlike other *proplist tables, this one is auto-populated by app
 register_tablecreate( "subsproplist", <<'EOC');
 CREATE TABLE subsproplist (
-    subpropid  SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    subpropid  SMALLINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name       VARCHAR(255) DEFAULT NULL,
 
-    PRIMARY KEY (subpropid),
     UNIQUE KEY (name)
 )
 EOC
@@ -2099,8 +2092,9 @@ CREATE TABLE subsprop (
     userid    INT      UNSIGNED NOT NULL,
     subid     INT      UNSIGNED NOT NULL,
     subpropid SMALLINT UNSIGNED NOT NULL,
-    PRIMARY KEY (userid, subid, subpropid),
-    value     VARCHAR(255) BINARY DEFAULT NULL
+    value     VARCHAR(255) BINARY DEFAULT NULL,
+
+    PRIMARY KEY (userid, subid, subpropid)
 )
 EOC
 
@@ -2125,7 +2119,7 @@ EOC
 
 register_tablecreate( "sch_funcmap", <<'EOC');
 CREATE TABLE sch_funcmap (
-    funcid         INT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    funcid         INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     funcname       VARCHAR(255) NOT NULL,
 
     UNIQUE(funcname)
@@ -2134,7 +2128,7 @@ EOC
 
 register_tablecreate( "sch_job", <<'EOC');
 CREATE TABLE sch_job (
-    jobid           BIGINT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    jobid           BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     funcid          INT UNSIGNED NOT NULL,
     arg             MEDIUMBLOB,
     uniqkey         VARCHAR(255) NULL,
@@ -2154,8 +2148,9 @@ register_tablecreate( "sch_note", <<'EOC');
 CREATE TABLE sch_note (
     jobid           BIGINT UNSIGNED NOT NULL,
     notekey         VARCHAR(255),
-    PRIMARY KEY (jobid, notekey),
-    value           MEDIUMBLOB
+    value           MEDIUMBLOB,
+
+    PRIMARY KEY (jobid, notekey)
 )
 EOC
 
@@ -2172,22 +2167,24 @@ EOC
 
 register_tablecreate( "sch_exitstatus", <<'EOC');
 CREATE TABLE sch_exitstatus (
-    jobid           BIGINT UNSIGNED PRIMARY KEY NOT NULL,
+    jobid           BIGINT UNSIGNED NOT NULL,
     status          SMALLINT UNSIGNED,
     completion_time INTEGER UNSIGNED,
     delete_after    INTEGER UNSIGNED,
 
+    PRIMARY KEY (jobid),
     INDEX (delete_after)
 )
 EOC
 
 register_tablecreate( "usersearch_packdata", <<'EOC');
 CREATE TABLE usersearch_packdata (
-    userid      INT UNSIGNED NOT NULL PRIMARY KEY,
+    userid      INT UNSIGNED NOT NULL,
     packed      CHAR(8) BINARY,
     mtime       INT UNSIGNED NOT NULL,
     good_until  INT UNSIGNED,
 
+    PRIMARY KEY (userid),
     INDEX (mtime),
     INDEX (good_until)
 )
@@ -2209,17 +2206,21 @@ EOC
 
 register_tablecreate( "password", <<'EOC');
 CREATE TABLE password (
-    userid    INT UNSIGNED NOT NULL PRIMARY KEY,
-    password  VARCHAR(50)
+    userid    INT UNSIGNED NOT NULL,
+    password  VARCHAR(50),
+
+    PRIMARY KEY (userid)
 )
 EOC
 
 register_tablecreate( "password2", <<'EOC');
 CREATE TABLE password2 (
-    userid      INT UNSIGNED NOT NULL PRIMARY KEY,
+    userid      INT UNSIGNED NOT NULL,
     version     INT UNSIGNED NOT NULL,
     password    VARCHAR(255) NOT NULL,
-    totp_secret VARCHAR(255)
+    totp_secret VARCHAR(255),
+
+    PRIMARY KEY (userid)
 )
 EOC
 
@@ -2237,18 +2238,20 @@ EOC
 
 register_tablecreate( "email", <<'EOC');
 CREATE TABLE email (
-    userid    INT UNSIGNED NOT NULL PRIMARY KEY,
+    userid    INT UNSIGNED NOT NULL,
     email     VARCHAR(50),
 
+    PRIMARY KEY (userid),
     INDEX     (email)
 )
 EOC
 
 register_tablecreate( "dirmogsethandles", <<'EOC');
 CREATE TABLE dirmogsethandles (
-    conskey  char(40) PRIMARY KEY,
+    conskey  char(40),
     exptime  INT UNSIGNED NOT NULL,
 
+    PRIMARY KEY (conskey),
     INDEX    (exptime)
 )
 EOC
@@ -2256,9 +2259,10 @@ EOC
 # global pollid -> userid map
 register_tablecreate( "pollowner", <<'EOC');
 CREATE TABLE pollowner (
-    pollid    INT UNSIGNED NOT NULL PRIMARY KEY,
+    pollid    INT UNSIGNED NOT NULL,
     journalid INT UNSIGNED NOT NULL,
 
+    PRIMARY KEY (pollid),
     INDEX (journalid)
 )
 EOC
@@ -2512,7 +2516,7 @@ EOC
 
 register_tablecreate( "sch_mass_funcmap", <<'EOC');
 CREATE TABLE sch_mass_funcmap (
-    funcid         INT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    funcid         INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     funcname       VARCHAR(255) NOT NULL,
 
     UNIQUE(funcname)
@@ -2521,7 +2525,7 @@ EOC
 
 register_tablecreate( "sch_mass_job", <<'EOC');
 CREATE TABLE sch_mass_job (
-    jobid           BIGINT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    jobid           BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     funcid          INT UNSIGNED NOT NULL,
     arg             MEDIUMBLOB,
     uniqkey         VARCHAR(255) NULL,
@@ -2541,8 +2545,9 @@ register_tablecreate( "sch_mass_note", <<'EOC');
 CREATE TABLE sch_mass_note (
     jobid           BIGINT UNSIGNED NOT NULL,
     notekey         VARCHAR(255),
-    PRIMARY KEY (jobid, notekey),
-    value           MEDIUMBLOB
+    value           MEDIUMBLOB,
+
+    PRIMARY KEY (jobid, notekey)
 )
 EOC
 
@@ -2559,11 +2564,12 @@ EOC
 
 register_tablecreate( "sch_mass_exitstatus", <<'EOC');
 CREATE TABLE sch_mass_exitstatus (
-    jobid           BIGINT UNSIGNED PRIMARY KEY NOT NULL,
+    jobid           BIGINT UNSIGNED NOT NULL,
     status          SMALLINT UNSIGNED,
     completion_time INTEGER UNSIGNED,
     delete_after    INTEGER UNSIGNED,
 
+    PRIMARY KEY (jobid),
     INDEX (delete_after)
 )
 EOC
@@ -2724,7 +2730,7 @@ EOC
 
 register_tablecreate( 'pp_tokens', <<'EOC');
 CREATE TABLE pp_tokens (
-    ppid int unsigned not null auto_increment,
+    ppid int unsigned not null PRIMARY KEY auto_increment,
     inittime int unsigned not null,
     touchtime int unsigned not null,
     cartid int unsigned not null,
@@ -2736,7 +2742,6 @@ CREATE TABLE pp_tokens (
     lastname varchar(255),
     payerid varchar(255),
 
-    primary key (ppid),
     unique (cartid),
     index (token)
 )
@@ -2856,7 +2861,7 @@ EOC
 # and make your own which you might have to do.
 register_tablecreate( 'cc_trans', <<'EOC');
 CREATE TABLE cc_trans (
-    cctransid int unsigned not null auto_increment,
+    cctransid int unsigned not null PRIMARY KEY auto_increment,
     cartid int unsigned not null,
 
     gctaskref varchar(255),
@@ -2886,7 +2891,6 @@ CREATE TABLE cc_trans (
     phone varchar(40),
     ipaddr varchar(15) not null,
 
-    primary key (cctransid),
     index (cartid)
 )
 EOC
@@ -2917,7 +2921,7 @@ EOC
 
 register_tablecreate( 'renames', <<'EOC');
 CREATE TABLE renames (
-    renid INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    renid INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     auth CHAR(13) NOT NULL,
     cartid INT UNSIGNED,
     ownerid INT UNSIGNED NOT NULL,
@@ -3013,13 +3017,13 @@ EOC
 
 register_tablecreate( "media_prop_list", <<'EOC');
 CREATE TABLE `media_prop_list` (
-  `propid` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
+  `propid` smallint(5) unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT,
   `name` varchar(50) DEFAULT NULL,
   `prettyname` varchar(60) DEFAULT NULL,
   `ownership` enum('system','user') NOT NULL DEFAULT 'user',
   `scope` enum('general','local') NOT NULL DEFAULT 'general',
   `des` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`propid`),
+
   UNIQUE KEY `name` (`name`)
 )
 EOC
@@ -3059,19 +3063,19 @@ EOC
 register_tablecreate( "dbnotes", <<'EOC');
 CREATE TABLE dbnotes (
     dbnote VARCHAR(40) NOT NULL,
-    PRIMARY KEY (dbnote),
-    value VARCHAR(255)
+    value VARCHAR(255),
+
+    PRIMARY KEY (dbnote)
 )
 EOC
 
 register_tablecreate( "captcha_cache", <<'EOC');
 CREATE TABLE captcha_cache (
-    `captcha_id` INT UNSIGNED NOT NULL auto_increment,
+    `captcha_id` INT UNSIGNED NOT NULL PRIMARY KEY auto_increment,
     `question`   VARCHAR(255) NOT NULL,
     `answer`     VARCHAR(255) NOT NULL,
     `issuetime`  INT UNSIGNED NOT NULL DEFAULT 0,
 
-    PRIMARY KEY (`captcha_id`),
     INDEX(`issuetime`)
 )
 EOC
@@ -3109,20 +3113,20 @@ EOC
 
 register_tablecreate( "key_prop_list", <<'EOC');
 CREATE TABLE `key_prop_list` (
-  `propid` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
+  `propid` smallint(5) unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT,
   `name` varchar(50) DEFAULT NULL,
   `prettyname` varchar(60) DEFAULT NULL,
   `ownership` enum('system','user') NOT NULL DEFAULT 'user',
   `scope` enum('general','local') NOT NULL DEFAULT 'general',
   `des` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`propid`),
+
   UNIQUE KEY `name` (`name`)
 )
 EOC
 
 register_tablecreate( "profile_services", <<'EOC');
 CREATE TABLE profile_services (
-    service_id MEDIUMINT(8) UNSIGNED NOT NULL AUTO_INCREMENT,
+    service_id MEDIUMINT(8) UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(40) NOT NULL,
     userprop VARCHAR(40),
     imgfile VARCHAR(40) NOT NULL,
@@ -3130,7 +3134,6 @@ CREATE TABLE profile_services (
     url_format VARCHAR(255),
     maxlen TINYINT(3) UNSIGNED NOT NULL,
 
-    PRIMARY KEY (service_id),
     UNIQUE KEY (name)
 )
 EOC
@@ -3301,20 +3304,6 @@ register_alter(
         #allow longer moodtheme pic URLs
         if ( column_type( "moodthemedata", "picurl" ) eq "varchar(100)" ) {
             do_alter( "moodthemedata", "ALTER TABLE moodthemedata MODIFY picurl VARCHAR(200)" );
-        }
-
-        # change interest.interest key to being unique, if it's not already
-        {
-            my $sth = $dbh->prepare("SHOW INDEX FROM interests");
-            $sth->execute;
-            while ( my $i = $sth->fetchrow_hashref ) {
-                if ( $i->{'Key_name'} eq "interest" && $i->{'Non_unique'} ) {
-                    do_alter( "interests",
-                              "ALTER IGNORE TABLE interests "
-                            . "DROP INDEX interest, ADD UNIQUE interest (interest)" );
-                    last;
-                }
-            }
         }
 
         if ( column_type( "supportcat", "scope" ) eq "" ) {

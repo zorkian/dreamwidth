@@ -31,6 +31,8 @@ use URI;
 
 use fields ( 'env', 'req', 'req_addr', 'res', 'res_body', 'res_length' );
 
+$DW::Request::PLACK_AVAILABLE = 1;
+
 BEGIN {
     # Do initialization for pass-throughs that will go to the Plack::Request
     # object inside
