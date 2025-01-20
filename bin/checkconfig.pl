@@ -104,7 +104,6 @@ sub check_modules {
             push @mods, $dt->{ver} ? "$mod\@$dt->{ver}" : $mod;
             next;
         }
-	print "$mod -> $@\n";
 
         my $ver_want = $modules{$mod}{ver};
         my $ver_got  = $mod->VERSION;

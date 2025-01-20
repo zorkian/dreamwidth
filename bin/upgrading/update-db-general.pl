@@ -1041,7 +1041,7 @@ CREATE TABLE s2layers (
 )
 EOC
 
-register_tablecreate( "s2info", <<'EOC');    # global
+register_tablecreate( "s2info", <<'EOC');      # global
 CREATE TABLE s2info (
     s2lid INT UNSIGNED NOT NULL,
     infokey   VARCHAR(80) NOT NULL,
@@ -1446,6 +1446,17 @@ CREATE TABLE modblob (
     request_stor    MEDIUMBLOB,
 
     PRIMARY KEY (journalid, modid)
+)
+EOC
+
+# modern counter table with integer index and domain, which can
+# be used to replace other uses if we want.
+register_tablecreate( "counter2", <<'EOC');
+CREATE TABLE counter2 (
+    domainid  INT UNSIGNED NOT NULL,
+    counterid INT UNSIGNED NOT NULL,
+    max       INT UNSIGNED NOT NULL,
+    PRIMARY KEY (counterid, subid)
 )
 EOC
 
