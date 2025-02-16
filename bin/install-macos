@@ -23,6 +23,14 @@ export LIBRARY_PATH="$(brew --prefix)/lib:$(brew --prefix imagemagick)/lib:$LIBR
 export CPATH="$(brew --prefix)/include:$(brew --prefix imagemagick)/include/ImageMagick-7:$CPATH"
 export PERL5LIB="$LJHOME/extlib/lib/perl5"
 
+# Install DBD::mysql which doesn't install cleanly using cpanm/cpm, due to
+# library shenanigans
+cpanm -n -L $LJHOME/extlib \
+	--configure-args="--libs=\"-L$(brew --prefix mysql-client@8.4)/lib \
+	                  -L$(brew --prefix)/lib \
+			  -lmysqlclient -lz  -lzstd  -lssl  -lcrypto -lresolv\"" \
+	DBD::mysql
+
 # install cpm with cpanminus
 cpanm -n -L $LJHOME/extlib App::cpm || die "Failed to install cpm"
 

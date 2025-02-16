@@ -24,13 +24,15 @@ my $log = Log::Log4perl->get_logger(__PACKAGE__);
 
 use parent qw/ Plack::Middleware /;
 
-use DW::Request;
+use Carp qw/ confess /;
 use URI;
+
+use DW::Request;
 
 sub call {
     my ( $self, $env ) = @_;
 
-    my $r = DW::Request->get( plack_env => $env );
+    my $r    = DW::Request->get;
     my $host = $r->host;
     my $path = $r->path;
     my $args = $r->query_parameters;
@@ -75,7 +77,7 @@ sub call {
             }
             else {
                 # Simpler redirect, we're dropping arguments and such here
-                return $r->redirect( $root );
+                return $r->redirect($root);
             }
         }
     }

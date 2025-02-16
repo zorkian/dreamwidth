@@ -94,14 +94,14 @@ sub address {
     my DW::Request::Plack $self = $_[0];
     return $self->{req_addr} // $self->{req}->address if scalar @_ == 1;
 
-    $log->info('Address set to ', $_[1]);
+    $log->info( 'Address set to ', $_[1] );
     return $self->{req_addr} = $_[1];
 }
 
 # return host
 sub host {
     my DW::Request::Plack $self = $_[0];
-    return $self->header_in( 'Host' );
+    return $self->header_in('Host');
 }
 
 # set the status
@@ -144,10 +144,11 @@ sub query_parameters {
 # return a new response that is a redirect
 sub redirect {
     my DW::Request::Plack $self = $_[0];
+
     # This is a 303 because we want to be explicit that when we do a redirect we expect
     # the user-agent to switch to a GET; this is an old assumption baked into the LJ/DW
     # code now made explicit here.
-    return Plack::Response->new(303, { 'Location' => $_[1] }, '' )->finalize;
+    return Plack::Response->new( 303, { 'Location' => $_[1] }, '' )->finalize;
 }
 
 # assemble a URL for something
@@ -156,7 +157,7 @@ sub uri_for {
     my ( $path, $args ) = ( $_[1], $_[2] );
 
     my $uri = $self->{req}->base;
-    $uri->path($uri->path . $path);
+    $uri->path( $uri->path . $path );
     $uri->query_form(@$args) if %$args;
     return $uri;
 }

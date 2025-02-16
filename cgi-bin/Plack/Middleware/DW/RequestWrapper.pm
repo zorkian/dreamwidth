@@ -24,6 +24,8 @@ my $log = Log::Log4perl->get_logger(__PACKAGE__);
 
 use parent qw/ Plack::Middleware /;
 
+use DW::Request;
+
 sub call {
     my ( $self, $env ) = @_;
 
@@ -33,7 +35,7 @@ sub call {
     LJ::Procnotify::check();
 
     # Standardize into a DW::Request module
-    DW::Request::Plack->new($env);
+    DW::Request->get( plack_env => $env );
 
     # Pass on down
     $log->debug('Request wrapped.');

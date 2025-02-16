@@ -31,7 +31,7 @@ use DW::Routing;
 BEGIN {
     # If we're a DEV server, do some configuration
     $LJ::IS_DEV_SERVER = 1 if $ENV{LJ_IS_DEV_SERVER};
-    $^W = 1 if $LJ::IS_DEV_SERVER;
+    $^W                = 1 if $LJ::IS_DEV_SERVER;
 
     # Configure S2
     S2::set_domain('LJ');
@@ -55,9 +55,9 @@ my $app = sub {
     # such, but until then, we're having to dispatch between various generations
     # of systems ourselves.
     my $uri = $r->path;
-    $log->debug('Routing for URI: ', $uri);
+    $log->debug( 'Routing for URI: ', $uri );
     if ( $uri =~ qr!^/api/v\d+/! ) {
-        DW::Routing->call(uri => $uri);
+        DW::Routing->call( uri => $uri );
     }
 
     return $r->res;
@@ -69,15 +69,15 @@ builder {
     # to be allowed; this will abort any calls that are methods that not accepted
     enable 'Options', allowed => [qw /DELETE GET HEAD POST PUT/];
 
+    # Manages start/end request and things we might want to do around the entire
+    # request lifecycle such as logging, resource checking, etc
+    enable 'DW::RequestWrapper';
+
     # Middleware for doing domain redirect management, i.e., we want to ensure that the
     # user has ended up on the right domain (www.dreamwidth.org instead of dreamwidth.co.uk
     # and the like), is also responsible for managing redirect.dat etc
     # TODO: still need to implement redirect.dat
     enable 'DW::Redirects';
-
-    # Manages start/end request and things we might want to do around the entire
-    # request lifecycle such as logging, resource checking, etc
-    enable 'DW::RequestWrapper';
 
     if ($LJ::IS_DEV_SERVER) {
         enable 'DW::Dev';

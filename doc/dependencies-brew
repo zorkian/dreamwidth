@@ -3,3 +3,7 @@ glib
 gpg
 gd
 cpanminus
+perl
+openssl@3
+mysql-client@8.4
+mysql@8.4
