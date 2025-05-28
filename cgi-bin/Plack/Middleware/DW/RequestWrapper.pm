@@ -35,7 +35,7 @@ sub call {
     LJ::Procnotify::check();
 
     # Standardize into a DW::Request module
-    DW::Request->get( plack_env => $env );
+    my $r = DW::Request->get( plack_env => $env );
 
     # Pass on down
     $log->debug('Request wrapped.');
