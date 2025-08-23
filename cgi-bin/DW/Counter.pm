@@ -22,7 +22,7 @@ use v5.10;
 use Log::Log4perl;
 my $log = Log::Log4perl->get_logger(__PACKAGE__);
 
-use DW::Schema;
+use Carp qw/ confess /;
 
 # Single-letter domain values are for livejournal-generic code.
 #  - 0-9 are reserved for site-local hooks and are mapped from a long

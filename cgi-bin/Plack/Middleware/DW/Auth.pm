@@ -21,3 +21,4 @@ package Plack::Middleware::DW::Auth;
 use strict;
 use v5.10;
 
+1;
