@@ -100,6 +100,20 @@ sub render_body {
             . LJ::Lang::ml('/login.bml.login.forget2')
             . "</a>\n";
         $ret .= "</fieldset>\n";
+        
+        # Add MFA field if needed
+        if ( $opts{need_mfa} ) {
+            $ret .= "<fieldset class='pkg nostyle'>\n";
+            $ret .=
+                  "<label for='mfa_code' class='left'>"
+                . "Authentication Code"
+                . "</label>\n";
+            $ret .=
+    "<input type='text' id='mfa_code' name='mfa_code' class='text' size='20' maxlength='20' tabindex='12.5' placeholder='000000 or recovery code' />\n";
+            $ret .= "<span class='small-text'>Enter the 6-digit code from your authenticator app or a recovery code.</span>\n";
+            $ret .= "</fieldset>\n";
+        }
+        
         $ret .=
 "<p><input type='checkbox' name='remember_me' id='remember_me' value='1' tabindex='13' /> <label for='remember_me'>Remember me</label></p>";
 
