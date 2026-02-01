@@ -30,13 +30,15 @@ use UUID::Tiny qw/ :std /;
 use DW::Task;
 
 sub init {
-    my $class = $_[0];
+    my ( $class, %opts ) = @_;
 
-    $log->debug("Initializing taskqueue for LocalDisk");
+    my $path = $opts{path} || "$LJ::HOME/var/taskqueue";
 
-    mkdir("$LJ::HOME/var/taskqueue") unless -d "$LJ::HOME/var/taskqueue";
+    $log->debug("Initializing taskqueue for LocalDisk at $path");
 
-    my $self = { path => "$LJ::HOME/var/taskqueue", queues => {} };
+    mkdir($path) unless -d $path;
+
+    my $self = { path => $path, queues => {} };
     return bless $self, $class;
 }
 
