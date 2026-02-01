@@ -70,12 +70,9 @@ if ( $len > IN_MEMORY_THRES ) {
     $msg = "ie:$md5";
 }
 
-my $h = DW::TaskQueue->dispatch(
-    TheSchwartz::Job->new(
-        funcname => "LJ::Worker::IncomingEmail",
-        arg      => $msg,
-    ),
-);
+use DW::Task::IncomingEmail;
+
+my $h = DW::TaskQueue->dispatch( DW::Task::IncomingEmail->new($msg) );
 exit 0 if $h;
 exit 75;    # temporary error
 
