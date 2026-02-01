@@ -35,8 +35,14 @@ my %workers = (
     'dw-latest-feed'      => [ 1, 1,  512, 256, 50, ],
     'dw-lazy-cleanup'     => [ 1, 1,  512, 256, 50, ],
     'dw-mass-privacy'     => [ 1, 1,  512, 256, 50, ],
-    'dw-sphinx-copier'    => [ 1, 50, 512, 256, 50, ],
-    'dw-synsuck'          => [ 1, 20, 512, 256, 50, ],
+    'dw-change-poster-id'   => [ 1, 1,  512, 256, 50, ],
+    'dw-distribute-invites' => [ 1, 1,  512, 256, 50, ],
+    'dw-embed-worker'       => [ 1, 15, 512, 256, 50, ],
+    'dw-incoming-email'     => [ 1, 1,  512, 256, 50, ],
+    'dw-sphinx-copier'      => [ 1, 50, 512, 256, 50, ],
+    'dw-support-notify'     => [ 1, 1,  512, 256, 50, ],
+    'dw-synsuck'            => [ 1, 20, 512, 256, 50, ],
+    'dw-xpost'              => [ 1, 1,  512, 256, 50, ],
 
     # Old style ESN workers, mostly deprecated, we keep one each around just
     # in case something ends up in the queue

@@ -20,16 +20,22 @@ on:
         - content-importer-verify
         - directory-meta
         - distribute-invites
+        - dw-change-poster-id
+        - dw-distribute-invites
+        - dw-embed-worker
         - dw-esn-cluster-subs
         - dw-esn-filter-subs
         - dw-esn-fired-event
         - dw-esn-process-sub
+        - dw-incoming-email
         - dw-latest-feed
         - dw-lazy-cleanup
         - dw-mass-privacy
         - dw-send-email
         - dw-sphinx-copier
+        - dw-support-notify
         - dw-synsuck
+        - dw-xpost
         - embeds
         - esn-cluster-subs
         - esn-filter-subs
@@ -151,6 +157,33 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
+      - name: (dw-change-poster-id) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-change-poster-id'
+        id: render-worker-container-dw-change-poster-id
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-change-poster-id-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
+      - name: (dw-distribute-invites) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-distribute-invites'
+        id: render-worker-container-dw-distribute-invites
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-distribute-invites-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
+      - name: (dw-embed-worker) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-embed-worker'
+        id: render-worker-container-dw-embed-worker
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-embed-worker-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
       - name: (dw-esn-cluster-subs) Render Amazon ECS task definition
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-esn-cluster-subs'
         id: render-worker-container-dw-esn-cluster-subs
@@ -184,6 +217,15 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ".github/workflows/tasks/worker-dw-esn-process-sub-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
+      - name: (dw-incoming-email) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-incoming-email'
+        id: render-worker-container-dw-incoming-email
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-incoming-email-service.json"
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
@@ -232,12 +274,30 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
+      - name: (dw-support-notify) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-support-notify'
+        id: render-worker-container-dw-support-notify
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-support-notify-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
       - name: (dw-synsuck) Render Amazon ECS task definition
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-synsuck'
         id: render-worker-container-dw-synsuck
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ".github/workflows/tasks/worker-dw-synsuck-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
+      - name: (dw-xpost) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-xpost'
+        id: render-worker-container-dw-xpost
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-xpost-service.json"
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
@@ -494,6 +554,30 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-distribute-invites-service"
 
+      - name: (dw-change-poster-id) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-change-poster-id'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-change-poster-id.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-change-poster-id-service"
+
+      - name: (dw-distribute-invites) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-distribute-invites'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-distribute-invites.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-distribute-invites-service"
+
+      - name: (dw-embed-worker) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-embed-worker'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-embed-worker.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-embed-worker-service"
+
       - name: (dw-esn-cluster-subs) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-esn-cluster-subs'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -525,6 +609,14 @@ jobs:
           task-definition: ${{ steps.render-worker-container-dw-esn-process-sub.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-dw-esn-process-sub-service"
+
+      - name: (dw-incoming-email) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-incoming-email'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-incoming-email.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-incoming-email-service"
 
       - name: (dw-latest-feed) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-latest-feed'
@@ -566,6 +658,14 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-dw-sphinx-copier-service"
 
+      - name: (dw-support-notify) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-support-notify'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-support-notify.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-support-notify-service"
+
       - name: (dw-synsuck) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-synsuck'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -573,6 +673,14 @@ jobs:
           task-definition: ${{ steps.render-worker-container-dw-synsuck.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-dw-synsuck-service"
+
+      - name: (dw-xpost) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-xpost'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-xpost.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-xpost-service"
 
       - name: (embeds) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'embeds'
