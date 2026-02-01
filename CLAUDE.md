@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dreamwidth is a Perl-based journaling/blogging platform forked from LiveJournal. It runs on Apache mod_perl with MySQL, Memcached, and TheSchwartz job queue. All code must be GPL-licensed.
+Dreamwidth is a Perl-based journaling/blogging platform forked from LiveJournal. It runs on Apache mod_perl with MySQL, Memcached, and SQS-based job queue. All code must be GPL-licensed.
 
 ## Development Environment
 
@@ -108,7 +108,7 @@ Media/blob storage via `DW::BlobStore` with pluggable backends: S3, MogileFS, or
 
 ### Job Queue
 
-Background processing via `DW::TaskQueue` with pluggable backends: SQS (`DW::TaskQueue::SQS`) or local disk (`DW::TaskQueue::LocalDisk`). Tasks are defined in `DW::Task::*`. Legacy jobs use TheSchwartz. Worker scripts in `bin/worker/`.
+Background processing via `DW::TaskQueue` with pluggable backends: SQS (`DW::TaskQueue::SQS`) or local disk (`DW::TaskQueue::LocalDisk`). Tasks are defined in `DW::Task::*`. Deduplication via `DW::TaskQueue::Dedup` (memcache-based). Worker scripts in `bin/worker/`.
 
 ## Troubleshooting
 

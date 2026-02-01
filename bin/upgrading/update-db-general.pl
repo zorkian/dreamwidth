@@ -3802,7 +3802,7 @@ q{ALTER TABLE shop_carts ADD COLUMN nextscan INT UNSIGNED NOT NULL DEFAULT 0 AFT
 We need to do an update of tag security metadata.  This is an UNSAFE update
 and we request that you shut off your site.
 
-Please turn off TheSchwartz workers, Gearman workers, Apache processes, and
+Please turn off TaskQueue workers, Gearman workers, Apache processes, and
 anything else that can touch the database.
 
 Once you are done doing that, please press ENTER to proceed.

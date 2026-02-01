@@ -84,8 +84,6 @@ use Time::Local    ();
 use Storable       ();
 use Compress::Zlib ();
 use DW::Request;
-use TheSchwartz;
-use TheSchwartz::Job;
 use LJ::Comment;
 use LJ::Message;
 use LJ::ConvUTF8;
@@ -257,28 +255,6 @@ sub gearman_client {
     $client->job_servers(@LJ::GEARMAN_SERVERS);
 
     return $client;
-}
-
-sub theschwartz {
-    return LJ::Test->theschwartz(@_) if $LJ::_T_FAKESCHWARTZ;
-
-    my $opts = shift;
-
-    my $role = $opts->{role} || "default";
-
-    return $LJ::SchwartzClient{$role} if $LJ::SchwartzClient{$role};
-
-    unless ( scalar grep { defined $_->{role} } @LJ::THESCHWARTZ_DBS ) {    # old config
-        $LJ::SchwartzClient{$role} = TheSchwartz->new( databases => \@LJ::THESCHWARTZ_DBS );
-        return $LJ::SchwartzClient{$role};
-    }
-
-    my @dbs = grep { $_->{role}->{$role} } @LJ::THESCHWARTZ_DBS;
-    die "Unknown role in LJ::theschwartz: '$role'" unless @dbs;
-
-    $LJ::SchwartzClient{$role} = TheSchwartz->new( databases => \@dbs );
-
-    return $LJ::SchwartzClient{$role};
 }
 
 sub gtop {

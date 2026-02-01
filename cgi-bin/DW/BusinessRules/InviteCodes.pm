@@ -101,7 +101,7 @@ Important note: this can return $max_nusers userids, even though $max_nusers is
 defined as "too many" by max_users(). This is so the caller can tell "too many"
 from "just the number we wanted".
 
-This function should be called from TheSchwartz only.
+This function should be called from DW::TaskQueue only.
 
 The default implementation just returns a bunch of random userids for personal
 journals (not deleted or suspended) with validated email addresses. Note that

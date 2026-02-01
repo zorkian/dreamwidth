@@ -149,7 +149,7 @@ sub _add_wt_edge {
     LJ::memcache_kill( $to_userid,   'watched_by' );
     LJ::memcache_kill( $to_userid,   'trusted_by' );
 
-    # fire notifications if we have theschwartz
+    # fire notifications
     my $notify =
           !$from_u->equals($to_u)
         && $from_u->is_visible
@@ -231,7 +231,7 @@ sub _del_wt_edge {
     LJ::memcache_kill( $to_u,   'trusted_by' );
     LJ::MemCache::delete( [ $from_u->id, "trustmask:" . $from_u->id . ":" . $to_u->id ] );
 
-    # fire notifications if we have theschwartz
+    # fire notifications
     my $notify =
           !$from_u->equals($to_u)
         && $from_u->is_visible

@@ -27,10 +27,6 @@ use Carp qw(croak);
 use DateTime;
 use DW::Task::MassPrivacy;
 
-sub schwartz_capabilities {
-    return qw(LJ::Worker::MassPrivacy);
-}
-
 # enqueue job to update privacy
 sub enqueue_job {
     my ( $class, %opts ) = @_;
@@ -187,36 +183,6 @@ sub handle {
             . $privacy{ $opts->{e_security} } );
 
     return 1;
-}
-
-# Schwartz job for processing changes to privacy en masse
-package LJ::Worker::MassPrivacy;
-use base 'TheSchwartz::Worker';
-
-use LJ::MassPrivacy;
-
-sub work {
-    my ( $class, $job ) = @_;
-
-    my $opts = $job->arg;
-
-    unless ($opts) {
-        $job->failed;
-        return;
-    }
-
-    LJ::MassPrivacy->handle($opts);
-
-    return $job->completed;
-}
-
-sub keep_exit_status_for { 0 }
-sub grab_for             { 300 }
-sub max_retries          { 5 }
-
-sub retry_delay {
-    my ( $class, $fails ) = @_;
-    return ( 10, 30, 60, 300, 600 )[$fails];
 }
 
 1;

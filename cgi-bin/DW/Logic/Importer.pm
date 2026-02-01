@@ -220,7 +220,7 @@ sub set_import_data_for_user {
 
     # this is a hack, but we use it until we get a better frontend.  we abort all
     # existing import jobs if they schedule a new one.  this won't actually stop any
-    # TheSchwartz jobs that are in progress, of course, but that should be okay
+    # TaskQueue jobs that are in progress, of course, but that should be okay
     $dbh->do(
         q{UPDATE import_items SET status = 'aborted'
           WHERE userid = ? AND status IN ('init', 'ready', 'queued')},

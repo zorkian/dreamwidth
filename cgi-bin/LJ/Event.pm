@@ -263,13 +263,6 @@ sub u             { LJ::load_userid( $_[0]->{userid} ) }
 sub arg1          { $_[0]->{args}[0] }
 sub arg2          { $_[0]->{args}[1] }
 
-# class method
-sub process_fired_events {
-    my $class = shift;
-    croak("Can't call in web context") if LJ::is_web_context();
-    LJ::ESN->process_fired_events;
-}
-
 # instance method.
 # fire either logs the event to the delayed work system to be
 # processed later, or does nothing, if it's a rare event and there
@@ -279,26 +272,6 @@ sub fire {
     # The TaskQueue knows how to convert us to an appropriate job or task and
     # schedule is in the correct place.
     return DW::TaskQueue->dispatch( $_[0] ) ? 1 : 0;
-}
-
-# returns the job object that would've fired, so callers can batch them together
-# in one insert_jobs (plural) call.  returns empty list or single item.  doesn't
-# return undef.
-sub fire_job {
-    my $self = shift;
-
-    if ( my $val = $LJ::DEBUG{'firings'} ) {
-        if ( ref $val eq "CODE" ) {
-            $val->($self);
-        }
-        else {
-            warn $self->as_string . "\n";
-        }
-    }
-
-    return unless $self->should_enqueue;
-
-    return TheSchwartz::Job->new_from_array( "LJ::Worker::FiredEvent", [ $self->raw_params ] );
 }
 
 sub fire_task {

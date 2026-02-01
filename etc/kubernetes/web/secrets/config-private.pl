@@ -26,14 +26,6 @@
                },
     );
 
-    # Schwartz DB configuration
-    @THESCHWARTZ_DBS = (
-            {
-                dsn => 'dbi:mysql:dw_schwartz;host=mysql',
-                user => 'root',
-                pass => 'password',
-            },
-        );
 
     # Configuration of BlobStore. This is the new storage abstraction used to
     # store any blobs (images, userpics, media, etc) that need storage. For small
