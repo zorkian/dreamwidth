@@ -355,6 +355,8 @@
     $SITENAMEABBREV = "TST";
 
     $BOGUS_EMAIL = "bogus\@$DOMAIN";
+
+    @MEMCACHE_SERVERS = ('127.0.0.1:11211');
 }
 
 1;
