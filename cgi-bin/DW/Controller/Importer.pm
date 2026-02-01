@@ -20,6 +20,8 @@ use strict;
 use warnings;
 
 use DW::Routing;
+use DW::Task::ImportEraser;
+use DW::TaskQueue::Dedup;
 use DW::Template;
 use LJ::Hooks;
 
@@ -370,28 +372,10 @@ sub render_status {
                 $i->{status_txt} = LJ::Lang::ml("widget.importstatus.status.$i->{status}");
 
                 if ( $i->{status} eq "aborted" ) {
-                    unless ($dbr) {
-
-                        # do manual connection
-                        my $db = $LJ::THESCHWARTZ_DBS[0];
-                        $dbr = DBI->connect( $db->{dsn}, $db->{user}, $db->{pass} );
-                    }
-
-                    if ($dbr) {
-
-                        # get the ids for the function map
-                        $funcmap ||=
-                            $dbr->selectall_hashref( 'SELECT funcid, funcname FROM funcmap',
-                            'funcname' );
-
-                        $dupect = $dbr->selectrow_array(
-                            q{SELECT COUNT(*) from job
-                                    WHERE funcid  = ?
-                                      AND uniqkey = ? },
-                            undef, $funcmap->{ $item_to_funcname->{$item} }->{funcid},
-                            join( "-", ( $item, $vars->{u}->id ) )
-                        );
-                    }
+                    $dupect = DW::TaskQueue::Dedup->is_pending(
+                        'DW::Task::ContentImporter',
+                        join( "-", ( $item, $vars->{u}->id ) )
+                    );
                 }
             }
 
@@ -405,40 +389,10 @@ sub render_status {
 }
 
 sub get_queue {
-    my $depth = LJ::MemCache::get('importer_queue_depth');
-    unless ($depth) {
 
-        # FIXME: don't make this slam the db with people asking the same question, use a lock
-        # FIXME: we don't have ddlockd, maybe we should
-
-        # do manual connection
-        my $db  = $LJ::THESCHWARTZ_DBS[0];
-        my $dbr = DBI->connect( $db->{dsn}, $db->{user}, $db->{pass} )
-            or return "Unable to manually connect to TheSchwartz database.";
-
-        # get the ids for the function map
-        my $tmpmap = $dbr->selectall_hashref( 'SELECT funcid, funcname FROM funcmap', 'funcname' );
-
-        # get the counts of jobs in queue (active or not)
-        my %cts;
-        foreach my $map ( keys %$tmpmap ) {
-            next unless $map =~ /^DW::Worker::ContentImporter::LiveJournal::/;
-
-            my $ct = $dbr->selectrow_array(
-                q{SELECT COUNT(*) FROM job
-                  WHERE funcid = ?
-                    AND run_after < UNIX_TIMESTAMP()},
-                undef, $tmpmap->{$map}->{funcid}
-            ) + 0;
-
-            $map =~ s/^.+::(\w+)$/$1/;
-            $cts{ lc $map } = $ct;
-        }
-
-        LJ::MemCache::set( 'importer_queue_depth', \%cts, 300 );
-        $depth = \%cts;
-    }
-    return $depth;
+    # Queue depth is no longer available now that we've migrated from
+    # TheSchwartz to SQS-based DW::TaskQueue.
+    return {};
 }
 
 sub erase_handler {
@@ -475,8 +429,7 @@ sub erase_handler {
 
     # Confirmed, let's schedule.
     DW::TaskQueue->dispatch(
-        TheSchwartz::Job->new_from_array(
-            'DW::Worker::ImportEraser',
+        DW::Task::ImportEraser->new(
             {
                 userid => $rv->{u}->userid
             }

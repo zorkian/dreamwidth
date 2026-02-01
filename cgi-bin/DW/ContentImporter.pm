@@ -7,7 +7,7 @@
 # Authors:
 #      Andrea Nall <anall@andreanall.com>
 #
-# Copyright (c) 2009 by Dreamwidth Studios, LLC.
+# Copyright (c) 2009-2026 by Dreamwidth Studios, LLC.
 #
 # This program is free software; you may redistribute it and/or modify it under
 # the same terms as Perl itself.  For a copy of the license, please reference
@@ -25,6 +25,8 @@ DW::ContentImporter - Web backend functions for Content Importing
 use strict;
 use Carp qw/ croak /;
 use DW::XML::Parser;
+use DW::Task::ContentImporter;
+use DW::TaskQueue::Dedup;
 
 =head1 API
 
@@ -48,43 +50,46 @@ sub queue_import {
     return undef
         if $class->current_job($u);
 
-    my $sh = LJ::theschwartz()
-        or croak 'content importer requires TheSchwartz';
+    my $uniqkey = "import-" . $u->id;
+    my $rv      = DW::TaskQueue->dispatch(
+        DW::Task::ContentImporter->new(
+            {
+                _worker_class => $importer,
+                %$data,
+                target => $u->id,
+            },
+            {
+                _task_opts => 1,
+                uniqkey    => $uniqkey,
+                dedup_ttl  => 86400,
+            }
+        )
+    );
 
-    my $new_job = TheSchwartz::Job->new(
-        funcname => $importer,
-        uniqkey  => "import-" . $u->id,
-        arg      => {
-            %$data, target => $u->id
-        }
-    ) or croak 'unable to create importer job';
+    croak 'unable to dispatch importer task' unless $rv;
 
-    my $h = $sh->insert($new_job)
-        or croak 'unable to insert importer job';
-
-    my $jobid = $h->dsn_hashed . "-" . $h->jobid;
-    $u->set_prop( import_job => $jobid );
-    return $h;
+    $u->set_prop( import_job => $uniqkey );
+    return $rv;
 }
 
 =head2 C<< $class->current_job( $user ); >>
 
-This function returns the current import job for the user.
+This function returns whether an import job is currently pending for the user.
 
 =cut
 
 sub current_job {
     my ( $class, $u ) = @_;
     $u = LJ::want_user($u)
-        or croak 'invalid user object passed to queue_import';
+        or croak 'invalid user object passed to current_job';
 
     my $jobid = $u->prop('import_job')
         or return undef;
 
-    my $sh = LJ::theschwartz()
-        or croak 'unable to contact TheSchwartz';
-    my $job = eval { $sh->lookup_job($jobid); };
-    return $job if $job;
+    # Check if the dedup key exists (meaning a job is still pending/running)
+    if ( DW::TaskQueue::Dedup->is_pending( 'DW::Task::ContentImporter', $jobid ) ) {
+        return 1;
+    }
 
     # Job seems to not exist
     $u->set_prop( import_job => '' );
