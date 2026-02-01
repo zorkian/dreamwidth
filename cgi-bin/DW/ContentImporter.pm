@@ -58,11 +58,8 @@ sub queue_import {
                 %$data,
                 target => $u->id,
             },
-            {
-                _task_opts => 1,
-                uniqkey    => $uniqkey,
-                dedup_ttl  => 86400,
-            }
+            uniqkey   => $uniqkey,
+            dedup_ttl => 86400,
         )
     );
 

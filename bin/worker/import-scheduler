@@ -134,11 +134,8 @@ sub worker {
                     userid         => $u->id,
                     import_data_id => $item->{impid},
                 },
-                {
-                    _task_opts => 1,
-                    uniqkey    => "import:$uniqkey",
-                    dedup_ttl  => 86400,
-                }
+                uniqkey   => "import:$uniqkey",
+                dedup_ttl => 86400,
             )
         );
 

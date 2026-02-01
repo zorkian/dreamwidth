@@ -68,11 +68,8 @@ sub work {
         my $rv = DW::TaskQueue->dispatch(
             DW::Task::SynSuck->new(
                 { userid => $row },
-                {
-                    _task_opts => 1,
-                    uniqkey    => "synsuck:$row",
-                    dedup_ttl  => 1800,
-                }
+                uniqkey   => "synsuck:$row",
+                dedup_ttl => 1800,
             )
         );
 
