@@ -44,14 +44,6 @@ use Net::Subnet;
                },
     );
 
-    # Schwartz DB configuration
-    @THESCHWARTZ_DBS = (
-            {
-                dsn => 'dbi:mysql:dw_schwartz;host=localhost',
-                user => 'dw',
-                pass => 'dw',
-            },
-        );
 
     # MemCache information, if you have MemCache servers running
     @MEMCACHE_SERVERS = ('127.0.0.1:11211');

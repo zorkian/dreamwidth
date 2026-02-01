@@ -125,7 +125,6 @@ LJ::Hooks::register_hook(
             styleview     => "Access to private styles on /customize/advanced",
             support       => "Access to /admin/supportcat",
             themes        => "Access to /admin/themes",
-            theschwartz   => "Access to /admin/theschwartz",
             usernames     => "Bypasses is_protected_username check",
             userpics      => "Access to expunge_userpic console command",
             users         => "Access to change_journal_status console command",

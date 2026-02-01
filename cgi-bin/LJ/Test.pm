@@ -38,42 +38,6 @@ END {
     }
 }
 
-$LJ::_T_FAKESCHWARTZ = 1 unless $LJ::_T_NOFAKESCHWARTZ;
-my $theschwartz = undef;
-
-sub theschwartz {
-    return $theschwartz if $theschwartz;
-
-    my $fakedb = "$LJ::HOME/t-theschwartz.sqlite";
-    unlink $fakedb, "$fakedb-journal";
-    my $fakedsn = "dbi:SQLite:dbname=$fakedb";
-
-    my $load_sql = sub {
-        my ($file) = @_;
-        open my $fh, $file or die "Can't open $file: $!";
-        my $sql = do { local $/; <$fh> };
-        close $fh;
-        split /;\s*/, $sql;
-    };
-
-    my $dbh = DBI->connect( $fakedsn, '', '', { RaiseError => 1, PrintError => 0 } );
-    my @sql = $load_sql->("$LJ::HOME/t/data/schema-sqlite.sql");
-    for my $sql (@sql) {
-        $dbh->do($sql);
-    }
-    $dbh->disconnect;
-
-    return $theschwartz = TheSchwartz->new(
-        databases => [
-            {
-                dsn  => $fakedsn,
-                user => '',
-                pass => '',
-            }
-        ]
-    );
-}
-
 sub temp_user {
     shift() if defined( $_[0] ) and $_[0] eq __PACKAGE__;
     my %args        = @_;

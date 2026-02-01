@@ -64,7 +64,6 @@ Test::Most
 Text::Fuzzy@0.27
 Text::Markdown
 Text::Wrap@2013.0523
-TheSchwartz
 URI::Fetch
 UUID::Tiny
 Unicode::CheckUTF8

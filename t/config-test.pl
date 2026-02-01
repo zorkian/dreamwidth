@@ -43,13 +43,6 @@
     @LANGS           = qw( en );
     @CLUSTERS        = ( 1, 2 );    # eg: (1, 2, 3) (for scalability)
     $DEFAULT_CLUSTER = [ 1, 2 ];
-    @THESCHWARTZ_DBS = (
-        {
-            dsn  => "dbi:mysql:$DW::PRIVATE::DBINFO{theschwartz}->{dbname};host=localhost",
-            user => $DW::PRIVATE::DBINFO{theschwartz}->{user},
-            pass => $DW::PRIVATE::DBINFO{theschwartz}->{pass},
-        }
-    );
 
     ## CAPABILITIES ##
     # capability class limits.

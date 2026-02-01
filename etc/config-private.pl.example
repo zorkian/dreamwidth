@@ -57,14 +57,6 @@ use Net::Subnet;
                #},
     );
 
-    # Schwartz DB configuration
-    @THESCHWARTZ_DBS = (
-            {
-                dsn => 'dbi:mysql:dw_schwartz;host=localhost', # CHANGETHIS if on Dreamhack to dreamhack_username instead of dw_schwartz
-                user => 'dw', # CHANGETHIS if on Dreamhack to dh_username
-                pass => 'password',     # CHANGETHIS
-            },
-        );
 
     # allow changelog posting.  this allows unauthenticated posts to the changelog
     # community from the IP and users specified.  this does not work on its own,
@@ -268,10 +260,6 @@ use Net::Subnet;
     #    master => {
     #        pass => ,
     #    },
-    #);
-
-    #%THESCHWARTZ_DBS = (
-    #    pass => ,
     #);
 
     #%RECAPTCHA = (

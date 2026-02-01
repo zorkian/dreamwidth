@@ -37,7 +37,6 @@ use Digest::MD5 qw/ md5_hex /;
 use LJ::Protocol;
 use LJ::Talk;
 
-use base 'TheSchwartz::Worker';
 
 =head1 Saving API
 

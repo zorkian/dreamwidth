@@ -71,14 +71,9 @@ sub dispatch {
 
     $self = $self->get unless ref $self;
 
-    # This is a shim function that inspects the tasks being sent and dispatches
-    # them to the appropriate task queueing system.
-    my ( @schwartz_jobs, @tsq_tasks );
+    my @tsq_tasks;
     foreach my $task (@tasks) {
-        if ( $task->isa('TheSchwartz::Job') ) {
-            push @schwartz_jobs, $task;
-        }
-        elsif ( $task->isa('DW::Task') ) {
+        if ( $task->isa('DW::Task') ) {
 
             # Check dedup before enqueuing
             if ( my $uniqkey = $task->uniqkey ) {
@@ -92,45 +87,17 @@ sub dispatch {
             push @tsq_tasks, $task;
         }
         elsif ( $task->isa('LJ::Event') ) {
-
-            # Do the TSQ check, because these tasks could go either way, and we
-            # want to be able to ramp up the traffic slowly.
-            if ( $LJ::ESN_OVER_SQS && rand() < $LJ::ESN_OVER_SQS ) {
-                push @tsq_tasks, $task->fire_task;
-            }
-            else {
-                push @schwartz_jobs, $task->fire_job;
-            }
+            push @tsq_tasks, $task->fire_task;
         }
         else {
-            $log->error( 'Unknown job/task type, dropping: ' . ref($task) );
+            $log->error( 'Unknown task type, dropping: ' . ref($task) );
         }
     }
 
-    my $rv = 1;
+    return 1 unless @tsq_tasks;
 
-    # Dispatch to Schwartz
-    if (@schwartz_jobs) {
-        if ( my $sclient = LJ::theschwartz() ) {
-            $log->debug( 'Inserting ' . scalar(@schwartz_jobs) . ' jobs into TheSchwartz.' );
-            $rv &&= $sclient->insert_jobs(@schwartz_jobs);
-        }
-        else {
-            $log->warn( 'Failed to retrieve TheSchwartz client, dropping '
-                    . scalar(@schwartz_jobs)
-                    . ' jobs.' );
-        }
-    }
-
-    # Dispatch to TaskQueue
-    if (@tsq_tasks) {
-        $log->debug( 'Inserting ' . scalar(@tsq_tasks) . ' tasks into TaskQueue.' );
-        $rv &&= $self->send(@tsq_tasks);
-    }
-
-    # Returns the "worse" of the return values. If either are falsey, we will
-    # return a false value.
-    return $rv;
+    $log->debug( 'Inserting ' . scalar(@tsq_tasks) . ' tasks into TaskQueue.' );
+    return $self->send(@tsq_tasks);
 }
 
 sub start_work {

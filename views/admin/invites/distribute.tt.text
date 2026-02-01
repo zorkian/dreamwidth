@@ -1,7 +1,7 @@
 ;; -*- coding: utf-8 -*-
 .btn.distribute=Distribute
 
-.error.cantinsertjob=Unable to start TheSchwartz job for invite codes distribution.
+.error.cantinsertjob=Unable to start job for invite codes distribution.
 
 .error.noinvites=Cannot distribute 0 invites!
 

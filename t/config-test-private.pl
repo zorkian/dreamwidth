@@ -20,12 +20,6 @@
             user   => "testuser",
             pass   => "",
         },
-
-        theschwartz => {
-            dbname => "test_schwartz",
-            user   => "testuser",
-            pass   => "",
-        }
     );
 }
 
