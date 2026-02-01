@@ -21,12 +21,14 @@ on:
         - directory-meta
         - distribute-invites
         - dw-change-poster-id
+        - dw-content-importer
         - dw-distribute-invites
         - dw-embed-worker
         - dw-esn-cluster-subs
         - dw-esn-filter-subs
         - dw-esn-fired-event
         - dw-esn-process-sub
+        - dw-import-eraser
         - dw-incoming-email
         - dw-latest-feed
         - dw-lazy-cleanup
@@ -166,6 +168,15 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
+      - name: (dw-content-importer) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-content-importer'
+        id: render-worker-container-dw-content-importer
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-content-importer-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
       - name: (dw-distribute-invites) Render Amazon ECS task definition
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-distribute-invites'
         id: render-worker-container-dw-distribute-invites
@@ -217,6 +228,15 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ".github/workflows/tasks/worker-dw-esn-process-sub-service.json"
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
+
+      - name: (dw-import-eraser) Render Amazon ECS task definition
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-import-eraser'
+        id: render-worker-container-dw-import-eraser
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ".github/workflows/tasks/worker-dw-import-eraser-service.json"
           container-name: ${{ env.CONTAINER_NAME }}
           image: "${{ env.IMAGE_BASE }}@${{ github.event.inputs.tag }}"
 
@@ -562,6 +582,14 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-dw-change-poster-id-service"
 
+      - name: (dw-content-importer) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-content-importer'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-content-importer.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-content-importer-service"
+
       - name: (dw-distribute-invites) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-distribute-invites'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -609,6 +637,14 @@ jobs:
           task-definition: ${{ steps.render-worker-container-dw-esn-process-sub.outputs.task-definition }}
           cluster: ${{ env.ECS_CLUSTER }}
           service: "worker-dw-esn-process-sub-service"
+
+      - name: (dw-import-eraser) Deploy to Amazon ECS service
+        if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-import-eraser'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-worker-container-dw-import-eraser.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: "worker-dw-import-eraser-service"
 
       - name: (dw-incoming-email) Deploy to Amazon ECS service
         if: github.event.inputs.service == 'ALL WORKERS (*)' || github.event.inputs.service == 'dw-incoming-email'
