@@ -22,6 +22,7 @@ use Digest::MD5 qw(md5_hex);
 
 use LJ::Sysban;
 use LJ::Faq;
+use DW::Task::SupportNotify;
 
 # Constants
 my $SECONDS_IN_DAY = 3600 * 24;
@@ -1102,8 +1103,7 @@ sub mini_auth {
 sub support_notify {
     my $params = shift;
 
-    my $h = DW::TaskQueue->dispatch(
-        TheSchwartz::Job->new_from_array( "LJ::Worker::SupportNotify", $params ) );
+    my $h = DW::TaskQueue->dispatch( DW::Task::SupportNotify->new($params) );
     return $h ? 1 : 0;
 }
 
