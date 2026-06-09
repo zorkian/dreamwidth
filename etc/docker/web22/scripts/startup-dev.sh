@@ -17,6 +17,5 @@ perl -I$LJHOME/extlib/ $LJHOME/bin/upgrading/texttool.pl load
 # Validate that the system is set up and working correctly.
 perl -I$LJHOME/extlib/ $LJHOME/bin/checkconfig.pl
 
-# Kick off Apache
-cp $LJHOME/ext/local/dreamwidth-dev.conf $LJHOME/ext/local/etc/apache2/sites-enabled/dreamwidth.conf
-/usr/sbin/apache2ctl -DFOREGROUND
+# Kick off Starman in the foreground (port 8080)
+perl $LJHOME/bin/starman --port 8080
