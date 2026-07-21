@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    if: github.repository == 'dreamwidth/dreamwidth'
+    if: github.repository == 'dreamwidth/dreamwidth' || github.repository == 'zorkian/dreamwidth'
 
     runs-on: ubuntu-latest
     container:
