@@ -77,6 +77,7 @@ sub rendered_vars {
 subtest 'saving a non-empty heading' => sub {
     plan tests => 2;
     save_form( title => 'My Heading', content => 'Some content' );
+
     is( $u->prop('customtext_title'), 'My Heading', 'heading is saved' );
     ok( !$u->prop('customtext_title_blank'), 'blank flag is not set' );
 };
@@ -84,6 +85,7 @@ subtest 'saving a non-empty heading' => sub {
 subtest 'saving a blank heading' => sub {
     plan tests => 2;
     save_form( title => '', content => 'Some content' );
+
     ok( !$u->prop('customtext_title'), 'previous heading is cleared' );
     is( $u->prop('customtext_title_blank'), 1, 'blank flag is set' );
 };
@@ -91,6 +93,7 @@ subtest 'saving a blank heading' => sub {
 subtest 'saving a non-empty heading after a blank one' => sub {
     plan tests => 2;
     save_form( title => 'My Heading', content => 'Some content' );
+
     is( $u->prop('customtext_title'), 'My Heading', 'heading is saved' );
     ok( !$u->prop('customtext_title_blank'), 'blank flag is cleared' );
 };
@@ -99,6 +102,7 @@ subtest 'resetting customization' => sub {
     plan tests => 2;
     save_form( title => '', content => 'Some content' );
     reset_form();
+
     is( $u->prop('customtext_title'), undef, 'heading is cleared' );
     ok( !$u->prop('customtext_title_blank'), 'blank flag is cleared' );
 };
@@ -110,6 +114,7 @@ $u->set_prop( stylesys => 1 );
 subtest 'redisplaying a saved blank heading' => sub {
     plan tests => 1;
     save_form( title => '', content => 'Some content' );
+
     my $vars = rendered_vars();
     is( $vars->{custom_text_title}, '', 'heading field stays blank' );
 };
@@ -117,6 +122,7 @@ subtest 'redisplaying a saved blank heading' => sub {
 subtest 'redisplaying a saved non-empty heading' => sub {
     plan tests => 1;
     save_form( title => 'My Heading', content => 'Some content' );
+
     my $vars = rendered_vars();
     is( $vars->{custom_text_title}, 'My Heading', 'heading field shows the saved heading' );
 };
@@ -125,6 +131,7 @@ subtest 'redisplaying a heading that was never customized' => sub {
     plan tests => 1;
     $u->clear_prop('customtext_title');
     $u->clear_prop('customtext_title_blank');
+
     my $vars = rendered_vars();
     is( $vars->{custom_text_title}, 'Custom Text', 'heading field shows the default text' );
 };
@@ -134,8 +141,10 @@ subtest 'page building resolves the heading' => sub {
 
     $u->clear_prop('customtext_title');
     $u->clear_prop('customtext_title_blank');
+
     my $title = LJ::S2::resolve_customtext_title( $u, fake_ctx() );
     is( $title, $STYLE_HEADING, 'unset heading falls back to the style default' );
+
     my $persisted = $u->prop('customtext_title');
     is( $persisted, $STYLE_HEADING, 'style default is persisted' );
 
@@ -147,6 +156,7 @@ subtest 'page building resolves the heading' => sub {
     $u->set_prop( customtext_title_blank => 1 );
     $title = LJ::S2::resolve_customtext_title( $u, fake_ctx() );
     is( $title, '', 'deliberately blank heading stays blank' );
+
     ok( !$u->prop('customtext_title'), 'blank heading is not overwritten' );
 
     $u->set_prop( customtext_title => 'My Heading' );
@@ -159,11 +169,10 @@ subtest 'S2 rendering of the custom text module' => sub {
     plan tests => 6;
 
     # compile the real core2 layer in memory, the same way update-db.pl does
-    my $source = do {
-        open( my $fh, '<', "$ENV{LJHOME}/styles/core2.s2" ) or die "open core2.s2: $!";
-        local $/;
-        <$fh>;
-    };
+    open( my $fh, '<', "$ENV{LJHOME}/styles/core2.s2" ) or die "open core2.s2: $!";
+    my $source = do { local $/; <$fh> };
+    close($fh);
+
     my $compiled;
     my $cplr = S2::Compiler->new( { checker => S2::Checker->new } );
     $cplr->compile_source(
@@ -176,12 +185,14 @@ subtest 'S2 rendering of the custom text module' => sub {
             builtinPackage => 'S2::Builtin::LJ',
         }
     );
+
     S2::set_domain('customtext-test');
     eval $compiled;
     die "compiling core2.s2 failed: $@" if $@;
-    my $ctx = S2::make_context( [990001] );
 
+    my $ctx = S2::make_context( [990001] );
     my $out = '';
+
     S2::set_output( sub { $out .= $_[0] } );
     S2::set_output_safe( sub { $out .= $_[0] } );
 
@@ -205,6 +216,7 @@ subtest 'S2 rendering of the custom text module' => sub {
         'customtext_url'     => '',
         'customtext_content' => 'Some custom content',
     };
+
     $out = '';
     S2::run_function( $ctx, 'print_module_customtext()' );
     unlike( $out, qr{<h2}, 'module prints no heading when the title is blank' );

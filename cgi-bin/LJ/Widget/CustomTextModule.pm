@@ -61,11 +61,11 @@ sub render_body {
     if ( $u->prop('customtext_title_blank') ) {
         $custom_text_title = '';
     }
+    elsif ( $u->prop('customtext_title') ne '' ) {
+        $custom_text_title = $u->prop('customtext_title');
+    }
     else {
-        $custom_text_title =
-              $u->prop('customtext_title') ne ''
-            ? $u->prop('customtext_title')
-            : "Custom Text";
+        $custom_text_title = "Custom Text";
     }
     my $custom_text_url = $u->prop('customtext_url') || $module_custom_text_url{override};
     my $custom_text_content =
