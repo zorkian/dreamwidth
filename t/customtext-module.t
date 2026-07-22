@@ -99,7 +99,7 @@ subtest 'resetting customization' => sub {
     plan tests => 2;
     save_form( title => '', content => 'Some content' );
     reset_form();
-    ok( !$u->prop('customtext_title'), 'heading is cleared' );
+    is( $u->prop('customtext_title'), undef, 'heading is cleared' );
     ok( !$u->prop('customtext_title_blank'), 'blank flag is cleared' );
 };
 
@@ -136,7 +136,8 @@ subtest 'page building resolves the heading' => sub {
     $u->clear_prop('customtext_title_blank');
     my $title = LJ::S2::resolve_customtext_title( $u, fake_ctx() );
     is( $title, $STYLE_HEADING, 'unset heading falls back to the style default' );
-    is( $u->prop('customtext_title'), $STYLE_HEADING, 'style default is persisted' );
+    my $persisted = $u->prop('customtext_title');
+    is( $persisted, $STYLE_HEADING, 'style default is persisted' );
 
     $u->set_prop( customtext_title => 'Custom Text' );
     $title = LJ::S2::resolve_customtext_title( $u, fake_ctx() );
@@ -193,8 +194,8 @@ subtest 'S2 rendering of the custom text module' => sub {
 
     $out = '';
     S2::run_function( $ctx, $open_module, 'customtext', '', '', 0 );
-    unlike( $out, qr{<h2}, 'blank title prints no heading element' );
     like( $out, qr{<div class="module-customtext module">}, 'module wrapper is still printed' );
+    unlike( $out, qr{<h2}, 'blank title prints no heading element' );
     like( $out, qr{<div class="module-content">}, 'module content wrapper is still printed' );
 
     no warnings 'once';
