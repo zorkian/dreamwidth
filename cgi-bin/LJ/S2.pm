@@ -2339,6 +2339,22 @@ sub Null {
     };
 }
 
+# returns the title to display for the custom text module: a heading that was
+# deliberately saved blank stays blank, while an unset or legacy default heading
+# is replaced with (and persisted as) the style's own default heading
+sub resolve_customtext_title {
+    my ( $u, $ctx ) = @_;
+
+    return '' if $u->prop('customtext_title_blank');
+
+    my $title = $u->prop('customtext_title');
+    if ( !defined $title || $title eq '' || $title eq "Custom Text" ) {
+        $title = $ctx->[S2::PROPS]->{text_module_customtext};
+        $u->set_prop( 'customtext_title', $title );
+    }
+    return $title;
+}
+
 sub Page {
     my ( $u, $opts ) = @_;
     my $styleid  = $u->{'_s2styleid'} + 0;
@@ -2406,12 +2422,7 @@ sub Page {
     unless ( $u->prop('customtext_url') ) {
         $u->set_prop( 'customtext_url', $opts->{ctx}->[S2::PROPS]->{text_module_customtext_url} );
     }
-    if (   !defined $u->prop('customtext_title')
-        || $u->prop('customtext_title') eq ''
-        || $u->prop('customtext_title') eq "Custom Text" )
-    {
-        $u->set_prop( 'customtext_title', $opts->{ctx}->[S2::PROPS]->{text_module_customtext} );
-    }
+    my $customtext_title = resolve_customtext_title( $u, $opts->{ctx} );
 
     my $r = DW::Request->get;
     my $p = {
@@ -2438,7 +2449,7 @@ sub Page {
             memories => "$LJ::SITEROOT/tools/memories?user=$u->{user}",
         },
         'linklist'            => $linklist,
-        'customtext_title'    => escape_prop_value_ret( $u->prop('customtext_title'), 'plain' ),
+        'customtext_title'    => escape_prop_value_ret( $customtext_title, 'plain' ),
         'customtext_url'      => escape_prop_value_ret( $u->prop('customtext_url'), 'plain' ),
         'customtext_content'  => escape_prop_value_ret( $u->prop('customtext_content'), 'html' ),
         'views_order'         => [ 'recent', 'archive', 'read', 'tags', 'memories', 'userinfo' ],

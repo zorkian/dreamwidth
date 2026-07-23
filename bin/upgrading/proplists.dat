@@ -150,6 +150,14 @@ userproplist.customtext_title:
   multihomed: 0
   prettyname: Text for the 'Custom Text' heading
 
+userproplist.customtext_title_blank:
+  cldversion: 4
+  datatype: bool
+  des: Whether the 'Custom Text' heading has deliberately been left blank
+  indexed: 0
+  multihomed: 0
+  prettyname: 'Custom Text' heading deliberately left blank
+
 userproplist.customtext_url:
   cldversion: 4
   datatype: char
