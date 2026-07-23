@@ -23,9 +23,9 @@ use Test::More;
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use LJ::Test qw(temp_user);
-use LJ::S2 ();
+use LJ::S2                       ();
 use LJ::Widget::CustomTextModule ();
-use DW::Template ();
+use DW::Template                 ();
 
 my $STYLE_HEADING = 'Style Default Heading';
 
@@ -193,7 +193,7 @@ subtest 'S2 rendering of the custom text module' => sub {
     my $ctx = S2::make_context( [990001] );
     my $out = '';
 
-    S2::set_output( sub { $out .= $_[0] } );
+    S2::set_output( sub      { $out .= $_[0] } );
     S2::set_output_safe( sub { $out .= $_[0] } );
 
     my $open_module = 'open_module(string,string,string,bool)';
