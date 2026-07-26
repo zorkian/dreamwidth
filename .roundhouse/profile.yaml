@@ -1,6 +1,30 @@
-version: 1
+version: 2
+
+workflow: workflow.yaml
+
 paths:
   allowed:
     - "**"
   protected:
     - ".github/workflows/**"
+
+merge:
+  mode: automatic
+  method: merge
+
+permissions:
+  operators:
+    repository_permissions:
+      - admin
+      - maintain
+      - write
+    users: []
+    teams: []
+
+instructions: {}
+
+validation:
+  commands: []
+
+development_environment:
+  devcontainer: .devcontainer/devcontainer.json

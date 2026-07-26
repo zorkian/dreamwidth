@@ -1,0 +1,281 @@
+version: 1
+
+triggers:
+  github.issue.started: qualify
+
+nodes:
+  qualify:
+    executor: agent.read
+    role: qualify
+    agent:
+      task: qualification
+      inputs:
+        issue: trigger.issue
+      result:
+        key: qualification
+        schema: roundhouse.qualification.v1
+      model:
+        id: openai/gpt-5.6-sol
+        reasoning: low
+      prompt: prompts/qualification.md
+    capabilities:
+      - repository.read
+      - context.read
+      - research.public
+    outputs:
+      - qualification.classification
+    transitions:
+      - when:
+          path: output.qualification.classification
+          in:
+            - bug
+            - feature
+            - maintenance
+        to: investigate
+      - when:
+          path: output.qualification.classification
+          equals: unclear
+        wait: clarification
+      - terminal: succeeded
+
+  investigate:
+    executor: agent.read
+    role: investigate
+    agent:
+      task: investigation
+      inputs:
+        issue: trigger.issue
+        qualification: nodes.qualify.qualification
+      result:
+        key: reproduction
+        schema: roundhouse.investigation.v1
+      model:
+        id: openai/gpt-5.6-sol
+        reasoning: low
+      prompt: prompts/investigation.md
+    capabilities:
+      - repository.read
+      - context.read
+      - research.public
+    outputs:
+      - reproduction.status
+    transitions:
+      - when:
+          path: output.reproduction.status
+          equals: confirmed
+        to: plan
+      - when:
+          path: output.reproduction.status
+          in:
+            - not_reproduced
+            - blocked
+        wait: clarification
+      - terminal: failed
+
+  plan:
+    executor: agent.read
+    role: plan
+    agent:
+      task: planning
+      inputs:
+        issue: trigger.issue
+        qualification: nodes.qualify.qualification
+        reproduction: nodes.investigate.reproduction
+      result:
+        key: plan
+        schema: roundhouse.plan.v1
+      model:
+        id: openai/gpt-5.6-sol
+        reasoning: low
+      prompt: prompts/planning.md
+    capabilities:
+      - repository.read
+      - context.read
+      - research.public
+    outputs:
+      - plan.status
+    transitions:
+      - when:
+          path: output.plan.status
+          equals: ready
+        to: implement
+      - when:
+          path: output.plan.status
+          equals: needs_clarification
+        wait: clarification
+      - terminal: failed
+
+  implement:
+    executor: agent.write
+    role: implement
+    agent:
+      task: implementation
+      inputs:
+        issue: trigger.issue
+        qualification: nodes.qualify.qualification
+        reproduction: nodes.investigate.reproduction
+        plan: nodes.plan.plan
+        implementation: nodes.implement.implementation
+        review: nodes.review.review
+        ci: nodes.checks.ci
+      result:
+        key: implementation
+        schema: roundhouse.implementation.v1
+      model:
+        id: moonshotai/kimi-k3
+        reasoning: low
+      prompt: prompts/implementation.md
+    capabilities:
+      - repository.read
+      - artifact.write
+      - commands.execute
+      - network.project
+      - preview.capture
+    outputs:
+      - implementation.screenshots
+    transitions:
+      - when:
+          all:
+            - path: attempt.changed
+              equals: false
+            - path: attempt.hasScreenshots
+              equals: true
+        terminal: succeeded
+      - when:
+          exists: attempt.acceptedHead
+        to: review
+      - terminal: failed
+
+  review:
+    executor: review
+    role: review
+    review:
+      reviewers:
+        - id: review-holistic
+          label: Holistic design review
+          activation: always
+          selects:
+            - review-security
+            - review-data
+          mode: blocking
+          blocking_severities:
+            - critical
+            - high
+            - medium
+          model:
+            id: openai/gpt-5.6-sol
+            reasoning: low
+          prompt: prompts/review-holistic.md
+        - id: review-security
+          label: Security review
+          activation: selected
+          selected_by: review-holistic
+          mode: blocking
+          blocking_severities:
+            - critical
+            - high
+            - medium
+          model:
+            id: openai/gpt-5.6-sol
+            reasoning: low
+          prompt: prompts/review-security.md
+        - id: review-data
+          label: Data consistency review
+          activation: selected
+          selected_by: review-holistic
+          mode: blocking
+          blocking_severities:
+            - critical
+            - high
+            - medium
+          model:
+            id: openai/gpt-5.6-sol
+            reasoning: low
+          prompt: prompts/review-data.md
+    capabilities:
+      - repository.read
+      - context.read
+    outputs:
+      - review.status
+    transitions:
+      - when:
+          path: output.review.status
+          equals: clean
+        to: integrate
+      - when:
+          path: output.review.status
+          equals: changes_requested
+        to: implement
+      - terminal: failed
+
+  integrate:
+    executor: validate
+    role: integrate
+    capabilities:
+      - repository.read
+      - commands.execute
+    outputs:
+      - integration.status
+    transitions:
+      - when:
+          path: output.integration.status
+          equals: ready
+        to: checks
+      - when:
+          path: output.integration.status
+          equals: changes_requested
+        to: implement
+      - when:
+          path: output.integration.status
+          equals: needs_resolution
+        to: integrate
+      - terminal: failed
+
+  checks:
+    executor: github.checks
+    capabilities:
+      - github.checks.read
+    outputs:
+      - ci.status
+      - ci.reason
+    transitions:
+      - when:
+          path: output.ci.status
+          equals: success
+        to: merge
+      - when:
+          path: output.ci.status
+          equals: reintegrate
+        to: integrate
+      - when:
+          path: output.ci.reason
+          in:
+            - diagnostics_unavailable
+            - evidence_consumed
+        wait: external_check
+      - when:
+          path: output.ci.status
+          equals: failure
+        to: implement
+      - wait: external_check
+
+  merge:
+    executor: github.merge
+    capabilities:
+      - github.merge
+    outputs:
+      - merge.status
+    transitions:
+      - when:
+          path: output.merge.status
+          equals: reintegrate
+        to: integrate
+      - when:
+          path: output.merge.status
+          equals: merged
+        terminal: succeeded
+      - when:
+          path: run.mergeMode
+          equals: maintainer
+        wait: maintainer_merge
+      - terminal: failed
