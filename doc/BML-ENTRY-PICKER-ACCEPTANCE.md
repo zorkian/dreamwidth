@@ -68,3 +68,14 @@ controls. Fixtures use disposable validated accounts and real persisted entries.
 This is baseline coverage, not picker extraction or editor cutover approval.
 Browser evidence, denied community actors and itemid mutation separation remain
 required. Logs: `/tmp/bml-entry-picker-{baseline3,community}.log` in foreman container.
+
+Sol independently cleared corrected HTTP baseline `95fcdf04c` (64 assertions).
+The browser baseline `t/browser/entry-picker.js` uses a disposable Perl helper,
+real login and entries, keyboard recent selection, empty date and community
+selection, and captures default/recent/empty/community/narrow states. Normal run
+passed; intentional failure after selection exits nonzero and the helper exits.
+Artifacts are in foreman container `/tmp/bml-entry-picker-before`; default and
+narrow images were visually inspected. The extensionless legacy page visibly
+shows `[missing string /editjournal.title]` whereas explicit .bml renders its
+title. Record that translation gap and require correct translated headings in the
+replacement; the browser baseline alone does not certify translation parity.
