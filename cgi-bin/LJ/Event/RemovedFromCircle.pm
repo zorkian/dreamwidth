@@ -17,6 +17,7 @@
 package LJ::Event::RemovedFromCircle;
 
 use strict;
+use LJ::Lang;
 use Scalar::Util qw( blessed );
 use Carp qw( croak );
 use base 'LJ::Event';
@@ -199,11 +200,11 @@ sub subscription_as_html {
     my $journal_is_owner = $journal->equals( $subscr->owner );
 
     if ($journal_is_owner) {
-        return BML::ml('event.removedfromcircle.me');    # "Someone removes me from their circle";
+        return LJ::Lang::ml('event.removedfromcircle.me'); # "Someone removes me from their circle";
     }
     else {
         my $user = $journal->ljuser_display;
-        return BML::ml( 'event.removedfromcircle.user', { user => $user } )
+        return LJ::Lang::ml( 'event.removedfromcircle.user', { user => $user } )
             ;    # "Someone removes $user from their circle";
     }
 }
