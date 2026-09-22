@@ -973,3 +973,14 @@ checks, after widgets Terra completes customization1/4.
   class and adds JS-enabled legacy RPC/reload coverage; Sol recheck pending.
   Widgets then continues actual maintainer characterization/implementation on
   its preserved separate branch, with itemid BML fallback retained.
+
+### Legacy inbox bulk CSRF reproduction
+
+- Foreman real-session probe at `80f14c739` confirms legacy selected markRead
+  changes direct DB state N->R with both absent and invalid CSRF, while modern
+  controls deny both. Separate disposable rows, no external delivery; two of12
+  assertions fail in `/tmp/bml-inbox-bulk-auth-probe.log`. This is pre-existing.
+- Themenav now implements the bounded legacy bulk guard/regression on a separate
+  branch; native request consumer `fdace9826` stays queued for Sol. PageStats
+  read-only audit finds its adapter filename unset under Plack and unused by
+  in-tree GA plugins; external filename contract remains a disposition item.

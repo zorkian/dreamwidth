@@ -123,3 +123,21 @@ pre-existing mutation boundaries requiring safe confirmation/POST handling.
 The modern rendered fallback link currently points to `/inbox/`, while its JS
 intercepts and uses token-bearing `/__rpc_inbox_actions`; preserve both JS and
 usable non-JS paths, including owned IDs, view/page context and legacy aliases.
+
+## Legacy bulk form-auth reproduction (2026-09-22)
+
+At foreman `80f14c739`, real-session POSTs to `/inbox/index.bml` with
+`markRead=1` and the rendered selection field shape `all_Check-QID=1` changed
+separate fresh queue rows from N to R both with a missing token and with an
+explicit invalid token. The matching modern `/inbox/new` requests retained N.
+All four fixtures began with directly queried N state; this is not cached
+NotificationItem evidence. The disposable no-delivery probe is
+`/tmp/bml-inbox-bulk-auth-probe.pl` and its log in foreman container8d7783a043d8.
+Two of12 assertions fail on the legacy handler.
+
+This predates the pending bookmark package. Add a supplied-token guard around
+all legacy bulk mutation paths, retain useful error output, and prove rendered
+valid-token actions plus missing/invalid-token nonmutation on independent rows.
+Cover selected read/unread/delete and all-read/delete-all with old button
+suffixes, aliases, view and single-entry scope. Keep the bookmark review and
+maintainer work independently reviewable.
