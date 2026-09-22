@@ -403,8 +403,11 @@ sub set_text {
     my $itid = get_itemid( $dmid, $itcode, { 'notes' => $opts->{'notes'} } );
     return set_error("Couldn't allocate itid.") unless $itid;
 
-    my $dbh   = LJ::get_db_writer();
-    my $txtid = 0;
+    # get_text_multi normalizes every process and memcache key, even if the
+    # source-file path retained mixed case.
+    my $cache_code = lc $itcode;
+    my $dbh        = LJ::get_db_writer();
+    my $txtid      = 0;
 
     my $oldtextid =
         $dbh->selectrow_array( "SELECT txtid FROM ml_text WHERE lnid=? AND dmid=? AND itid=?",
@@ -435,11 +438,11 @@ sub set_text {
             . "VALUES ($lnid, $dmid, $itid, $txtid, NOW(), $staleness)" );
     return set_error( "Error inserting ml_latest: " . $dbh->errstr ) if $dbh->err;
     if ( defined $text ) {
-        LJ::MemCache::set( "ml.${lncode}.${dmid}.${itcode}", $text );
+        LJ::MemCache::set( "ml.${lncode}.${dmid}.${cache_code}", $text );
 
         # keep the in-process cache in step with memcache, else a worker that
         # already cached this code as missing would keep serving the stale miss
-        $TXT_CACHE{"ml.${lncode}.${dmid}.${itcode}"} = $text;
+        $TXT_CACHE{"ml.${lncode}.${dmid}.${cache_code}"} = $text;
     }
 
     my $langids;
@@ -457,8 +460,8 @@ sub set_text {
                 }
                 $langids .= "," if $langids;
                 $langids .= $cid + 0;
-                LJ::MemCache::delete("ml.$clid->{'lncode'}.${dmid}.${itcode}");
-                delete $TXT_CACHE{"ml.$clid->{'lncode'}.${dmid}.${itcode}"};
+                LJ::MemCache::delete("ml.$clid->{'lncode'}.${dmid}.${cache_code}");
+                delete $TXT_CACHE{"ml.$clid->{'lncode'}.${dmid}.${cache_code}"};
                 $rec->( $clid, $rec );
             }
         };
@@ -517,8 +520,12 @@ sub remove_text {
     $dbh->do( "DELETE FROM ml_text WHERE dmid=? AND txtid IN ($txtid_bind)",
         undef, $dmid, @txtids );
 
-    # delete from memcache if lncode is defined
-    LJ::MemCache::delete("ml.${lncode}.${dmid}.${itcode}") if $lncode;
+    # get_text_multi uses lowercase process and memcache keys.
+    if ($lncode) {
+        my $cache_code = lc $itcode;
+        LJ::MemCache::delete("ml.${lncode}.${dmid}.${cache_code}");
+        delete $TXT_CACHE{"ml.${lncode}.${dmid}.${cache_code}"};
+    }
 
     return 1;
 }

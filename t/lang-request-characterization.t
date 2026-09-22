@@ -203,12 +203,13 @@ subtest 'native request context handles DB, fallback, misses, and source autoloa
     my $db_code          = $fresh->("$prefix.db");
     my $missing_code     = $fresh->("$prefix.missing");
     my $cached_miss_code = $fresh->("$prefix.cached-miss");
-    my $source_dir    = tempdir( 'lang-native-XXXXXX', DIR => "$ENV{LJHOME}/views", CLEANUP => 1 );
+    my $source_dir    = tempdir( 'LANG-native-XXXXXX', DIR => "$ENV{LJHOME}/views", CLEANUP => 1 );
     my ($source_name) = $source_dir =~ m{/([^/]+)$};
     my $source_code   = $fresh->("/$source_name/autoload.tt.value");
     open my $source, '>', "$source_dir/autoload.tt.text" or die $!;
     print {$source} ";; -*- coding: utf-8 -*-\n.value=Source [[name]]\n";
     close $source or die $!;
+    utime time - 10, time - 10, "$source_dir/autoload.tt.text" or die $!;
 
     eval {
         ok(
@@ -274,7 +275,8 @@ subtest 'native request context handles DB, fallback, misses, and source autoloa
                 'Source cold',
                 'production cold lookup auto-loads source through native request context' );
             is( LJ::Lang::ml( $source_code, { name => 'warm' } ),
-                'Source warm', 'production warm lookup preserves source auto-load result' );
+                'Source warm',
+                'production warm lookup uses the normalized source-autoload cache entry' );
         }
         DW::Request->reset;
         1;
