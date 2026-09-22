@@ -27,8 +27,15 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         assert.ok(fixture.user && fixture.community, 'fixture creates disposable browser credentials');
         browser = await puppeteer.launch({executablePath: '/usr/bin/google-chrome-stable', args: ['--no-sandbox']});
         const page = await browser.newPage();
-        const errors = [];
+        const errors = [], dialogs = [];
+        let dialogPhase = '';
         page.on('pageerror', error => errors.push(error.message));
+        page.on('dialog', async dialog => {
+            dialogs.push(`${dialogPhase}:${dialog.type()}: ${dialog.message()}`);
+            if (dialogPhase === 'cancel-unsaved') return dialog.dismiss();
+            if (dialogPhase === 'deleteinactive') return dialog.accept();
+            throw new Error(`unexpected dialog: ${dialog.type()}: ${dialog.message()}`);
+        });
         const base = 'http://127.0.0.1:8080';
         const save = async () => Promise.all([
             page.waitForNavigation({waitUntil: 'networkidle0'}), page.click('#settings_save input')
@@ -60,6 +67,13 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         await save();
         await page.reload({waitUntil: 'networkidle0'});
         assert.equal(await page.$eval(messaging, element => element.value), 'M', 'privacy setting saves and reloads');
+        await page.select(messaging, 'N');
+        const unsavedRuntime = await page.evaluate(() => ({ settings: !!window.Settings, changed: window.Settings && Settings.form_changed }));
+        console.log('unsaved runtime', JSON.stringify(unsavedRuntime));
+        dialogPhase = 'cancel-unsaved';
+        await Promise.all([page.waitForNavigation({waitUntil: 'networkidle0'}), page.click('#settings_nav a[href*="cat=display"]')]);
+        dialogPhase = '';
+        assert.match(page.url(), /cat=display/, 'cancelled unsaved navigation still follows the legacy link');
 
         await page.goto(base + '/manage/settings/?cat=display', {waitUntil: 'networkidle0'});
         const mobile = '[name=DW__Setting__MobileView_val]';
@@ -72,8 +86,9 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         await page.goto(base + '/manage/settings/?cat=notifications', {waitUntil: 'networkidle0'});
         const inactiveButton = '[name=deleteinactive]';
         assert.ok(await page.$(inactiveButton), 'notification inactive-cleanup control renders');
-        page.once('dialog', dialog => dialog.accept());
+        dialogPhase = 'deleteinactive';
         await Promise.all([page.waitForNavigation({waitUntil: 'networkidle0'}), page.click(inactiveButton)]);
+        dialogPhase = '';
         const verified = await new Promise((resolve, reject) => {
             let text = '';
             const timeout = setTimeout(() => reject(new Error('fixture verification timed out')), 10000);
@@ -89,7 +104,11 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         });
         assert.equal(verified.active, 1, 'fresh fixture read retains unrelated active Inbox subscription');
         assert.equal(verified.inactive, 0, 'fresh fixture read confirms browser deleteinactive removed inactive subscription');
+        assert.equal(verified.usermsg, 'M', 'cancelled unsaved privacy change is absent from fresh DB state');
         assert.deepEqual(errors, [], 'settings mutation pages have no JavaScript errors');
+        assert.equal(unsavedRuntime.changed, false, 'legacy settings page does not arm unsaved navigation after select change');
+        assert.equal(dialogs.filter(value => value.startsWith('cancel-unsaved:')).length, 0, 'legacy unarmed navigation shows no confirmation');
+        assert.equal(dialogs.filter(value => value.startsWith('deleteinactive:')).length, 1, 'one inactive-cleanup confirmation');
         if (process.env.SETTINGS_BROWSER_FAIL_AFTER_SAVE) throw new Error('intentional settings cleanup probe');
         console.log('PASS disposable settings community/privacy/mobile saves and notification form');
     } finally {

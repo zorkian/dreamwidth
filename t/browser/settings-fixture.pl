@@ -33,6 +33,6 @@ my $command = <>;    # Keep LJ::Test fixtures alive until the browser closes std
 if ( $command && $command =~ /verify/ ) {
     my @subs = LJ::load_userid( $user->id, 1 )->subscriptions;
     my %ids = map { $_->id => 1 } @subs;
-    print encode_json({ active => $ids{ $active->id } ? 1 : 0, inactive => $ids{ $inactive->id } ? 1 : 0 }) . "\n";
+    print encode_json({ active => $ids{ $active->id } ? 1 : 0, inactive => $ids{ $inactive->id } ? 1 : 0, usermsg => LJ::load_userid( $user->id, 1 )->prop('opt_usermsg') }) . "\n";
     <>;    # Browser closes stdin after it has consumed verification.
 }
