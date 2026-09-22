@@ -60,3 +60,13 @@ Required concrete acceptance: render both entry-form maxlength values, and save
   verify same-response and fresh-response wrapper selection before substitution.
   Keep BMLschemepref cookie name, default-cookie deletion, user choice persistence
   and invalid-choice behavior. Login reset of BML scheme is a separate caller.
+
+## Shared error wrapper call-site follow-up
+
+Do not delete the error helpers merely because native controllers no longer call
+error_list directly. Current in-tree consumers include DW::Widget::LatestInbox
+and LJ::Widget::InboxFolderNav (held inbox scope), LJ::Poll submit through
+error_noremote, and DW::Controller::Talk at its error_noremote path. Legacy
+entry_form still calls error_list. Native poll/comment message rendering needs
+bounded caller-specific replacement and actual response evidence before the
+BML wrappers can disappear. This is source inventory, not a reproduced new bug.

@@ -1145,3 +1145,17 @@ checks, after widgets Terra completes customization1/4.
 - SiteScheme `c431dba34` awaits independent review. Terra packages next cover
   journal/feed adapter method mapping and ordinary draft/preview characterization
   before legacy page retirement. No premature editor or BML engine deletion.
+
+### SiteScheme integrated; external hook question pending
+
+- Sol cleared `c431dba34` with24 real-form assertions; integrated `0838d1028`.
+  Foreman settings/language4 files /151 tests, tidy1073 and compile1605 pass in
+  `/tmp/bml-scheme-language-{integrated,tidy,compile}.log`.
+- Journal/feed audit and characterization `c2bf8d5de` await Sol. RSS/Atom already
+  use native conditional response APIs. No in-tree custom data_handler:* or
+  s2_head_content_extra implementations exist. User has been asked whether
+  deployed extensions use those Apache-style arguments; answer is pending.
+  Do not infer approval or remove the adapters while the question is pending.
+- Independent work continues on ordinary draft/preview characterization and
+  comment request metadata maintenance. Neither requires changing the external
+  hook contract or resuming held inbox work.
