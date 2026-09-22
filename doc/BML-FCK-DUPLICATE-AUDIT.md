@@ -34,3 +34,12 @@ Required bounded evidence before deletion:
 The root dialog's existing fields, callback, preview iframe and legacy
 /imgupload.bml translation keys remain the reference behavior. This package
 does not authorize deleting those shared translation keys or replacing FCK.
+
+## Completed consolidation
+
+Sol cleared `dd207c99c` plus corrected legacy alias `d85f96d33`. Integrated
+locally as `6dca2d923`; both split bundles now use the root native route and the
+physical duplicate is removed. Direct root/nested GET and render-only POST
+coverage plus actual Image/ImageButton insert/edit and fixture cleanup pass.
+Foreman exact-assets browser and3 files /95 HTTP assertions pass. Captures are
+in fck-consolidated. Eight executable BML page files remain.

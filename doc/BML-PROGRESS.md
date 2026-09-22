@@ -1266,3 +1266,15 @@ checks, after widgets Terra completes customization1/4.
 - Draft candidate `2a57cbf58` remains held: its blanket synthetic-event filter
   drops the real icon selector change event. Initialization-only correction and
   subsequent user autosave browser proof are being implemented separately.
+
+### FCK duplicate removed; eight BML pages remain
+
+- Cleared sources `dd207c99c` + `d85f96d33` integrated as `6dca2d923`. Root and
+  nested aliases remain native; both split command bundles use the root path.
+  Foreman build,3 files /95 HTTP tests, actual Image/ImageButton insertion/edit,
+  modal cleanup and no-JS/resource-error checks pass. Captures: fck-consolidated.
+- Foreman integrated mode browser also passes all five exact no-op/changed
+  roundtrips; captures: entry-modes-native. The finite ordinary edit-form matrix
+  is now independently cleared and integration-tested.
+- New-post characterization `79b65d19d` awaits Sol. Legacy posting-form contract
+  characterization and narrower draft initialization/autosave fixes remain active.
