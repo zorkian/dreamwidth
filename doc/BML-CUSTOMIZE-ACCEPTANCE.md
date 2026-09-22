@@ -45,7 +45,8 @@ or certify complete browser acceptance.
 Sol audited the fixed range through `4c220b920`, reusing independently passed
 169 mutation assertions, 118 controller assertions, full browser/resource flows,
 aliases and narrow correction. No migration-introduced material defect was found.
-The following finite proof gates remain before integrating the two BML deletions:
+The following finite proof gates were required before integrating the two BML deletions.
+All are now resolved; final status and exact evidence follow the checklist:
 
 1. Nonzero user-layer ownership belongs to the effective journal, with a real
    nonzero foreign layer unchanged.
@@ -65,8 +66,20 @@ The following finite proof gates remain before integrating the two BML deletions
    This disposition does not waive CSRF or unauthorized-target nonmutation.
    Adding semantic validation would be a separate product change.
 
-Widgets Terra owns 1/4 in existing tests; gate 6 has the disposition above. The second Terra, after committing its
-Mobile settings increment, owns 2/3/5 on an isolated acceptance branch using new
-test files. Sol reviews fixed commits; one combined final run follows. Previously
-cleared rows must not be reopened without new evidence. Pre-existing debug
-`warn %opts` in ThemeChooser is removed by separate `853d7bde8` (Sol cleared).
+Final independent disposition:
+
+| Gate | Reviewed source | Evidence |
+|---|---|---|
+| 1 and 4 | `9cd353e17` | 124 HTTP assertions; real nonzero ownership repair and foreign preservation; browser explicit control types save/reload/reset |
+| 2 | `03ff0a8b` atop `2348d4da9` | 56 assertions; distinct rendered category plus designer/layout criteria and community/query context |
+| 3 | `3dae19752` atop `718a2d5a5` | Personal/community subtitle, one RPC each, reload; intentional failure exits1 and removes helper |
+| 5 | `fed30ca8e` atop `5a7259b3` | Real replacement dropdown identity, alternate mood/nav/force save, fresh reload, reset defaults, unchanged theme/layout |
+| 6 | Independent source audit | Not applicable as explained above; shared legacy coercion contract retained |
+
+Sol's finite integration gate is clear. Pre-existing ThemeChooser `warn %opts`
+was removed separately by `853d7bde8` and independently cleared. Final production,
+translation and acceptance content is integrated locally as `bcdced59f`.
+Foreman combined validation passes 17 files / 714 tests, both customization
+browser suites, static build, tidy1047 and compile1601. Durable after images are
+under `doc/bml-evidence/2026-09-22/customize-after/`. This closes customization;
+editor, settings and whole-runtime retirement retain their separate gates.
