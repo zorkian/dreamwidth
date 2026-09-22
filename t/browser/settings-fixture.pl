@@ -14,6 +14,14 @@ my $comm     = temp_comm();
 $user->set_password($password);
 $comm->set_password($password);
 LJ::set_rel( $comm, $user, 'A' );
-print encode_json({ user => $user->user, community => $comm->user, password => $password, community_type => $comm->journaltype, maintainer => LJ::check_rel( $comm, $user, 'A' ) ? 1 : 0 }) . "\n";
+print encode_json(
+    {
+        user           => $user->user,
+        community      => $comm->user,
+        password       => $password,
+        community_type => $comm->journaltype,
+        maintainer     => LJ::check_rel( $comm, $user, 'A' ) ? 1 : 0
+    }
+) . "\n";
 $| = 1;
 <>;    # Keep LJ::Test fixtures alive until the browser closes stdin.

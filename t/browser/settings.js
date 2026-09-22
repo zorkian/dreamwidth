@@ -4,22 +4,28 @@ const assert = require('node:assert/strict');
 const {spawn} = require('node:child_process');
 const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
 
-const helper = spawn('perl', ['t/browser/settings-fixture.pl'], {cwd: process.env.LJHOME});
-const fixturePromise = new Promise((resolve, reject) => {
-    let output = '';
-    helper.stdout.on('data', chunk => {
-        output += chunk;
-        if (output.includes('\n')) resolve(JSON.parse(output));
-    });
-    helper.once('error', reject);
-    helper.once('exit', code => reject(new Error(`fixture exited early: ${code}`)));
-});
-
 (async () => {
-    const browser = await puppeteer.launch({executablePath: '/usr/bin/google-chrome-stable', args: ['--no-sandbox']});
+    const helper = spawn('perl', ['t/browser/settings-fixture.pl'], {cwd: process.env.LJHOME, stdio: ['pipe', 'pipe', 'inherit']});
+    const done = new Promise((resolve, reject) => {
+        helper.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`fixture exit: ${code}/${signal}`)));
+        helper.once('error', reject);
+    });
+    done.catch(() => {});
+    let browser;
     try {
-        const fixture = await fixturePromise;
+        const fixture = await new Promise((resolve, reject) => {
+            let output = '';
+            helper.stdout.on('data', chunk => {
+                output += chunk;
+                if (output.includes('\n')) {
+                    try { resolve(JSON.parse(output.split('\n')[0])); } catch (error) { reject(error); }
+                }
+            });
+            helper.once('error', reject);
+            helper.once('exit', () => reject(new Error('fixture exited before ready')));
+        });
         assert.ok(fixture.user && fixture.community, 'fixture creates disposable browser credentials');
+        browser = await puppeteer.launch({executablePath: '/usr/bin/google-chrome-stable', args: ['--no-sandbox']});
         const page = await browser.newPage();
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
@@ -66,10 +72,10 @@ const fixturePromise = new Promise((resolve, reject) => {
         await page.goto(base + '/manage/settings/?cat=notifications', {waitUntil: 'networkidle0'});
         assert.ok(await page.$('#settings_form'), 'notification settings form renders for the disposable account');
         assert.deepEqual(errors, [], 'settings mutation pages have no JavaScript errors');
+        if (process.env.SETTINGS_BROWSER_FAIL_AFTER_SAVE) throw new Error('intentional settings cleanup probe');
         console.log('PASS disposable settings community/privacy/mobile saves and notification form');
     } finally {
-        await browser.close();
-        helper.stdin.end();
-        await new Promise(resolve => helper.once('exit', resolve));
+        try { if (browser) await browser.close(); }
+        finally { helper.stdin.end(); await done; }
     }
 })().catch(error => { console.error(error); process.exit(1); });
