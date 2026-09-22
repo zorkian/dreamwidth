@@ -1005,3 +1005,17 @@ checks, after widgets Terra completes customization1/4.
 - Six matching disposable legacy/modern inbox baseline screenshots are committed
   under `doc/bml-evidence/2026-09-22/inbox-before`; this is visual evidence, not
   a claim of behavioral acceptance or clean console/network checks.
+
+### Native request consumers integrated
+
+- Sol cleared `fdace9826` plus permanent test correction `060f8ebdb`; integrated
+  locally as `2e57379dc`. Intervening anonymous request and true/false loginout
+  marker controls are meaningful. Foreman passes7 files /86 tests in
+  `/tmp/bml-native-request-integrated.log`; formatting/compile are running.
+- Ordinary journal rendering baseline captures recent/read/archive/month/day/entry
+  at200 with no pageerror/requestfailed events, using a disposable local fixture.
+  Saved under `journal-rendering-before`; capture timing and limits are explicit.
+- Admin FAQ candidate `a3b51c425` remains unintegrated: removal accidentally
+  dropped a TT closing delimiter, and its mocked renderer did not exercise the
+  template or removed callback. Terra is fixing the delimiter and replacing
+  that test with actual template rendering and content/global-state assertions.
