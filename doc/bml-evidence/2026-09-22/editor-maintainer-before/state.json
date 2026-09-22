@@ -1,0 +1,21 @@
+{
+  "states": {
+    "legacy-desktop": {
+      "title": "Edit Entries",
+      "width": 1280
+    },
+    "legacy-narrow": {
+      "title": "Edit Entries",
+      "width": 648
+    },
+    "modern-gap": {
+      "title": "Error",
+      "width": 1280
+    }
+  },
+  "errors": [
+    "Cannot set properties of null (setting 'checked')\nXPostAccount.xpostAcctUpdated (http://127.0.0.1:8080/js/??6alib/inputcomplete.js,6alib/json.js,6alib/template.js,userpicselect.js,6alib/datasource.js,6alib/selectable_table.js,rte.js,entry.js,poll.js,xpost.js,md5.js?v=1790092958:40:2643)",
+    "Cannot set properties of null (setting 'checked')\nXPostAccount.xpostAcctUpdated (http://127.0.0.1:8080/js/??6alib/inputcomplete.js,6alib/json.js,6alib/template.js,userpicselect.js,6alib/datasource.js,6alib/selectable_table.js,rte.js,entry.js,poll.js,xpost.js,md5.js?v=1790092958:40:2643)"
+  ],
+  "failures": []
+}

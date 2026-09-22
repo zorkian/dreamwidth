@@ -51,3 +51,12 @@ narrow form states and actual translated confirmation/error text.
 Keep `/editjournal` itemid fallthrough and all legacy editor pages during this
 package. Broader posting, preview, saved drafts, crossposting and rollout remain
 separate acceptance gates in BML-REMOVAL-PLAN.md.
+
+## Preserved visual baseline
+
+Desktop, narrow and modern-denial images are in
+`doc/bml-evidence/2026-09-22/editor-maintainer-before`. The disposable browser
+probe completed successfully and awaited fixture exit, but recorded existing
+legacy XPostAccount null.checked errors on both renders and body width648 at
+viewport390. These are explicit baseline defects, not clean-browser evidence
+or reasons to reproduce the broken layout in the replacement.
