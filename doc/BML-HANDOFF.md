@@ -32,12 +32,24 @@ The integrated legacy HTTP/return baseline passes 115 assertions (two explicit
 off-origin redirect TODOs); before screenshots are preserved in settings-before.
 Unsaved navigation and Other Sites resources are migration requirements.
 
-Widgets Terra committed native no-item entry-picker extraction as
-`1c5f0efd12cae67424ae9e982e4601cee988f5bc` on
-`bml-terra-entry-picker-20260922`. It is under Sol review and not integrated.
-Any itemid request must fall through unchanged to the existing BML editor.
-Foreman requested a separate security-indicator/linked-poster rendering fix.
-Modern editor other-poster manager parity remains a separate retirement gate.
+Widgets Terra's native no-item picker extraction is preserved through
+`e4e3958b7fed56d8e0a7a331a3d456edcfb181c4` on
+`bml-terra-entry-picker-img-alt-20260922`. Sol is rechecking the final image-alt
+and legacy error-key corrections; it is not integrated yet. Prior itemid
+fallthrough/CSRF/permissions/aliases, input auto-selection, individual authas
+selector and successful-page legacy language scope are independently clear.
+Any itemid request still belongs to the existing BML editor. Modern editor
+other-poster manager parity remains a separate retirement gate.
+
+Native account/notification label conversion is reviewed and integrated as
+`538d5d8dc` (worker `c1aba5fb4`); foreman related regression passes130 tests.
+Bounded modern inbox compose error repair is reviewed and integrated as
+`3dd1c4464` (worker `e4ba001a2`); foreman related regression passes31 tests.
+Widgets Terra resumes `bml-terra-inbox-spam-errors-20260922` for lost no-action
+errors and real action/CSRF/ownership acceptance after the picker correction.
+Bookmark tokenless GET mutations are independently reproduced and documented as
+the next bounded inbox package. No beta/public route cutover is approved by
+these narrow fixes. Local no-delivery probe scripts are in host/container /tmp.
 
 Preserve all three existing worker sessions/worktrees/containers; use the exact
 session identifiers in BML-PROGRESS.md. Their sessions sometimes end after
