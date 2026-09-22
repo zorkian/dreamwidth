@@ -1,0 +1,145 @@
+#!/usr/bin/perl
+# Characterize retained legacy /update posting forms before the beta route is retired.
+# Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+
+use strict;
+use warnings;
+
+use Test::More;
+use HTTP::Request::Common;
+use HTML::Form;
+use Plack::Test;
+
+BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+
+use LJ::Entry;
+use LJ::Session;
+use LJ::Test qw(temp_user);
+
+plan skip_all => 'Legacy update integration requires a development server'
+    unless $LJ::IS_DEV_SERVER;
+
+my $app = do "$ENV{LJHOME}/app.psgi";
+die $@ unless ref $app eq 'CODE';
+
+sub update_form {
+    my ($content) = @_;
+    return (
+        grep {
+                   ( $_->attr('id') || '' ) eq 'updateForm'
+                && $_->find_input('subject')
+                && $_->find_input('event')
+        } HTML::Form->parse( $content, 'http://localhost/update' )
+    )[0];
+}
+
+sub fresh_entry {
+    my ( $owner, $jitemid ) = @_;
+    LJ::Entry::reset_singletons();
+    return LJ::Entry->new( $owner, jitemid => $jitemid );
+}
+
+my $owner = temp_user();
+$owner->update_self( { status => 'A' } );
+my $owner_id = $owner->id;
+my $session  = LJ::Session->create( $owner, nolog => 1 );
+my $cookie =
+      'ljmastersession='
+    . $session->master_cookie_string
+    . '; ljloggedin='
+    . $session->loggedin_cookie_string;
+local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'legacyUpdateContract';
+
+ok( !LJ::BetaFeatures->user_in_beta( $owner => 'updatepage' ),
+    'disposable owner is outside the updatepage beta and reaches the retained BML form' );
+
+test_psgi $app, sub {
+    my $send    = shift;
+    my $request = sub {
+        my ($req) = @_;
+        $req->header( Cookie => $cookie );
+        return $send->($req);
+    };
+
+    for my $index ( 0, 1 ) {
+        my $path = $index ? '/update.bml' : '/update';
+        my $res  = $request->( GET $path );
+        is( $res->code, 200, "$path renders the retained legacy form outside beta" );
+        unlike( $res->header('Location') || '', qr{/entry/new}, "$path is not beta-redirected" );
+        my $form = update_form( $res->content );
+        ok( $form, "$path renders the actual legacy update form" ) or next;
+
+        for my $name (
+            qw(subject event security prop_taglist prop_current_location prop_current_music lj_form_auth)
+            )
+        {
+            ok( $form->find_input($name), "$path legacy form contains $name" );
+        }
+        ok( $form->find_input('action:update'), "$path has its actual update submit control" );
+        is( $form->value('security'),
+            'public', "$path starts with legacy public security selected" );
+
+        my ($before_count) = $owner->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
+            undef, $owner_id );
+        $form->action( 'http://localhost' . $path );
+        $form->value( subject               => "Legacy $index private subject" );
+        $form->value( event                 => "Legacy $index private body" );
+        $form->value( security              => 'private' );
+        $form->value( prop_taglist          => "legacy-$index-one, legacy-$index-two" );
+        $form->value( prop_current_location => "Legacy $index location" );
+        $form->value( prop_current_music    => "Legacy $index music" );
+        my $post = $form->click('action:update');
+        $post->uri( 'http://localhost' . $path );
+        $post->header( Referer => 'http://localhost' . $path );
+        $res = $request->($post);
+        is( $res->code, 200, "$path direct valid legacy POST returns a response" );
+        like(
+            $res->content,
+            qr/(?:updated|posted|success)/i,
+            "$path direct valid legacy POST has a meaningful success body"
+        );
+
+        my $fresh_owner = LJ::load_userid( $owner_id, 1 );
+        my ($after_count) =
+            $fresh_owner->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
+            undef, $owner_id );
+        is( $after_count, $before_count + 1,
+            "$path direct POST creates exactly one private entry" );
+        my ($jitemid) = $fresh_owner->selectrow_array(
+            'SELECT jitemid FROM log2 WHERE journalid=? ORDER BY jitemid DESC LIMIT 1',
+            undef, $owner_id );
+        my $entry = fresh_entry( $fresh_owner, $jitemid );
+        ok( $entry, "$path newly created entry loads from fresh state" ) or next;
+        is( $entry->security, 'private', "$path preserves private security" );
+        is( $entry->subject_raw, "Legacy $index private subject", "$path preserves exact subject" );
+        is( $entry->event_raw,   "Legacy $index private body",    "$path preserves exact body" );
+        is_deeply(
+            [ sort $entry->tags ],
+            [ "legacy-$index-one", "legacy-$index-two" ],
+            "$path preserves tags through prop_taglist"
+        );
+        is(
+            $entry->prop('current_location'),
+            "Legacy $index location",
+            "$path preserves prop_current_location"
+        );
+        is(
+            $entry->prop('current_music'),
+            "Legacy $index music",
+            "$path preserves prop_current_music"
+        );
+    }
+
+    {
+        no warnings 'redefine';
+        local *LJ::BetaFeatures::user_in_beta = sub { 1 };
+        for my $path ( '/update', '/update.bml' ) {
+            my $res = $request->( GET $path );
+            is( $res->code, 302, "$path beta GET redirects to the native editor" );
+            like( $res->header('Location') || '',
+                qr{/entry/new}, "$path beta GET retains the native editor destination" );
+        }
+    }
+};
+
+done_testing;
