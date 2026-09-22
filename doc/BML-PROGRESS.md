@@ -1011,7 +1011,8 @@ checks, after widgets Terra completes customization1/4.
 - Sol cleared `fdace9826` plus permanent test correction `060f8ebdb`; integrated
   locally as `2e57379dc`. Intervening anonymous request and true/false loginout
   marker controls are meaningful. Foreman passes7 files /86 tests in
-  `/tmp/bml-native-request-integrated.log`; formatting/compile are running.
+  `/tmp/bml-native-request-integrated.log`; tidy1060 and compile1605 pass in
+  `/tmp/bml-native-request-{tidy,compile}.log`.
 - Ordinary journal rendering baseline captures recent/read/archive/month/day/entry
   at200 with no pageerror/requestfailed events, using a disposable local fixture.
   Saved under `journal-rendering-before`; capture timing and limits are explicit.
@@ -1019,3 +1020,18 @@ checks, after widgets Terra completes customization1/4.
   dropped a TT closing delimiter, and its mocked renderer did not exercise the
   template or removed callback. Terra is fixing the delimiter and replacing
   that test with actual template rendering and content/global-state assertions.
+
+### Maintainer characterization integrated; rendering work active
+
+- Sol cleared `a9bcc488a` plus correction `078067ef9`; integrated as
+  `156f37328`. Foreman exact test passes141 in
+  `/tmp/bml-maintainer-characterization-integrated.log`. The nondefault
+  unrelated property and genuinely different denied value resolve prior weak
+  assertions. This is prerequisite characterization, not native UI approval.
+- Widgets now has native restricted maintainer GET/form and property-only POST
+  WIP; it must complete actual form save/reload plus browser acceptance before
+  committing or integration. Legacy editor/itemid routes remain retained.
+- Admin FAQ `a3b51c425` + `a7a14e557` awaits Sol actual-render review. The
+  delimiter is restored and the regression now runs the real TT body rather
+  than mocking it away. S2 request-note rendering migration proceeds separately
+  from base `2e57379dc`, with existing adapter/language initialization retained.
