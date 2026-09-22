@@ -445,8 +445,8 @@ test_psgi $app, sub {
     $request->header( Cookie => $cookie );
     $res = $send->($request);
     like( $res->content, qr/invalid/i, 'invalid privacy value has useful validation text' );
-    unlike( LJ::load_userid( $user->id, 1 )->prop('opt_usermsg') || '',
-        qr/invalid/, 'invalid privacy value does not persist' );
+    is( LJ::load_userid( $user->id, 1 )->prop('opt_usermsg'),
+        'M', 'invalid privacy value leaves the prior value unchanged' );
 };
 
 done_testing;
