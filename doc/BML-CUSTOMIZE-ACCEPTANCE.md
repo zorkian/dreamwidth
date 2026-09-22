@@ -55,11 +55,18 @@ The following finite proof gates remain before integrating the two BML deletions
    text/textarea/color paths were exercised, not just generic value/checked code.
 5. Display mood/nav controls show saved selection and reset to defaults while
    preserving theme/layout.
-6. Real invalid option input produces useful visible validation, retains useful
-   input and leaves persisted state unchanged.
+6. **Closed as not applicable after independent source audit.** Legacy and
+   migrated pages dispatch the same option widgets, which have no semantic
+   invalid-value rejection/input-retention contract: S2 int/bool values coerce,
+   Color/string/select values quote, unknown properties are ignored; invalid
+   mood choices normalize to zero, invalid layouts do nothing, links canonicalize
+   and text/title values accept or trim. Preserve these behaviors. Terra's
+   integer/Color probes confirmed coercion rather than a migration regression.
+   This disposition does not waive CSRF or unauthorized-target nonmutation.
+   Adding semantic validation would be a separate product change.
 
-Widgets Terra owns 1/4/6 in existing tests. The second Terra, after committing its
+Widgets Terra owns 1/4 in existing tests; gate 6 has the disposition above. The second Terra, after committing its
 Mobile settings increment, owns 2/3/5 on an isolated acceptance branch using new
 test files. Sol reviews fixed commits; one combined final run follows. Previously
 cleared rows must not be reopened without new evidence. Pre-existing debug
-`warn %opts` in ThemeChooser is removed by separate `853d7bde8` (review queued).
+`warn %opts` in ThemeChooser is removed by separate `853d7bde8` (Sol cleared).

@@ -759,3 +759,18 @@ Do not classify larger consumers as equivalent one-line replacements:
   a rejected option. Preserve the experimental failure logs; independent audit
   must distinguish a pre-existing absent validation contract from a migration
   regression. No blanket new validation policy or deletion gate waiver yet.
+
+### Finite validation-gate disposition
+
+Sol independently established that customization gate6 was asking for a contract
+absent from both legacy and migrated widgets. Coercion/normalization is shared;
+integer and Color probes therefore do not establish regressions. Gate6 is closed
+as not applicable, with details in BML-CUSTOMIZE-ACCEPTANCE.md. Existing CSRF and
+unauthorized nonmutation requirements remain. No new semantic validation policy
+is added as part of BML removal.
+
+Original image preview/dialog production review is bounded clear (41 HTTP
+assertions and real editor browser flow). Sol found saved draft-properties
+mutation even after successful seeded browser runs. Both image and access-filter
+harnesses are queued for disposable-fixture corrections and intentional-failure
+checks, after widgets Terra completes customization1/4.
