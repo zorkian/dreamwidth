@@ -774,3 +774,26 @@ assertions and real editor browser flow). Sol found saved draft-properties
 mutation even after successful seeded browser runs. Both image and access-filter
 harnesses are queued for disposable-fixture corrections and intentional-failure
 checks, after widgets Terra completes customization1/4.
+
+### Final customization proofs — 2026-09-22
+
+- Gate3 source `718a2d5a5` + `3dae19752` independently clears distinct personal
+  and managed-community subtitle save/reload with one RPC, plus intentional
+  failure exit1 and no surviving helper.
+- Gates1/4 source `9cd353e17` independently clears 124 controller assertions and
+  the full browser flow after an exact static build. Nonzero repaired-community
+  ownership and unchanged foreign layers are proved. Dedicated select/checkbox
+  actions use actual controls and fresh GETs after save/reset; process exit0 and
+  helper cleanup are confirmed. Generic first-control iteration alone initially
+  failed the new inventory, so it was replaced with explicit type coverage.
+- Gate2 `2348d4da9` had a category self-link gap despite 54 passes. Correction
+  `03ff0a8b` chooses a rendered category other than all and reports 56 passes;
+  independent recheck remains pending. Designer/layout checks follow untouched
+  emitted parameters and require nonempty, universally matching result metadata.
+- Gate5 `5a7259b3` reports passing real display save/reset with fresh GETs and
+  preserved theme/layout. The test waits for mood preview AJAX before setting
+  the force checkbox; the earlier failure was a fixture timing error. Independent
+  review remains pending. Its inspected reset screenshot is preserved locally.
+- Widgets Terra now owns separate disposable access/image harness corrections;
+  themenav Terra prepared settings migration and awaits the post-customization
+  base. No worker checkout or session was replaced.
