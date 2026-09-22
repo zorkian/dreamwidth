@@ -14,6 +14,7 @@
 package LJ::User;
 
 use strict;
+use DW::Request;
 use v5.10;
 use Log::Log4perl;
 my $log = Log::Log4perl->get_logger(__PACKAGE__);
@@ -145,7 +146,8 @@ sub make_login_session {
     $exptype ||= 'short';
     return 0 unless $u;
 
-    eval { BML::get_request()->notes->{ljuser} = $u->user; };
+    my $r = DW::Request->get;
+    $r->note( ljuser => $u->user ) if $r && $r->can('note');
 
     # create session and log user in
     my $sess_opts = {
@@ -442,8 +444,8 @@ sub get_remote {
     };
 
     # can't have a remote user outside of web context
-    my $apache_r = eval { BML::get_request(); };
-    return $no_remote->() unless $apache_r;
+    my $r = DW::Request->get;
+    return $no_remote->() unless $r;
 
     my $criterr = $opts->{criterr} || do { my $d; \$d; };
     $$criterr = 0;
@@ -485,7 +487,7 @@ sub get_remote {
     }
 
     LJ::User->set_remote($u);
-    $apache_r->notes->{ljuser} = $u->user;
+    $r->note( ljuser => $u->user );
     return $u;
 }
 
