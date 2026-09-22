@@ -81,14 +81,13 @@ sub make_journal {
         return;
     }
 
-    # see also Apache/LiveJournal.pm
-    my $lang = $LJ::DEFAULT_LANG;
-
-    # note that's it's very important to pass LJ::Lang::get_text here explicitly
-    # rather than relying on BML::set_language's fallback mechanism, which won't
-    # work in this context since BML::cur_req won't be loaded if no BML requests
-    # have been served from this Apache process yet
-    BML::set_language( $lang, \&LJ::Lang::get_text );
+    # S2 labels use LJ::Lang::ml directly.  Keep the historical default language
+    # and explicit getter without installing BML's process-global callbacks.  The
+    # native context merges this with any caller-established translation scope.
+    LJ::Lang::set_request_context(
+        lang   => $LJ::DEFAULT_LANG,
+        getter => \&LJ::Lang::get_text,
+    );
 
     # let layouts disable EntryPage / ReplyPage, using the siteviews version
     # instead.  We may also have explicitly asked to use siteviews by the caller
