@@ -883,3 +883,22 @@ checks, after widgets Terra completes customization1/4.
 - Widgets Terra continues owned CSRF bookmark confirmation/action handling;
   Themenav Terra continues native S2 page labels in a separate branch.
   All work stays local and existing sessions/worktrees are preserved.
+
+### Inbox spam integrated; settings finite proofs pending
+
+- Sol cleared spam correction `345d6e246` atop `038607cea`. Integrated final
+  content as `e772d7919`. Foreman own-container spam+compose regression passes
+  2 files / 63 assertions in `/tmp/bml-inbox-spam-integrated.log`. Existing
+  checkbox-value and invalid-token warnings remain recorded, not new failures.
+- Settings production review through `5f323e9e5` is clear after localized
+  confirmation (`f0042473`) and accepted same-origin encoded-slash return URLs.
+  Sol independently passed 104 settings, 46 return, 4 confirmation assertions,
+  the four-alias16-assertion probe, static build and disposable browser flow.
+  Before integration, Terra is adding exactly three finite coverage proofs:
+  account-stat hook, notification page/form context, and existing-subscription
+  modification. These are test gaps, not asserted production bugs.
+- Bookmark WIP remains unaccepted while denial regressions are diagnosed using
+  before/after persisted state. Notification qids are per-account; foreign-ID
+  tests must prove the ID is absent from the owner, not assume global uniqueness.
+- Native Event `eb65a9f66` and S2 label `cd45ffb4` await Sol. FAQ runtime seams
+  are the next independent Themenav task, preserved around settings followups.
