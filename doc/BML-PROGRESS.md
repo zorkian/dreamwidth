@@ -830,3 +830,19 @@ checks, after widgets Terra completes customization1/4.
   `/tmp/bml-image-disposable-integrated.log`; final tidy passes 1049 checks
   (`/tmp/bml-disposable-integrated-tidy.log`). Sol already covered intentional
   failure and signal cleanup on the exact source range.
+
+### Native account labels and inbox repair queue
+
+- Sol cleared worker `c1aba5fb4` (four native full-key callers and direct method
+  tests). Integrated as `538d5d8dc`. Foreman combined native caller/service,
+  request-language and notification-method run passes 5 files / 130 tests;
+  log `/tmp/bml-native-account-integrated.log` in the foreman container.
+- Inbox compose error candidate `e4ba001a2` is under Sol review, not integrated.
+  Its no-delivery authenticated tests report 23 passing assertions; preserves
+  rejected input and handles service-provided rendered error strings correctly.
+- Picker final review through `0ec661a94` found four concrete compatibility
+  gaps: input changes selecting the appropriate radio, existing locale keys,
+  individual-only authas selector, and accessible security/poster labels.
+  Input-selection correction `fba4e942b` reports direct-input browser pass.
+  Terra is fixing the remaining findings on the preserved picker branch.
+  Itemid fallback/CSRF/permissions/aliases otherwise passed independent review.
