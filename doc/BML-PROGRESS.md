@@ -1130,3 +1130,18 @@ checks, after widgets Terra completes customization1/4.
 - S2 language initialization `78817b24a` and Birthday labels `3e1749319` are
   undergoing independent review. SiteScheme request selection and journal/feed
   adapter characterization proceed separately. The inbox platform hold remains.
+
+### Native S2 language initialization and Birthday integrated
+
+- Sol cleared S2 `78817b24a`, integrated as `ea61aa63d`; Birthday `3e1749319`,
+  integrated as `d50c11eea`. Foreman6 files /30 top-level tests pass in
+  `/tmp/bml-s2-birthday-integrated.log`.
+- Exact restarted six-view journal replay returns200 with no JS/resource errors,
+  successful disposable helper completion, and normalized captured text equal
+  to prior control-strip replay. Evidence is in `s2-language-native`.
+- Final maintainer screenshot replay after `8986e7de8` passes and visibly has one
+  heading; captures are in `maintainer-final` rather than the earlier duplicate
+  heading captures retained for comparison.
+- SiteScheme `c431dba34` awaits independent review. Terra packages next cover
+  journal/feed adapter method mapping and ordinary draft/preview characterization
+  before legacy page retirement. No premature editor or BML engine deletion.
