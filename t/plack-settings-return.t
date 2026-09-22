@@ -5,9 +5,12 @@ use warnings;
 use Test::More;
 use HTTP::Request::Common;
 use HTML::Form;
+use HTML::TreeBuilder;
 use URI;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+require DW::Controller::SettingsHub;
+require DW::Request::Plack;
 use LJ::Test qw(temp_user);
 use LJ::Subscription::Pending;
 plan skip_all => 'Settings integration requires a development server'
@@ -23,6 +26,42 @@ my $cookie =
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'settingsReturnProbe';
+
+# The receiver must derive its origin from the actual PSGI request, not the
+# deployment-wide protocol setting.  This is deliberately HTTPS while the
+# development default below is HTTP.
+{
+    open my $input, '<', '/dev/null' or die "open /dev/null: $!";
+    my $https = DW::Request::Plack->new(
+        {
+            REQUEST_METHOD    => 'GET',
+            SCRIPT_NAME       => '',
+            PATH_INFO         => '/',
+            QUERY_STRING      => '',
+            SERVER_NAME       => 'localhost',
+            SERVER_PORT       => 8443,
+            HTTP_HOST         => 'localhost:8443',
+            'psgi.url_scheme' => 'https',
+            'psgi.input'      => $input,
+        }
+    );
+    local $LJ::PROTOCOL = 'http';
+    is( DW::Controller::SettingsHub::_notification_return_url( $https, '/return' ),
+        '/return', 'relative return is resolved against the actual HTTPS request origin' );
+    is(
+        DW::Controller::SettingsHub::_notification_return_url(
+            $https, 'https://localhost:8443/return'
+        ),
+        'https://localhost:8443/return',
+        'same HTTPS host and port are accepted despite configured protocol mismatch'
+    );
+    ok(
+        !defined DW::Controller::SettingsHub::_notification_return_url(
+            $https, 'http://localhost:8443/return'
+        ),
+        'configured HTTP protocol cannot authorize an HTTP return for an HTTPS request'
+    );
+}
 
 # Isolate notification delivery to the local Inbox; dev mail is not configured.
 local @LJ::NOTIFY_TYPES = ('LJ::NotificationMethod::Inbox');
@@ -97,6 +136,15 @@ test_psgi $app, sub {
         qr/undef error|DieObject=|BML ERROR/,
         'validation response is not an exception banner'
     );
+    unlike( $res->content, qr/<[?]errorbar/,
+        'quota response contains no legacy BML errorbar token' );
+    my $quota_tree = HTML::TreeBuilder->new_from_content( $res->content );
+    like(
+        $quota_tree->as_text,
+        qr/reached your limit of .* active notifications/s,
+        'quota error is visible rendered text, not inert legacy BML markup'
+    );
+    $quota_tree->delete;
     is( scalar @{ persisted() }, 0, 'failed notification save leaves subscription absent' );
     $res = $cb->( $form->click );
     is( $res->code, 302, 'successful tracking save retains legacy redirect status' );
@@ -109,9 +157,24 @@ test_psgi $app, sub {
     is( scalar @$saved, 1, 'successful tracking POST persists exactly one intended subscription' );
     ok( @$saved && $saved->[0]->active, 'saved subscription is active on fresh load' );
 
-    # The receiver must validate this field even when a trusted caller normally
-    # supplies it. Keep the known legacy failure visible until hub conversion.
-    for my $untrusted ( 'https://offsite.invalid/landing', '//offsite.invalid/landing' ) {
+    for my $accepted ( '/some%2Fpath', 'http://localhost/%2Fok', '/return?next=%2Ffolder' ) {
+        $form->value( 'ret_url', $accepted );
+        $res = $cb->( $form->click );
+        is( $res->code, 302, "same-origin encoded slash return redirects: $accepted" );
+        is( $res->header('Location'),
+            $accepted, "same-origin encoded slash return preserves its raw URL bytes: $accepted" );
+        is( scalar @{ persisted() },
+            1, "accepted encoded slash return does not duplicate the subscription: $accepted" );
+    }
+
+    # The settings receiver owns this final validation, including URL forms
+    # that browser-side callers normally never emit.
+    for my $untrusted (
+        'https://offsite.invalid/landing',   '//offsite.invalid/landing',
+        'http://attacker@localhost/landing', 'javascript:alert(1)',
+        'http://localhost:8081/landing',     '/%5c%5coffsite.invalid/landing',
+        )
+    {
         $form->value( 'ret_url', $untrusted );
         $res = $cb->( $form->click );
         unlike(
@@ -124,16 +187,12 @@ test_psgi $app, sub {
             defined $location
             ? URI->new_abs( $location, 'http://localhost/manage/settings/' )
             : undef;
-    TODO: {
-            local $TODO = 'Legacy settings trusts POST ret_url; migrated receiver must constrain it'
-                if -e "$ENV{LJHOME}/htdocs/manage/settings/index.bml";
-            ok(
-                !$destination || ( $destination->scheme eq 'http'
-                    && $destination->host eq 'localhost'
-                    && $destination->port == 80 ),
-                "receiver refuses off-origin return URL $untrusted"
-            );
-        }
+        ok(
+            !$destination || ( $destination->scheme eq 'http'
+                && $destination->host eq 'localhost'
+                && $destination->port == 80 ),
+            "receiver refuses off-origin return URL $untrusted"
+        );
         is( scalar @{ persisted() },
             1, 'forged return URL does not duplicate the intended subscription' );
     }

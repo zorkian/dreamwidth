@@ -39,8 +39,11 @@ if ( $command && $command =~ /verify/ ) {
         {
             active   => $ids{ $active->id }   ? 1 : 0,
             inactive => $ids{ $inactive->id } ? 1 : 0,
-            usermsg => LJ::load_userid( $user->id, 1 )->prop('opt_usermsg')
+            usermsg => LJ::load_userid( $user->id, 1 )->prop('opt_usermsg'),
+            xpost_disable_comments =>
+                LJ::load_userid( $user->id, 1 )->prop('opt_xpost_disable_comments'),
+            xpost_footer => LJ::load_userid( $user->id, 1 )->prop('crosspost_footer_text'),
         }
     ) . "\n";
-    <>;              # Browser closes stdin after it has consumed verification.
+    <>;    # Browser closes stdin after it has consumed verification.
 }

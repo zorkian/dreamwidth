@@ -77,6 +77,16 @@ test_psgi $app, sub {
     $res = $cb->($req);
     is( $res->code, 200, 'real display form submitted' );
     like( $res->content, qr/id=['"]settings_form/, 'successful save renders form' );
+    like(
+        $res->content,
+        qr/successfully saved/i,
+        'native template resolves the physical settings/index.tt success string'
+    );
+    unlike(
+        $res->content,
+        qr{/(?:manage/settings/index|settings/index)[.]tt[.]success},
+        'native template never exposes a missing request-language scope key'
+    );
     unlike(
         $res->content,
         qr/unblessed|undef error|BML ERROR/,
@@ -136,7 +146,14 @@ sub settings_form {
 test_psgi $app, sub {
     my $send     = shift;
     my $anon_url = '/manage/settings/?cat=display';
-    my $res      = $send->( GET $anon_url );
+    my $res      = $send->( GET $anon_url . '&delete_subscription=1' );
+    is( $res->code, 200, 'anonymous crafted delete confirmation request renders normally' );
+    unlike(
+        $res->content,
+        qr/(?:Can't call method|Internal Server Error)/,
+        'anonymous crafted delete confirmation request cannot dereference an absent user'
+    );
+    $res = $send->( GET $anon_url );
     is( $res->code, 200, 'anonymous display settings render' );
     my ($form) = settings_form( $res->content, $anon_url );
     ok( $form, 'anonymous display settings expose the cookie-backed form contract' );
@@ -240,11 +257,32 @@ test_psgi $app, sub {
     $res = $cb->( POST $url, Content => [ lj_form_auth => $token, deleteinactive => 1 ] );
     ok( !grep( { $_->id == $inactive->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
         'deleteinactive removes an inactive subscription through POST' );
-    $res = $cb->( GET $url . '&deletesub_' . $legacy->id . '=1' );
+    my $legacy_delete_url = $url . '&deletesub_' . $legacy->id . '=1';
+    $res = $cb->( GET $legacy_delete_url );
+    is( $res->code, 200, 'legacy deletesub URL renders a safe confirmation' );
+    ok( grep( { $_->id == $legacy->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'legacy deletesub GET does not mutate the owned subscription' );
+    my ($delete_form) = settings_form( $res->content, $legacy_delete_url );
+    ok( $delete_form, 'legacy delete confirmation carries a CSRF form' ) or return;
+    is( $delete_form->value('delete_subscription_id'),
+        $legacy->id, 'confirmation binds the exact owned subscription id' );
+    my $delete_token = $delete_form->value('lj_form_auth');
+    $delete_form->value( 'lj_form_auth', 'invalid' );
+    my $delete_req = $delete_form->click('delete_subscription_confirm');
+    $delete_req->uri( 'http://localhost' . $url );
+    $res = $cb->($delete_req);
+    like( $res->content, qr/Invalid form/i, 'invalid delete confirmation token is explained' );
     ok(
-        !grep( { $_->id == $legacy->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
-        'legacy deletesub GET currently mutates and must be replaced safely during migration'
+        grep( { $_->id == $legacy->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'invalid delete confirmation token leaves the subscription intact'
     );
+    $delete_form->value( 'lj_form_auth', $delete_token );
+    $delete_req = $delete_form->click('delete_subscription_confirm');
+    $delete_req->uri( 'http://localhost' . $url );
+    $res = $cb->($delete_req);
+    is( $res->code, 200, 'confirmed legacy deletion returns settings' );
+    ok( !grep( { $_->id == $legacy->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'CSRF POST deletes only the confirmed owned subscription' );
 
     my $fresh_owner = LJ::load_userid( $owner->id, 1 );
     my $protected   = $fresh_owner->subscribe(
@@ -580,4 +618,97 @@ test_psgi $app, sub {
         $after, 'invalid CSRF preserves reply-email auth' );
 };
 
+test_psgi $app, sub {
+    my $send   = shift;
+    my $user   = temp_user();
+    my $cookie = settings_cookie($user);
+    my $calls  = 0;
+    local $LJ::HOOKS{settings_account_stats} = [
+        sub {
+            my ($hook_user) = @_;
+            $calls++;
+            return q{<span id="settings-account-stats-fixture">fixture stats</span>};
+        }
+    ];
+
+    my $account_url = '/manage/settings/?cat=account';
+    my $res         = $send->( GET $account_url, Cookie => $cookie );
+    is( $res->code, 200, 'account category renders with account-stats hook' );
+    like(
+        $res->content,
+        qr/id=["']settings-account-stats-fixture["']/,
+        'account-stats hook output is rendered in the account category'
+    );
+    is( $calls, 1, 'account-stats hook is invoked for the account category' );
+
+    my $display_url = '/manage/settings/?cat=display';
+    $res = $send->( GET $display_url, Cookie => $cookie );
+    is( $res->code, 200, 'unrelated display category renders' );
+    unlike(
+        $res->content,
+        qr/settings-account-stats-fixture/,
+        'account-stats hook output is absent from an unrelated category'
+    );
+    is( $calls, 1, 'account-stats hook is not invoked for an unrelated category' );
+};
+
+test_psgi $app, sub {
+    local @LJ::NOTIFY_TYPES = ('LJ::NotificationMethod::Inbox');
+    my $send   = shift;
+    my $owner  = temp_user();
+    my $cookie = settings_cookie($owner);
+    my $cb     = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+    my $unrelated = $owner->subscribe(
+        event   => 'AddedToCircle',
+        journal => $owner,
+        method  => 'Inbox',
+        arg1    => 97
+    );
+    $owner->subscribe( event => 'JournalNewEntry', journalid => 0, method => 'Inbox' );
+    my $url = '/manage/settings/?cat=notifications&page=1';
+    my $res = $cb->( GET $url );
+    is( $res->code, 200, 'paged notifications render for an owner' );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'paged notifications expose the real mutation form' ) or return;
+    like( $form->action, qr/(?:\?|&)page=1(?:&|\z)/,
+        'notification form action preserves the requested page query' );
+
+    my @old_inputs = grep { ( $_->name || '' ) =~ /\Asubid-\d+-(\d+)-old\z/ } $form->inputs;
+    ok( @old_inputs,
+        'rendered notification form exposes an existing owned subscription for editing' )
+        or return;
+    my ($target_id) = $old_inputs[0]->name =~ /\Asubid-\d+-(\d+)-old\z/;
+    my $other_id = $unrelated->id;
+    my $before = LJ::load_userid( $owner->id, 1 );
+    my ($target) = grep { $_->id == $target_id } $before->subscriptions;
+    my ($other)  = grep { $_->id == $other_id } $before->subscriptions;
+    ok( $target && $target->active,
+        'chosen rendered target is an existing active owned subscription' )
+        or return;
+    ok( $other && $other->active, 'separate rendered subscription starts active' ) or return;
+
+    # Submit the actual rendered form with only the selected existing checkbox
+    # cleared. This retains its hidden -old input and all unrelated controls.
+    my ($target_input) = grep { ( $_->name || '' ) eq $target->freeze } $form->inputs;
+    ok( $target_input, 'the selected existing subscription has a rendered editable checkbox' )
+        or return;
+    $target_input->value(undef);
+    my $request = $form->click;
+    $request->uri( 'http://localhost' . $url );
+    $request->header( Cookie => $cookie );
+    $res = $send->($request);
+    is( $res->code, 200, 'editing an existing notification returns the settings page' );
+    my ($after_form) = settings_form( $res->content, $url );
+    ok( $after_form, 'notification edit response remains a rendered form' );
+    like( $after_form->action, qr/(?:\?|&)page=1(?:&|\z)/,
+        'notification edit response retains the page query in its next form action' );
+
+    my $fresh = LJ::load_userid( $owner->id, 1 );
+    my ($changed)   = grep { $_->id == $target_id } $fresh->subscriptions;
+    my ($untouched) = grep { $_->id == $other_id } $fresh->subscriptions;
+    ok( !$changed,
+        'rendered-form edit removes the selected non-tracking subscription on fresh load' );
+    ok( $untouched && $untouched->active,
+        'rendered-form edit leaves the unrelated active subscription unchanged on fresh load' );
+};
 done_testing;
