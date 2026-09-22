@@ -87,7 +87,7 @@ sub index_handler {
         my $res = handle_post( $remote, $action, $view, $itemid, \@item_ids );
         unless ( $res->{success} ) {
             for my $error ( @{ $res->{errors} } ) {
-                $errors->add( undef, $error );
+                $errors->add_string( undef, $error );
             }
         }
     }
@@ -548,7 +548,7 @@ sub compose_handler {
                 # Will target user accept messages from sender
                 unless ( $tou->can_receive_message($remote) ) {
 
-                    errors->add( 'msg_to', 'error.message.canreceive',
+                    $errors->add( 'msg_to', 'error.message.canreceive',
                         { ljuser => $tou->ljuser_display } );
                     next;
                 }
@@ -591,7 +591,7 @@ sub compose_handler {
                     $msg->can_send( \@errors );
                 }
                 foreach my $error (@errors) {
-                    $error->add( undef, $error );
+                    $errors->add_string( undef, $error );
                 }
             }
 
@@ -602,7 +602,7 @@ sub compose_handler {
                     $msg->send( \@errors );
                 }
                 foreach my $error (@errors) {
-                    $error->add( undef, $error );
+                    $errors->add_string( undef, $error );
                 }
                 return $r->msg_redirect( LJ::Lang::ml("$scope.message.sent"),
                     $r->SUCCESS, "$LJ::SITEROOT/inbox" )
