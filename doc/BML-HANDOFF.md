@@ -1,5 +1,15 @@
 # BML removal: resume handoff
 
+## Active continuation: 2026-09-22
+
+Implementation has resumed under the dedicated Astra foreman. The earlier
+checkpoint-only instruction and launch caveat below are historical. See the
+latest BML-PROGRESS.md section for live branches, worker session IDs, reproduced
+validation and review status. The user now explicitly authorizes
+`--approve-for-me` for these sessions, retaining automatic safety review and
+workspace sandboxing. New work remains local; no further push or deployment is
+authorized. Parent checkout and preexisting worktrees/containers stay untouched.
+
 ## Start here
 
 Read this file, [BML-PROGRESS.md](BML-PROGRESS.md),

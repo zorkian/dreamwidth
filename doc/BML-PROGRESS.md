@@ -267,8 +267,61 @@ does not depend on the original /tmp evidence directory.
 - Terra ThemeNav worker: `bml-terra-themenav-20260922`, workspace `w7`.
   Owns request/query handling and explicit widget redirect propagation.
 - Sol reviewer: `bml-sol-review-20260922`, workspace `w8`. Reviewing fixed range
-  `d9ea4bea6..595a54928` independently; review is pending, not yet a pass.
+  `d9ea4bea6..595a54928` independently; no actionable regression found. Its
+  focused HTTP and access-filter/image/widget browser tests passed, with one
+  intermittent allocator abort in the combined customization test run; all 58
+  customization assertions passed on an isolated rerun. Two further exact combined runs passed all 261 tests; the original
+  `malloc(): invalid next size (unsorted)` / exit 134 did not recur. Its native
+  allocator cause remains unknown. Live upload-return service remains untested.
 - Each worker has a separate checkout and must use its own devcontainer.
   [BML-CUSTOMIZE-ACCEPTANCE.md](BML-CUSTOMIZE-ACCEPTANCE.md) records the next
   controller/template package's acceptance gate, including links-list behavior
   missing from the earlier rendering baseline.
+
+- Final baseline static build completed successfully. All ten customization
+  screenshot states recorded zero JS exceptions. Captured additional links-list
+  and 390px theme/color states before migration. Evidence is in the foreman
+  container `/tmp/bml-baseline-customize` and host `/tmp/bml-astra-customize-before`.
+  Visually inspected theme browser, colors and access-filter mobile captures;
+  the existing missing advanced-customization string remains visible in BML.
+
+
+### Approval mode and preserved worker sessions
+
+The user explicitly authorized `--approve-for-me` on resuming the foreman after
+an interruption. This supersedes the earlier launch caveat: automatic approval
+review with workspace sandboxing is authorized for these workers and routine
+implementation, setup, tests and local commits. Safeguards remain enabled.
+
+- Sol: `01a0c9d8-e3d8-7330-bc30-c78bf4ec2b4d`, safely exited while idle and
+  resumed with automatic review in the same Herdr pane.
+- Terra ThemeNav: `01a0c9d8-7910-7fe3-ac68-19dc9567a899`, likewise resumed after
+  committing `2fe1b6a20`; now undertaking the independent FCK poll dialog package.
+- Terra widgets: `01a0c9d8-0966-7a70-b058-5a3a4328a791`, still validating;
+  approval-mode resume is deferred until a safe boundary.
+
+ThemeNav commit `2fe1b6a20` is under independent Sol review. Its reported focused
+suite passes 92 tests, and format/compile checks pass. It is not yet integrated.
+The widget gate additionally requires a real Foundation-rendered browser fixture;
+injecting jQuery after legacy page initialization alone is insufficient evidence.
+
+
+### New-package review and additional characterization
+
+- Independent Sol review of `2fe1b6a20` found a material error-display regression:
+  the BML caller passes the always-truthy widget error arrayref directly to
+  `LJ::bad_input`, rendering `LJ::Error::DieObject=HASH(...)` after both successful
+  widget saves and invalid-CSRF submissions. The 92-test suite missed the response
+  body issue. Sent to Terra for a separate fix, HTTP body assertions and Sol
+  recheck before integration. Other changed dispatch/query paths had no material
+  finding.
+- Captured 15 existing settings states in the foreman container: anonymous
+  display, eight personal categories, four community categories, unauthorized
+  authas and 390px display. All requests returned HTTP 200; no resource HTTP
+  failures. Personal Other Sites raises an existing JavaScript exception,
+  `Cannot set properties of undefined (setting 'display')`; the other states
+  recorded no exceptions. This is rendering characterization, not settings-save
+  acceptance. Capture script: host `/tmp/bml-settings-baseline.js`; data/images:
+  host `/tmp/bml-astra-settings-before`, container `/tmp/bml-settings-before`.
+- Additional customization before screenshots are retained locally in
+  `doc/bml-evidence/2026-09-22`. No artifacts or new commits have been pushed.
