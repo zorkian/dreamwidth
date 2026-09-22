@@ -860,3 +860,26 @@ checks, after widgets Terra completes customization1/4.
   comparison found inherited 625px minimum-width overflow at a 390px viewport
   and an omitted Account Settings heading. Both are routed as required visual
   acceptance corrections before final immutable review.
+
+### Picker integrated; settings and native followups under review
+
+- Sol cleared final picker source `e4e3958b7`, including actual image alt/title,
+  no XXX placeholders, legacy title/error ML keys, and direct-input behavior.
+  Integrated as `e83cddf0e`. Foreman own-container validation passes 3 files /
+  155 tests, tidy1051, compile1603 and real browser. Logs:
+  `/tmp/bml-picker-integrated-{prove,tidy,compile,browser}.log`.
+  Durable screenshots: `doc/bml-evidence/2026-09-22/picker-after`.
+  This extracts selection only; ten BML pages still remain.
+- Settings candidate `bcb019343f` is committed and under Sol review. Worker
+  reports104 settings and37 return assertions, static build, browser,
+  tidy1048 and compile1603. Foreman inspected final narrow anonymous layout:
+  overflow and heading issues are resolved. Not integrated before review.
+- Spam `038607cea` had a meaningful error-display bug: literal text was passed
+  to FormErrors::add and appeared in a missing-string banner. Sol's stronger
+  body assertion caught the false positive. Separate fix `345d6e246` uses
+  add_string with40 passing HTTP assertions; queued for independent recheck.
+- Event language range `eb65a9f66` is queued for Sol. Worker actual-method,
+  notification inbox and comment tests plus scoped tidy/compile1603 pass.
+- Widgets Terra continues owned CSRF bookmark confirmation/action handling;
+  Themenav Terra continues native S2 page labels in a separate branch.
+  All work stays local and existing sessions/worktrees are preserved.

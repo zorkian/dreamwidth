@@ -23,33 +23,32 @@ Their disposable browser fixture corrections through worker `74c332713` are
 independently reviewed and integrated locally as `855414735`. Normal and
 intentional-failure runs prove helper cleanup, including signal-exit rejection.
 
-Themenav Terra is implementing settings on
-`bml-terra-settings-migration-20260922`, based on reviewed foreman `bcdced59f`.
-Its checklist is `/tmp/bml-settings-production-checklist.md`. Preserve aliases,
-Foundation-compatible resources and hooks; constrain receiver return URLs and
-replace legacy notification GET deletion with owned confirmation plus CSRF POST.
-The integrated legacy HTTP/return baseline passes 115 assertions (two explicit
-off-origin redirect TODOs); before screenshots are preserved in settings-before.
-Unsaved navigation and Other Sites resources are migration requirements.
+Settings migration candidate `bcb019343f3f0612a949ebae06906de2452dc104`
+is committed on `bml-terra-settings-migration-20260922` and under independent
+Sol review. It is not integrated. Worker reports 104 settings and 37 return
+assertions, static build, real browser, tidy1048 and compile1603 passing.
+Final narrow screenshots resolve the observed overflow and missing heading.
+Before screenshots remain in settings-before; receiver redirects, safe deletion,
+permissions, aliases, resources and unsaved navigation are review requirements.
 
-Widgets Terra's native no-item picker extraction is preserved through
-`e4e3958b7fed56d8e0a7a331a3d456edcfb181c4` on
-`bml-terra-entry-picker-img-alt-20260922`. Sol is rechecking the final image-alt
-and legacy error-key corrections; it is not integrated yet. Prior itemid
-fallthrough/CSRF/permissions/aliases, input auto-selection, individual authas
-selector and successful-page legacy language scope are independently clear.
-Any itemid request still belongs to the existing BML editor. Modern editor
-other-poster manager parity remains a separate retirement gate.
+Native no-item picker final source `e4e3958b7` is independently cleared and
+integrated as `e83cddf0e`. Foreman regression passes 3 files / 155 tests,
+tidy1051, compile1603 and the real picker browser flow. Screenshots are in
+`doc/bml-evidence/2026-09-22/picker-after`. All itemid requests still fall
+through to the existing BML editor; editor retirement is not approved.
 
-Native account/notification label conversion is reviewed and integrated as
-`538d5d8dc` (worker `c1aba5fb4`); foreman related regression passes130 tests.
-Bounded modern inbox compose error repair is reviewed and integrated as
-`3dd1c4464` (worker `e4ba001a2`); foreman related regression passes31 tests.
-Widgets Terra resumes `bml-terra-inbox-spam-errors-20260922` for lost no-action
-errors and real action/CSRF/ownership acceptance after the picker correction.
-Bookmark tokenless GET mutations are independently reproduced and documented as
-the next bounded inbox package. No beta/public route cutover is approved by
-these narrow fixes. Local no-delivery probe scripts are in host/container /tmp.
+Native account labels and inbox compose repairs are reviewed and integrated as
+`538d5d8dc` and `3dd1c4464`; related foreman regressions pass130 and31 tests.
+Spam candidate `038607cea` has a literal-as-ML-key finding; narrow correction
+`345d6e246` uses add_string and rejects missing-string banners, with40 HTTP
+assertions passing. Both remain pending Sol recheck and are not integrated.
+Widgets Terra continues CSRF-safe bookmark handling on preserved branch
+`bml-terra-inbox-bookmark-errors-20260922`, covering modern and legacy URLs.
+
+Native Event candidate `eb65a9f6604f91cd2fa1292195af00543c51d064` is queued
+for Sol after settings. Themenav Terra continues a separate native S2 language
+package while preserving settings and Event branches. No inbox/editor beta
+cutover, push, or deployment is implied by these bounded packages.
 
 Preserve all three existing worker sessions/worktrees/containers; use the exact
 session identifiers in BML-PROGRESS.md. Their sessions sometimes end after
