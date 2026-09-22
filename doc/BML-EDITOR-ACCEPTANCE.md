@@ -10,9 +10,11 @@ work. Passing helper or protocol tests alone does not prove web-form parity.
 1. Actual modern edit GET/save/fresh-reload for subject, body, tags, location,
    music and userpic, including clearing existing values.
 2. Visible general validation errors, exact submitted input retention and
-   forced-fresh unchanged entry after failure. Source currently collects unnamed
-   errors but entry/form.tt renders warnings and field-specific errors only.
-   Reproduce empty-body/invalid-date before fixing; do not weaken validation.
+   forced-fresh unchanged entry after failure. The independent actual HTTP probe
+   confirms the outer wrapper already renders general errors; the initial
+   source-only claim of invisible errors was incorrect. Empty-body localization
+   is broken, while invalid-date text, retention and nonmutation pass. Fix the
+   full translation key without adding a duplicate error block.
 3. Location/music maxlength reflects the existing native std_max_length80/100
    language mapping. Current modern module hardcodes80; legacy form is dynamic.
 4. Existing timestamp load, changed timestamp persistence, backdated on/off,
@@ -30,7 +32,9 @@ work. Passing helper or protocol tests alone does not prove web-form parity.
 - Draft/preview source `f7c7b285a` is queued for independent review; it does not
   authorize deleting legacy update/edit/preview/draft endpoints.
 
-Next bounded implementation fixes the three source-backed rendering gaps
-(general errors, maxlength, accessible names) with actual HTTP/browser evidence.
+The bounded implementation fixes empty-body localization, maxlength and
+accessible names with actual HTTP/browser evidence. Candidate followups
+`9cd637697` and `1e934ae71` remove the proposed duplicate block and use the
+existing full empty-body translation key; independent review remains pending.
 The remaining roundtrip gates follow using disposable owned entries and fresh
 reads; no public editor cutover is approved by this document.

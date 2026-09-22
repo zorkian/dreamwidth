@@ -1159,3 +1159,16 @@ checks, after widgets Terra completes customization1/4.
 - Independent work continues on ordinary draft/preview characterization and
   comment request metadata maintenance. Neither requires changing the external
   hook contract or resuming held inbox work.
+
+### Journal characterization and corrected editor audit
+
+- Sol cleared Journal/feed characterization `c2bf8d5de`, integrated as
+  `24d762c77`. It does not remove either external-hook adapter; the deployment
+  question remains unanswered.
+- Independent actual editor HTTP probing supersedes the source-only invisible
+  general-error claim: the outer wrapper renders errors. Empty-body translation
+  is the reproduced defect; invalid-date text, retained inputs and unchanged
+  persistence pass. Rendering corrections through `1e934ae71` await review and
+  remove the unnecessary duplicate error block.
+- Separate Terra work continues on real owned-entry save/reload and timestamp
+  parity. Draft/preview `f7c7b285a` and comment metadata `5994d6271` await Sol.
