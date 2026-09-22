@@ -685,3 +685,23 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   BML POSTs with mode=init, itemid and synthesized delete/maintainer actions reach
   CSRF guards; missing/invalid tokens preserve entry and maintainer properties.
   This covers the extraction boundary, not successful editor mutation parity.
+
+### Continued integration — 2026-09-22, 19:00 UTC
+
+- Sol cleared ThemeChooser debug cleanup source `853d7bde8`; integrated locally
+  as `86a8788ed`. The removed diagnostic was pre-existing and exposed theme
+  search/filter values to stderr. Focused independent widget tests passed 28.
+- Sol cleared Other Sites/local settings source `ec2e7a83c` (83 assertions) and
+  the unsaved-navigation baseline `22b8fd0f` + `0f4b301c`. Integrated locally as
+  `a687a4985`, `859889089`, `46cf9b4e3`. Foreman combined settings/return suite
+  passes 105 assertions, with the two documented legacy redirect TODO failures
+  (`/tmp/bml-settings-integrated-105.log`). Browser integration rerun underway.
+- Mobile API-key source `5fea7e600` is explicitly failing worker WIP, excluded
+  from accepted integration. Terra is correcting the rendered delete form
+  contract and reset control lookup; exact passing tests and Sol review remain
+  required. No production Mobile defect is established by this fixture failure.
+- Final customization proof work remains split: widgets Terra owns nonzero
+  user-layer ownership, exercised control types, and invalid-option input/error
+  preservation; themenav Terra will cover filters, subtitles and display resets
+  in separate new test files after its clean Mobile correction. Sol is reviewing
+  the original access-filter checkpoint while these implementation tasks run.
