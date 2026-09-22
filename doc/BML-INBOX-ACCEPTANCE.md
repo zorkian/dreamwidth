@@ -1,0 +1,76 @@
+# Inbox replacement acceptance
+
+Disposition: complete the existing TT replacement, then retire three legacy BML
+pages after parity and cutover gates. This source audit at foreman `80ba04c72`
+is not runtime acceptance. Test old and new endpoints separately before changing
+routing. Never send test messages to real users or external mail services.
+
+## Routes and legacy forms
+
+Keep `/inbox/`, index and `.bml` aliases, compose and markspam links working.
+Legacy index GET redirects beta members to `/inbox/new`; POST stays legacy.
+Legacy compose/markspam remain independently reachable. A redirect cannot safely
+translate legacy mutation POST bodies.
+
+| Contract | Legacy | Modern acceptance |
+|---|---|---|
+| Selected actions | `markRead`, `markUnread`, `delete`, including `_1`/`_2` button suffixes | Map deliberately to `mark_read`, `mark_unread`, `delete`; preserve selected IDs and reject foreign IDs |
+| All actions | `markAllRead`, `deleteAll` | `mark_all`, `delete_all`; assert current view and single-entry scope only |
+| Selection fields | `all_Check-QID` in the index handler | `check_*` field values / RPC `ids`; exercise actual rendered forms |
+| Pagination | Zero-based legacy page | One-based modern page; test old links, lower/upper bounds and last-item deletion |
+| View precedence | POST before GET | Modern GET before POST; preserve old form semantics in compatibility dispatch |
+| Bookmarks | GET `bookmark_off` adds; `bookmark_on` removes | Both current implementations mutate on GET; replace with a safe POST/confirmation path and retain usable non-JS controls |
+
+Exercise all/unread, received/sent, bookmarks, single-entry and category folders,
+archive enabled/disabled, invalid views, empty inbox and multiple pages. Assert
+fresh item state, unread counts, pagination and folder summaries after actions.
+RPC expansion is read-only; every mutation must reject missing/invalid CSRF with
+unchanged target. Test logged-out, unavailable ESN, normal and privileged actors.
+
+## Compose and reply
+
+Use disposable validated users with mail/queue delivery isolated. Test recipient
+whitespace/case/deduplication, multiple recipients, CC default persistence,
+renamed/identity/community/invalid recipients, recipient validation and message
+privacy, banned sender, suspended sender, byte/character limits and UTF-8,
+empty-body confirmation, userpic, rate limits and send failures. Preserve entered
+subject/body/recipients on errors and reject missing/invalid tokens before effects.
+Verify persisted sent/received copies, not only a success redirect.
+
+Reply must load an owned message, enforce can_reply, retain parent linkage and
+quoted text, and reject missing/foreign/deleted IDs without sending anything.
+Notification-generated reply and spam links remain compatibility consumers;
+`LJ::Event::UserMessageRecvd` currently selects compose URL by beta membership,
+while its spam link still uses the legacy path.
+
+Source findings requiring reproductions and fixes before cutover:
+
+- Rejected recipient calls `errors->add` rather than `$errors->add`.
+- `can_send`/`send` error loops call `$error->add` on each error instead of the
+  form error collection; exercise nonempty error returns explicitly.
+- Legacy compose requires validated sender. Modern early eligibility checks the
+  messaging feature instead and uses the validation message for that condition.
+  Sender eligibility is an unresolved product contract; preserve the existing
+  legacy restriction at any public cutover unless explicitly decided otherwise.
+- Scope-dependent error translations need real request tests, including suspended
+  sender and rate-limit responses, rather than successful rendering only.
+
+## Spam and ban
+
+Cover received-message ownership, outgoing/invalid message rejection, spamreport
+sysban, spam only, ban only, both, neither, and invalid/missing CSRF. Confirm spam
+state and ban relation independently. Modern neither-selected branch currently
+adds an error then redirects without rendering it; preserve an actionable form
+error. Keep logging and response behavior reviewable and isolate external effects.
+
+## Browser and cutover gates
+
+Capture matching empty/populated/filtered/compose/error/spam states, desktop and
+narrow. Exercise expansion, selection, bulk actions, bookmarks, page boundaries,
+compose/reply/CC, validation and non-JS forms with console/network assertions.
+Restore fixtures on success and failure or use disposable accounts.
+
+Parity fixes and characterization can proceed independently of editor/settings
+work. Do not remove beta gating, change sender eligibility or delete the three
+BML pages solely because TT routes exist. Public route promotion and deployment
+beta/local-overlay evidence remain explicit gates in BML-REMOVAL-PLAN.md.
