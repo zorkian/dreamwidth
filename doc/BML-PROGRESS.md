@@ -824,3 +824,9 @@ checks, after widgets Terra completes customization1/4.
   Sol independent review is running. Foreman visual/source inspection requested
   a separate correction to raw untranslated security enums and plain community
   poster names. No picker integration or editor retirement is claimed yet.
+
+- Foreman integrated disposable browser normal runs both pass:
+  `/tmp/bml-access-disposable-integrated.log` and
+  `/tmp/bml-image-disposable-integrated.log`; final tidy passes 1049 checks
+  (`/tmp/bml-disposable-integrated-tidy.log`). Sol already covered intentional
+  failure and signal cleanup on the exact source range.
