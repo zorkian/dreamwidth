@@ -2,6 +2,20 @@
 
 ## Active continuation: 2026-09-22
 
+Latest accepted production is FCK consolidation `6dca2d923` (eight executable
+BML files remain), with exact build/95 HTTP tests/real Image+ImageButton browser
+and tidy1082/compile1605 passing. Timestamp gate `8823c34c1`, exact mode browser
+`e9281a322`, and private-post characterization `42b80ed08` are integrated and
+independently clear. See new evidence folders and latest progress entries.
+
+Current draft candidate `2a57cbf58` is held on its broad synthetic-event guard;
+Terra Themenav is implementing initialization-only ordering plus real userpic
+autosave proof. Widgets is characterizing legacy /update GET/valid private POST
+contracts. Sol is auditing ordinary preview differences while those finish.
+No remaining finite ordinary edit-form gate; larger draft/legacy route retirement
+gates are separate. External Journal hook question and held inbox work remain
+unchanged. Preserve exact sessions and local-only commits.
+
 Latest ordinary editor integration: owned-form HTTP `f07bac73b`, mode HTTP
 `558ba0609`, rendering `0aad3e37f`, draft browser characterization `f86d593dd`.
 Foreman related116 tests, tidy1078/compile1605 and real draft browser pass;

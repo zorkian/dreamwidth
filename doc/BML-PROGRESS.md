@@ -1278,3 +1278,15 @@ checks, after widgets Terra completes customization1/4.
   is now independently cleared and integration-tested.
 - New-post characterization `79b65d19d` awaits Sol. Legacy posting-form contract
   characterization and narrower draft initialization/autosave fixes remain active.
+
+### Native private-post characterization integrated
+
+- Sol cleared test-only `79b65d19d`, integrated as `42b80ed08`. Foreman new/edit
+ 2 files /73 assertions pass in container `/tmp/bml-entry-new-integrated.log`.
+  Real private-post action creates exactly one entry with fresh exact content
+  and metadata, and clears seeded draft body/properties. Cleared body reads
+  undef under existing storage semantics; no production change was made.
+- Full integrated FCK formatting1082 and compile1605 pass in container
+  `/tmp/bml-fck-integrated-{tidy,compile}.log`.
+- Legacy update URL/form characterization is active separately. No old editor
+  route, beta gate, or deferred Journal hook interface has been retired.
