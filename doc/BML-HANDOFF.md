@@ -2,6 +2,19 @@
 
 ## Active continuation: 2026-09-22
 
+Latest local integration: `0bceb2942` (S2 request-note rendering), evidence ledger
+`7f3a22a61`. Sol cleared source `c2204e313`; foreman six-view replay passed all
+HTTP/JS/resource checks after server restart. Tidy1063/compile1605 pass. Admin
+FAQ is integrated as `c39b78ca1`, with real-template tests passing. Authas labels
+`11ec1c696` are under Sol review; the new test needs formatting before acceptance.
+Ordinary control-strip translation and maintainer UI work continue in preserved
+Terra sessions. Later historical checkpoint sections below are not current gates.
+
+Restricted inbox work remains held under the parent platform-limitation direction;
+do not retry or reassign it around that restriction. UniqCookie has a separate
+unanswered approval question and remains untouched. Neither scheduled checks nor
+this handoff grant that approval. All new work remains local and unpublished.
+
 Implementation has resumed under the dedicated Astra foreman. The earlier
 checkpoint-only instruction and launch caveat below are historical. See the
 latest BML-PROGRESS.md section for live branches, worker session IDs, reproduced
