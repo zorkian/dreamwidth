@@ -68,3 +68,10 @@ matching migrated states and inspect them before deleting the BML source.
 Add HTTP integration tests and actual browser mutations, retain inherited GPL
 notices when moving the legacy controller logic, and review fixed commits
 independently before foreman integration.
+
+Receiver return-URL baseline: `t/plack-settings-return.t` proves the real tracking
+form adds an Inbox subscription and returns to a validated same-origin Referer,
+while CSRF/quota failures stay on settings. Separate valid-token direct receiver
+POSTs with absolute and scheme-relative offsite ret_url currently fail explicit
+TODO safety assertions. These become required automatically when the legacy BML
+hub is removed. Validate at the receiving controller; do not trust hidden fields.

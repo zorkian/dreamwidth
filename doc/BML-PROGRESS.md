@@ -584,3 +584,30 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   `BML-ALTERNATE-IMAGE-DIALOG.md`. Both distributed editor bundles and context
   menu retain the command; current plain-text static response does not prove
   the intended feature is unused or authorize dropping its upload shell.
+
+### Reviewed callers and remaining acceptance (2026-09-22)
+
+- Sol cleared customization alias correction `c46146316` with independent
+  four-alias GET/POST probes (24 assertions), and disposable fixture lifecycle
+  follow-up `3f87be1d1` with normal and intentional-failure browser runs. Broader
+  customization acceptance remains open; no page deletion is integrated.
+- Sol cleared settings `20e7d159a` and hook `2fecefaed` (57 assertions). The six
+  settings characterization/plan commits are integrated as `21e6d6890`,
+  `702c7d20b`, `a665e5a6a`, `e1ecc46f4`, `65677a97e`, `d602048b9`.
+  Foreman reran the 57 assertions successfully. Categories/browser remain open.
+- Foreman tracking return characterization `ff2b5abb9` passed 16 assertions and
+  Sol independently confirmed the real form, valid session, quota/CSRF failures,
+  fresh subscription and trusted return redirect. Sol identified the separate
+  receiver trust gap: legacy settings redirects a forged POST ret_url verbatim.
+  Added absolute and scheme-relative offsite receiver cases as explicit legacy
+  TODOs, automatically required when the BML hub is removed. Migration must
+  constrain returns to the intended origin; trusted-caller coverage is not enough.
+- Native controller source `3c7c80ae3` and handler fixtures `c25653b39` cleared
+  Sol review: 45 assertions across four files, tidy 1,038 and compile 1,599.
+  Integrated locally as `2f9b0f43f` and `51666e404`. Foreman combined native and
+  expanded return coverage passed 67 assertions across five files, with the two
+  explicit legacy receiver TODO failures (`/tmp/bml-native-callers-return.log`).
+- Native Message/Poll/UserMessageRecvd source and fixtures `6603f2cda` are queued
+  for Sol review. Terra returned to independent settings category/browser work;
+  customization Terra continues distinct selection, property/reset and denial
+  acceptance. All branches, worker sessions and containers remain preserved.

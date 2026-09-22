@@ -5,6 +5,7 @@ use warnings;
 use Test::More;
 use HTTP::Request::Common;
 use HTML::Form;
+use URI;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Test qw(temp_user);
@@ -107,5 +108,34 @@ test_psgi $app, sub {
     my $saved = persisted();
     is( scalar @$saved, 1, 'successful tracking POST persists exactly one intended subscription' );
     ok( @$saved && $saved->[0]->active, 'saved subscription is active on fresh load' );
+
+    # The receiver must validate this field even when a trusted caller normally
+    # supplies it. Keep the known legacy failure visible until hub conversion.
+    for my $untrusted ( 'https://offsite.invalid/landing', '//offsite.invalid/landing' ) {
+        $form->value( 'ret_url', $untrusted );
+        $res = $cb->( $form->click );
+        unlike(
+            $res->content,
+            qr/Invalid form|undef error|DieObject=|BML ERROR/,
+            'forged return URL reaches receiver with valid session and token'
+        );
+        my $location = $res->header('Location');
+        my $destination =
+            defined $location
+            ? URI->new_abs( $location, 'http://localhost/manage/settings/' )
+            : undef;
+    TODO: {
+            local $TODO = 'Legacy settings trusts POST ret_url; migrated receiver must constrain it'
+                if -e "$ENV{LJHOME}/htdocs/manage/settings/index.bml";
+            ok(
+                !$destination || ( $destination->scheme eq 'http'
+                    && $destination->host eq 'localhost'
+                    && $destination->port == 80 ),
+                "receiver refuses off-origin return URL $untrusted"
+            );
+        }
+        is( scalar @{ persisted() },
+            1, 'forged return URL does not duplicate the intended subscription' );
+    }
 };
 done_testing;
