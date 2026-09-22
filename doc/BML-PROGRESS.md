@@ -1254,3 +1254,15 @@ checks, after widgets Terra completes customization1/4.
   `/tmp/bml-entry-displaydate-browser.log`.
 - Sol independently confirmed FCK `dd207c99c` nested aliases return404; root
   routes pass. It remains held pending the already-assigned route correction.
+
+### Finite edit-form matrix independently clear
+
+- Sol cleared mode browser `d3ad7add3` atop `a6889cd94`, integrated locally as
+  `e9281a322`. Actual initial state, no-op/changed saves, exact bodies/editor
+  properties and failure cleanup are covered. Foreman replay is running.
+- Sol cleared FCK alias `d85f96d33` atop `dd207c99c`: all65 HTTP aliases and
+  previous actual Image/ImageButton browser behavior pass. Integration waits
+  for the active foreman mode replay to finish before changing runtime files.
+- Draft candidate `2a57cbf58` remains held: its blanket synthetic-event filter
+  drops the real icon selector change event. Initialization-only correction and
+  subsequent user autosave browser proof are being implemented separately.

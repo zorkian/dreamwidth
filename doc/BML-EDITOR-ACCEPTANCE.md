@@ -48,5 +48,8 @@ reads; no public editor cutover is approved by this document.
 Gate4 through `013cc57da` is independently clear and integrated as `8823c34c1`.
 Parsed checkbox states after both reloads and visible desktop/narrow panel
 labels pass. Foreman timestamp/rendering34 assertions and actual browser pass;
-captures are in entry-displaydate-native. Gate5 browser remains held on precise
-initial-state, no-op and exact-body proof corrections to `a6889cd94`.
+captures are in entry-displaydate-native. Gate5 browser through `d3ad7add3` is independently clear and integrated as
+`e9281a322`: actual initial state, no-op and changed saves, exact fresh bodies,
+legacy Markdown detection and intentional failure cleanup all pass. The
+foreman combined-branch replay is running. The finite ordinary edit-form
+matrix is independently clear; other retirement gates remain separate.
