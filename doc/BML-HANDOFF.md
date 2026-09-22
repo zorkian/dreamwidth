@@ -11,10 +11,11 @@ workspace sandboxing. New work remains local; no further push or deployment is
 authorized. Parent checkout and preexisting worktrees/containers stay untouched.
 
 Current isolated foreman branch/worktree is `bml-astra-foreman-20260922`.
-Reviewed ThemeNav, Foundation widget runtime and poll dialog migration are now
-integrated locally. Twelve BML pages remain. Customization conversion and native
-request-language work are active in Terra worktrees and not yet accepted; Sol
-reviews exact commits in its own worktree. Preserve these existing Herdr sessions
+Reviewed ThemeNav, Foundation widget runtime, poll dialog migration and native
+request-language context are now integrated locally. Twelve BML pages remain. Customization conversion is committed in its Terra worktree and under review;
+its deletion and acceptance corrections are not yet integrated. Sol reviews
+exact commits in its own worktree. Native language passed independent review
+and foreman integration tests; remaining direct BML consumers still need migration. Preserve these existing Herdr sessions
 instead of starting replacements. Settings has a reviewed 18-test real-session
 display baseline and an acceptance matrix, but no hub migration yet. See the
 progress ledger for all exact session IDs, containers, commits and open findings.

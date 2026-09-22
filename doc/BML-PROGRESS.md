@@ -537,3 +537,17 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   remaining category/hook/validation/browser acceptance on the settings branch;
   the prior stash was restored successfully. Production hub migration remains
   behind customization acceptance.
+
+- Broader native request/authentication/error/template regression passed another
+  92 tests across eight files (`/tmp/bml-native-request-regression.log`). The
+  foreman restarted its server and captured/inspected translated customization
+  and settings pages with `bin/dev/screenshot`; both returned HTTP 200, with
+  intact labels. Images retained at host `/tmp/bml-astra-native-evidence`.
+- Customization follow-up `44125e980` attempts fixture restoration, but foreman
+  found omitted generic properties reset by the same form and incomplete failure
+  cleanup. Terra is correcting this and the still-open preview identity,
+  distinct layout, actual property reload and real-form reset acceptance gaps.
+  No customization integration approval is implied by its reported test counts.
+- Foreman source-only inbox audit is `BML-INBOX-ACCEPTANCE.md`; it records action
+  and pagination mappings, additional compose error-collection paths requiring
+  reproduction, and the unresolved sender eligibility/beta cutover gates.
