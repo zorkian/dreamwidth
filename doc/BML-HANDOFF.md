@@ -181,3 +181,56 @@ Done means every inventory item has a tested disposition, compatible routes
 remain where needed, and startup/acceptance work with the BML engine physically
 absent. Merely eliminating .bml page files, renaming adapters, or retaining a
 permanent BML shim does not satisfy that goal.
+
+
+## Continuation update — 2026-09-22, 18:33 UTC
+
+All work remains local, with the same Herdr sessions/worktrees/devcontainers and
+reviewed automatic approvals. Do not restart or replace workers. Terra workers
+sometimes end after a partial step or while a browser is running; inspect and
+resume them with the concrete remaining deliverable rather than treating that
+as completion. Never edit their active checkouts concurrently.
+
+Foreman integrated native controller caller commits as `2f9b0f43f`, `51666e404`
+and native services as `ba3604b24`, all independently cleared by Sol. Foreman
+native/return coverage passed 67 assertions, service/poll rerun passed, and later
+full tidy/compile passed 1,042/1,599 (`/tmp/bml-foreman-picker-{tidy,compile}.log`).
+
+Settings characterization through `2fecefaed` is integrated and cleared (57).
+Foreman return test `ff2b5abb9` plus `86b144d66` is reviewed, with 22 assertions
+and two explicit legacy off-origin receiver TODO failures; migration must fix
+receiver validation. New worker category `fde5bdc43` adds 72 total assertions;
+Sol found a weak privacy unchanged assertion, fixed by `de562134176` and awaiting
+recheck. Browser `05d14a830` saves community/privacy/mobile using disposable
+accounts, but cleanup lifecycle still needs correction. Settings Terra is
+actively fixing that, then must add actual notifications/unsaved acceptance.
+No settings production conversion is integrated; wait for customization gate.
+
+Customization production plus acceptance remains on the widgets branch, not
+integrated. Alias and disposable fixture lifecycle findings are cleared. HTTP
+reset correction `8917dc475` passes 169; remaining text-click serialization was
+fixed in `c5b939a15`, along with the first narrow input-width correction. Foreman
+viewed its screenshot and found fields still clipped out of view. Widgets Terra
+is running a follow-up that stacks narrow navigation/content and verifies visible
+focused input area (`/tmp/linkslist-visible-browser`). Then finish initialization,
+style ownership/name migration, logged-out/options aliases/validation gates.
+Sol is reviewing fixed immutable ranges; no blanket custom gate approval yet.
+
+Picker HTTP baseline `95fcdf04c` is independently cleared (64): exact dated latest
+entries, direct POST aliases, pre-request body snapshots/fresh reads, community
+manager and retained other-poster editor controls. Browser baseline `de14507c5`
+is independently cleared: actual keyboard/recent/date/community/narrow, normal
+and intentional failure cleanup. Screenshots are committed under
+`doc/bml-evidence/2026-09-22/picker-before`. Legacy extensionless title is missing,
+explicit .bml is correct; require translated replacement heading. The current
+permission model does not allow delegated personal authas; do not invent a grant.
+`BML-ENTRY-PICKER-ACCEPTANCE.md` records the source-backed temporary route decline
+approach to preserve itemid requests through existing BML fallback, still needing
+actual dispatch tests before extraction. Editor beta/parity gates remain separate.
+
+Next integration after customization gate: use `git log --reverse --cherry-pick
+--right-only foreman...widgets` to avoid duplicate widget patches; run combined
+native+custom tests and static/browser on the foreman container after restart.
+Then Terra can extract the picker while settings Terra converts its hub. Other
+independent inbox/image-dialog/native runtime packages remain as documented;
+external beta/overlay/upload decisions do not justify stopping all work.
