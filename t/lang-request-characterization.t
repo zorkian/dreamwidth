@@ -194,8 +194,9 @@ subtest 'native request context handles DB, fallback, misses, and source autoloa
             undef, $en->{lnid} );
     }
 
-    my $db_code       = $fresh->("$prefix.db");
-    my $missing_code  = $fresh->("$prefix.missing");
+    my $db_code          = $fresh->("$prefix.db");
+    my $missing_code     = $fresh->("$prefix.missing");
+    my $cached_miss_code = $fresh->("$prefix.cached-miss");
     my $source_dir    = tempdir( 'lang-native-XXXXXX', DIR => "$ENV{LJHOME}/views", CLEANUP => 1 );
     my ($source_name) = $source_dir =~ m{/([^/]+)$};
     my $source_code   = $fresh->("/$source_name/autoload.tt.value");
@@ -215,21 +216,30 @@ subtest 'native request context handles DB, fallback, misses, and source autoloa
         request('/native.tt');
         LJ::Lang::set_request_context( lang => 'en', getter => \&LJ::Lang::get_text );
         local $LJ::IS_DEV_SERVER = 0;
-        local $LJ::NO_ML_CACHE   = 1;
-        is(
-            LJ::Lang::ml( $db_code, { name => 'cold' } ),
-            'Database cold',
-            'cold DB lookup goes through native request context'
-        );
+        {
+            local $LJ::NO_ML_CACHE = 1;
+            is(
+                LJ::Lang::ml( $db_code, { name => 'cold' } ),
+                'Database cold',
+                'cold DB lookup bypasses caches through native request context'
+            );
+            is( LJ::Lang::ml($missing_code),
+                '', 'cold DB miss keeps production missing-string contract' );
+        }
+        $flush->($db_code);
         is(
             LJ::Lang::ml( $db_code, { name => 'warm' } ),
             'Database warm',
-            'warm DB lookup preserves substitutions through native context'
+            'normal-cache warm DB lookup preserves substitutions through native context'
         );
         is( LJ::Lang::ml($missing_code),
-            '', 'cold DB miss keeps production missing-string contract' );
-        is( LJ::Lang::ml($missing_code),
-            '', 'warm DB miss keeps production missing-string contract' );
+            '', 'normal-cache warm DB miss keeps production missing-string contract' );
+        is( LJ::Lang::ml($cached_miss_code),
+            '', 'normal-cache miss is cached through native context' );
+        ok( LJ::Lang::set_text( $dmid, 'en', $cached_miss_code, 'Now cached', {} ),
+            'set_text updates isolated cached-miss fixture' );
+        is( LJ::Lang::ml($cached_miss_code),
+            'Now cached', 'set_text invalidates the native request cached miss' );
         DW::Request->reset;
 
     SKIP: {

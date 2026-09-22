@@ -30,7 +30,7 @@ BEGIN {
     };
 }
 
-plan tests => 11;
+plan tests => 13;
 
 # Keep engine coverage independent of pages as they migrate to controllers.
 my $fixture_dir = tempdir( 'bml-test-XXXXXX', DIR => "$ENV{LJHOME}/htdocs", CLEANUP => 1 );
@@ -38,7 +38,8 @@ my ($fixture_name)   = $fixture_dir =~ m{([^/]+)$};
 my $fixture_url      = "/$fixture_name/";
 my $fixture_page_url = $fixture_url . "index.bml";
 open my $fixture, '>', "$fixture_dir/index.bml" or die $!;
-print {$fixture} '<?_code return "BML test fixture: <?_ml .greeting _ml?>"; _code?>';
+print {$fixture}
+q{<?_code return "BML test fixture: <?_ml .greeting _ml?> / " . LJ::Lang::ml('.greeting'); _code?>};
 close $fixture or die $!;
 open my $fixture_text, '>', "$fixture_dir/index.bml.text" or die $!;
 print {$fixture_text} ";; -*- coding: utf-8 -*-\n.greeting=Translated BML fixture\n";
@@ -92,10 +93,24 @@ test_psgi $app, sub {
     is( $res->code, 200, "BML fixture returns 200" );
     is(
         $res->content,
-        'BML test fixture: Translated BML fixture',
-        'BML page translates its scoped string'
+        'BML test fixture: Translated BML fixture / Translated BML fixture',
+        'BML page translates both BML and native scoped strings'
     );
     like( $res->content_type, qr{text/html}, "BML response has text/html content type" );
+};
+
+# A directory URL has historically used the URL directory for <?_ml>, while
+# native LJ::Lang::ml receives the physical index.bml scope. Keep this route
+# covered and characterize that preexisting difference rather than changing it.
+test_psgi $app, sub {
+    my $cb  = shift;
+    my $res = $cb->( GET $fixture_url );
+    is( $res->code, 200, 'BML directory fixture returns 200' );
+    is(
+        $res->content,
+        "BML test fixture: [missing string $fixture_url.greeting] / Translated BML fixture",
+        'directory route preserves distinct legacy and native relative lookup scopes'
+    );
 };
 
 # Test 9: Non-existent .bml-resolvable path returns 404
