@@ -547,7 +547,10 @@ sub set_request_scope {
 sub get_effective_lang {
     my $context = request_context();
     my $lang    = $context ? $context->{lang} : undef;
-    return $lang if $lang;
+
+    # Keep the old data-lookup contract: debug is meaningful to ml(), but it
+    # is not a language that direct get_text callers may send to the database.
+    return $lang if $lang && LJ::Lang::get_lang($lang);
     return $LJ::DEFAULT_LANG;
 }
 

@@ -34,11 +34,15 @@ plan tests => 11;
 
 # Keep engine coverage independent of pages as they migrate to controllers.
 my $fixture_dir = tempdir( 'bml-test-XXXXXX', DIR => "$ENV{LJHOME}/htdocs", CLEANUP => 1 );
-my ($fixture_name) = $fixture_dir =~ m{([^/]+)$};
-my $fixture_url = "/$fixture_name/";
+my ($fixture_name)   = $fixture_dir =~ m{([^/]+)$};
+my $fixture_url      = "/$fixture_name/";
+my $fixture_page_url = $fixture_url . "index.bml";
 open my $fixture, '>', "$fixture_dir/index.bml" or die $!;
-print {$fixture} '<?_code return "BML test fixture"; _code?>';
+print {$fixture} '<?_code return "BML test fixture: <?_ml .greeting _ml?>"; _code?>';
 close $fixture or die $!;
+open my $fixture_text, '>', "$fixture_dir/index.bml.text" or die $!;
+print {$fixture_text} ";; -*- coding: utf-8 -*-\n.greeting=Translated BML fixture\n";
+close $fixture_text or die $!;
 
 # Load the Plack app
 my $app_file = "$ENV{LJHOME}/app.psgi";
@@ -84,9 +88,13 @@ test_psgi $app, sub {
 # The fixture must actually execute through BML rather than a controller.
 test_psgi $app, sub {
     my $cb  = shift;
-    my $res = $cb->( GET $fixture_url );
+    my $res = $cb->( GET $fixture_page_url );
     is( $res->code, 200, "BML fixture returns 200" );
-    is( $res->content, 'BML test fixture', 'BML code executed' );
+    is(
+        $res->content,
+        'BML test fixture: Translated BML fixture',
+        'BML page translates its scoped string'
+    );
     like( $res->content_type, qr{text/html}, "BML response has text/html content type" );
 };
 

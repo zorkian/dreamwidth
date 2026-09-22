@@ -43,12 +43,18 @@ sub ml {
     return sub {
         my ($code) = @_;
 
-        $code = DW::Request->get->note('ml_scope') . $code
-            if rindex( $code, '.', 0 ) == 0;
+        # Keep the native request-local context authoritative.  Preserve the
+        # old uselang override, but otherwise honor a BML/custom getter context.
+        my $r       = DW::Request->get;
+        my $uselang = $r->get_args->{uselang} || '';
+        if ( $uselang eq 'debug' || LJ::Lang::get_lang($uselang) ) {
+            LJ::Lang::set_request_context( lang => $uselang );
+        }
+        elsif ( !LJ::Lang::request_context() ) {
+            LJ::Lang::set_request_context( lang => decide_language() );
+        }
 
-        my $lang = decide_language();
-        return $code if $lang eq 'debug';
-        return LJ::Lang::get_text( $lang, $code, undef, $args );
+        return LJ::Lang::ml( $code, $args );
     };
 }
 
