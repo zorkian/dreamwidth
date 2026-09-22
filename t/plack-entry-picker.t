@@ -8,7 +8,7 @@ use HTML::Form;
 use URI;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_user temp_comm);
 plan skip_all => 'Picker integration requires a development server' unless $LJ::IS_DEV_SERVER;
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
@@ -103,5 +103,98 @@ test_psgi $app, sub {
         ok( $fresh->valid, 'read-only selection leaves entry present' );
         is( $fresh->event_raw, $entry->event_raw, 'selection leaves persisted body unchanged' );
     }
+};
+
+test_psgi $app, sub {
+    my $send  = shift;
+    my $cb    = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+    my $comm  = temp_comm();
+    my $empty = temp_comm();
+    LJ::set_rel( $comm,  $owner, 'A' );
+    LJ::set_rel( $empty, $owner, 'A' );
+    $outsider->update_self( { status => 'A' } );
+    my $own_entry = $owner->t_post_fake_comm_entry( $comm, body => 'Manager community body' );
+    my $other_entry =
+        $outsider->t_post_fake_comm_entry( $comm, body => 'Other poster community body' );
+    my @expected = sort { $a <=> $b } ( $own_entry->ditemid, $other_entry->ditemid );
+
+    for my $key ( 'usejournal', 'journal' ) {
+        my $res = $cb->( GET '/editjournal?' . $key . '=' . $comm->user );
+        is_deeply( [ entry_ids( $res->content ) ],
+            \@expected, "maintainer sees both posters through $key context" );
+        like(
+            $res->content,
+            qr/Other poster community body/,
+            'visible other-poster summary is retained'
+        );
+        for my $form ( grep { $_->find_input('itemid') } picker_forms( $res->content ) ) {
+            my %query = $form->action->query_form;
+            is( $query{usejournal}, $comm->user, 'entry form preserves community context' );
+        }
+    }
+    my $res = $cb->(
+        POST '/editjournal?usejournal=' . $comm->user,
+        Content => [
+            mode       => 'edit',
+            selecttype => 'lastn',
+            howmany    => 20,
+            usejournal => $empty->user
+        ]
+    );
+    is_deeply( [ entry_ids( $res->content ) ],
+        \@expected, 'GET usejournal takes precedence over POST' );
+    $res = $cb->(
+        POST '/editjournal?journal=' . $empty->user,
+        Content => [
+            mode       => 'edit',
+            selecttype => 'lastn',
+            howmany    => 20,
+            usejournal => $comm->user
+        ]
+    );
+    is_deeply( [ entry_ids( $res->content ) ],
+        \@expected, 'POST usejournal takes precedence over journal alias' );
+    $res = $cb->(
+        POST '/editjournal',
+        Content => [
+            mode       => 'edit',
+            selecttype => 'lastn',
+            howmany    => 20,
+            usejournal => $empty->user
+        ]
+    );
+    like(
+        $res->content,
+        qr/The selected journal has no entries/,
+        'empty recent selection has journal-specific message'
+    );
+    $res = $cb->( GET '/editjournal?authas=' . $comm->user );
+    is( scalar entry_ids( $res->content ),
+        0, 'managed community cannot impersonate individual picker actor' );
+    $comm->update_self( { statusvis => 'O' } );
+    $res = $cb->(
+        POST '/editjournal',
+        Content => [
+            mode       => 'edit',
+            selecttype => 'lastn',
+            howmany    => 20,
+            usejournal => $comm->user
+        ]
+    );
+    is_deeply( [ entry_ids( $res->content ) ],
+        \@expected, 'read-only community remains selectable by manager' );
+    $comm->update_self( { statusvis => 'V' } );
+    $res =
+        $cb->( GET '/editjournal?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid );
+    is( $res->code, 200, 'manager other-poster editor remains reachable without beta redirect' );
+    my @forms = picker_forms( $res->content );
+    ok(
+        scalar( grep { $_->find_input('action:delete') } @forms ),
+        'manager retains legacy delete action for another poster'
+    );
+    ok(
+        scalar( grep { $_->find_input('action:savemaintainer') } @forms ),
+        'manager retains legacy maintainer controls for another poster'
+    );
 };
 done_testing;

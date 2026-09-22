@@ -32,9 +32,12 @@ That is an editor parity gate, not evidence those old actions are obsolete.
 
 Preserve delegated identity explicitly: old BML compares authas to the already
 resolved user's name, so it accidentally omits authas from forms/redirects.
-Migration should retain the intended actor context and prove it with a delegated
-fixture. Encode query components and escape form actions instead of copying
-legacy raw interpolation.
+Encode query components and escape form actions instead of copying legacy raw
+interpolation. Current `LJ::User::can_manage` rejects management of any other
+personal account, and the picker rejects community authas actors; consequently
+a delegated individual fixture is not currently reachable through production
+permissions. Do not invent a grant to claim current coverage. Preserve explicit
+identity context if this branch becomes reachable through an audited extension.
 
 ## Permissions and mutation separation
 
@@ -53,3 +56,15 @@ journal/itemid aliases. Inventory and test those callers before changing URLs.
 Capture old/new default, filtered, empty and community result states plus narrow
 layout; validate selector submission and per-entry navigation in a real browser.
 Beta promotion and full editor retirement remain separate external/product gates.
+
+## Executed baseline
+
+Foreman `t/plack-entry-picker.t` now passes 64 real-session assertions: both
+legacy URLs, default five, actual recent/single/date form submissions, exact
+composite IDs, owner private summaries, login/authas denial, and unchanged bodies.
+Community cases cover both journal aliases, GET/POST journal precedence, empty
+recent results, read-only selection, and actual other-poster delete/maintainer
+controls. Fixtures use disposable validated accounts and real persisted entries.
+This is baseline coverage, not picker extraction or editor cutover approval.
+Browser evidence, denied community actors and itemid mutation separation remain
+required. Logs: `/tmp/bml-entry-picker-{baseline3,community}.log` in foreman container.
