@@ -706,8 +706,12 @@ sub markspam_handler {
     if ( $r->did_post && $POST->{'confirm'} ) {
 
         # Some action must be selected
-        $errors->add( undef, 'No action selected' )
+        $errors->add_string( undef, 'No action selected' )
             unless ( $POST->{spam} || $POST->{'ban'} );
+
+        return DW::Template->render_template( 'inbox/markspam.tt',
+            { errors => $errors, msg_user => $msg->other_u, msgid => $msg_id } )
+            if $errors->exist;
 
         # Mark as spam
         if ( $POST->{spam} ) {
