@@ -1230,3 +1230,17 @@ checks, after widgets Terra completes customization1/4.
 - Browser-mode candidate `a6889cd94` awaits independent review. Timestamp
   checkbox/visible-panel corrections pass worker HTTP17/browser and are being
   committed; they are not yet independently cleared.
+
+### Pending browser proof corrections and FCK alias
+
+- Mode browser `a6889cd94` exits0 but is not accepted: it selects the mode
+  before checking initial state, omits rendered initial-body/legacy detection
+  proof and a no-op save, and compares saved body with a regex. Widgets now
+  owns the separate correction; Themenav owns draft parity fixes.
+- FCK duplicate deletion `dd207c99c` passes worker35 HTTP, real Image/ImageButton
+  insert/edit, build/tidy/compile and intentional cleanup, but foreman found the
+  promised nested legacy route absent from the exact commit. Added old-path
+  assertion labels still exercise only root paths. Integration is held for a
+  real nested alias and direct GET/POST tests; independent confirmation queued.
+- Timestamp correction `013cc57da` awaits Sol recheck. No held inbox work or
+  external Journal hook interface has been changed.
