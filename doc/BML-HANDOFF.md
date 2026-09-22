@@ -6,7 +6,8 @@ Latest local integration: `0bceb2942` (S2 request-note rendering), evidence ledg
 `7f3a22a61`. Sol cleared source `c2204e313`; foreman six-view replay passed all
 HTTP/JS/resource checks after server restart. Tidy1063/compile1605 pass. Admin
 FAQ is integrated as `c39b78ca1`, with real-template tests passing. Authas labels
-`11ec1c696` are under Sol review; the new test needs formatting before acceptance.
+through `d8d0fa892` are independently cleared and integrated as `363cda887`;
+foreman249 related tests and changed-file tidy pass.
 Ordinary control-strip translation and maintainer UI work continue in preserved
 Terra sessions. Later historical checkpoint sections below are not current gates.
 

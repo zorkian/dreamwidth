@@ -1072,3 +1072,17 @@ checks, after widgets Terra completes customization1/4.
 - Widgets also has the next ordinary Support FAQ default-language package on
   a separate branch. Sol is auditing text-length language compatibility and
   reviewing the immutable ordinary ranges. Held work remains unchanged.
+
+### Authas native labels integrated
+
+- Sol cleared exact final `d8d0fa892` atop `11ec1c696`, `a0adf67e9`,
+  `f0e722c25`: both default Foundation labels are now asserted in actual output,
+  and required formatting passes. Integrated locally as `363cda887`.
+- Foreman helper/settings/customization regression passes3 files /249 tests,
+  `/tmp/bml-authas-integrated.log`; exact changed-file tidy passes in
+  `/tmp/bml-authas-integrated-tidy.log`.
+- Control-strip range through `2416c5e125` (including actual TT/hook correction
+  `36404e182`) and std_max_length `68c28dd1a` are with Sol. Maintainer correction
+  `90be0f37c` is queued for recheck of selected state and poster-property data.
+  All remain unintegrated pending their bounded reviews. OPML redirect and
+  Support FAQ default-language work continue separately; held work is unchanged.
