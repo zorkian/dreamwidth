@@ -3640,7 +3640,8 @@ sub placeholder_link {
 # truncated or throw an error.  we'll risk that and give them 20 more
 # characters.
 sub std_max_length {
-    my $lang = eval { BML::get_language() };
+    my $context = LJ::Lang::request_context();
+    my $lang    = $context ? $context->{lang} : undef;
     return 80  if !$lang || $lang =~ /^en/;
     return 100 if $lang =~ /\b(hy|az|be|et|ka|ky|kk|lt|lv|mo|ru|tg|tk|uk|uz)\b/i;
     return 80;
