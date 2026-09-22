@@ -192,8 +192,8 @@ sub make_authas_select {
     my ( $u, $opts ) = @_;    # type, authas, label, button
 
     my $authas = $opts->{authas} || $u->user;
-    my $button = $opts->{button} || $BML::ML{'web.authas.btn'};
-    my $label  = $opts->{label}  || $BML::ML{'web.authas.select.label'};
+    my $button = $opts->{button} || LJ::Lang::ml('web.authas.btn');
+    my $label  = $opts->{label}  || LJ::Lang::ml('web.authas.select.label');
 
     my $foundation = $opts->{foundation} || 0;
 
