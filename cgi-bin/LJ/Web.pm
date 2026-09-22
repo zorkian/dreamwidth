@@ -626,7 +626,7 @@ sub form_auth {
 #          or the user has changed session (logged out and in again, or something).
 # </LJFUNC>
 sub check_form_auth {
-    my $formauth = shift || $BMLCodeBlock::POST{'lj_form_auth'};
+    my $formauth = @_ ? shift : $BMLCodeBlock::POST{'lj_form_auth'};
     return 0 unless $formauth;
 
     my $remote = LJ::get_remote();
