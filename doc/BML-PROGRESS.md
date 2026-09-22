@@ -457,3 +457,24 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   completing generic property-family save/reset acceptance. Captured WIP colors
   also displayed missing strings; subsequent translation moves require fresh
   verified captures. BML deletion remains unintegrated.
+
+
+### Poll migrated and independently accepted
+
+- Sol cleared the exact poll-only lifecycle correction `0b32de310`, reviewed
+  without the intervening language candidate. Empty, subject fixture and a
+  genuinely preexisting nonempty draft all passed actual browser acceptance;
+  independent GET confirmed full original draft/properties preserved.
+- Integrated source `f037a27cb`, `c05449cd5`, `0b32de310` locally as
+  `80c1c7c27`, `adb8502ff`, `6300adc42`. Old `/tools/fck_poll.bml` remains a
+  compatibility route to the standalone TT controller; plugin uses extensionless
+  URL. Nonzero-index poll edits populate correctly. Twelve BML page files remain.
+- Foreman integrated poll/image/protocol tests passed 44 assertions, static build
+  passed and actual modern editor browser passed. Logs in foreman container:
+  `/tmp/bml-poll-integrated-{tests,build,browser}.log`; screenshots retained in
+  `doc/bml-evidence/2026-09-22/poll-before` and `poll-after`.
+- Native language scope-loss finding is corrected in source `6d81b9548`, pending
+  independent recheck and remaining nested/cache acceptance. No language candidate
+  integrated. Customization CodeMirror diagnosis remains active: installed TT
+  compares string `==` correctly, disproving the initial numeric-comparison
+  explanation. Resource loading/initialization requires actual browser evidence.
