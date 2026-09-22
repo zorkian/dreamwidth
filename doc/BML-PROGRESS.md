@@ -400,3 +400,34 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
 - While poll review proceeds, its Terra worker is characterizing request-language
   behavior and proposing a compatibility design. Production language conversion
   has not started. Existing-page compatibility and request isolation remain gates.
+
+
+### Integrated regression and active acceptance work
+
+- Foreman checkpoint regression with widget-resource tests passed 293 assertions
+  across 11 files. Formatting passed 1,033 checks and compile passed 1,597
+  assertions. Logs: `/tmp/bml-integrated-{regression,tidy,compile}.log` in the
+  foreman container.
+- Sol poll review of `f037a27cb` found no material production regression. Its
+  static build, 57 poll/image assertions and actual browser passed; diagnostic
+  inspection confirmed exactly four polls and replacement of the selected
+  nonzero-index poll. Integration awaits harness correction: final unexpected
+  dialog checks and complete saved-draft restoration, including editor mode.
+  Clearing only the body did not restore the fixture. Before/after screenshots
+  copied to host `/tmp/bml-astra-poll-{before,after}`; Setup and populated
+  Questions states visually inspected.
+- Sol reviewed characterization `47a66155e` and strengthened `18e4a0656`. Tests
+  now require an alternate theme and exercise additional legacy aliases/S1
+  initialization. Exact preview identity, distinct layout persistence, generic
+  option control families, real-form reset and valid unauthorized mutation
+  remain conversion gates. Terra received the detailed findings directly.
+- Language characterization `72af53305` confirms global BML scope can override
+  a later modern request scope. Native request-local context design approved,
+  with actual PSGI/nested/error restoration, fallback/cache, custom getter and
+  background compatibility tests required. No language change integrated yet.
+- Settings acceptance matrix is `doc/BML-SETTINGS-ACCEPTANCE.md`. Foreman
+  characterization `d792dc5c4` passes 14 tests using actual rendered display-form
+  fields, fresh GET persistence, legacy aliases, invalid CSRF and valid-token
+  unauthorized target. This is a bounded baseline, not complete hub parity.
+  Test-only review requested; remaining setting families and notifications
+  remain unimplemented. Logs: foreman `/tmp/bml-settings-tests.log`.
