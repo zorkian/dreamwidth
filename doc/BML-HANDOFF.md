@@ -2,6 +2,19 @@
 
 ## Active continuation: 2026-09-22
 
+Latest ordinary editor integration: owned-form HTTP `f07bac73b`, mode HTTP
+`558ba0609`, rendering `0aad3e37f`, draft browser characterization `f86d593dd`.
+Foreman related116 tests, tidy1078/compile1605 and real draft browser pass;
+required captures are in entry-draft-native.
+
+Pending finite work: mode browser `a6889cd94` awaits Sol; timestamp candidate
+`fdbb67460` needs checkbox reload assertions and visible panel before browser
+label checks. Terra Themenav is fixing those. Terra Widgets is consolidating
+the static-tree FCK dialog on a separate branch (uncommitted); actual
+ImageButton insert/edit browser validation remains pending. Sol is independently
+probing legacy-format draft restore/decline, then reviewing mode browser.
+Preserve all existing sessions/worktrees. No editor route retirement yet.
+
 Current accepted local ranges additionally include S2 language `ea61aa63d`,
 Birthday `d50c11eea`, SiteScheme `0838d1028`, Journal/feed characterization
 `24d762c77`, and comment request metadata `fcba06e32`. Foreman comment suite
