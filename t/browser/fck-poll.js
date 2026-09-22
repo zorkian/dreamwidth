@@ -6,6 +6,8 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
 
 (async () => {
     const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome-stable', args: ['--no-sandbox'] });
+    const base = 'http://127.0.0.1:8080';
+    let originalDraft;
     try {
         const page = await browser.newPage();
         const errors = [];
@@ -15,16 +17,18 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
             dialogs.push(`${dialog.type()}: ${dialog.message()}`);
             await dialog.dismiss();
         });
-        const base = 'http://127.0.0.1:8080';
         await page.goto(base + '/mobile/login', { waitUntil: 'networkidle0' });
         await page.type('[name=user]', 'test_user');
         await page.type('[name=password]', 'dreamwidth');
         await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('[type=submit]')]);
+        originalDraft = await page.evaluate(async () => {
+            const draft = await (await fetch('/__rpc_draft')).json();
+            const properties = await (await fetch('/__rpc_draft?getProperties=1')).json();
+            return { draft: draft.draft, properties };
+        });
         await page.goto(base + '/entry/new', { waitUntil: 'networkidle0', timeout: 30000 });
         await page.select('#editor', 'rte0');
         await page.waitForFunction(() => window.FCKeditorAPI && FCKeditorAPI.GetInstance('entry-body')?.Status === 2);
-        assert.ok(dialogs.every(message => message === 'confirm: Restore from saved draft?'),
-            'only the pre-existing draft restore confirmation may be dismissed');
 
         const open = async () => {
             await page.evaluate(() => {
@@ -83,6 +87,7 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         await dialog.$eval('input[name=pq_1_maxlength]', e => { e.value = '120'; });
         assert.match(await dialog.$eval('#QNav', e => e.textContent), /Question 2 of 2/, 'new question updates navigation');
         await dialog.evaluate(() => document.querySelector('#QNav a[href="javascript:switchQuestion(0)"]').click());
+        await dialog.waitForFunction(() => /Question 1 of 2/.test(document.querySelector('#QNav').textContent));
         assert.match(await dialog.$eval('#QNav', e => e.textContent), /Question 1 of 2/, 'previous question navigation works');
         await dialog.evaluate(() => switchQuestion(1));
         assert.equal(await dialog.$('input[value*="Remove"]'), null, 'legacy dialog has no question removal control to exercise');
@@ -132,8 +137,38 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         await page.select('#editor', 'html_raw0');
         assert.match(await page.$eval('#entry-body', e => e.value), /Edited first/, 'polls survive HTML round trip');
         await page.screenshot({ path: `${output}/html-roundtrip.png`, fullPage: true });
-        await page.$eval('#entry-body', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
         assert.deepEqual(errors, [], 'no poll dialog JavaScript errors');
+        assert.ok(dialogs.every(message => message === 'confirm: Restore from saved draft?'),
+            'only saved-draft restoration confirmations were dismissed');
+        await page.close();
         console.log('PASS: inserted, edited, and HTML-round-tripped FCK polls without publishing');
-    } finally { await browser.close(); }
+    } finally {
+        if (originalDraft) {
+            const cleanup = await browser.newPage();
+            await cleanup.goto(base + '/mobile/', { waitUntil: 'networkidle0' });
+            const restoredDraft = await cleanup.evaluate(async original => {
+                const post = async values => fetch('/__rpc_draft', {
+                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(values),
+                });
+                await post({ clearProperties: 1 });
+                const propertyNames = {
+                    subject: 'saveSubject', editor: 'saveEditor', userpic: 'saveUserpic', taglist: 'saveTaglist',
+                    moodid: 'saveMoodID', mood: 'saveMood', location1: 'saveLocation', music: 'saveMusic',
+                    adultreason: 'saveAdultReason', commentset: 'saveCommentSet', commentscr: 'saveCommentScr',
+                    adultcnt: 'saveAdultCnt',
+                };
+                const values = {};
+                for (const [name, value] of Object.entries(original.properties)) values[propertyNames[name]] = value;
+                if (Object.keys(values).length) await post(values);
+                await post({ saveDraft: original.draft || '' });
+                const draft = await (await fetch('/__rpc_draft')).json();
+                const properties = await (await fetch('/__rpc_draft?getProperties=1')).json();
+                return { draft: draft.draft, properties };
+            }, originalDraft);
+            assert.deepEqual(restoredDraft, originalDraft, 'finally restores complete original saved draft state');
+            await cleanup.close();
+        }
+        await browser.close();
+    }
 })().catch(e => { console.error(e); process.exit(1); });
