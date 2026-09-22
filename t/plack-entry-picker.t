@@ -22,12 +22,30 @@ my $cookie =
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'entryPickerBaseline';
+
+# Use distinct event dates so latest/default-five assertions cannot pass on
+# arbitrary entries tied to the same second.
 my @entries = map {
-    $owner->t_post_fake_entry(
-        subject  => "Picker subject $_",
-        body     => "Picker body $_",
-        security => $_ == 1 ? 'private' : 'public'
-    )
+    my %result;
+    LJ::do_request(
+        {
+            mode     => 'postevent',
+            ver      => $LJ::PROTOCOL_VER,
+            user     => $owner->user,
+            subject  => "Picker subject $_",
+            event    => "Picker body $_",
+            year     => 2020,
+            mon      => 1,
+            day      => $_,
+            hour     => 12,
+            min      => 0,
+            security => $_ == 1 ? 'private' : 'public'
+        },
+        \%result,
+        { noauth => 1, nomod => 1 }
+    );
+    die "Picker fixture post failed: $result{errmsg}" unless $result{success} eq 'OK';
+    LJ::Entry->new( $owner, jitemid => $result{itemid} );
 } 1 .. 6;
 my %ids             = map { $_->ditemid => 1 } @entries;
 my %original_bodies = map { $_->ditemid => $_->event_raw } @entries;
@@ -58,7 +76,15 @@ test_psgi $app, sub {
         is( $form->value('howmany'),    20,     'recent selector defaults to twenty' );
         my @listed = entry_ids( $res->content );
         is( scalar @listed, 5, 'initial page lists five entries' );
-        ok( !grep( { !$ids{$_} } @listed ), 'all initial forms carry real composite entry IDs' );
+        is_deeply(
+            \@listed,
+            [ sort { $a <=> $b } map { $_->ditemid } @entries[ 1 .. 5 ] ],
+            'initial page contains exactly the five newest dated entries'
+        );
+
+        # Exercise the alias as a receiver too; rendered legacy actions point to
+        # the extensionless route regardless of the incoming URL.
+        $form->action( 'http://localhost' . $path );
         $form->value( 'selecttype', 'lastn' );
         $form->value( 'howmany',    6 );
         $res = $cb->( $form->click );
@@ -76,7 +102,11 @@ test_psgi $app, sub {
         my $location = URI->new_abs( $res->header('Location') || '', 'http://localhost' );
         is( $location->path, '/editjournal', 'single match retains existing edit URL' );
         my %query = $location->query_form;
-        ok( $ids{ $query{itemid} || 0 }, 'redirect retains a real composite entry ID' );
+        is(
+            $query{itemid},
+            $entries[-1]->ditemid,
+            'last selector redirects to the exact newest dated entry'
+        );
         $form->value( 'selecttype', 'day' );
         $form->value( 'year',       1970 );
         $form->value( 'month',      1 );
