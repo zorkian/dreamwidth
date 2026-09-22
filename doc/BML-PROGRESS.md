@@ -1052,3 +1052,23 @@ checks, after widgets Terra completes customization1/4.
   Terra continues ordinary control-strip translations and maintainer UI
   rendering acceptance. Restricted inbox work remains held; the UniqCookie
   approval question is still unanswered and no authorization is inferred.
+
+### Ordinary translation and maintainer review queue
+
+- Authas production `11ec1c696` is functionally clear in Sol review. Required
+  test formatting and default text assertions are corrected by `a0adf67e9`
+  and `f0e722c25`; an explicit Foundation default-label assertion is still
+  being added because the legacy sentence exercises a different label key.
+- Control-strip label-map candidate `eb8fd7163` remains unintegrated. Terra is
+  converting the remaining substitution calls and strengthening actual-template,
+  hook, and default-text evidence; the first test mocked template output and
+  mislabeled request-default behavior as background behavior.
+- Native maintainer UI candidate `b861d751c` passes worker152 HTTP assertions,
+  browser, tidy and compile1605, but remains unintegrated. Foreman found the
+  adult override select lacks selected-state rendering; the browser checked
+  only the reason after save. Terra is correcting exact persisted selection
+  and checkbox reload assertions. Its temporary local config was restored;
+  the earlier missing control was an unset template variable, now corrected.
+- Widgets also has the next ordinary Support FAQ default-language package on
+  a separate branch. Sol is auditing text-length language compatibility and
+  reviewing the immutable ordinary ranges. Held work remains unchanged.
