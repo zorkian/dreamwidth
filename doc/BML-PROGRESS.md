@@ -1086,3 +1086,13 @@ checks, after widgets Terra completes customization1/4.
   `90be0f37c` is queued for recheck of selected state and poster-property data.
   All remain unintegrated pending their bounded reviews. OPML redirect and
   Support FAQ default-language work continue separately; held work is unchanged.
+
+### Explicit UniqCookie approval received
+
+- User asked what the open question was, received the precise two-read
+  UniqCookie migration explanation, then replied "do it". This supersedes the
+  earlier unanswered approval status for that package only.
+- Assigned to the existing Themenav Terra: native request URI/note reads,
+  explicit dependency, preserved precedence and behavior, focused harmless
+  request-context regressions. Automatic review remains enabled; no workaround
+  for a rejection is authorized. Previously held inbox/platform work stays held.

@@ -12,9 +12,10 @@ Ordinary control-strip translation and maintainer UI work continue in preserved
 Terra sessions. Later historical checkpoint sections below are not current gates.
 
 Restricted inbox work remains held under the parent platform-limitation direction;
-do not retry or reassign it around that restriction. UniqCookie has a separate
-unanswered approval question and remains untouched. Neither scheduled checks nor
-this handoff grant that approval. All new work remains local and unpublished.
+do not retry or reassign it around that restriction. The user explicitly approved the separate UniqCookie request-read migration
+with "do it" after asking what the open question was. That bounded package is
+now assigned to Terra under automatic safety review; this does not release held
+inbox work or authorize bypassing any platform restriction. All new work remains local and unpublished.
 
 Implementation has resumed under the dedicated Astra foreman. The earlier
 checkpoint-only instruction and launch caveat below are historical. See the
