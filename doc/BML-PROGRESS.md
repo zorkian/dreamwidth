@@ -551,3 +551,36 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
 - Foreman source-only inbox audit is `BML-INBOX-ACCEPTANCE.md`; it records action
   and pagination mappings, additional compose error-collection paths requiring
   reproduction, and the unresolved sender eligibility/beta cutover gates.
+
+
+### Continuing compatibility review and characterization
+
+- Sol found customization `70a66a0cb` registered an unreachable index.bml route:
+  DW::Routing strips the extension before matching. First fix `30b230ff1`
+  restored index.bml but synthesized a slashless redirect that dropped POST
+  bodies. Foreman identified that consequence and Sol independently reproduced
+  it. Corrective `c46146316` adds no_redirects and broader alias submissions;
+  exact recheck is pending. No customization deletion has been integrated.
+- Customization browser fixtures now use disposable users (`afcc4d3c3`) rather
+  than mutating test_user. Follow-ups `c46146316` and `3f87be1d1` address startup
+  and cleanup lifecycle. Both migrated TT templates now carry inherited notices.
+  Preview identity, distinct theme/layout and actual property/reset acceptance
+  remain work in progress; reported passing counts do not close those gates.
+- Settings characterization grew through `6c4ae6ce9`, `70a954caf`, `20e7d159a`
+  and `2fecefaed` (57 assertions reported). Sol caught a falsely reported fix
+  absent from immutable `70a954caf`, plus a cookie denial assertion ignoring
+  response changes. `20e7d159a` actually contains a fresh eligible subscription
+  and forced fresh denial read, and sends cookies while asserting no setting
+  cookie update. Recheck remains pending; none of this range is integrated yet.
+- `2fecefaed` adds scoped extension-hook save/validation characterization.
+  Notification ret_url and remaining category/browser mutations are still open.
+  Settings branch is preserved; hook WIP was restored and committed.
+- At a clean boundary Terra created `bml-terra-native-callers-20260922` from
+  reviewed native foreman `f51de6ca4` in the same owned worktree/container/session.
+  Bounded next package removes direct BML translation calls from MassPrivacy,
+  RPC::CutExpander and Customize::Advanced with explicit pre-template scope.
+  This is independent of the customization/settings page deletion gates.
+- Alternate ImageButton dialog source/static-dispatch evidence is documented in
+  `BML-ALTERNATE-IMAGE-DIALOG.md`. Both distributed editor bundles and context
+  menu retain the command; current plain-text static response does not prove
+  the intended feature is unused or authorize dropping its upload shell.
