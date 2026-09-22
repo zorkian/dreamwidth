@@ -2,6 +2,14 @@
 
 ## Active continuation: 2026-09-22
 
+Current accepted local ranges additionally include S2 language `ea61aa63d`,
+Birthday `d50c11eea`, SiteScheme `0838d1028`, Journal/feed characterization
+`24d762c77`, and comment request metadata `fcba06e32`. Foreman comment suite
+passes421 tests. Ordinary editor gates are active; see BML-EDITOR-ACCEPTANCE.md
+and the latest progress entries. External Journal hook usage remains a pending
+user question; both adapters stay unchanged. UniqCookie is completed and
+approved, not pending. Historical queue entries below are superseded.
+
 Latest accepted ranges additionally include native control strip `0512f0105`,
 maintainer UI `2a33bfeb7` + heading `8986e7de8`, field lengths `23023f579`,
 OPML `04f0fe2b2`, Support FAQ `7634070da`, and explicitly approved UniqCookie

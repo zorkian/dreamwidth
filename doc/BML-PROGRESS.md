@@ -1179,3 +1179,18 @@ checks, after widgets Terra completes customization1/4.
   with no JS/resource failures and completed disposable fixture cleanup. Four
   captures are saved in `sitescheme-native`; browser log is on the host at
   `/tmp/bml-sitescheme-browser.log`.
+
+### Native comment metadata integrated
+
+- Sol cleared `5994d6271`: native request metadata preserves existing forwarded
+  and historical IP composition, repeat behavior and no-request behavior;
+  independent focused/existing suites pass455 assertions. Integrated locally
+  as `fcba06e32`. Foreman4 files /421 tests pass in container
+  `/tmp/bml-comment-metadata-final.log`. The initial command named nonexistent
+  `t/talkpost.t`; corrected to the existing comment validation suite.
+- Editor rendering through `1e934ae71` is production-clear with independent
+ 17 committed plus16 probe assertions. Permanent test cache-reset correction
+  remains queued; no duplicate general error block remains in the final range.
+- Draft/preview `f7c7b285a` independently passes the browser but needs fresh entry
+  count, visible preview DOM text and exact dialog-count assertions. It remains
+  unintegrated. Owned-edit `afbbfa240` is queued separately for Sol.
