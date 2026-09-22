@@ -498,6 +498,7 @@ sub _init {
 
         limits => {
             subject_length => LJ::CMAX_SUBJECT,
+            current_length => LJ::std_max_length,
         },
 
         # TODO: Remove this when beta is over

@@ -130,6 +130,7 @@ postFormInitData.strings = {
     [%- END -%]
 [%- END -%]
 
+
 <form method="POST" id="js-post-entry" action="[% action.url %]" class="
         [%- formwidth == "narrow" ? "entry-partial-width" : "entry-full-width" -%]">
     <input type="hidden" id="nojs" value="1" name="nojs" />
