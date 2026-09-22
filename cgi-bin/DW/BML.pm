@@ -167,6 +167,9 @@ unless ( defined &BML::ml ) {
             $getter ||= $req->{'env'}->{'HOOK-ml_getter'};
         }
 
+        LJ::Lang::set_request_context( lang => $lang, getter => $getter )
+            if defined &LJ::Lang::set_request_context;
+
         no strict 'refs';
         if ( $lang eq "debug" ) {
             no warnings 'redefine';
@@ -208,6 +211,7 @@ unless ( defined &BML::ml ) {
 
     *BML::set_language_scope = sub {
         $BML::ML_SCOPE = $_[0];
+        LJ::Lang::set_request_scope( $_[0] ) if defined &LJ::Lang::set_request_scope;
     };
 
     *BML::get_language_scope = sub {

@@ -523,29 +523,44 @@ sub remove_text {
     return 1;
 }
 
+sub request_context {
+    return unless LJ::is_web_context();
+    my $r = DW::Request->get or return;
+    return $r->pnote('language_context');
+}
+
+sub set_request_context {
+    my (%context) = @_;
+    my $r = DW::Request->get or return;
+    return $r->pnote( language_context => \%context );
+}
+
+sub set_request_scope {
+    my ($scope) = @_;
+    my $context = request_context() || set_request_context();
+    $context->{scope} = $scope;
+    return $scope;
+}
+
 sub get_effective_lang {
-
-    my $lang;
-    if ( LJ::is_web_context() ) {
-        $lang = BML::get_language();
-    }
-
-    # did we get a valid language code?
-    if ( $lang && $LN_CODE{$lang} ) {
-        return $lang;
-    }
-
-    # had no language code, or invalid.  return default
+    my $context = request_context();
+    my $lang    = $context ? $context->{lang} : undef;
+    return $lang if $lang;
     return $LJ::DEFAULT_LANG;
 }
 
 sub ml {
     my ( $code, $vars ) = @_;
 
-    if ( LJ::is_web_context() ) {
-
-        # this means we should use BML::ml and not do our own handling
-        my $text = BML::ml( $code, $vars );
+    if ( my $context = request_context() ) {
+        return $code if ( $context->{lang} || '' ) eq 'debug';
+        if ( rindex( $code, '.', 0 ) == 0 ) {
+            my $scope = $context->{scope};
+            $scope = DW::Request->get->note('ml_scope') unless defined $scope;
+            $code  = $scope . $code if $scope;
+        }
+        my $getter = $context->{getter} || \&LJ::Lang::get_text;
+        my $text   = $getter->( $context->{lang} || $LJ::DEFAULT_LANG, $code, undef, $vars );
         $LJ::_ML_USED_STRINGS{$code} = $text if $LJ::IS_DEV_SERVER;
         return $text;
     }

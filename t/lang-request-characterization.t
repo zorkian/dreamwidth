@@ -94,6 +94,9 @@ subtest 'RequestWrapper sequential PSGI requests retain legacy BML scope' => sub
             if ( $env->{PATH_INFO} eq '/first' ) {
                 BML::set_language_scope('/first.bml');
             }
+            else {
+                DW::Request->get->note( ml_scope => '/second.tt' );
+            }
             my $body = LJ::Lang::ml('.key');
             return [ 200, [ 'Content-Type' => 'text/plain' ], [$body] ];
         }
@@ -101,12 +104,8 @@ subtest 'RequestWrapper sequential PSGI requests retain legacy BML scope' => sub
     test_psgi $app, sub {
         my $cb = shift;
         is( $cb->( GET '/first' )->content, '/first.bml.key', 'first PSGI request has BML scope' );
-    TODO: {
-            local $TODO =
-                'RequestWrapper must clear BML-derived language state during native migration';
-            is( $cb->( GET '/second' )->content,
-                '/second.tt.key', 'second PSGI request is isolated from BML scope' );
-        }
+        is( $cb->( GET '/second' )->content,
+            '/second.tt.key', 'second PSGI request is isolated from BML scope' );
     };
 };
 
@@ -118,11 +117,7 @@ subtest 'sequential requests expose the global BML scope migration gap' => sub {
 
     request('/second.tt');
     BML::set_language( 'en', sub { return $_[1]; } );
-TODO: {
-        local $TODO = 'native language state must be request-scoped before BML removal';
-        is( LJ::Lang::ml('.key'), '/second.tt.key',
-            'next request does not inherit prior BML scope' );
-    }
+    is( LJ::Lang::ml('.key'), '/second.tt.key', 'next request does not inherit prior BML scope' );
     DW::Request->reset;
 };
 
