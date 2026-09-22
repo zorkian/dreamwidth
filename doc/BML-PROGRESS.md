@@ -1096,3 +1096,21 @@ checks, after widgets Terra completes customization1/4.
   explicit dependency, preserved precedence and behavior, focused harmless
   request-context regressions. Automatic review remains enabled; no workaround
   for a rejection is authorized. Previously held inbox/platform work stays held.
+
+### Control strip, maintainer UI and ordinary helpers integrated
+
+- Sol cleared control-strip range through `2416c5e125`; integrated as
+  `0512f0105`. Foreman5 files /18 top-level tests pass, tidy1065/compile1605.
+  Six ordinary journal views again return200 without JS/resource failures;
+  normalized captured text matches prior replay. Evidence: `controlstrip-native`.
+- Sol cleared maintainer `b861d751c` + `90be0f37c`; integrated as `2a33bfeb7`.
+  Foreman maintainer+picker285 tests and real desktop/narrow browser pass.
+  Rating/reason/checkbox reload and poster property data are covered. Visual
+  inspection found duplicate heading; a separate narrow cleanup is queued.
+- Sol cleared std_max_length `68c28dd1a` + `7770828d9`, integrated `23023f579`;
+  OPML `2b162e1b3` + `f31de37a1`, integrated `04f0fe2b2`. Combined helper tests
+  pass4 files /18 top-level assertions in `/tmp/bml-native-web-integrated.log`.
+  OPML native303 deliberately repairs old404/noLocation; explicit-user200 and
+  anonymous302 behavior remain. No unsupported status-parity claim.
+- Support FAQ `55bb9e683` awaits Sol. S2 language initialization is assigned as
+  the next ordinary package; explicit journal adapter remains separate.
