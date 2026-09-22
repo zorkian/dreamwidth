@@ -478,3 +478,38 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   integrated. Customization CodeMirror diagnosis remains active: installed TT
   compares string `==` correctly, disproving the initial numeric-comparison
   explanation. Resource loading/initialization requires actual browser evidence.
+
+
+### Native language review and continuing customization acceptance
+
+- Integrated poll format/compile checks passed 1,036 and 1,599 assertions.
+- Customization test increment `e01066729` passes 132 property assertions;
+  Foundation resource registration and page-object initialization corrections
+  removed the recorded CodeMirror errors. Strict browser mutation work now
+  covers actual CSS, ordered links and custom-text saves/resets. Final denial
+  checks, fixture preservation, translation retirement and production commit
+  remain in the widget Terra checkout; no customization deletion integrated.
+- Language candidate fixes are on preserved branch `bml-terra-themenav-20260922`:
+  `6d81b9548` preserves BML scope across language changes; `d7ea4b0bc` restores
+  nested scopes including exceptions and valid effective-language fallback;
+  `9c300057c` strengthens cache and real BML native/legacy lookup tests;
+  `e16647eb4` preserves the scoped TT debug-key contract. Sol rechecked those
+  findings as resolved, but the overall language integration gate remains open.
+- Sol made the intermittent warm source-autoload failure deterministic: mixed
+  case keys were stored and invalidated differently from normalized lookups.
+  Correction `f087aed71` normalizes cache keys. Sol then reproduced stale warm
+  DB-only values after all-language removal and root removal with child fallback.
+  A narrow all-affected-language invalidation correction is in progress.
+- One language compile run segfaulted late in `get-users-for-paid-accounts.pl`;
+  subsequent full compile passed. Logs preserved in the ThemeNav container at
+  `/tmp/lang-compile-correction{,-rerun}.log`. Cause remains unknown and is not
+  attributed to the separately explained translation-cache bug.
+- ThemeNav Terra created `bml-terra-settings-20260922` from foreman `ce2874a36`
+  in its existing isolated worktree/container. The original language branch and
+  exact session are preserved. It reran the reviewed 18-test settings baseline
+  and started anonymous/community/notification characterization. That test-only
+  WIP is safely stashed with message `settings characterization WIP before
+  language cache correction` while priority language correction runs.
+- Sol's independent picker extraction audit is retained in
+  `doc/BML-ENTRY-PICKER-ACCEPTANCE.md`. Modern editor maintainer parity remains
+  a cutover gate; read-only picker extraction can proceed independently later.
