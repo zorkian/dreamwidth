@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More;
+use File::Spec;
 use HTTP::Request::Common;
 use Plack::Test;
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
@@ -15,7 +16,11 @@ test_psgi $app, sub {
     my $cb  = shift;
     my $res = $cb->( GET '/imguploadrte' );
     unlike( $res->content, qr/id="txtUrl"/, 'anonymous cannot open insertion form' );
-    for my $path ( '/imguploadrte', '/imguploadrte.bml' ) {
+    for my $path (
+        '/imguploadrte',                       '/imguploadrte.bml',
+        '/stc/fck/editor/dialog/imguploadrte', '/stc/fck/editor/dialog/imguploadrte.bml'
+        )
+    {
         my $url = "$path?as=" . $u->user;
         $res = $cb->( GET $url);
         is( $res->code, 200, "$path opens authenticated" );
@@ -25,9 +30,35 @@ test_psgi $app, sub {
         }
         like( $res->content, qr{src="[^"]*/imgpreview"},  'preview iframe' );
         like( $res->content, qr{fck_image/fck_image\.js}, 'dialog callbacks' );
+        like(
+            $res->content,
+            qr{id="txtAlt" style="WIDTH: 80%"},
+            'legacy path reaches the native standalone template rather than a static duplicate'
+        );
         unlike( $res->content, qr{id="(?:header|footer|content)"}, 'standalone document' );
         $res = $cb->( POST $url, Content => [] );
-        is( $res->code, 200, 'old POST redisplays without mutating' );
+        is( $res->code, 200, "$path render-only POST redisplays without mutating" );
+        like(
+            $res->content,
+            qr{id="txtAlt" style="WIDTH: 80%"},
+            "$path render-only POST reaches the native standalone template"
+        );
     }
 };
+for my $bundle (qw(fckeditorcode_gecko_2.js fckeditorcode_ie_2.js)) {
+    my $path = File::Spec->catfile( $ENV{LJHOME}, 'htdocs', 'stc', 'fck', 'editor', 'js', $bundle );
+    open my $fh, '<', $path or die "open $path: $!";
+    local $/;
+    my $source = <$fh>;
+    like(
+        $source,
+        qr{window\.parent\.Site\.siteroot \+ '/imguploadrte\.bml\?ImageButton'},
+        "$bundle ImageButton command uses the native root URL with its exact query"
+    );
+    unlike(
+        $source,
+        qr{dialog/imguploadrte\.bml\?ImageButton},
+        "$bundle no longer targets the removed static dialog"
+    );
+}
 done_testing;

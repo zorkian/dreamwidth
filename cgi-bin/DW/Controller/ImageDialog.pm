@@ -23,6 +23,14 @@ use DW::Template;
 
 DW::Routing->register_string( '/imguploadrte', \&dialog_handler, app => 1, no_cache => 1 );
 
+# FCK's split legacy bundles still request this static-tree spelling.  Static
+# pass-through must reach the same standalone native dialog, including .bml.
+DW::Routing->register_string(
+    '/stc/fck/editor/dialog/imguploadrte', \&dialog_handler,
+    app      => 1,
+    no_cache => 1
+);
+
 sub dialog_handler {
 
     # POST only redisplays this dialog; no entry or upload is changed here.
