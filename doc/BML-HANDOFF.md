@@ -11,14 +11,31 @@ workspace sandboxing. New work remains local; no further push or deployment is
 authorized. Parent checkout and preexisting worktrees/containers stay untouched.
 
 Current isolated foreman branch/worktree is `bml-astra-foreman-20260922`.
-Reviewed ThemeNav, Foundation widget runtime, poll dialog migration and native
-request-language context are now integrated locally. Twelve BML pages remain. Customization conversion is committed in its Terra worktree and under review;
-its deletion and acceptance corrections are not yet integrated. Sol reviews
-exact commits in its own worktree. Native language passed independent review
-and foreman integration tests; remaining direct BML consumers still need migration. Preserve these existing Herdr sessions
-instead of starting replacements. Settings has a reviewed 18-test real-session
-display baseline and an acceptance matrix, but no hub migration yet. See the
-progress ledger for all exact session IDs, containers, commits and open findings.
+Reviewed ThemeNav, Foundation widgets, poll dialog, request-local language and
+native caller/service ranges are integrated locally. Twelve BML pages remain.
+Customization deletion is still only on the widgets Terra branch; its final six
+proof gates are tracked in BML-CUSTOMIZE-ACCEPTANCE.md. Widgets Terra owns gates
+1/4 and the gate6 validation-contract audit. Themenav Terra is temporarily on
+`bml-terra-customize-acceptance-20260922` (based on `853d7bde8`) for gates2/3/5,
+using separate new test files. Its preserved settings branch has reviewed final
+Mobile test content through `229979bd7`, integrated as one passing foreman commit
+`e4679e8c8`; failing intermediate WIP was not accepted independently.
+
+Settings remains legacy production. Its integrated HTTP/return baseline passes
+115 assertions, including two intentional legacy off-origin return-URL TODOs.
+The disposable browser save/cleanup/unsaved-navigation baseline passes; 15 legacy
+screenshots are preserved in doc/bml-evidence/2026-09-22/settings-before. Picker
+80-assertion HTTP boundary and browser baselines are reviewed; no extraction yet.
+Modern editor other-poster manager parity remains a separate gate.
+
+Sol is reviewing original checkpoint packages while the Terra workers finish
+customization. Access-filter production/HTTP/browser passed review, but its
+seeded-account browser harness needs disposable fixtures and a fail-after-save
+cleanup test. Image preview/dialog review and the validation-contract question
+are in progress. Preserve all three existing worker sessions/worktrees/containers;
+use the exact session identifiers in BML-PROGRESS.md. Their sessions sometimes
+end after routine edits or while tests are active: inspect and resume concrete
+unfinished work rather than treating such a checkpoint as completion.
 
 Everything below that describes unstarted workers, checkpoint-only authorization
 or thirteen remaining pages is historical context for the original checkpoint.

@@ -748,3 +748,14 @@ Do not classify larger consumers as equivalent one-line replacements:
   range; no Mobile source change or accepted integration is claimed yet.
 - Integrated settings fixture required formatting-only correction `b4e7475fd`;
   all 1043 tidy checks now pass (`/tmp/bml-settings-integrated-tidy-fixed.log`).
+
+- Sol cleared final Mobile test range through `229979bd7`; integrated its final
+  content as single foreman `e4679e8c8`, without accepting the failing intermediate
+  checkpoints separately. Foreman settings/return run now passes 115 assertions
+  (`/tmp/bml-settings-integrated-115.log`).
+- Legacy settings visual matrix is durable in `settings-before/` under the
+  2026-09-22 evidence directory (commit `cc7554229`).
+- Customization gate6 probes currently show integer/color coercion rather than
+  a rejected option. Preserve the experimental failure logs; independent audit
+  must distinguish a pre-existing absent validation contract from a migration
+  regression. No blanket new validation policy or deletion gate waiver yet.
