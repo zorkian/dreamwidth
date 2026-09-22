@@ -653,3 +653,35 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   browser `da6072d85` covers only controls/invalid validation and is insufficient
   mutation acceptance. Terra is implementing disposable browser users and real
   saves, replacing the claim that a seeded full-form invalid POST is nonmutating.
+
+### Continued acceptance — 2026-09-22, 18:46 UTC
+
+- Sol cleared narrow Links List `4aae7087f` after independently reproducing the
+  first width-only correction's 52px visible fields. The follow-up stacks narrow
+  navigation/content, preserves local scrolling, and passes actual visible-field
+  intersection/focus checks. Desktop behavior remains unchanged. Foreman viewed
+  the new screenshot and confirmed fields are initially visible.
+- Sol cleared `/customize/options.bml` POST coverage `fd4c8bcfb` (106). Actual
+  controller name/foreign-style ownership fixture `4c220b920` reports 118 passes;
+  recheck and consolidated final customization matrix audit are pending. Initial
+  fixture errors included unauthorized actors and stale pre-request user props;
+  these do not establish production ownership regressions.
+- Settings category/fix sources `fde5bdc43`, `de5621341` cleared review and are
+  integrated as `87d0268ec`, `6724f718f`. Foreman settings/return tests pass 94
+  assertions with the two explicit receiver TODO failures.
+- Settings browser source range `da6072d85`, `05d14a830`, `4177ca8cb`, `79831becd`
+  cleared independent normal/failure lifecycle and mutation review. Integrated as
+  `65dc45522`, `d0475eb3d`, `d99501cab`, `e0d9bb463`; foreman browser rerun passes
+  (`/tmp/bml-settings-browser-integrated.log`). It uses disposable accounts,
+  verifies community/privacy/mobile reloads and exact inactive deletion with an
+  unrelated active Inbox subscription preserved by a fresh helper DB read.
+- Additional settings baseline `22b8fd0f`/`0f4b301c` records a real legacy resource
+  gap: Settings is absent on the jquery-group page, so its unsaved-change handler
+  never starts. Changed privacy N is discarded by navigation and fresh DB remains
+  M. Passing corrected browser evidence is `/tmp/settings-browser-unsaved.log` in
+  the worker container; independent review pending. Migration must explicitly
+  load compatible resources and implement reliable save/discard navigation.
+- Sol independently cleared picker dispatch increment `81ed8db2e` (80). Direct
+  BML POSTs with mode=init, itemid and synthesized delete/maintainer actions reach
+  CSRF guards; missing/invalid tokens preserve entry and maintainer properties.
+  This covers the extraction boundary, not successful editor mutation parity.
