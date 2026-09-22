@@ -2709,147 +2709,205 @@ sub control_strip {
     my $euri        = LJ::eurl($baseuri);
     my $create_link = LJ::Hooks::run_hook( "override_create_link_on_navstrip", $journal )
         || "<a href='$LJ::SITEROOT/create'>"
-        . BML::ml( 'web.controlstrip.links.create', { 'sitename' => $LJ::SITENAMESHORT } ) . "</a>";
+        . LJ::Lang::ml( 'web.controlstrip.links.create', { 'sitename' => $LJ::SITENAMESHORT } )
+        . "</a>";
+
+    my %ml = map { $_ => LJ::Lang::ml($_) } qw(
+        web.controlstrip.links.addfeed
+        web.controlstrip.links.addtocircle
+        web.controlstrip.links.confirm
+        web.controlstrip.links.editcommmembers
+        web.controlstrip.links.editcommprofile
+        web.controlstrip.links.home
+        web.controlstrip.links.inbox
+        web.controlstrip.links.invitefriends
+        web.controlstrip.links.joincomm
+        web.controlstrip.links.learnmore
+        web.controlstrip.links.leavecomm
+        web.controlstrip.links.login
+        web.controlstrip.links.managecircle
+        web.controlstrip.links.managecomminvites
+        web.controlstrip.links.manageentries
+        web.controlstrip.links.modifycircle
+        web.controlstrip.links.popfeeds
+        web.controlstrip.links.post2
+        web.controlstrip.links.postcomm
+        web.controlstrip.links.queue
+        web.controlstrip.links.recentcomments
+        web.controlstrip.links.removecomm
+        web.controlstrip.links.removefeed
+        web.controlstrip.links.settings
+        web.controlstrip.links.trackcomm
+        web.controlstrip.links.trackuser
+        web.controlstrip.links.viewreadingpage
+        web.controlstrip.links.watchcomm
+        web.controlstrip.nouserpic.alt
+        web.controlstrip.nouserpic.title
+        web.controlstrip.select.friends.all
+        web.controlstrip.select.friends.communities
+        web.controlstrip.select.friends.feeds
+        web.controlstrip.select.friends.journals
+        web.controlstrip.status.yourjournal
+        web.controlstrip.status.yournetworkpage
+        web.controlstrip.status.yourreadingpage
+        web.controlstrip.userpic.alt
+        web.controlstrip.userpic.title
+    );
 
     # Build up some common links
     my %links = (
         'login' =>
-            "<a href='$LJ::SITEROOT/?returnto=$euri'>$BML::ML{'web.controlstrip.links.login'}</a>",
-        'post_journal' =>
-            "<a href='$LJ::SITEROOT/update'>$BML::ML{'web.controlstrip.links.post2'}</a>",
-        'home' => "<a href='$LJ::SITEROOT/'>" . $BML::ML{'web.controlstrip.links.home'} . "</a>",
+            "<a href='$LJ::SITEROOT/?returnto=$euri'>$ml{'web.controlstrip.links.login'}</a>",
+        'post_journal' => "<a href='$LJ::SITEROOT/update'>$ml{'web.controlstrip.links.post2'}</a>",
+        'home'         => "<a href='$LJ::SITEROOT/'>" . $ml{'web.controlstrip.links.home'} . "</a>",
         'recent_comments' =>
-"<a href='$LJ::SITEROOT/comments/recent'>$BML::ML{'web.controlstrip.links.recentcomments'}</a>",
+"<a href='$LJ::SITEROOT/comments/recent'>$ml{'web.controlstrip.links.recentcomments'}</a>",
         'manage_friends' =>
-"<a href='$LJ::SITEROOT/manage/circle/'>$BML::ML{'web.controlstrip.links.managecircle'}</a>",
+            "<a href='$LJ::SITEROOT/manage/circle/'>$ml{'web.controlstrip.links.managecircle'}</a>",
         'manage_entries' =>
-"<a href='$LJ::SITEROOT/editjournal'>$BML::ML{'web.controlstrip.links.manageentries'}</a>",
+            "<a href='$LJ::SITEROOT/editjournal'>$ml{'web.controlstrip.links.manageentries'}</a>",
         'invite_friends' =>
-"<a href='$LJ::SITEROOT/manage/circle/invite'>$BML::ML{'web.controlstrip.links.invitefriends'}</a>",
+"<a href='$LJ::SITEROOT/manage/circle/invite'>$ml{'web.controlstrip.links.invitefriends'}</a>",
         'create_account' => $create_link,
         'syndicated_list' =>
-            "<a href='$LJ::SITEROOT/feeds/list'>$BML::ML{'web.controlstrip.links.popfeeds'}</a>",
+            "<a href='$LJ::SITEROOT/feeds/list'>$ml{'web.controlstrip.links.popfeeds'}</a>",
         'learn_more' => LJ::Hooks::run_hook('control_strip_learnmore_link')
-            || "<a href='$LJ::SITEROOT/'>$BML::ML{'web.controlstrip.links.learnmore'}</a>",
+            || "<a href='$LJ::SITEROOT/'>$ml{'web.controlstrip.links.learnmore'}</a>",
         'explore' => "<a href='$LJ::SITEROOT/explore/'>"
-            . BML::ml( 'web.controlstrip.links.explore', { sitenameabbrev => $LJ::SITENAMEABBREV } )
+            . LJ::Lang::ml( 'web.controlstrip.links.explore',
+            { sitenameabbrev => $LJ::SITENAMEABBREV } )
             . "</a>",
-        'confirm' =>
-            "<a href='$LJ::SITEROOT/register'>$BML::ML{'web.controlstrip.links.confirm'}</a>",
+        'confirm' => "<a href='$LJ::SITEROOT/register'>$ml{'web.controlstrip.links.confirm'}</a>",
     );
 
     if ($remote) {
         my $unread = $remote->notification_inbox->unread_count;
-        $links{inbox} .= "<a href='$LJ::SITEROOT/inbox/'>$BML::ML{'web.controlstrip.links.inbox'}";
+        $links{inbox} .= "<a href='$LJ::SITEROOT/inbox/'>$ml{'web.controlstrip.links.inbox'}";
         $links{inbox} .= " ($unread)" if $unread;
         $links{inbox} .= "</a>";
 
         $links{settings} =
-"<a href='$LJ::SITEROOT/manage/settings/'>$BML::ML{'web.controlstrip.links.settings'}</a>";
+            "<a href='$LJ::SITEROOT/manage/settings/'>$ml{'web.controlstrip.links.settings'}</a>";
         $links{'view_friends_page'} =
               "<a href='"
             . $remote->journal_base
-            . "/read'>$BML::ML{'web.controlstrip.links.viewreadingpage'}</a>";
+            . "/read'>$ml{'web.controlstrip.links.viewreadingpage'}</a>";
         $links{'add_friend'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$BML::ML{'web.controlstrip.links.addtocircle'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.addtocircle'}</a>";
         $links{'edit_friend'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$BML::ML{'web.controlstrip.links.modifycircle'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.modifycircle'}</a>";
         $links{'track_user'} =
-"<a href='$LJ::SITEROOT/manage/tracking/user?journal=$journal->{user}'>$BML::ML{'web.controlstrip.links.trackuser'}</a>";
+"<a href='$LJ::SITEROOT/manage/tracking/user?journal=$journal->{user}'>$ml{'web.controlstrip.links.trackuser'}</a>";
 
         if ( $journal->is_syndicated ) {
             $links{'add_friend'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=subscribe'>$BML::ML{'web.controlstrip.links.addfeed'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=subscribe'>$ml{'web.controlstrip.links.addfeed'}</a>";
             $links{'remove_friend'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=remove'>$BML::ML{'web.controlstrip.links.removefeed'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=remove'>$ml{'web.controlstrip.links.removefeed'}</a>";
         }
         if ( $journal->is_community ) {
             $links{'join_community'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$BML::ML{'web.controlstrip.links.joincomm'}</a>"
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.joincomm'}</a>"
                 unless $journal->is_closed_membership;
             $links{'leave_community'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$BML::ML{'web.controlstrip.links.leavecomm'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.leavecomm'}</a>";
             $links{'watch_community'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=subscribe'>$BML::ML{'web.controlstrip.links.watchcomm'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit?action=subscribe'>$ml{'web.controlstrip.links.watchcomm'}</a>";
             $links{'unwatch_community'} =
-"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$BML::ML{'web.controlstrip.links.removecomm'}</a>";
+"<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.removecomm'}</a>";
             $links{'post_to_community'} =
-"<a href='$LJ::SITEROOT/update?usejournal=$journal->{user}'>$BML::ML{'web.controlstrip.links.postcomm'}</a>";
+"<a href='$LJ::SITEROOT/update?usejournal=$journal->{user}'>$ml{'web.controlstrip.links.postcomm'}</a>";
             $links{'edit_community_profile'} =
-"<a href='$LJ::SITEROOT/manage/profile/?authas=$journal->{user}'>$BML::ML{'web.controlstrip.links.editcommprofile'}</a>";
+"<a href='$LJ::SITEROOT/manage/profile/?authas=$journal->{user}'>$ml{'web.controlstrip.links.editcommprofile'}</a>";
             $links{'edit_community_invites'} =
                   "<a href='"
                 . $journal->community_invite_members_url
-                . "'>$BML::ML{'web.controlstrip.links.managecomminvites'}</a>";
+                . "'>$ml{'web.controlstrip.links.managecomminvites'}</a>";
             $links{'edit_community_members'} =
                   "<a href='"
                 . $journal->community_manage_members_url
-                . "'>$BML::ML{'web.controlstrip.links.editcommmembers'}</a>";
+                . "'>$ml{'web.controlstrip.links.editcommmembers'}</a>";
             $links{'track_community'} =
-"<a href='$LJ::SITEROOT/manage/tracking/user?journal=$journal->{user}'>$BML::ML{'web.controlstrip.links.trackcomm'}</a>";
+"<a href='$LJ::SITEROOT/manage/tracking/user?journal=$journal->{user}'>$ml{'web.controlstrip.links.trackcomm'}</a>";
             $links{'queue'} =
                   "<a href='"
                 . $journal->moderation_queue_url
-                . "'>$BML::ML{'web.controlstrip.links.queue'}</a>";
+                . "'>$ml{'web.controlstrip.links.queue'}</a>";
         }
     }
     my $journal_display = $journal->ljuser_display;
     my %statustext      = (
-        'yourjournal'            => $BML::ML{'web.controlstrip.status.yourjournal'},
-        'yourfriendspage'        => $BML::ML{'web.controlstrip.status.yourreadingpage'},
-        'yourfriendsfriendspage' => $BML::ML{'web.controlstrip.status.yournetworkpage'},
-        'personal' => BML::ml( 'web.controlstrip.status.personal', { 'user' => $journal_display } ),
-        'personalfriendspage' => BML::ml(
-            'web.controlstrip.status.personalreadingpage', { 'user' => $journal_display }
+        'yourjournal'            => $ml{'web.controlstrip.status.yourjournal'},
+        'yourfriendspage'        => $ml{'web.controlstrip.status.yourreadingpage'},
+        'yourfriendsfriendspage' => $ml{'web.controlstrip.status.yournetworkpage'},
+        'personal' =>
+            LJ::Lang::ml( 'web.controlstrip.status.personal', { 'user' => $journal_display } ),
+        'personalfriendspage' => LJ::Lang::ml(
+            'web.controlstrip.status.personalreadingpage',
+            { 'user' => $journal_display }
         ),
-        'personalfriendsfriendspage' => BML::ml(
-            'web.controlstrip.status.personalnetworkpage', { 'user' => $journal_display }
+        'personalfriendsfriendspage' => LJ::Lang::ml(
+            'web.controlstrip.status.personalnetworkpage',
+            { 'user' => $journal_display }
         ),
         'community' =>
-            BML::ml( 'web.controlstrip.status.community', { 'user' => $journal_display } ),
-        'syn'   => BML::ml( 'web.controlstrip.status.syn',   { 'user' => $journal_display } ),
-        'other' => BML::ml( 'web.controlstrip.status.other', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.community', { 'user' => $journal_display } ),
+        'syn'   => LJ::Lang::ml( 'web.controlstrip.status.syn',   { 'user' => $journal_display } ),
+        'other' => LJ::Lang::ml( 'web.controlstrip.status.other', { 'user' => $journal_display } ),
         'mutualtrust' =>
-            BML::ml( 'web.controlstrip.status.mutualtrust', { 'user' => $journal_display } ),
-        'mutualtrust_mutualwatch' => BML::ml(
+            LJ::Lang::ml( 'web.controlstrip.status.mutualtrust', { 'user' => $journal_display } ),
+        'mutualtrust_mutualwatch' => LJ::Lang::ml(
             'web.controlstrip.status.mutualtrust_mutualwatch',
             { 'user' => $journal_display }
         ),
-        'mutualtrust_watch' =>
-            BML::ml( 'web.controlstrip.status.mutualtrust_watch', { 'user' => $journal_display } ),
-        'mutualtrust_watchedby' => BML::ml(
+        'mutualtrust_watch' => LJ::Lang::ml(
+            'web.controlstrip.status.mutualtrust_watch',
+            { 'user' => $journal_display }
+        ),
+        'mutualtrust_watchedby' => LJ::Lang::ml(
             'web.controlstrip.status.mutualtrust_watchedby',
             { 'user' => $journal_display }
         ),
         'mutualwatch' =>
-            BML::ml( 'web.controlstrip.status.mutualwatch', { 'user' => $journal_display } ),
-        'trust_mutualwatch' =>
-            BML::ml( 'web.controlstrip.status.trust_mutualwatch', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.mutualwatch', { 'user' => $journal_display } ),
+        'trust_mutualwatch' => LJ::Lang::ml(
+            'web.controlstrip.status.trust_mutualwatch',
+            { 'user' => $journal_display }
+        ),
         'trust_watch' =>
-            BML::ml( 'web.controlstrip.status.trust_watch', { 'user' => $journal_display } ),
-        'trust_watchedby' =>
-            BML::ml( 'web.controlstrip.status.trust_watchedby', { 'user' => $journal_display } ),
-        'trustedby_mutualwatch' => BML::ml(
+            LJ::Lang::ml( 'web.controlstrip.status.trust_watch', { 'user' => $journal_display } ),
+        'trust_watchedby' => LJ::Lang::ml(
+            'web.controlstrip.status.trust_watchedby',
+            { 'user' => $journal_display }
+        ),
+        'trustedby_mutualwatch' => LJ::Lang::ml(
             'web.controlstrip.status.trustedby_mutualwatch',
             { 'user' => $journal_display }
         ),
-        'trustedby_watch' =>
-            BML::ml( 'web.controlstrip.status.trustedby_watch', { 'user' => $journal_display } ),
-        'trustedby_watchedby' => BML::ml(
-            'web.controlstrip.status.trustedby_watchedby', { 'user' => $journal_display }
+        'trustedby_watch' => LJ::Lang::ml(
+            'web.controlstrip.status.trustedby_watch',
+            { 'user' => $journal_display }
+        ),
+        'trustedby_watchedby' => LJ::Lang::ml(
+            'web.controlstrip.status.trustedby_watchedby',
+            { 'user' => $journal_display }
         ),
         'maintainer' =>
-            BML::ml( 'web.controlstrip.status.maintainer', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.maintainer', { 'user' => $journal_display } ),
         'memberwatcher' =>
-            BML::ml( 'web.controlstrip.status.memberwatcher', { 'user' => $journal_display } ),
-        'watcher' => BML::ml( 'web.controlstrip.status.watcher', { 'user' => $journal_display } ),
-        'member'  => BML::ml( 'web.controlstrip.status.member',  { 'user' => $journal_display } ),
-        'trusted' => BML::ml( 'web.controlstrip.status.trusted', { 'user' => $journal_display } ),
-        'watched' => BML::ml( 'web.controlstrip.status.watched', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.memberwatcher', { 'user' => $journal_display } ),
+        'watcher' =>
+            LJ::Lang::ml( 'web.controlstrip.status.watcher', { 'user' => $journal_display } ),
+        'member' =>
+            LJ::Lang::ml( 'web.controlstrip.status.member', { 'user' => $journal_display } ),
+        'trusted' =>
+            LJ::Lang::ml( 'web.controlstrip.status.trusted', { 'user' => $journal_display } ),
+        'watched' =>
+            LJ::Lang::ml( 'web.controlstrip.status.watched', { 'user' => $journal_display } ),
         'trusted_by' =>
-            BML::ml( 'web.controlstrip.status.trustedby', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.trustedby', { 'user' => $journal_display } ),
         'watched_by' =>
-            BML::ml( 'web.controlstrip.status.watchedby', { 'user' => $journal_display } ),
+            LJ::Lang::ml( 'web.controlstrip.status.watchedby', { 'user' => $journal_display } ),
     );
 
     # Vars for controlstrip.tt
@@ -2909,7 +2967,7 @@ sub control_strip {
             $template_args->{'userpic_html'} =
                   "<a href='$LJ::SITEROOT/manage/icons'><img src='"
                 . $userpic->url
-                . "' alt=\"$BML::ML{'web.controlstrip.userpic.alt'}\" title=\"$BML::ML{'web.controlstrip.userpic.title'}\" $wh /></a>";
+                . "' alt=\"$ml{'web.controlstrip.userpic.alt'}\" title=\"$ml{'web.controlstrip.userpic.title'}\" $wh /></a>";
         }
         else {
             my $tinted_nouserpic_img = "";
@@ -2933,7 +2991,7 @@ sub control_strip {
                 $tinted_nouserpic_img = "$LJ::IMGPREFIX/controlstrip/nouserpic.gif";
             }
             $template_args->{'userpic_html'} =
-"<a href='$LJ::SITEROOT/manage/icons'><img src='$tinted_nouserpic_img' alt=\"$BML::ML{'web.controlstrip.nouserpic.alt'}\" title=\"$BML::ML{'web.controlstrip.nouserpic.title'}\" height='43' width='43' /></a>";
+"<a href='$LJ::SITEROOT/manage/icons'><img src='$tinted_nouserpic_img' alt=\"$ml{'web.controlstrip.nouserpic.alt'}\" title=\"$ml{'web.controlstrip.nouserpic.title'}\" height='43' width='43' /></a>";
         }
 
         if ( $remote->equals($journal) ) {
@@ -2949,10 +3007,10 @@ sub control_strip {
 
             if ( $view_is->("read") || $view_is->("network") ) {
                 my @filters = (
-                    "all",             $BML::ML{'web.controlstrip.select.friends.all'},
-                    "showpeople",      $BML::ML{'web.controlstrip.select.friends.journals'},
-                    "showcommunities", $BML::ML{'web.controlstrip.select.friends.communities'},
-                    "showsyndicated",  $BML::ML{'web.controlstrip.select.friends.feeds'}
+                    "all",             $ml{'web.controlstrip.select.friends.all'},
+                    "showpeople",      $ml{'web.controlstrip.select.friends.journals'},
+                    "showcommunities", $ml{'web.controlstrip.select.friends.communities'},
+                    "showsyndicated",  $ml{'web.controlstrip.select.friends.feeds'}
                 );
 
 # content_filters returns an array of content filters this user had, sorted by sortorder
