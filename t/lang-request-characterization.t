@@ -37,6 +37,27 @@ sub request {
     return $r;
 }
 
+subtest 'BML scope survives language changes without a matching request note' => sub {
+    request();
+    BML::set_language_scope('/customize/index.bml');
+    BML::set_language( 'en', sub { return $_[1]; } );
+    is(
+        LJ::Lang::ml('.setstyle.user'),
+        '/customize/index.bml.setstyle.user',
+        'BML scope survives language setup'
+    );
+
+    request('/different.tt');
+    BML::set_language_scope('/customize/index.bml');
+    BML::set_language( 'en', sub { return $_[1]; } );
+    is(
+        LJ::Lang::ml('.setstyle.user'),
+        '/customize/index.bml.setstyle.user',
+        'BML scope wins over a different request note'
+    );
+    DW::Request->reset;
+};
+
 subtest 'web keys, scope, and substitutions use the configured getter' => sub {
     my @calls;
     request('/entry/form.tt');

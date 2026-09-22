@@ -531,8 +531,10 @@ sub request_context {
 
 sub set_request_context {
     my (%context) = @_;
-    my $r = DW::Request->get or return;
-    return $r->pnote( language_context => \%context );
+    my $r         = DW::Request->get or return;
+    my $existing  = $r->pnote('language_context') || {};
+    @{$existing}{ keys %context } = values %context;
+    return $r->pnote( language_context => $existing );
 }
 
 sub set_request_scope {
