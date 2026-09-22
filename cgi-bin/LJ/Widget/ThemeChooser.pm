@@ -223,6 +223,13 @@ sub js {
     q [
         initWidget: function () {
             var self = this;
+            var widget = this.getWidget();
+
+            // ThemeNav can ask this persistent JS object to initialize after
+            // replacing its nested markup. Do not bind the same live element
+            // twice when more than one refresh path reaches it.
+            if (this._initialized_widget === widget) return;
+            this._initialized_widget = widget;
 
             var filter_links = DOM.getElementsByClassName(document, "theme-cat");
             filter_links = filter_links.concat(DOM.getElementsByClassName(document, "theme-layout"));

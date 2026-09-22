@@ -128,14 +128,24 @@ sub render {
 
         my $opts = { $widget->need_res_opts };
 
+        # Widget JS predates resource groups, so it normally lands in the
+        # legacy/default group. A Foundation page does not include that group.
+        # Put only widget JS in Foundation without changing BML and other
+        # legacy callers, or removing widget CSS from the all group.
+        my $is_foundation = ( $LJ::ACTIVE_RES_GROUP || '' ) eq 'foundation';
+
         # include any resources that this widget declares
         foreach my $file ( $widget->need_res ) {
+            my $resource_opts = {%$opts};
+            $resource_opts->{group} ||= 'foundation'
+                if $is_foundation && $file =~ /\.js$/i;
+
             if ( $file =~ m!^[^/]+\.(js|css)$!i ) {
                 my $prefix = $1 eq 'js' ? "js" : "stc";
-                LJ::need_res( $opts, "$prefix/widgets/$subclass/$file" );
+                LJ::need_res( $resource_opts, "$prefix/widgets/$subclass/$file" );
                 next;
             }
-            LJ::need_res( $opts, $file );
+            LJ::need_res( $resource_opts, $file );
         }
         LJ::need_res( $opt_hash{stylesheet} ) if $opt_hash{stylesheet};
 
@@ -401,17 +411,43 @@ sub wrapped_js {
     my $authtoken = LJ::Auth->ajax_auth_token( LJ::get_remote(), "/_widget" );
     $authtoken = LJ::ejs($authtoken);
 
-    LJ::need_res(qw(js/ljwidget.js));
+    my $resource_opts = {};
+    if ( ( $LJ::ACTIVE_RES_GROUP || '' ) eq 'foundation' ) {
+
+        # Foundation intentionally keeps jQuery as window.$. Widgets use the
+        # older DOM/HTTPReq/LiveJournal APIs, so load those APIs in the same
+        # group and let their own code use the explicit DOM helper below.
+        $resource_opts = { group => 'foundation' };
+        LJ::need_res(
+            { group => 'foundation', priority => $LJ::LIB_RES_PRIORITY },
+            qw(js/6alib/core.js js/6alib/dom.js js/6alib/httpreq.js js/livejournal.js)
+        );
+    }
+
+    LJ::need_res( $resource_opts, qw(js/ljwidget.js) );
 
     my $widgetvar     = "LJWidget.widgets[\"$widgetid\"]";
     my $widget_js_obj = $opts{page_js_obj} ? "$opts{page_js_obj}.$widgetclass = $widgetvar;" : "";
 
     return qq {
         <script>
-            $widgetvar = new LJWidget("$widgetid", "$widgetclass", "$authtoken");
-            $widget_js_obj
-            OBJ.extend($widgetvar, {$js});
-            LiveJournal.register_hook("page_load", function () { $widgetvar.initWidget() });
+            var initWidget = function () {
+                // Do not replace window.\$: Foundation owns it for jQuery.
+                // This local alias preserves the DOM-element contract of
+                // legacy widget implementations only.
+                var \$ = DOM.getElement;
+                $widgetvar = new LJWidget("$widgetid", "$widgetclass", "$authtoken");
+                $widget_js_obj
+                OBJ.extend($widgetvar, {$js});
+                LiveJournal.register_hook("page_load", function () { $widgetvar.initWidget() });
+            };
+
+            if (window.LJWidget && LJWidget.runInit) {
+                LJWidget.runInit(initWidget);
+            } else {
+                window.LJWidgetInitQueue = window.LJWidgetInitQueue || [];
+                window.LJWidgetInitQueue.push(initWidget);
+            }
         </script>
     };
 }
