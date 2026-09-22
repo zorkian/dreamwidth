@@ -7,7 +7,7 @@ use HTTP::Request::Common;
 use HTML::Form;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_comm temp_user);
 plan skip_all => 'Settings integration requires a development server'
     unless $LJ::IS_DEV_SERVER;
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -85,4 +85,126 @@ test_psgi $app, sub {
     is( LJ::load_userid( $other->id, 1 )->prop('timeformat_24') || 0,
         $other_before, 'denied target unchanged' );
 };
+
+sub settings_cookie {
+    my ($user) = @_;
+    my $session = LJ::Session->create( $user, nolog => 1 );
+    return
+          'ljmastersession='
+        . $session->master_cookie_string
+        . '; ljloggedin='
+        . $session->loggedin_cookie_string;
+}
+
+sub settings_form {
+    my ( $content, $url ) = @_;
+    return
+        grep { ( $_->attr('id') || '' ) eq 'settings_form' }
+        HTML::Form->parse( $content, 'http://localhost' . $url );
+}
+
+test_psgi $app, sub {
+    my $send     = shift;
+    my $anon_url = '/manage/settings/?cat=display';
+    my $res      = $send->( GET $anon_url );
+    is( $res->code, 200, 'anonymous display settings render' );
+    my ($form) = settings_form( $res->content, $anon_url );
+    ok( $form, 'anonymous display settings expose the cookie-backed form contract' );
+    ok( defined $form->value('lj_form_auth'), 'anonymous form retains CSRF contract' );
+    ok( !defined $form->value('DW__Setting__TimeFormat_timeformat'),
+        'anonymous form omits account-backed display settings (baseline gap for cookie saves)' );
+};
+
+test_psgi $app, sub {
+    my $send  = shift;
+    my $maint = temp_user();
+    my $comm  = temp_comm();
+    LJ::set_rel( $comm, $maint, 'A' );
+    my $cookie = settings_cookie($maint);
+    my $cb     = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+    my $url    = '/manage/settings/?authas=' . $comm->user . '&cat=community';
+    my $res    = $cb->( GET $url );
+    is( $res->code, 200, 'maintainer community settings render through authas' );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'maintainer receives rendered community save form' ) or return;
+    $form->value( 'DW__Setting__CommunityMembership_communitymembership', 'closed' );
+    my $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $res = $cb->($req);
+    like( $res->content, qr/successfully saved/i, 'community form save reports success' );
+    is( ( LJ::load_userid( $comm->id, 1 )->get_comm_settings )[0],
+        'closed', 'maintainer community membership survives fresh load' );
+
+    my $outsider        = temp_user();
+    my $outsider_cookie = settings_cookie($outsider);
+    my $outsider_form_res =
+        $send->( GET '/manage/settings/?cat=display', Cookie => $outsider_cookie );
+    my ($outsider_form) =
+        settings_form( $outsider_form_res->content, '/manage/settings/?cat=display' );
+    my $before = ( LJ::load_userid( $comm->id, 1 )->get_comm_settings )[0];
+    my $bad    = $send->(
+        POST $url,
+        Cookie  => $outsider_cookie,
+        Content => [
+            lj_form_auth => $outsider_form->value('lj_form_auth'),
+            'DW__Setting__CommunityMembership_communitymembership' => 'open'
+        ]
+    );
+    unlike( $bad->content, qr/id=['"]settings_form/,
+        'unauthenticated authas community POST is denied' );
+    is( ( LJ::load_userid( $comm->id, 1 )->get_comm_settings )[0],
+        $before, 'denied community target remains unchanged' );
+};
+
+test_psgi $app, sub {
+    my $send   = shift;
+    my $owner  = temp_user();
+    my $viewer = temp_user();
+    $viewer->grant_priv( 'canview', 'subscriptions' );
+    my $inactive =
+        $owner->subscribe( event => 'JournalNewEntry', journalid => 0, method => 'Inbox' );
+    $inactive->_deactivate;
+    my $legacy = $owner->subscribe(
+        event   => 'AddedToCircle',
+        journal => $owner,
+        method  => 'Inbox',
+        arg1    => 1
+    );
+    my $cookie = settings_cookie($owner);
+    my $cb     = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+    my $url    = '/manage/settings/?cat=notifications';
+    my $res    = $cb->( GET $url );
+    is( $res->code, 200, 'owner notification settings render' );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'owner notification settings expose mutation form' ) or return;
+    my $token = $form->value('lj_form_auth');
+    $res = $cb->( POST $url, Content => [ lj_form_auth => $token, deleteinactive => 1 ] );
+    ok( !grep( { $_->id == $inactive->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'deleteinactive removes an inactive subscription through POST' );
+    $res = $cb->( GET $url . '&deletesub_' . $legacy->id . '=1' );
+    ok(
+        !grep( { $_->id == $legacy->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'legacy deletesub GET currently mutates and must be replaced safely during migration'
+    );
+
+    my $viewer_cookie = settings_cookie($viewer);
+    my $inspect       = $send->(
+        GET '/manage/settings/?cat=notifications&user=' . $owner->user,
+        Cookie => $viewer_cookie
+    );
+    is( $inspect->code, 200, 'privileged notification inspection renders' );
+    unlike( $inspect->content, qr/id=['"]settings_form/,
+        'privileged inspection exposes no mutation form' );
+    my $before          = scalar $owner->subscriptions;
+    my $viewer_form_res = $send->( GET '/manage/settings/?cat=display', Cookie => $viewer_cookie );
+    my ($viewer_form) = settings_form( $viewer_form_res->content, '/manage/settings/?cat=display' );
+    my $post = $send->(
+        POST '/manage/settings/?cat=notifications&user=' . $owner->user,
+        Cookie  => $viewer_cookie,
+        Content => [ lj_form_auth => $viewer_form->value('lj_form_auth'), deleteinactive => 1 ]
+    );
+    is( scalar $owner->subscriptions,
+        $before, 'privileged inspection POST cannot mutate owner subscriptions' );
+};
+
 done_testing;
