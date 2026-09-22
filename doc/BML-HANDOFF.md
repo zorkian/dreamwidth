@@ -12,30 +12,37 @@ authorized. Parent checkout and preexisting worktrees/containers stay untouched.
 
 Current isolated foreman branch/worktree is `bml-astra-foreman-20260922`.
 Reviewed ThemeNav, Foundation widgets, poll dialog, request-local language and
-native caller/service ranges are integrated locally. Twelve BML pages remain.
-Customization deletion is still only on the widgets Terra branch; its final six
-proof gates are tracked in BML-CUSTOMIZE-ACCEPTANCE.md. Widgets Terra owns gates
-1/4 and the gate6 validation-contract audit. Themenav Terra is temporarily on
-`bml-terra-customize-acceptance-20260922` (based on `853d7bde8`) for gates2/3/5,
-using separate new test files. Its preserved settings branch has reviewed final
-Mobile test content through `229979bd7`, integrated as one passing foreman commit
-`e4679e8c8`; failing intermediate WIP was not accepted independently.
+native caller/service ranges are integrated locally. Customization migration is
+now integrated as `bcdced59f`: all six finite acceptance gates are resolved,
+including the explicitly inapplicable legacy semantic-validation gate. Ten BML
+page files remain. Foreman validation passes 714 tests across 17 files, both
+customization browser suites, static build, 1047 tidy and 1601 compile checks.
 
-Settings remains legacy production. Its integrated HTTP/return baseline passes
-115 assertions, including two intentional legacy off-origin return-URL TODOs.
-The disposable browser save/cleanup/unsaved-navigation baseline passes; 15 legacy
-screenshots are preserved in doc/bml-evidence/2026-09-22/settings-before. Picker
-80-assertion HTTP boundary and browser baselines are reviewed; no extraction yet.
-Modern editor other-poster manager parity remains a separate gate.
+Original access-filter and image dialog/preview production reviews are clear.
+Their disposable browser fixture corrections through worker `74c332713` are
+independently reviewed and integrated locally as `855414735`. Normal and
+intentional-failure runs prove helper cleanup, including signal-exit rejection.
 
-Sol is reviewing original checkpoint packages while the Terra workers finish
-customization. Access-filter production/HTTP/browser passed review, but its
-seeded-account browser harness needs disposable fixtures and a fail-after-save
-cleanup test. Image preview/dialog review and the validation-contract question
-are in progress. Preserve all three existing worker sessions/worktrees/containers;
-use the exact session identifiers in BML-PROGRESS.md. Their sessions sometimes
-end after routine edits or while tests are active: inspect and resume concrete
-unfinished work rather than treating such a checkpoint as completion.
+Themenav Terra is implementing settings on
+`bml-terra-settings-migration-20260922`, based on reviewed foreman `bcdced59f`.
+Its checklist is `/tmp/bml-settings-production-checklist.md`. Preserve aliases,
+Foundation-compatible resources and hooks; constrain receiver return URLs and
+replace legacy notification GET deletion with owned confirmation plus CSRF POST.
+The integrated legacy HTTP/return baseline passes 115 assertions (two explicit
+off-origin redirect TODOs); before screenshots are preserved in settings-before.
+Unsaved navigation and Other Sites resources are migration requirements.
+
+Widgets Terra committed native no-item entry-picker extraction as
+`1c5f0efd12cae67424ae9e982e4601cee988f5bc` on
+`bml-terra-entry-picker-20260922`. It is under Sol review and not integrated.
+Any itemid request must fall through unchanged to the existing BML editor.
+Foreman requested a separate security-indicator/linked-poster rendering fix.
+Modern editor other-poster manager parity remains a separate retirement gate.
+
+Preserve all three existing worker sessions/worktrees/containers; use the exact
+session identifiers in BML-PROGRESS.md. Their sessions sometimes end after
+routine edits or while tests are active: inspect and resume concrete unfinished
+work rather than treating such a checkpoint as completion.
 
 Everything below that describes unstarted workers, checkpoint-only authorization
 or thirteen remaining pages is historical context for the original checkpoint.

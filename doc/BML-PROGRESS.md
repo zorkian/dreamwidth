@@ -797,3 +797,30 @@ checks, after widgets Terra completes customization1/4.
 - Widgets Terra now owns separate disposable access/image harness corrections;
   themenav Terra prepared settings migration and awaits the post-customization
   base. No worker checkout or session was replaced.
+
+### Customization integration and next production packages
+
+- Sol cleared category navigation correction `03ff0a8b` (56 assertions) and
+  final Display replacement-node proof `fed30ca8e`. Together with gates1/4
+  `9cd353e17`, gate3 `3dae19752`, and gate6 NA, the finite customization matrix
+  is complete. Integrated reviewed final content as `bcdced59f`; two BML pages
+  removed, ten page files remain. Original worker commits remain preserved.
+- Foreman exact integrated validation: static build PASS; tidy 1047, compile
+  1601; combined 17-file regression PASS, 714 top-level tests. Logs are
+  `/tmp/bml-customize-integrated-{build,tidy,compile,prove}.log` in container
+  `8d7783a043d8`. Actual customization baseline and navigation/display browser
+  flows both pass in `/tmp/bml-customize-integrated-browser.log` and
+  `/tmp/bml-customize-integrated-display.log`.
+- Sol independently cleared access/image disposable harness sources
+  `a3d45557d`, `def79a51b`, and strict signal-exit correction `74c332713`.
+  Both normal flows and intentional failures leave no helper; seeded accounts
+  are no longer used. Integrated final reviewed content as `855414735`.
+- Settings Terra now implements production conversion from `bcdced59f` on
+  `bml-terra-settings-migration-20260922`; receiver redirect validation,
+  safe legacy deletion aliases, compatible settings resources and unsaved
+  navigation are explicit requirements, not exemptions.
+- Picker Terra committed `1c5f0efd12cae67424ae9e982e4601cee988f5bc` with
+  104 HTTP assertions, normal/failure browser evidence, tidy1044/compile1601.
+  Sol independent review is running. Foreman visual/source inspection requested
+  a separate correction to raw untranslated security enums and plain community
+  poster names. No picker integration or editor retirement is claimed yet.
