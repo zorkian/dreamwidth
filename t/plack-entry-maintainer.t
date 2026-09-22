@@ -210,15 +210,12 @@ test_psgi $app, sub {
     my @expected = sort { $a <=> $b } ( $own_entry->ditemid, $other_entry->ditemid );
     my $modern   = $cb->( GET '/entry/' . $comm->user . '/' . $other_entry->ditemid . '/edit' );
     is( $modern->code, 200, 'modern maintainer response status characterized' );
+    like( $modern->content, qr/entry-maintainer-form/,
+        'modern route renders restricted maintainer form' );
     like(
         $modern->content,
-        qr/IS AN ADMIN/,
-        'modern route rejects other-poster manager with placeholder'
-    );
-    unlike(
-        $modern->content,
         qr/name=["']action:savemaintainer/,
-        'modern route has no maintainer save control'
+        'modern route has maintainer save control'
     );
     my $legacy = $cb->(
         GET '/editjournal.bml?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid );
@@ -264,6 +261,83 @@ test_psgi $app, sub {
         $original_subject, 'maintainer save cannot change other poster subject' );
     is( $saved_maintainer->prop('opt_preformatted') || '',
         $unrelated, 'maintainer save preserves unrelated properties' );
+    LJ::set_logprop(
+        $comm,
+        $other_entry->jitemid,
+        {
+            adult_content_maintainer  => 'concepts',
+            opt_nocomments_maintainer => 1,
+            adult_content             => 'explicit',
+            opt_nocomments            => 0,
+        }
+    );
+    LJ::Entry::reset_singletons();
+    my $native_url = '/entry/' . $comm->user . '/' . $other_entry->ditemid . '/edit';
+    my $native_get = $cb->( GET $native_url );
+    is( $native_get->code, 200, 'authorized manager receives native maintainer form' );
+    like( $native_get->content, qr/entry-maintainer-form/, 'native form is property-only surface' );
+    like(
+        $native_get->content,
+        qr/<option value="concepts" selected>/,
+        'native form selects an existing nondefault adult override'
+    );
+    like(
+        $native_get->content,
+        qr/<input(?=[^>]*name="prop_opt_nocomments_maintainer")(?=[^>]*checked="1")[^>]*>/,
+        'native form checks an existing nondefault comments override'
+    );
+    like(
+        $native_get->content,
+        qr/Poster's Setting \(Age 18\+\)/,
+        "native form reports the poster’s exact inherited age rating"
+    );
+    my ($native_form) = grep { $_->find_input('action:savemaintainer') }
+        HTML::Form->parse( $native_get->content, 'http://localhost' . $native_url );
+    ok( $native_form, 'native rendered maintainer save form exists' );
+    $native_form->value( 'prop_adult_content_maintainer_reason', 'native reason marker' );
+    $native_form->value( 'prop_adult_content_maintainer',        'concepts' );
+    $native_form->value( 'prop_opt_nocomments_maintainer',       1 );
+    $native_form->action( 'http://localhost' . $native_url );
+    my $native_save = $cb->( $native_form->click('action:savemaintainer') );
+    is( $native_save->code, 302, 'native property-only save redirects after success' );
+    LJ::Entry::reset_singletons();
+    my $native_saved = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
+    is(
+        $native_saved->prop('adult_content_maintainer_reason'),
+        'native reason marker',
+        'native save persists reason'
+    );
+    is( $native_saved->prop('adult_content_maintainer'), 'concepts', 'native save persists level' );
+    is( $native_saved->prop('opt_nocomments_maintainer') || 0,
+        1, 'native save persists comments override' );
+    is( $native_saved->event_raw,   $original_body,    'native save preserves foreign body' );
+    is( $native_saved->subject_raw, $original_subject, 'native save preserves foreign subject' );
+    is( $native_saved->prop('opt_preformatted') || '',
+        $unrelated, 'native save preserves unrelated property' );
+    my $native_reload = $cb->( GET $native_url );
+    like(
+        $native_reload->content,
+        qr/native reason marker/,
+        'fresh native GET reloads saved reason'
+    );
+    like(
+        $native_reload->content,
+        qr/<option value="concepts" selected>/,
+        'fresh native GET retains selected adult override'
+    );
+    like(
+        $native_reload->content,
+        qr/<input(?=[^>]*name="prop_opt_nocomments_maintainer")(?=[^>]*checked="1")[^>]*>/,
+        'fresh native GET retains checked comments override'
+    );
+    LJ::set_logprop( $comm, $other_entry->jitemid, { opt_nocomments => 1 } );
+    LJ::Entry::reset_singletons();
+    my $poster_disabled = $cb->( GET $native_url );
+    unlike(
+        $poster_disabled->content,
+        qr/name="prop_opt_nocomments_maintainer"/,
+        'native form omits the comments override when the poster disabled comments'
+    );
     LJ::Entry::reset_singletons();
     is(
         LJ::Entry->new( $comm, ditemid => $other_entry->ditemid )->event_raw,

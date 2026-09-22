@@ -534,6 +534,37 @@ sub _edit {
     my $warnings = DW::FormErrors->new;
     my $post;
 
+    my $maintainer_post = $r->did_post ? $r->post_args : undef;
+    if ( $maintainer_post && $maintainer_post->{'action:savemaintainer'} ) {
+        my $entry  = LJ::Entry->new( $journal, ditemid => $ditemid );
+        my $anum   = $ditemid % 256;
+        my $itemid = $ditemid >> 8;
+        return error_ml('/entry/form.tt.error.nofind')
+            unless $entry->editable_by($remote)
+            && $anum == $entry->anum
+            && $itemid == $entry->jitemid
+            && !$entry->poster->equals($remote)
+            && $journal->is_comm
+            && $remote->can_manage($journal)
+            && !$journal->readonly;
+        return error_ml('error.invalidform')
+            unless LJ::check_form_auth( $maintainer_post->{lj_form_auth} );
+        LJ::set_logprop(
+            $journal, $itemid,
+            {
+                adult_content_maintainer_reason =>
+                    $maintainer_post->{prop_adult_content_maintainer_reason},
+                adult_content_maintainer  => $maintainer_post->{prop_adult_content_maintainer},
+                opt_nocomments_maintainer => $maintainer_post->{prop_opt_nocomments_maintainer}
+                ? 1
+                : 0,
+            }
+        );
+        $r->status(302);
+        $r->header_out( Location => LJ::create_url( undef, keep_args => 1 ) );
+        return $r->OK;
+    }
+
     if ( $r->did_post ) {
         $post = $r->post_args;
 
@@ -617,10 +648,32 @@ sub _edit {
         && $anum == $entry_obj->anum
         && $itemid == $entry_obj->jitemid;
 
-    # so at this point, we know that we are authorized to edit this entry
-    # but we need to handle things differently if we're an admin
-    # FIXME: handle communities
-    return error_ml('IS AN ADMIN') unless $entry_obj->poster->equals($remote);
+    # A community maintainer may manage another poster's entry, but never edit
+    # its subject or body.  Keep that property-only surface separate from the
+    # ordinary editor below.
+    unless ( $entry_obj->poster->equals($remote) ) {
+        return error_ml('/entry/form.tt.error.nofind')
+            unless $journal->is_comm && $remote->can_manage($journal) && !$journal->readonly;
+        return DW::Template->render_template(
+            'entry/maintainer.tt',
+            {
+                entry                 => $entry_obj,
+                journal               => $journal,
+                adult_content_enabled => LJ::is_enabled('adult_content'),
+                remote                => $remote,
+                action                => LJ::create_url( undef, keep_args => 1 ),
+                props                 => {
+                    adult_content_maintainer_reason =>
+                        $entry_obj->prop('adult_content_maintainer_reason') || '',
+                    adult_content_maintainer => $entry_obj->prop('adult_content_maintainer') || '',
+                    opt_nocomments_maintainer => $entry_obj->prop('opt_nocomments_maintainer') || 0,
+                    adult_content  => $entry_obj->prop('adult_content')  || '',
+                    opt_nocomments => $entry_obj->prop('opt_nocomments') || 0,
+                },
+            },
+            { ml_scope => '/entry/form.tt' }
+        );
+    }
 
     my %crosspost;
     if ( !$r->did_post && ( my $xpost = $entry_obj->prop("xpostdetail") ) ) {
