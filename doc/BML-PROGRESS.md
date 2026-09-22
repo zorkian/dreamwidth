@@ -513,3 +513,27 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
 - Sol's independent picker extraction audit is retained in
   `doc/BML-ENTRY-PICKER-ACCEPTANCE.md`. Modern editor maintainer parity remains
   a cutover gate; read-only picker extraction can proceed independently later.
+
+
+### Native language independently accepted and integrated
+
+- Sol cleared exact source `774925a26b8c71805235a381eec29fd4b308e9f0` after
+  its independent DB-only removal probe passed all nine checks and the combined
+  native language/BML/cache suite passed 42 assertions. No material native-range
+  finding remains. All affected latest-row language caches are invalidated.
+- Integrated the nine native commits as `207f70451`, `c49960248`, `ea1cf1913`,
+  `29bc1c753`, `f7119e637`, `04daf5eaf`, `bf7db4c81`, `bd02c8fa1`, `f51de6ca4`.
+  Existing poll commits were not duplicated. All work remains local.
+- Foreman integrated native/widget/customization/settings/poll/image coverage
+  passed 229 tests across ten files; tidy passed 1,037 and compile passed 1,599.
+  Logs: `/tmp/bml-native-integrated-{tests,tidy,compile}.log` in its container.
+- Customization production candidate `70a66a0cb` is committed in the widgets
+  worktree and queued for independent Sol review. No page deletion integrated.
+  Foreman found its browser harness still overwrites seeded settings without
+  restoring original state; a separate fixture-lifecycle correction is required.
+- Settings characterization source `e4cae3eb2` extends the reviewed real-session
+  baseline to 35 assertions, including community, privileged read-only and
+  notification cases. It is queued for review, not integrated. Terra continues
+  remaining category/hook/validation/browser acceptance on the settings branch;
+  the prior stash was restored successfully. Production hub migration remains
+  behind customization acceptance.
