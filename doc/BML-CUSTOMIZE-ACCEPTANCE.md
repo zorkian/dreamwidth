@@ -38,3 +38,28 @@ The existing `t/plack-customize.t`, `t/browser/widget-titles.js` and
 `t/browser/customize-baseline.js` are starting points. The last script captures
 rendering states and records exceptions; it does not assert option persistence
 or certify complete browser acceptance.
+
+
+## Final independent proof checklist (2026-09-22)
+
+Sol audited the fixed range through `4c220b920`, reusing independently passed
+169 mutation assertions, 118 controller assertions, full browser/resource flows,
+aliases and narrow correction. No migration-introduced material defect was found.
+The following finite proof gates remain before integrating the two BML deletions:
+
+1. Nonzero user-layer ownership belongs to the effective journal, with a real
+   nonzero foreign layer unchanged.
+2. Category, designer and layout filter actions retain query and community context.
+3. Personal/community subtitles save and reload with exactly one RPC per click.
+4. Explicit control-type inventory proves distinct select, checkbox/radio and
+   text/textarea/color paths were exercised, not just generic value/checked code.
+5. Display mood/nav controls show saved selection and reset to defaults while
+   preserving theme/layout.
+6. Real invalid option input produces useful visible validation, retains useful
+   input and leaves persisted state unchanged.
+
+Widgets Terra owns 1/4/6 in existing tests. The second Terra, after committing its
+Mobile settings increment, owns 2/3/5 on an isolated acceptance branch using new
+test files. Sol reviews fixed commits; one combined final run follows. Previously
+cleared rows must not be reopened without new evidence. Pre-existing debug
+`warn %opts` in ThemeChooser is removed by separate `853d7bde8` (review queued).
