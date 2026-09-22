@@ -276,6 +276,8 @@ test_psgi $app, sub {
     my $native_get = $cb->( GET $native_url );
     is( $native_get->code, 200, 'authorized manager receives native maintainer form' );
     like( $native_get->content, qr/entry-maintainer-form/, 'native form is property-only surface' );
+    is( scalar( () = $native_get->content =~ m{<h1(?:\s[^>]*)?>Administrator Override</h1>}g ),
+        1, 'native maintainer form has one accessible page heading' );
     like(
         $native_get->content,
         qr/<option value="concepts" selected>/,
