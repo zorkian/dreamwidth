@@ -431,3 +431,29 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   unauthorized target. This is a bounded baseline, not complete hub parity.
   Test-only review requested; remaining setting families and notifications
   remain unimplemented. Logs: foreman `/tmp/bml-settings-tests.log`.
+
+
+### Response-body and browser acceptance corrections
+
+- Sol found the first settings characterization could pass while its synthetic
+  `as` actor produced a 147-byte error response after saving. The test now uses
+  a real disposable session with both cookies and requires the rendered response,
+  no server exception, distinct initial values, and forced fresh property reads.
+  Corrective commit `6a24a6b7b` passes all 18 assertions in both foreman and Sol
+  containers. This resolves the test false positive; no production defect is
+  asserted from the synthetic-actor failure.
+- Poll correction `c05449cd5` restores original draft body and properties in
+  `finally` through a separate authenticated page. Sol verified restoration on
+  failure as well as success, including a nonempty fixture. Its subject-bearing
+  restore confirmation is still rejected by the exact allowlist; another small
+  correction is pending. Intermittent FCK `SetEnabled` errors remain under
+  diagnosis, with no error suppression accepted.
+- Language candidate `bc7088a6b` is queued for independent review. Mandatory
+  nested scope/exception restoration and database/cache acceptance remain open.
+- Customization mutation WIP reports 72 passing assertions, but its initial
+  browser capture is NOT an acceptance pass: foreman inspected `results.json`
+  and found CodeMirror exceptions in seven option states despite exit zero.
+  Terra is fixing resource ordering and adding enforced JS-error checks while
+  completing generic property-family save/reset acceptance. Captured WIP colors
+  also displayed missing strings; subsequent translation moves require fresh
+  verified captures. BML deletion remains unintegrated.
