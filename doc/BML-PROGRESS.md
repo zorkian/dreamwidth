@@ -937,3 +937,19 @@ checks, after widgets Terra completes customization1/4.
   Terra must emit native markup and prove real rendered labels/config/errors,
   alongside the previously finite account-hook/page/edit-subscription proofs.
   Settings and bookmarks remain unintegrated pending these bounded checks.
+
+### Settings integration complete
+
+- Sol cleared all production and finite acceptance through `0d8fd5ff6` atop
+  `a7a4d038e`, `5f323e9e5`, `f0042473`, `bcb019343`. Integrated final reviewed
+  content as `035e27196`; nine BML page files remain.
+- Foreman exact combined regression passes17 files /501 tests in
+  `/tmp/bml-settings-integrated-prove.log`; static build, tidy1058, compile1605
+  and full disposable settings browser pass in corresponding build/tidy/
+  compile/browser logs. Matching15-state captures also pass with no JS/resource
+  failures; durable before/after images are under doc/bml-evidence/2026-09-22.
+- FAQ production `656b2cbea` is reviewed sound; corrected test `d719fae1c`
+  (including parent `7c3d81367`) now proves native rendering leaves the legacy
+  base_recent_mod global unchanged, not merely that HTTP has no Last-Modified.
+  Final independent recheck pending. Direct request-context consumers are the
+  next active Themenav package; bookmark browser work remains active in widgets.

@@ -1,7 +1,8 @@
 # Settings hub controller conversion plan
 
-This plan follows the legacy characterization in `t/plack-settings.t`. It does
-not migrate `htdocs/manage/settings/index.bml` yet.
+Implemented and independently reviewed as foreman `035e27196`; the legacy hub
+has been removed. The plan below records the implemented compatibility boundary.
+See BML-SETTINGS-ACCEPTANCE.md for completed validation and visual evidence.
 
 ## Compatibility boundary
 

@@ -23,13 +23,13 @@ Their disposable browser fixture corrections through worker `74c332713` are
 independently reviewed and integrated locally as `855414735`. Normal and
 intentional-failure runs prove helper cleanup, including signal-exit rejection.
 
-Settings migration candidate `bcb019343f3f0612a949ebae06906de2452dc104`
-is committed on `bml-terra-settings-migration-20260922` and under independent
-Sol review. It is not integrated. Worker reports 104 settings and 37 return
-assertions, static build, real browser, tidy1048 and compile1603 passing.
-Final narrow screenshots resolve the observed overflow and missing heading.
-Before screenshots remain in settings-before; receiver redirects, safe deletion,
-permissions, aliases, resources and unsaved navigation are review requirements.
+Settings migration is independently cleared through worker `0d8fd5ff6` and
+integrated as `035e27196`. Nine BML page files remain. Foreman integrated tests
+pass17 files /501 assertions, static build, tidy1058, compile1605 and the full
+disposable browser flow. Matching category captures are saved in settings-after;
+all15 states return200 with no JS/resource failures. The old Other Sites JS
+exception is resolved. Notification scope/native error markup/localized dirty
+form config and the final three hook/page/existing-subscription proofs are clear.
 
 Native no-item picker final source `e4e3958b7` is independently cleared and
 integrated as `e83cddf0e`. Foreman regression passes 3 files / 155 tests,
@@ -51,14 +51,14 @@ Bookmark WIP still needs complete ownership/RPC/browser acceptance and review.
 
 Native Event `eb65a9f66` and S2 `cd45ffb4` are independently cleared and
 integrated as `f4b760a3e` and `5249750db`. Foreman tests pass118 and16 respectively;
-combined formatting1054 and compile1603 pass. Settings through
-`5f323e9e5` has additional confirmed notification translation/output defects:
-wrong fragment ML scope, missing localized dirty-form config on notifications,
-and a visible stray errorbar?> token (quota sentence itself remains visible).
-Terra is correcting these and closing three finite committed-test gaps
-(account-stat hook, notification page/form context, editing an existing
-subscription) before integration. Its FAQ native-dependency work is preserved
-around those corrections. No beta cutover, push or deployment is implied.
+combined formatting1054 and compile1603 pass. Settings is complete as described above. FAQ native candidate `656b2cbea`
+plus test corrections `7c3d81367`/`d719fae1c` awaits final Sol recheck of the
+process-global modification-time isolation assertion. Themenav Terra proceeds
+with the independently audited five direct DW::Request call sites in Login,
+Administration, Config and S2 FriendsPage (plus middleware comment/tests).
+Widgets Terra continues bookmark browser acceptance; its latest timeout was a
+jQuery .data cache versus native dataset test mismatch, not yet a confirmed
+production RPC failure. No beta cutover, push or deployment is implied.
 
 Preserve all three existing worker sessions/worktrees/containers; use the exact
 session identifiers in BML-PROGRESS.md. Their sessions sometimes end after

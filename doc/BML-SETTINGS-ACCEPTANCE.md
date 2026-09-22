@@ -1,9 +1,20 @@
 # Settings hub migration acceptance
 
-The live hub is `htdocs/manage/settings/index.bml`; existing Settings controllers
-implement separate account operations. Migrate the hub after the shared widget
-seam, preserving setting classes and extension hooks. This document records
-source contracts and acceptance gates, not completed mutation testing.
+The hub is now native (`DW::Controller::SettingsHub`, `views/settings/index.tt`),
+integrated as `035e27196` after independent Sol review through worker
+`0d8fd5ff6`. All specified finite acceptance gates below are closed. The legacy
+source/behavior descriptions are the preserved migration baseline.
+
+Final review includes aliases and real POST dispatch, actor permissions, cookie
+settings, hooks/account statistics, notification add/edit/delete/page context,
+receiver return URLs, translation scopes, native validation markup, localized
+unsaved navigation, Other Sites resource compatibility and narrow layout.
+Foreman integrated validation passes17 files /501 tests, static build,1058 tidy,
+1605 compile and the disposable browser flow. Matching15-state captures and two
+additional narrow states are in `doc/bml-evidence/2026-09-22/settings-after`.
+All captured routes return200 with no JS or resource errors. The default local
+notification configuration has no available methods in both before and after
+screenshots; configured-method persistence is exercised by the HTTP fixtures.
 
 ## Routes, actors and categories
 
