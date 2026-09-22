@@ -29,7 +29,8 @@ my @entries = map {
         security => $_ == 1 ? 'private' : 'public'
     )
 } 1 .. 6;
-my %ids = map { $_->ditemid => 1 } @entries;
+my %ids             = map { $_->ditemid => 1 } @entries;
+my %original_bodies = map { $_->ditemid => $_->event_raw } @entries;
 
 sub picker_forms {
     return HTML::Form->parse( $_[0], 'http://localhost/editjournal' );
@@ -98,10 +99,16 @@ test_psgi $app, sub {
     $res = $send->( GET '/editjournal' );
     is( scalar entry_ids( $res->content ), 0, 'logged-out visitor sees no entry forms' );
     unlike( $res->content, qr/Picker body/, 'logged-out visitor sees no entry summaries' );
+    LJ::Entry::reset_singletons();
+
     for my $entry (@entries) {
         my $fresh = LJ::Entry->new( $owner, ditemid => $entry->ditemid );
         ok( $fresh->valid, 'read-only selection leaves entry present' );
-        is( $fresh->event_raw, $entry->event_raw, 'selection leaves persisted body unchanged' );
+        is(
+            $fresh->event_raw,
+            $original_bodies{ $entry->ditemid },
+            'selection leaves persisted body unchanged'
+        );
     }
 };
 
