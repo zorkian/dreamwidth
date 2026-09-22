@@ -42,16 +42,20 @@ Native account labels and inbox compose repairs are reviewed and integrated as
 Spam sources `038607cea` + `345d6e246` are independently cleared and integrated
 as `e772d7919`; foreman spam/compose regression passes63 assertions.
 Widgets Terra continues uncommitted bookmark handling on preserved branch
-`bml-terra-inbox-bookmark-errors-20260922`. Missing-token denial failures now
-have a concrete shared-CSRF hypothesis: check_form_auth uses a false-value
-fallback to process-global legacy POST. Terra must prove before/after DB state
-and produce a separate core correction; Sol independently assesses it. Do not
-claim arbitrary invalid tokens pass or accept this WIP before review.
+`bml-terra-inbox-bookmark-errors-20260922`. The shared missing-token defect is fixed and integrated as `42840ba7b`
+(sources `2f5509984` + real-token regression `4b557e1af`). Sol independently
+reproduced valid legacy POST -> tokenless modern authorization before the fix,
+then rejection afterward; the corrected permanent test fails on old code.
+Foreman combined six-suite run passes308 assertions, tidy1055 and compile1603.
+Bookmark WIP still needs complete ownership/RPC/browser acceptance and review.
 
 Native Event `eb65a9f66` and S2 `cd45ffb4` are independently cleared and
 integrated as `f4b760a3e` and `5249750db`. Foreman tests pass118 and16 respectively;
-combined formatting1054 and compile1603 pass. Settings production through
-`5f323e9e5` is clear, but Terra is closing three finite committed-test gaps
+combined formatting1054 and compile1603 pass. Settings through
+`5f323e9e5` has additional confirmed notification translation/output defects:
+wrong fragment ML scope, missing localized dirty-form config on notifications,
+and a visible stray errorbar?> token (quota sentence itself remains visible).
+Terra is correcting these and closing three finite committed-test gaps
 (account-stat hook, notification page/form context, editing an existing
 subscription) before integration. Its FAQ native-dependency work is preserved
 around those corrections. No beta cutover, push or deployment is implied.

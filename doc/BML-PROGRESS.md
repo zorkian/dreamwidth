@@ -917,3 +917,23 @@ checks, after widgets Terra completes customization1/4.
   assertions reused the already-mutated target and cannot independently prove
   an invalid-token bypass. Terra and Sol are testing the exact sequential
   request/DB boundary; no bookmark range has been integrated.
+
+### Shared form-auth isolation fixed; notification rendering corrections
+
+- Sol independently confirmed stale legacy POST token reuse for explicit empty
+  modern calls. Core `2f5509984` plus meaningful real-token test `4b557e1af`
+  are cleared and integrated as `42840ba7b`. The corrected test fails against
+  old code for empty/undef tokens while positive controls pass. Arbitrary
+  invalid tokens were already rejected; do not conflate those cases.
+- Foreman integrated validation: six files /308 tests pass in
+  `/tmp/bml-form-auth-integrated.log`, covering real-token unit controls,
+  spam/compose, customization and retained legacy settings/returns. Formatting
+  1055 and compile1603 pass in `/tmp/bml-form-auth-{tidy,compile}.log`.
+- Settings review narrowed additional actual output defects at `5f323e9e5`:
+  notification fragment relative keys resolve under the hub scope and display
+  missing strings; localized SettingsConfirmMsg is omitted on notifications;
+  quota error output retains a visible `errorbar?>` suffix. Sol verified the
+  quota sentence IS visible, correcting the initial invisibility hypothesis.
+  Terra must emit native markup and prove real rendered labels/config/errors,
+  alongside the previously finite account-hook/page/edit-subscription proofs.
+  Settings and bookmarks remain unintegrated pending these bounded checks.
