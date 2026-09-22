@@ -141,3 +141,20 @@ valid-token actions plus missing/invalid-token nonmutation on independent rows.
 Cover selected read/unread/delete and all-read/delete-all with old button
 suffixes, aliases, view and single-entry scope. Keep the bookmark review and
 maintainer work independently reviewable.
+
+## Modern RPC view evaluation reproduction (2026-09-22)
+
+At foreman `ad467d384`, authenticated `/__rpc_inbox_actions` accepted an
+unvalidated `view` in a valid-token delete request with an empty IDs array.
+`items_by_view` interpolated that input into string eval. A harmless process-local
+marker assignment embedded in the view executed, then rendering returned500
+because the assignment result was not a notification object. No notification
+rows, shell commands or external services were affected. The two-assertion
+probe fails its marker-unchanged assertion; source/log are
+`/tmp/bml-inbox-view-probe.pl` and `.log` in foreman container8d7783a043d8.
+
+This is a pre-existing modern-handler defect, separate from bookmark changes.
+Replace string evaluation with validated method dispatch and reject malformed
+RPC views before mutation. Preserve valid folder/single-entry behavior and
+archive feature gating. Require a real-token would-mutate regression showing
+malformed view leaves owned rows unchanged, alongside meaningful valid controls.
