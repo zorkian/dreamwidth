@@ -95,3 +95,19 @@ fixtures. Preserve native translation scope and entered inputs, and prove no
 success redirect on failures. It can proceed without changing beta eligibility
 or public routes. Spam neither-selected and safe bookmark mutation are separate
 bounded packages before full index/compose browser parity.
+
+## Reproduced spam no-action baseline (2026-09-22)
+
+Foreman constructed a local message with `LJ::Message::save_to_db` between two
+disposable users; no message-send/event method was invoked. A real owner session
+and rendered form submitted with both spam and ban unchecked produces legacy
+HTTP200 with `No action selected`, but modern HTTP303 to `/inbox` with the error
+lost. Evidence: `/tmp/bml-inbox-spam-probe.pl` and
+`/tmp/bml-inbox-spam-probe.log` in the foreman container. The modern form also
+emits a development warning for a checkbox without an explicit value; actual
+rendered submission values should be characterized in the repair tests.
+
+Terra's bounded repair should prove neither-selected nonmutation and useful
+response, independent spam/ban/both outcomes, CSRF and owned-message guards,
+using fresh database reads and isolating report delivery. This does not authorize
+or certify public inbox cutover by itself.
