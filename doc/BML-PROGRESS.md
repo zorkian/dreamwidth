@@ -984,3 +984,24 @@ checks, after widgets Terra completes customization1/4.
   branch; native request consumer `fdace9826` stays queued for Sol. PageStats
   read-only audit finds its adapter filename unset under Plack and unused by
   in-tree GA plugins; external filename contract remains a disposition item.
+
+### Platform restriction and unaffected continuation
+
+- Parent reported a platform restriction on cybersecurity requests and directed
+  no retry or reassignment to bypass it. The affected inbox probes/fixes/reviews
+  are preserved and held; no inferred permission from the scheduled check.
+  UniqCookie authorization remains unanswered and that module untouched.
+- Preserved worker state: bulk guard `b1117371e` plus all-action fixture
+  correction `3f8a2e7c5`; modern view-dispatch controller/test WIP is being
+  stashed in Themenav checkout. Bookmark followup `de705e8` atop `12f01f135`
+  and `4caf02a83` remains unintegrated and not gate-clear.
+- Unaffected work continues: native request-context test-only completion (real
+  intervening no-cookie request, true loginout-marker rendering behavior), S2
+  request-note rendering audit, and restricted maintainer UI parity. Sol
+  production-cleared `fdace9826` but requires those two permanent tests.
+- Maintainer characterization `a9bcc488a` passes140 independently but needs a
+  nondefault unrelated-property fixture and a genuinely different denied value;
+  Terra is correcting both before the bounded native UI implementation.
+- Six matching disposable legacy/modern inbox baseline screenshots are committed
+  under `doc/bml-evidence/2026-09-22/inbox-before`; this is visual evidence, not
+  a claim of behavioral acceptance or clean console/network checks.
