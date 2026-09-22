@@ -449,4 +449,68 @@ test_psgi $app, sub {
         'M', 'invalid privacy value leaves the prior value unchanged' );
 };
 
+test_psgi $app, sub {
+    my $send   = shift;
+    my $user   = temp_user();
+    my $cookie = settings_cookie($user);
+    my $url    = '/manage/settings/?cat=mobile';
+    my $res    = $send->( GET $url, Cookie => $cookie );
+    is( $res->code, 200, 'mobile category renders for a disposable personal account' );
+    like(
+        $res->content,
+        qr/email posting|Email Posting/i,
+        'mobile EmailPosting contract renders without external action'
+    );
+
+    $url = '/manage/settings/?cat=othersites';
+    $res = $send->( GET $url, Cookie => $cookie );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'Other Sites local settings form renders' ) or return;
+    my $prefix = 'DW__Setting__XPostAccounts_';
+    my %keys   = map { $_ => $prefix . $_ }
+        qw(xpostdisablecomments crosspost_footer_append crosspost_footer_text crosspost_footer_nocomments);
+    ok( defined $form->value( $keys{crosspost_footer_append} ), 'Other Sites footer mode renders' )
+        or return;
+    $form->value( $keys{xpostdisablecomments},        1 );
+    $form->value( $keys{crosspost_footer_append},     'A' );
+    $form->value( $keys{crosspost_footer_text},       'browser-safe footer' );
+    $form->value( $keys{crosspost_footer_nocomments}, 'browser-safe no comments' );
+    my $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    like(
+        $res->content,
+        qr/successfully saved/i,
+        'Other Sites local settings save reports success'
+    );
+    my $fresh = LJ::load_userid( $user->id, 1 );
+    is( $fresh->prop('opt_xpost_disable_comments'), '1', 'Other Sites disable-comments persists' );
+    is( $fresh->prop('crosspost_footer_append'),    'A', 'Other Sites footer mode persists' );
+    is(
+        $fresh->prop('crosspost_footer_text'),
+        'browser-safe footer',
+        'Other Sites footer text persists'
+    );
+    is(
+        $fresh->prop('crosspost_footer_nocomments'),
+        'browser-safe no comments',
+        'Other Sites comment footer persists'
+    );
+    ($form) = settings_form( $res->content, $url );
+    $form->value( $keys{crosspost_footer_text}, 'forged change' );
+    $form->value( 'lj_form_auth',               'invalid' );
+    $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    like( $res->content, qr/Invalid form/i, 'Other Sites invalid CSRF is explained' );
+    $fresh = LJ::load_userid( $user->id, 1 );
+    is(
+        $fresh->prop('crosspost_footer_text'),
+        'browser-safe footer',
+        'Other Sites invalid CSRF leaves exact prior footer'
+    );
+};
+
 done_testing;
