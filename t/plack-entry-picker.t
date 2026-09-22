@@ -233,5 +233,34 @@ test_psgi $app, sub {
         scalar( grep { $_->find_input('action:savemaintainer') } @forms ),
         'manager retains legacy maintainer controls for another poster'
     );
+
+    # itemid must override picker mode even when the action comes from the
+    # editor's JavaScript submit_value field. Denied mutations must reach the
+    # retained editor CSRF guard, not disappear into read-only selection.
+    my $before_maintainer = $other_entry->prop('opt_nocomments_maintainer') || 0;
+    for my $token ( undef, 'invalid' ) {
+        for my $action ( 'action:delete', 'action:savemaintainer' ) {
+            my @payload = (
+                mode                           => 'init',
+                itemid                         => $other_entry->ditemid,
+                submit_value                   => $action,
+                prop_opt_nocomments_maintainer => 1
+            );
+            push @payload, lj_form_auth => $token if defined $token;
+            $res = $cb->( POST '/editjournal.bml?usejournal=' . $comm->user, Content => \@payload );
+            like(
+                $res->content,
+                qr/Invalid form/i,
+                "itemid $action reaches CSRF guard despite init mode"
+            );
+            ok( !$res->header('Location'),
+                'denied legacy mutation does not redirect away its body' );
+            LJ::Entry::reset_singletons();
+            my $fresh_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
+            ok( $fresh_entry->valid, 'denied editor request cannot delete another poster entry' );
+            is( $fresh_entry->prop('opt_nocomments_maintainer') || 0,
+                $before_maintainer, 'denied editor request cannot change maintainer properties' );
+        }
+    }
 };
 done_testing;
