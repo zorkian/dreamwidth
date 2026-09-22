@@ -731,3 +731,20 @@ Do not classify larger consumers as equivalent one-line replacements:
 - LJ::Lang::get_lang_names computes an unused translated name, while set_lang
   still forwards to BML. Audit actual callers before changing/removing either;
   a source-only search is not acceptance for externally callable behavior.
+
+### Original checkpoint review follow-up
+
+- Sol reviewed access-filter migration source `c2ed9b0f9` against immutable
+  foreman `46cf9b4e3`: no production regression found; 27 HTTP assertions, static
+  build and normal browser flow pass. Translation move, permissions, CSRF,
+  aliases, filter/membership operations and wide masks are covered.
+- Material browser-harness finding remains: `t/browser/access-filters.js` uses
+  seeded test_user/test_friend and only closes Chrome in finally. Failure after
+  the first saved filter leaves group/membership state behind. Normal-run exact
+  pre/post equality does not prove failure cleanup. Assign disposable helper
+  lifecycle plus fail-after-save acceptance to Terra at its next clean boundary.
+- Mobile final candidate `229979bd7` reports 93 passing settings assertions;
+  exact independent review is queued. It corrects the previously excluded WIP
+  range; no Mobile source change or accepted integration is claimed yet.
+- Integrated settings fixture required formatting-only correction `b4e7475fd`;
+  all 1043 tidy checks now pass (`/tmp/bml-settings-integrated-tidy-fixed.log`).
