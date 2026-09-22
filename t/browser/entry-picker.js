@@ -42,19 +42,39 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         const sorted = values => [...values].sort((a,b)=>a-b);
         const res = await page.goto(base + '/editjournal.bml', {waitUntil:'networkidle0'});
         assert.equal(res.status(), 200);
+        assert.match(await page.title(), /Edit Entries/, 'native picker uses its translated heading');
+        assert.ok(await page.$('form.entry-picker'), 'native picker form renders');
         assert.deepEqual(await ids(), sorted(data.ids.slice(1)), 'initial page shows exact newest five');
         await page.screenshot({path:output+'/default.png',fullPage:true});
-        await page.focus('#selecttype-lastn');
-        await page.keyboard.press('Space');
-        await page.$eval('[name=howmany]', el => { el.value = '6'; });
+        await page.$eval('[name=howmany]', el => { el.value = '6'; el.dispatchEvent(new Event('change', {bubbles:true})); });
+        assert.equal(await page.$eval('#selecttype-lastn', el => el.checked), true,
+            'editing howmany selects the recent-entry mode without a radio click');
         await Promise.all([page.waitForNavigation({waitUntil:'networkidle0'}), page.$eval('[name=howmany]', el => el.form.querySelector('[type=submit]').click())]);
-        assert.deepEqual(await ids(), sorted(data.ids), 'keyboard-selected recent search includes private owner entry');
+        assert.deepEqual(await ids(), sorted(data.ids), 'edited recent count includes private owner entry');
+        const security = await page.$$eval('.entry-picker-security', elements => elements.map(el => el.className));
+        assert.ok(security.includes('entry-picker-security entry-picker-security-private'), 'private icon renders');
+        assert.ok(security.includes('entry-picker-security entry-picker-security-protected'), 'friends icon renders');
+        assert.ok(security.includes('entry-picker-security entry-picker-security-groups'), 'custom-groups icon renders');
+        assert.ok(!security.includes('entry-picker-security entry-picker-security-public'), 'public entries have no marker');
+        const iconAccessibility = await page.$$eval('.entry-picker-security', elements => elements.map(element => ({
+            alt: element.querySelector('img')?.alt,
+            title: element.querySelector('img')?.title || '',
+            html: element.innerHTML,
+        })));
+        const expectedSecurityLabels = ['Custom access entry', 'Friends-only entry', 'Private entry'];
+        assert.deepEqual(iconAccessibility.map(icon => icon.alt).sort(), expectedSecurityLabels,
+            'security icons expose translated, distinct image alt labels');
+        assert.deepEqual(iconAccessibility.map(icon => icon.title).sort(), expectedSecurityLabels,
+            'security icons expose translated, distinct image title labels');
+        assert.ok(iconAccessibility.every(icon => !icon.html.includes('XXX')),
+            'security icons never render an invalid image type placeholder');
         await page.screenshot({path:output+'/recent.png',fullPage:true});
         await page.goto(base + '/editjournal', {waitUntil:'networkidle0'});
-        await page.click('#selecttype-day');
         for (const [name,value] of Object.entries({year:'1970',month:'1',day:'1'})) {
-            await page.$eval('[name='+name+']', (el,value) => { el.value=value; }, value);
+            await page.$eval('[name='+name+']', (el,value) => { el.value=value; el.dispatchEvent(new Event('change', {bubbles:true})); }, value);
         }
+        assert.equal(await page.$eval('#selecttype-day', el => el.checked), true,
+            'editing a date field selects day mode without a radio click');
         await Promise.all([page.waitForNavigation({waitUntil:'networkidle0'}), page.$eval('[name=year]', el => el.form.querySelector('[type=submit]').click())]);
         assert.match(await page.$eval('body', el=>el.textContent), /No entries match the criteria/);
         assert.deepEqual(await ids(), []);

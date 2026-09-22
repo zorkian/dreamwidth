@@ -1,0 +1,36 @@
+;; -*- coding: utf-8 -*-
+;; The native picker deliberately uses /editjournal.bml translation keys while
+;; the retained itemid editor remains a BML consumer; this copied TT source is
+;; not the active lookup scope.
+
+.btn.proceed=Proceed
+
+.certainday=Certain Day:
+
+.desc=Use the form below to search for the entry you'd like to edit.
+
+.edit.this.entry=Edit this Entry
+
+.error.getting=There was an error while loading this entry.
+
+.error.nocomm=The selected journal is not a community.
+
+.htmlonly=(this entry only contains HTML content)
+
+.in=In community:
+
+.massprivacy=You also may want to use the <a [[aopts]]>mass privacy tool</a> to change the security of a group of entries at once.
+
+.no.entries.exist=The selected journal has no entries.
+
+.no.entries.found=No Entries Found
+
+.no.entries.match=No entries match the criteria you specified. Please go back and adjust your search.
+
+.recententries=Most recent entries
+
+.recententry=Most recent entry
+
+.title=Edit Entries
+
+.viewwhat=View Which Entries:

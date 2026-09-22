@@ -14,6 +14,7 @@ my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
 my $owner    = temp_user();
 my $outsider = temp_user();
+my $groupid  = $owner->create_trust_group( groupname => 'Picker custom security' );
 $owner->update_self( { status => "A" } );
 my $session = LJ::Session->create( $owner, nolog => 1 );
 my $cookie =
@@ -29,17 +30,18 @@ my @entries = map {
     my %result;
     LJ::do_request(
         {
-            mode     => 'postevent',
-            ver      => $LJ::PROTOCOL_VER,
-            user     => $owner->user,
-            subject  => "Picker subject $_",
-            event    => "Picker body $_",
-            year     => 2020,
-            mon      => 1,
-            day      => $_,
-            hour     => 12,
-            min      => 0,
-            security => $_ == 1 ? 'private' : 'public'
+            mode      => 'postevent',
+            ver       => $LJ::PROTOCOL_VER,
+            user      => $owner->user,
+            subject   => "Picker subject $_",
+            event     => "Picker body $_",
+            year      => 2020,
+            mon       => 1,
+            day       => $_,
+            hour      => 12,
+            min       => 0,
+            security  => $_ == 1 ? 'private' : $_ == 2 || $_ == 3 ? 'usemask' : 'public',
+            allowmask => $_ == 2 ? 1 : $_ == 3 ? 1 << $groupid : undef,
         },
         \%result,
         { noauth => 1, nomod => 1 }
@@ -70,6 +72,7 @@ test_psgi $app, sub {
             qr/undef error|DieObject=|BML ERROR/,
             'picker is not an exception response'
         );
+        like( $res->content, qr/class="entry-picker"/, 'native picker form renders' );
         my ($form) = grep { $_->find_input('selecttype') } picker_forms( $res->content );
         ok( $form, 'actual selector form exists' ) or next;
         is( $form->value('selecttype'), 'last', 'selector defaults to latest entry' );
@@ -96,6 +99,57 @@ test_psgi $app, sub {
         );
         like( $res->content, qr/Picker body 1/,    'owner sees private entry summary' );
         like( $res->content, qr/Picker subject 6/, 'result retains subject' );
+        like(
+            $res->content,
+            qr/entry-picker-security-private/,
+            'private entries retain the private icon'
+        );
+        like(
+            $res->content,
+            qr/<img\b[^>]*\balt=["']Private entry["'][^>]*\btitle=["']Private entry["'][^>]*>/,
+            'private icon renders meaningful image alt and title labels'
+        );
+        like(
+            $res->content,
+qr/<img\b[^>]*\balt=["']Friends-only entry["'][^>]*\btitle=["']Friends-only entry["'][^>]*>/,
+            'friends icon renders meaningful image alt and title labels'
+        );
+        like(
+            $res->content,
+qr/<img\b[^>]*\balt=["']Custom access entry["'][^>]*\btitle=["']Custom access entry["'][^>]*>/,
+            'custom icon renders meaningful image alt and title labels'
+        );
+        unlike( $res->content, qr/<b>XXX<\/b>/,
+            'security icons never render an invalid image type' );
+        like(
+            $res->content,
+            qr/entry-picker-security-protected/,
+            'friends entries retain the protected icon'
+        );
+        like(
+            $res->content,
+            qr/entry-picker-security-groups/,
+            'custom entries retain the groups icon'
+        );
+        unlike(
+            $res->content,
+            qr/entry-picker-security-public/,
+            'public entries have no security marker'
+        );
+        $res = $cb->(
+            POST $path . '?usejournal=',
+            Content =>
+                [ mode => 'edit', selecttype => 'lastn', howmany => 6, usejournal => $owner->user ]
+        );
+        is_deeply(
+            [ entry_ids( $res->content ) ],
+            [ sort { $a <=> $b } keys %ids ],
+            'empty GET usejournal falls through to the nonempty POST context'
+        );
+        $res = $cb->( GET $path . '?mode=edit&usejournal=' . $owner->user );
+        is( $res->code, 302, 'no-item edit-mode GET preserves the legacy picker redirect' );
+        is( $res->header('Location'),
+            '/editjournal', 'legacy edit-mode redirect drops selection context' );
         $form->value( 'selecttype', 'last' );
         $res = $cb->( $form->click );
         is( $res->code, 302, 'single match redirects to editor entry point' );
@@ -159,10 +213,25 @@ test_psgi $app, sub {
         my $res = $cb->( GET '/editjournal?' . $key . '=' . $comm->user );
         is_deeply( [ entry_ids( $res->content ) ],
             \@expected, "maintainer sees both posters through $key context" );
+        unlike(
+            $res->content,
+            qr/<option value=['"]\Q@{[ $comm->user ]}\E/,
+            'personal authas selector omits managed communities'
+        );
         like(
             $res->content,
             qr/Other poster community body/,
             'visible other-poster summary is retained'
+        );
+        like(
+            $res->content,
+            qr/entry-picker-poster.*lj:user=['"]\Q@{[ $outsider->user ]}\E/s,
+            'community poster uses a linked journal identity'
+        );
+        like(
+            $res->content,
+            qr/entry-picker-poster">Poster:/,
+            'community poster has the legacy translated label'
         );
         for my $form ( grep { $_->find_input('itemid') } picker_forms( $res->content ) ) {
             my %query = $form->action->query_form;
@@ -247,20 +316,51 @@ test_psgi $app, sub {
                 prop_opt_nocomments_maintainer => 1
             );
             push @payload, lj_form_auth => $token if defined $token;
-            $res = $cb->( POST '/editjournal.bml?usejournal=' . $comm->user, Content => \@payload );
-            like(
-                $res->content,
-                qr/Invalid form/i,
-                "itemid $action reaches CSRF guard despite init mode"
-            );
-            ok( !$res->header('Location'),
-                'denied legacy mutation does not redirect away its body' );
-            LJ::Entry::reset_singletons();
-            my $fresh_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
-            ok( $fresh_entry->valid, 'denied editor request cannot delete another poster entry' );
-            is( $fresh_entry->prop('opt_nocomments_maintainer') || 0,
-                $before_maintainer, 'denied editor request cannot change maintainer properties' );
+            for my $path ( '/editjournal', '/editjournal.bml' ) {
+                $res = $cb->( POST $path . '?usejournal=' . $comm->user, Content => \@payload );
+                like(
+                    $res->content,
+                    qr/Invalid form/i,
+                    "$path itemid $action reaches CSRF guard despite init mode"
+                );
+                ok( !$res->header('Location'),
+                    'denied legacy mutation does not redirect away its body' );
+                LJ::Entry::reset_singletons();
+                my $fresh_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
+                ok( $fresh_entry->valid,
+                    'denied editor request cannot delete another poster entry' );
+                is( $fresh_entry->prop('opt_nocomments_maintainer') || 0,
+                    $before_maintainer,
+                    'denied editor request cannot change maintainer properties' );
+            }
         }
     }
 };
+
+subtest 'picker retains legacy language keys with a request getter' => sub {
+    no warnings 'redefine';
+    local *LJ::Lang::get_text = sub {
+        my ( $lang, $code ) = @_;
+        return "picker-legacy-key:$code";
+    };
+    test_psgi $app, sub {
+        my $send = shift;
+        my $cb  = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+        my $res = $cb->( GET '/editjournal' );
+        like(
+            $res->content,
+            qr/picker-legacy-key:\/editjournal\.bml\.title/,
+            'normal picker render resolves its title through the retained BML key'
+        );
+        $res = $cb->( GET '/editjournal?usejournal=' . $outsider->user );
+        like(
+            $res->content,
+            qr/picker-legacy-key:\/editjournal\.bml\.error\.nocomm/,
+            'picker error response resolves through the retained BML error key'
+        );
+        unlike( $res->content, qr/editjournal\.tt\.error\./,
+            'error response never asks the getter for a template filename key' );
+    };
+};
+
 done_testing;

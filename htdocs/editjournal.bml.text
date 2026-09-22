@@ -11,6 +11,8 @@
 
 .error.getting=There was an error while loading this entry.
 
+.error.nocomm=The selected journal is not a community.
+
 .error.nofind=Could not find selected journal entry.
 
 .extradata.subj=The entry was posted with the following subject:
@@ -61,3 +63,9 @@
 .title=Edit Entries
 
 .viewwhat=View Which Entries:
+
+.security.private=Private entry
+
+.security.protected=Friends-only entry
+
+.security.groups=Custom access entry

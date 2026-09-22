@@ -13,23 +13,25 @@ my $password = 'picker-browser-' . LJ::rand_chars(12);
 $user->set_password($password);
 $user->update_self( { status => 'A' } );
 LJ::set_rel( $comm, $user, 'A' );
+my $groupid = $user->create_trust_group( groupname => 'Picker browser custom security' );
 my @ids;
 
 for my $day ( 1 .. 6 ) {
     my %res;
     LJ::do_request(
         {
-            mode     => 'postevent',
-            ver      => $LJ::PROTOCOL_VER,
-            user     => $user->user,
-            subject  => "Picker browser $day",
-            event    => "Visible picker body $day",
-            year     => 2020,
-            mon      => 1,
-            day      => $day,
-            hour     => 12,
-            min      => 0,
-            security => $day == 1 ? 'private' : 'public'
+            mode      => 'postevent',
+            ver       => $LJ::PROTOCOL_VER,
+            user      => $user->user,
+            subject   => "Picker browser $day",
+            event     => "Visible picker body $day",
+            year      => 2020,
+            mon       => 1,
+            day       => $day,
+            hour      => 12,
+            min       => 0,
+            security  => $day == 1 ? 'private' : $day == 2 || $day == 3 ? 'usemask' : 'public',
+            allowmask => $day == 2 ? 1 : $day == 3 ? 1 << $groupid : undef,
         },
         \%res,
         { noauth => 1, nomod => 1 }
