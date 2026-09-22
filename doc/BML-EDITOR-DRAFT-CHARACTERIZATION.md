@@ -55,3 +55,20 @@ then save/reload through the modern UI. Separately decline restoration and
 verify the stored draft is retained or characterize the established behavior.
 No replacement draft implementation or endpoint deletion is authorized by this
 audit alone.
+
+## Independent legacy-format browser findings
+
+Sol reproduced at immutable `1929db445` using separate disposable accounts:
+
+- Accepting a legacy hash without editor while the preferred mode is markdown0
+  selects html_casual1 and writes that value to saved properties. Body, subject,
+  tags, location and music remain exact. Legacy restore preserves the existing
+  mode. Only applying a nonempty saved mode is required before retirement.
+- Declining clears rendered body/subject and stored body, but initialization
+  later leaves saved properties containing editor=markdown0. The documented
+  clear-body/all-properties contract needs a fresh RPC regression and ordering
+  correction. Exactly one restore dialog occurred.
+
+The earlier single-account reseed timeout was not evidence; the findings above
+use separate real browser accounts to avoid autosave races between cases.
+Corrections are assigned separately and not yet integrated.

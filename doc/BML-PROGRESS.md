@@ -1219,3 +1219,14 @@ checks, after widgets Terra completes customization1/4.
   separate. Latest editor production tidy1078/compile1605 pass.
 - Timestamp HTTP/browser `fdbb67460` awaits Sol. Browser-mode gate5 is assigned
   to Terra; no acceptance claimed from its branch setup alone.
+
+### Legacy draft compatibility findings
+
+- Independent real-browser audit at `1929db445` confirms absent legacy editor
+  overwrites a nondefault preferred mode with Casual HTML, while retaining
+  content/metadata. Decline clears body but initialization repopulates editor
+  property instead of leaving all properties cleared. Separate-account cases
+  avoid the earlier reseed race. Narrow fixes/tests are queued with Terra.
+- Browser-mode candidate `a6889cd94` awaits independent review. Timestamp
+  checkbox/visible-panel corrections pass worker HTTP17/browser and are being
+  committed; they are not yet independently cleared.
