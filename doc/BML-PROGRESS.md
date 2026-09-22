@@ -1114,3 +1114,19 @@ checks, after widgets Terra completes customization1/4.
   anonymous302 behavior remain. No unsupported status-parity claim.
 - Support FAQ `55bb9e683` awaits Sol. S2 language initialization is assigned as
   the next ordinary package; explicit journal adapter remains separate.
+
+### Approved UniqCookie package complete
+
+- User-approved source `366d2584f` is independently clear: new request isolation,
+  existing48 cookie assertions and10 sysban assertions pass in Sol container.
+  Integrated locally as `a23efe915`; only the two request reads and explicit
+  dependency change. Mapping/cookie format/block policy remain unchanged.
+- Cleared maintainer heading fix `a4dfa3156` integrated as `8986e7de8`.
+  Foreman combined5 files /223 tests pass in
+  `/tmp/bml-uniq-maintainer-integrated.log`; tidy1070 and compile1605 pass in
+  `/tmp/bml-uniq-integrated-{tidy,compile}.log`. All work remains local.
+- Support FAQ source `55bb9e683` was cleared and integrated as `7634070da`;
+  foreman3 files /78 tests pass in `/tmp/bml-support-faq-integrated.log`.
+- S2 language initialization `78817b24a` and Birthday labels `3e1749319` are
+  undergoing independent review. SiteScheme request selection and journal/feed
+  adapter characterization proceed separately. The inbox platform hold remains.

@@ -2,6 +2,13 @@
 
 ## Active continuation: 2026-09-22
 
+Latest accepted ranges additionally include native control strip `0512f0105`,
+maintainer UI `2a33bfeb7` + heading `8986e7de8`, field lengths `23023f579`,
+OPML `04f0fe2b2`, Support FAQ `7634070da`, and explicitly approved UniqCookie
+`a23efe915`. Latest foreman related regression223, tidy1070 and compile1605 pass.
+S2 language initialization and Birthday labels await Sol; see progress ledger.
+
+
 Latest local integration: `0bceb2942` (S2 request-note rendering), evidence ledger
 `7f3a22a61`. Sol cleared source `c2204e313`; foreman six-view replay passed all
 HTTP/JS/resource checks after server restart. Tidy1063/compile1605 pass. Admin
