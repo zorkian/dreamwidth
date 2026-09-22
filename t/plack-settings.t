@@ -372,4 +372,81 @@ test_psgi $app, sub {
     };
 }
 
+test_psgi $app, sub {
+    my $send  = shift;
+    my $maint = temp_user();
+    my $comm  = temp_comm();
+    LJ::set_rel( $comm, $maint, 'A' );
+    my $cookie = settings_cookie($maint);
+    my $url    = '/manage/settings/?authas=' . $comm->user . '&cat=community';
+    my $res    = $send->( GET $url, Cookie => $cookie );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'community posting and moderation controls render for a maintainer' ) or return;
+
+    my $postlevel_key  = 'DW__Setting__CommunityPostLevel_communitypostlevel';
+    my $moderation_key = 'DW__Setting__CommunityEntryModeration_val';
+    ok( defined $form->value($postlevel_key), 'community posting level control is rendered' )
+        or return;
+    ok( grep( { ( $_->name || '' ) eq $moderation_key } $form->inputs ),
+        'community moderation control is rendered' )
+        or return;
+    $form->value( $postlevel_key,  'select' );
+    $form->value( $moderation_key, 1 );
+    my $request = $form->click;
+    $request->uri( 'http://localhost' . $url );
+    $request->header( Cookie => $cookie );
+    $res = $send->($request);
+    like(
+        $res->content,
+        qr/successfully saved/i,
+        'community posting and moderation save reports success'
+    );
+    my $fresh = LJ::load_userid( $comm->id, 1 );
+    is( ( $fresh->get_comm_settings )[1], 'select', 'community post level survives forced reload' );
+    is( $fresh->prop('moderated'),        1,        'community moderation survives forced reload' );
+
+    ($form) = settings_form( $res->content, $url );
+    $form->value( $postlevel_key, 'not-a-level' );
+    $request = $form->click;
+    $request->uri( 'http://localhost' . $url );
+    $request->header( Cookie => $cookie );
+    $res = $send->($request);
+    like( $res->content, qr/invalid/i,
+        'invalid community posting level has useful validation text' );
+    unlike( $res->content, qr/not-a-level/,
+        'legacy select validation does not render an invalid non-option community level' );
+    is( ( LJ::load_userid( $comm->id, 1 )->get_comm_settings )[1],
+        'select', 'invalid community posting level does not persist' );
+};
+
+test_psgi $app, sub {
+    my $send   = shift;
+    my $user   = temp_user();
+    my $cookie = settings_cookie($user);
+    my $url    = '/manage/settings/?cat=privacy';
+    my $res    = $send->( GET $url, Cookie => $cookie );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'privacy category has a rendered save form' ) or return;
+    my $key = 'LJ__Setting__UserMessaging_usermsg';
+    ok( defined $form->value($key), 'privacy UserMessaging control is rendered' ) or return;
+    $form->value( $key, 'M' );
+    my $request = $form->click;
+    $request->uri( 'http://localhost' . $url );
+    $request->header( Cookie => $cookie );
+    $res = $send->($request);
+    like( $res->content, qr/successfully saved/i, 'privacy control save has a success response' );
+    is( LJ::load_userid( $user->id, 1 )->prop('opt_usermsg'),
+        'M', 'privacy control persists on a forced fresh user' );
+
+    ($form) = settings_form( $res->content, $url );
+    $form->value( $key, 'invalid' );
+    $request = $form->click;
+    $request->uri( 'http://localhost' . $url );
+    $request->header( Cookie => $cookie );
+    $res = $send->($request);
+    like( $res->content, qr/invalid/i, 'invalid privacy value has useful validation text' );
+    unlike( LJ::load_userid( $user->id, 1 )->prop('opt_usermsg') || '',
+        qr/invalid/, 'invalid privacy value does not persist' );
+};
+
 done_testing;
