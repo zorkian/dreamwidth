@@ -48,3 +48,15 @@ listed codes100. Sequential en/ru/reset/debug coverage must prove isolation.
 Required concrete acceptance: render both entry-form maxlength values, and save
 105-character JournalTitles values under English and Russian, verifying exact
 80/100-character forced-fresh stored values. This package is not implemented yet.
+
+## Remaining setting-language/theme consumers
+
+- Birthday error_check still localizes BML::ML_SCOPE while calling native relative
+  ML keys. Current messages live in views/manage/profile.tt.text. A bounded
+  explicit-key conversion must preserve the existing date rules and error fields;
+  it is assigned to Terra, not yet integrated.
+- SiteScheme save already persists user/cookie choice through DW::SiteScheme,
+  then calls BML::set_scheme. The native request selector is set_for_request;
+  verify same-response and fresh-response wrapper selection before substitution.
+  Keep BMLschemepref cookie name, default-cookie deletion, user choice persistence
+  and invalid-choice behavior. Login reset of BML scheme is a separate caller.
