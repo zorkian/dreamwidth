@@ -1210,3 +1210,12 @@ checks, after widgets Terra completes customization1/4.
   full tidy1075/compile1605 pass. All commits remain local.
 - Draft correction `1929db445` is under independent browser recheck; timestamp
   browser proof and duplicate FCK dialog consolidation are active separately.
+
+- Sol cleared corrected draft range through `1929db445`; integrated as
+  `f86d593dd`. Foreman clean-server real browser passes draft persistence,
+  restore/clear, visible preview, exact dialog sequence, unchanged fresh entry
+  count and fixture cleanup. Captures: `entry-draft-native`; host log
+  `/tmp/bml-entry-draft-integrated.log`. Legacy draft interoperability remains
+  separate. Latest editor production tidy1078/compile1605 pass.
+- Timestamp HTTP/browser `fdbb67460` awaits Sol. Browser-mode gate5 is assigned
+  to Terra; no acceptance claimed from its branch setup alone.
