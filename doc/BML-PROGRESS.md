@@ -1308,3 +1308,17 @@ checks, after widgets Terra completes customization1/4.
 - Existing worktrees, sessions, containers and local-only publication policy
   are preserved. External Journal hooks remain an unanswered deployment gate;
   held inbox work remains untouched.
+
+### Legacy private-post baseline integrated; draft timing held
+
+- Sol cleared the bounded 49-assertion legacy update baseline `821770db5`,
+  integrated as `b1f8b13cc`. Foreman combined legacy/native private-post run
+  passes2 files /87 assertions in `/tmp/bml-legacy-update-integrated.log`.
+  Beta query preservation is source-inspected but not yet asserted by that test;
+  a separate narrow query followup is queued with Terra.
+- Sol reproduced an actual early-input autosave regression at draft candidate
+  `03b07b101`: delaying an image after DOM readiness postpones window.load;
+  entered subject/body remain absent from fresh saved draft after load and the
+  normal autosave delay. Candidate stays unintegrated. Terra preserves preview
+  WIP in a named stash while correcting initialization ordering and adding the
+  delayed-image regression, then resumes preview work.
