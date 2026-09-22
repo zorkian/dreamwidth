@@ -12,7 +12,8 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         const page = await browser.newPage();
         const errors = [];
         const dialogs = [];
-        page.on('pageerror', e => errors.push(e.message));
+        let phase = 'login';
+        page.on('pageerror', e => errors.push(`${phase}: ${e.message}\n${e.stack || ''}`));
         page.on('dialog', async dialog => {
             dialogs.push(`${dialog.type()}: ${dialog.message()}`);
             await dialog.dismiss();
@@ -26,6 +27,25 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
             const properties = await (await fetch('/__rpc_draft?getProperties=1')).json();
             return { draft: draft.draft, properties };
         });
+        const fixture = process.env.FCK_POLL_DRAFT_FIXTURE;
+        const activeDraft = await page.evaluate(async fixture => {
+            if (!fixture) return null;
+            const post = async values => fetch('/__rpc_draft', {
+                method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(values),
+            });
+            await post({ clearProperties: 1, clearDraft: 1 });
+            if (fixture === 'subject') {
+                await post({ saveSubject: 'Sol draft subject', saveEditor: 'html_casual1', saveTaglist: 'soltag' });
+                await post({ saveDraft: 'Sol preserved draft body with <b>markup</b>' });
+            }
+            const draft = await (await fetch('/__rpc_draft')).json();
+            const properties = await (await fetch('/__rpc_draft?getProperties=1')).json();
+            return { draft: draft.draft, properties };
+        }, fixture) || originalDraft;
+        const expectedRestoreDialog = activeDraft.properties.subject
+            ? `confirm: Restore from saved draft entitled ${activeDraft.properties.subject}?`
+            : 'confirm: Restore from saved draft?';
         await page.goto(base + '/entry/new', { waitUntil: 'networkidle0', timeout: 30000 });
         await page.select('#editor', 'rte0');
         await page.waitForFunction(() => window.FCKeditorAPI && FCKeditorAPI.GetInstance('entry-body')?.Status === 2);
@@ -47,6 +67,11 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
             const shell = page.frames().find(f => f.url().endsWith('/fckdialog.html'));
             assert.ok(shell, 'FCK dialog shell exists');
             await shell.click('#btnOk');
+            await page.waitForFunction(
+                () => !document.querySelector('iframe[src*="fckdialog.html"]'),
+                { timeout: 10000 }
+            );
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
             await page.waitForFunction(text => FCKeditorAPI.GetInstance('entry-body').GetXHTML(false).includes(text),
                 { timeout: 10000 }, expected);
         };
@@ -134,12 +159,16 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         await accept('Edited first');
         html = await page.evaluate(() => FCKeditorAPI.GetInstance('entry-body').GetXHTML(false));
         assert.match(html, /Edited first/, 'existing poll edit replaces selected poll');
+        phase = 'switching to HTML';
         await page.select('#editor', 'html_raw0');
+        await page.waitForFunction(() => document.querySelector('#editor').value === 'html_raw0');
+        await page.waitForNetworkIdle({ idleTime: 500, timeout: 10000 });
+        phase = 'HTML round trip complete';
         assert.match(await page.$eval('#entry-body', e => e.value), /Edited first/, 'polls survive HTML round trip');
         await page.screenshot({ path: `${output}/html-roundtrip.png`, fullPage: true });
         assert.deepEqual(errors, [], 'no poll dialog JavaScript errors');
-        assert.ok(dialogs.every(message => message === 'confirm: Restore from saved draft?'),
-            'only saved-draft restoration confirmations were dismissed');
+        assert.ok(dialogs.every(message => message === expectedRestoreDialog),
+            'only the expected saved-draft restoration confirmation was dismissed');
         await page.close();
         console.log('PASS: inserted, edited, and HTML-round-tripped FCK polls without publishing');
     } finally {
