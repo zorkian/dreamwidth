@@ -74,3 +74,24 @@ Parity fixes and characterization can proceed independently of editor/settings
 work. Do not remove beta gating, change sender eligibility or delete the three
 BML pages solely because TT routes exist. Public route promotion and deployment
 beta/local-overlay evidence remain explicit gates in BML-REMOVAL-PLAN.md.
+
+## Reproduced compose denial baseline (2026-09-22)
+
+Foreman tested both real HTTP handlers at integrated `0fe7f64c0`, using two
+validated disposable users, a real session cookie, and the rendered form token.
+The recipient had `opt_usermsg=N`; entered subject/body were distinct markers.
+Message delivery was explicitly replaced with a throwing guard, so no external
+send was possible. Legacy `/inbox/compose.bml` returned 200, retained both inputs,
+and rendered validation without an exception. `/inbox/new/compose` returned 500
+at Inbox.pm:551 (`errors->add`), losing both inputs. This is a reproduced
+pre-existing replacement defect and a retirement gate, not a BML migration
+regression. Probe and captured responses are in the foreman container:
+`/tmp/bml-inbox-rejection-probe.pl`, `/tmp/bml-inbox-rejection-probe.log`, and
+`/tmp/bml-inbox-{legacy,modern}-denial.html`.
+
+The first bounded repair package should cover this rejection and the analogous
+`can_send`/`send` error collections with actual handler requests and no-delivery
+fixtures. Preserve native translation scope and entered inputs, and prove no
+success redirect on failures. It can proceed without changing beta eligibility
+or public routes. Spam neither-selected and safe bookmark mutation are separate
+bounded packages before full index/compose browser parity.
