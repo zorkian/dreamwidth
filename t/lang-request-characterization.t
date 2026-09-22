@@ -16,16 +16,17 @@ use DW::Request;
 use DW::Request::Plack;
 use LJ::Lang;
 use DW::Template;
+use DW::Template::Filters;
 
 sub request {
-    my ($scope) = @_;
+    my ( $scope, $query ) = @_;
     DW::Request->reset;
     open my $input, '<', \( my $body = '' ) or die $!;
     my $r = DW::Request->get(
         plack_env => {
             REQUEST_METHOD    => 'GET',
             PATH_INFO         => '/',
-            QUERY_STRING      => '',
+            QUERY_STRING      => $query || '',
             SERVER_NAME       => 'localhost',
             SERVER_PORT       => 80,
             HTTP_HOST         => 'localhost',
@@ -157,6 +158,11 @@ subtest 'debug language returns keys without invoking a getter' => sub {
     LJ::Lang::set_request_context( lang => 'not-a-language' );
     is( LJ::Lang::get_effective_lang(),
         $LJ::DEFAULT_LANG, 'invalid context language falls back for direct data lookups' );
+
+    request( '/entry/form.tt', 'uselang=debug' );
+    is( DW::Template::Filters::ml()->('.key'),
+        '/entry/form.tt.key', 'TT filter resolves a scoped debug key before returning it' );
+    is( LJ::Lang::ml('.key'), '.key', 'direct native debug lookup preserves its supplied key' );
 };
 
 subtest 'nonweb callers use default language and direct translation' => sub {

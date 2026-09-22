@@ -54,6 +54,16 @@ sub ml {
             LJ::Lang::set_request_context( lang => decide_language() );
         }
 
+        # The TT filter historically resolves relative keys before honoring
+        # uselang=debug. LJ::Lang::ml intentionally keeps its direct debug
+        # contract (returning the supplied key), so preserve this here.
+        if ( ( LJ::Lang::request_context()->{lang} || '' ) eq 'debug'
+            && rindex( $code, '.', 0 ) == 0 )
+        {
+            my $scope = $r->note('ml_scope');
+            return $scope . $code if defined $scope;
+        }
+
         return LJ::Lang::ml( $code, $args );
     };
 }
