@@ -39,16 +39,22 @@ through to the existing BML editor; editor retirement is not approved.
 
 Native account labels and inbox compose repairs are reviewed and integrated as
 `538d5d8dc` and `3dd1c4464`; related foreman regressions pass130 and31 tests.
-Spam candidate `038607cea` has a literal-as-ML-key finding; narrow correction
-`345d6e246` uses add_string and rejects missing-string banners, with40 HTTP
-assertions passing. Both remain pending Sol recheck and are not integrated.
-Widgets Terra continues CSRF-safe bookmark handling on preserved branch
-`bml-terra-inbox-bookmark-errors-20260922`, covering modern and legacy URLs.
+Spam sources `038607cea` + `345d6e246` are independently cleared and integrated
+as `e772d7919`; foreman spam/compose regression passes63 assertions.
+Widgets Terra continues uncommitted bookmark handling on preserved branch
+`bml-terra-inbox-bookmark-errors-20260922`. Missing-token denial failures now
+have a concrete shared-CSRF hypothesis: check_form_auth uses a false-value
+fallback to process-global legacy POST. Terra must prove before/after DB state
+and produce a separate core correction; Sol independently assesses it. Do not
+claim arbitrary invalid tokens pass or accept this WIP before review.
 
-Native Event candidate `eb65a9f6604f91cd2fa1292195af00543c51d064` is queued
-for Sol after settings. Themenav Terra continues a separate native S2 language
-package while preserving settings and Event branches. No inbox/editor beta
-cutover, push, or deployment is implied by these bounded packages.
+Native Event `eb65a9f66` and S2 `cd45ffb4` are independently cleared and
+integrated as `f4b760a3e` and `5249750db`. Foreman tests pass118 and16 respectively;
+combined formatting1054 and compile1603 pass. Settings production through
+`5f323e9e5` is clear, but Terra is closing three finite committed-test gaps
+(account-stat hook, notification page/form context, editing an existing
+subscription) before integration. Its FAQ native-dependency work is preserved
+around those corrections. No beta cutover, push or deployment is implied.
 
 Preserve all three existing worker sessions/worktrees/containers; use the exact
 session identifiers in BML-PROGRESS.md. Their sessions sometimes end after

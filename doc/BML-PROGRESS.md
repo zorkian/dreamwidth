@@ -902,3 +902,18 @@ checks, after widgets Terra completes customization1/4.
   tests must prove the ID is absent from the owner, not assume global uniqueness.
 - Native Event `eb65a9f66` and S2 label `cd45ffb4` await Sol. FAQ runtime seams
   are the next independent Themenav task, preserved around settings followups.
+
+### Native Event and S2 integrated
+
+- Sol cleared Event `eb65a9f66` and S2 `cd45ffb4`; integrated as `f4b760a3e`
+  and `5249750db`. Foreman Event/notification/native regression passes5 files /
+  118 tests (`/tmp/bml-native-event-integrated.log`); S2 constructor/color
+  regression passes2 files /16 tests (`/tmp/bml-native-s2-integrated.log`).
+- Combined spam/Event/S2 checkout passes tidy1054 and compile1603 in
+  `/tmp/bml-native-inbox-integrated-{tidy,compile}.log`.
+- Bookmark denial investigation remains open. Source shows check_form_auth
+  uses `shift || $BMLCodeBlock::POST{lj_form_auth}`, potentially reusing a prior
+  legacy token for an explicitly missing/empty modern token. Invalid-token
+  assertions reused the already-mutated target and cannot independently prove
+  an invalid-token bypass. Terra and Sol are testing the exact sequential
+  request/DB boundary; no bookmark range has been integrated.
