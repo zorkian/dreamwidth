@@ -2,6 +2,16 @@
 
 ## Active continuation: 2026-09-22
 
+Current queue supersedes older entries below: preview compatibility implementation
+is active in the preserved Themenav session from `83f0e1172`, using the finite
+three-test contract in BML-PREVIEW-ACCEPTANCE.md. Draft initialization range through
+`03b07b101` awaits Sol, including real icon autosave and input before window load.
+Do not integrate it from worker browser success alone. Legacy update baseline
+`821770db5` and owned-delete baseline `53dd7cccd` are queued for independent review.
+Widgets is now characterizing actual legacy owned-edit form/save contracts on a
+separate branch. No editor route cutover has occurred. Keep all held inbox work
+and the unanswered external Journal hook interfaces untouched.
+
 Latest accepted production is FCK consolidation `6dca2d923` (eight executable
 BML files remain), with exact build/95 HTTP tests/real Image+ImageButton browser
 and tidy1082/compile1605 passing. Timestamp gate `8823c34c1`, exact mode browser

@@ -1290,3 +1290,21 @@ checks, after widgets Terra completes customization1/4.
   `/tmp/bml-fck-integrated-{tidy,compile}.log`.
 - Legacy update URL/form characterization is active separately. No old editor
   route, beta gate, or deferred Journal hook interface has been retired.
+
+### Preview extraction and remaining editor contracts
+
+- Finite preview contract is recorded at `83f0e1172`; Terra is implementing a
+  legacy-schema wrapper around the native renderer, with old aliases, translation
+  scope and style selection preserved. Compilation alone is not acceptance;
+  HTTP metadata/poll/embed and actual old/new popup evidence remain required.
+- Draft candidate through `03b07b101` passes worker normal/failure lifecycle runs
+  but remains under Sol review. The blanket synthetic-event guard was removed;
+  binding at window load still needs early-input timing review. No integration
+  is claimed yet.
+- Test-only legacy update `821770db5` and owned-entry deletion `53dd7cccd` await
+  review. Delete uses the supported edit-form action:delete and confirmation;
+  no standalone delete route exists or is proposed. Widgets proceeds with a
+  separate legacy owned-edit form characterization.
+- Existing worktrees, sessions, containers and local-only publication policy
+  are preserved. External Journal hooks remain an unanswered deployment gate;
+  held inbox work remains untouched.
