@@ -1,20 +1,43 @@
 // Exercise the image-preview iframe through the real modern entry editor.
-// Requires devcontainer seed users and bin/dev/screenshot dependencies.
+// Uses an owned disposable fixture and requires bin/dev/screenshot dependencies.
 // Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const {spawn} = require('node:child_process');
 const vm = require('node:vm');
 const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
 (async () => {
-    const browser = await puppeteer.launch({executablePath:'/usr/bin/google-chrome-stable', args:['--no-sandbox']});
+    let fixture;
+    let fixtureDone;
+    let browser;
     try {
+        fixture = spawn('perl', [process.env.LJHOME + '/t/browser/image-preview-fixture.pl'],
+            {stdio: ['pipe', 'pipe', 'inherit']});
+        fixtureDone = new Promise((resolve, reject) => {
+            fixture.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error('image fixture cleanup failed: ' + code + '/' + signal)));
+            fixture.once('error', reject);
+        });
+        fixtureDone.catch(() => {});
+        const fixtureData = await new Promise((resolve, reject) => {
+            let output = '';
+            fixture.stdout.on('data', data => {
+                output += data;
+                const newline = output.indexOf('\n');
+                if (newline < 0) return;
+                try { resolve(JSON.parse(output.slice(0, newline))); }
+                catch (error) { reject(error); }
+            });
+            fixture.once('error', reject);
+            fixture.once('exit', code => reject(new Error('image fixture exited before startup: ' + code)));
+        });
+        browser = await puppeteer.launch({executablePath:'/usr/bin/google-chrome-stable', args:['--no-sandbox']});
         const page = await browser.newPage();
         const errors = [];
         page.on('pageerror', e => errors.push(e.message));
         const base = 'http://127.0.0.1:8080';
         await page.goto(base + '/mobile/login', {waitUntil:'networkidle0'});
-        await page.type('[name=user]', 'test_user');
-        await page.type('[name=password]', 'dreamwidth');
+        await page.type('[name=user]', fixtureData.user);
+        await page.type('[name=password]', fixtureData.password);
         await Promise.all([page.waitForNavigation({waitUntil:'networkidle0'}), page.click('[type=submit]')]);
         for (const sourceURL of ['last', 'https://example.invalid/"quoted\\path</script><script>throw new Error(1)</script>']) {
             const callbackURL = '/imguploadrte.bml?' + new URLSearchParams({
@@ -61,6 +84,9 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         const shell = page.frames().find(f => f.url().endsWith('/fckdialog.html'));
         await shell.click('#btnOk');
         await page.waitForFunction(() => FCKeditorAPI.GetInstance('entry-body').GetXHTML(false).includes('Preview regression'));
+        if (process.env.IMAGE_PREVIEW_FAIL_AFTER_MUTATION) {
+            throw new Error('intentional image fixture cleanup probe');
+        }
         const html = await page.evaluate(() => FCKeditorAPI.GetInstance('entry-body').GetXHTML(false));
         assert.match(html, /search\.gif/);
         await page.evaluate(() => {
@@ -89,5 +115,13 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         console.log('Inserted and edited preview image successfully');
         assert.deepEqual(errors, [], 'no image-dialog JS errors');
         console.log('PASS: real editor iframe, callback registration, loading, sizing, alt text, insertion');
-    } finally { await browser.close(); }
+    } finally {
+        try { if (browser) await browser.close(); }
+        finally {
+            if (fixture) {
+                fixture.stdin.end();
+                await fixtureDone;
+            }
+        }
+    }
 })().catch(e => { console.error(e); process.exit(1); });
