@@ -111,8 +111,34 @@ test_psgi $app, sub {
     my ($form) = settings_form( $res->content, $anon_url );
     ok( $form, 'anonymous display settings expose the cookie-backed form contract' );
     ok( defined $form->value('lj_form_auth'), 'anonymous form retains CSRF contract' );
-    ok( !defined $form->value('DW__Setting__TimeFormat_timeformat'),
-        'anonymous form omits account-backed display settings (baseline gap for cookie saves)' );
+    ok(
+        !defined $form->value('DW__Setting__TimeFormat_timeformat'),
+        'anonymous form omits account-backed display settings'
+    );
+    $form->value( 'DW__Setting__MobileView_val', 1 );
+    my $request = $form->click;
+    $request->uri( 'http://localhost' . $anon_url );
+    $res = $send->($request);
+    is( $res->code, 200, 'anonymous MobileView form save returns a rendered response' );
+    like( $res->header('Set-Cookie') || '',
+        qr/no_mobile=1/, 'anonymous MobileView save sets cookie' );
+    my @set_cookies  = $res->headers->header('Set-Cookie');
+    my @cookie_pairs = map { /^([^;]+)/ ? $1 : () } @set_cookies;
+    diag( 'anonymous MobileView Set-Cookie: ' . join( ' | ', @set_cookies ) );
+    $res = $send->( GET $anon_url, Cookie => join( '; ', @cookie_pairs ) );
+    ($form) = settings_form( $res->content, $anon_url );
+    is( $form->value('DW__Setting__MobileView_val'),
+        1, 'anonymous MobileView cookie survives a fresh rendered request' );
+    $form->value( 'DW__Setting__MobileView_val', 0 );
+    $form->value( 'lj_form_auth',                'invalid' );
+    $request = $form->click;
+    $request->uri( 'http://localhost' . $anon_url );
+    $res = $send->($request);
+    like( $res->content, qr/Invalid form/i, 'anonymous invalid token is explained' );
+    $res = $send->( GET $anon_url, Cookie => join( '; ', @cookie_pairs ) );
+    ($form) = settings_form( $res->content, $anon_url );
+    is( $form->value('DW__Setting__MobileView_val'),
+        1, 'anonymous invalid token does not clear the cookie-backed setting' );
 };
 
 test_psgi $app, sub {
