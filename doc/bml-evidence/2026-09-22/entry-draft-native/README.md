@@ -7,3 +7,6 @@ Exactly one expected restoration dialog occurred. Captures show restored RTE
 and rendered preview; log: host `/tmp/bml-entry-draft-integrated.log`.
 
 This is modern-flow characterization, not legacy endpoint retirement approval.
+
+Foreman visual inspection confirms the restored title and formatted RTE body,
+and the preview title/body plus explicit preview-only notice.

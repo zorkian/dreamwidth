@@ -37,3 +37,21 @@ accepted:
    request isolation;
 4. edit/delete, community/maintainer, metadata/security, and publication
    round-trips.
+
+## Remaining format seam from source audit
+
+Both implementations store the same body and Storable property hash. The legacy
+endpoint writes subject/userpic/tags/mood/location/music/comment/adult fields but
+never writes an editor property. The modern endpoint adds saveEditor/editor.
+The modern template currently emits draft_properties.editor directly as
+restoredEditor, and restore assigns that value to the mode selector. A legacy
+draft with no editor property therefore needs an actual restore test; the
+modern-format browser baseline alone does not establish its fallback behavior.
+This is a source-observed test gap, not a reproduced data-loss claim.
+
+Next bounded interoperability evidence should seed a genuine legacy-format
+body/property hash, accept restoration, inspect mode and all retained fields,
+then save/reload through the modern UI. Separately decline restoration and
+verify the stored draft is retained or characterize the established behavior.
+No replacement draft implementation or endpoint deletion is authorized by this
+audit alone.
