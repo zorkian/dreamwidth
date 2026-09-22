@@ -70,7 +70,25 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         assert.equal(await page.$eval(mobile, element => element.checked), !before, 'mobile preference saves and reloads');
 
         await page.goto(base + '/manage/settings/?cat=notifications', {waitUntil: 'networkidle0'});
-        assert.ok(await page.$('#settings_form'), 'notification settings form renders for the disposable account');
+        const inactiveButton = '[name=deleteinactive]';
+        assert.ok(await page.$(inactiveButton), 'notification inactive-cleanup control renders');
+        page.once('dialog', dialog => dialog.accept());
+        await Promise.all([page.waitForNavigation({waitUntil: 'networkidle0'}), page.click(inactiveButton)]);
+        const verified = await new Promise((resolve, reject) => {
+            let text = '';
+            const timeout = setTimeout(() => reject(new Error('fixture verification timed out')), 10000);
+            helper.stdout.on('data', chunk => {
+                text += chunk;
+                if (!text.includes('\n')) return;
+                clearTimeout(timeout);
+                try { resolve(JSON.parse(text.split('\n')[0])); } catch (error) { reject(error); }
+            });
+            helper.once('error', reject);
+            helper.once('exit', () => reject(new Error('fixture exited before verification response')));
+            helper.stdin.write('verify\n');
+        });
+        assert.equal(verified.active, 1, 'fresh fixture read retains unrelated active Inbox subscription');
+        assert.equal(verified.inactive, 0, 'fresh fixture read confirms browser deleteinactive removed inactive subscription');
         assert.deepEqual(errors, [], 'settings mutation pages have no JavaScript errors');
         if (process.env.SETTINGS_BROWSER_FAIL_AFTER_SAVE) throw new Error('intentional settings cleanup probe');
         console.log('PASS disposable settings community/privacy/mobile saves and notification form');
