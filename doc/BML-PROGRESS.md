@@ -846,3 +846,17 @@ checks, after widgets Terra completes customization1/4.
   Input-selection correction `fba4e942b` reports direct-input browser pass.
   Terra is fixing the remaining findings on the preserved picker branch.
   Itemid fallback/CSRF/permissions/aliases otherwise passed independent review.
+
+- Sol cleared inbox compose `e4ba001a2`, including an independent five-assertion
+  real-request probe of the extra index `add_string` line. Keep that line:
+  handle_post returns rendered sentences, not ML keys. Integrated as
+  `3dd1c4464`; foreman focused run passes 3 files / 31 tests in
+  `/tmp/bml-inbox-compose-integrated.log`.
+- Picker `bdca9e525` addresses scope/selector/labels but remains unaccepted:
+  foreman found translated icon text passed as LJ::img's type argument, which
+  emits XXX instead of an image. Terra must use the alt attribute argument,
+  test actual image text, and finish remaining controller error-key scopes.
+- Settings normal browser flow passes in its worker, but foreman screenshot
+  comparison found inherited 625px minimum-width overflow at a 390px viewport
+  and an omitted Account Settings heading. Both are routed as required visual
+  acceptance corrections before final immutable review.

@@ -111,3 +111,15 @@ Terra's bounded repair should prove neither-selected nonmutation and useful
 response, independent spam/ban/both outcomes, CSRF and owned-message guards,
 using fresh database reads and isolating report delivery. This does not authorize
 or certify public inbox cutover by itself.
+
+## Bookmark GET baseline (2026-09-22)
+
+Foreman queued local AddedToCircle events directly into a disposable account's
+inbox, without firing delivery events. GET requests without CSRF to both
+`/inbox/index.bml?bookmark_off=ID` and `/inbox/new?bookmark_off=ID` returned200
+and changed fresh bookmark state from false to true. Probe/log:
+`/tmp/bml-inbox-bookmark-probe.{pl,log}` in the foreman container. These are
+pre-existing mutation boundaries requiring safe confirmation/POST handling.
+The modern rendered fallback link currently points to `/inbox/`, while its JS
+intercepts and uses token-bearing `/__rpc_inbox_actions`; preserve both JS and
+usable non-JS paths, including owned IDs, view/page context and legacy aliases.
