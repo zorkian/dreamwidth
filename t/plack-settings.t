@@ -133,8 +133,11 @@ test_psgi $app, sub {
     $form->value( 'lj_form_auth',                'invalid' );
     $request = $form->click;
     $request->uri( 'http://localhost' . $anon_url );
+    $request->header( Cookie => join( '; ', @cookie_pairs ) );
     $res = $send->($request);
     like( $res->content, qr/Invalid form/i, 'anonymous invalid token is explained' );
+    unlike( join( ' | ', $res->headers->header('Set-Cookie') || () ),
+        qr/no_mobile=/, 'anonymous invalid token does not update the MobileView cookie' );
     $res = $send->( GET $anon_url, Cookie => join( '; ', @cookie_pairs ) );
     ($form) = settings_form( $res->content, $anon_url );
     is( $form->value('DW__Setting__MobileView_val'),
@@ -213,6 +216,14 @@ test_psgi $app, sub {
         'legacy deletesub GET currently mutates and must be replaced safely during migration'
     );
 
+    my $fresh_owner = LJ::load_userid( $owner->id, 1 );
+    my $protected   = $fresh_owner->subscribe(
+        event   => 'AddedToCircle',
+        journal => $fresh_owner,
+        method  => 'Inbox',
+        arg1    => 99
+    );
+    $protected->_deactivate;
     my $viewer_cookie = settings_cookie($viewer);
     my $inspect       = $send->(
         GET '/manage/settings/?cat=notifications&user=' . $owner->user,
@@ -221,7 +232,10 @@ test_psgi $app, sub {
     is( $inspect->code, 200, 'privileged notification inspection renders' );
     unlike( $inspect->content, qr/id=['"]settings_form/,
         'privileged inspection exposes no mutation form' );
-    my $before          = scalar $owner->subscriptions;
+    ok(
+        grep( { $_->id == $protected->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'privileged target has an eligible inactive subscription before forged action'
+    );
     my $viewer_form_res = $send->( GET '/manage/settings/?cat=display', Cookie => $viewer_cookie );
     my ($viewer_form) = settings_form( $viewer_form_res->content, '/manage/settings/?cat=display' );
     my $post = $send->(
@@ -229,8 +243,8 @@ test_psgi $app, sub {
         Cookie  => $viewer_cookie,
         Content => [ lj_form_auth => $viewer_form->value('lj_form_auth'), deleteinactive => 1 ]
     );
-    is( scalar $owner->subscriptions,
-        $before, 'privileged inspection POST cannot mutate owner subscriptions' );
+    ok( grep( { $_->id == $protected->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'privileged inspection POST cannot mutate owner subscription' );
 };
 
 test_psgi $app, sub {
