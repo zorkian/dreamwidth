@@ -635,3 +635,21 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   and overflow. Legacy colors/mobile evidence is already similarly constrained;
   matched Links List comparison is underway. No new visual regression is asserted
   from an unmatched screenshot, and JS-only passes do not close visual acceptance.
+
+- Sol cleared picker `95fcdf04c` independently (64/64). Browser baseline
+  `de14507c5` passes normal and intentional-failure cleanup runs; review pending.
+  Screenshots are preserved under `bml-evidence/2026-09-22/picker-before/`.
+  Explicit .bml title renders correctly, while extensionless legacy title uses
+  missing `/editjournal.title`; DW::BML scopes legacy ML by incoming URI before
+  and after the native language change. Replacement headings must translate.
+- Matched legacy 390px Links List evidence is preserved under
+  `bml-evidence/2026-09-22/customize-before/linkslist-narrow.png`. Legacy horizontal
+  overflow is confirmed, but migrated inputs shrink much more severely. Terra
+  is addressing usable narrow input widths rather than treating all overflow as
+  a new regression. Browser assertions alone did not reveal this visual issue.
+- Customization reset fixture correction `8917dc475` now submits complete real
+  forms and reports 169 passing HTTP assertions. Independent recheck queued.
+- Settings category increment `fde5bdc43` reports 72 passing HTTP assertions;
+  browser `da6072d85` covers only controls/invalid validation and is insufficient
+  mutation acceptance. Terra is implementing disposable browser users and real
+  saves, replacing the claim that a seeded full-form invalid POST is nonmutating.
