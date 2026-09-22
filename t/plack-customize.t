@@ -85,6 +85,11 @@ test_psgi $app, sub {
             );
             is( LJ::load_userid( $target->id )->prop('journaltitle'),
                 $title, 'title persists through page widget dispatch' );
+            unlike(
+                $res->content,
+                qr/(?:LJ::Error::DieObject|ARRAY\()/,
+                'successful widget POST has no object-pointer error banner'
+            );
             $res = $cb->(
                 POST $path . $query,
                 Content => [
@@ -95,6 +100,13 @@ test_psgi $app, sub {
             );
             is( LJ::load_userid( $target->id )->prop('journaltitle'),
                 $title, 'invalid token cannot change title' );
+            like( $res->content, qr/Invalid form/i, 'invalid widget token shows its error message' )
+                if $path eq '/customize/';
+            unlike(
+                $res->content,
+                qr/(?:LJ::Error::DieObject|ARRAY\()/,
+                'invalid widget token has no object-pointer error banner'
+            );
         }
         for my $group (qw(presentation colors fonts images text modules customcss display)) {
             $res = $cb->( GET '/customize/options' . $query . '&group=' . $group );
