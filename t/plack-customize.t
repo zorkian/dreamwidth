@@ -46,6 +46,31 @@ test_psgi $app, sub {
         $res = $cb->( POST $url, Content => [ nextpage => 1, lj_form_auth => 'invalid' ] );
         ok( !$res->header('Location'), 'invalid next-page token does not redirect' );
 
+        my $theme_nav_url = $url . '&page=2&show=24';
+        $res = $cb->( GET $theme_nav_url );
+        my ($theme_nav_token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
+        $res = $cb->(
+            POST $theme_nav_url,
+            Content => [
+                lj_form_auth              => $theme_nav_token,
+                'Widget[ThemeNav]_search' => 'encoded search',
+            ]
+        );
+        is( $res->code, 302, 'ThemeNav POST produces a real redirect response' );
+        is(
+            $res->header('Location'),
+            "$LJ::SITEROOT/customize/?search=encoded+search&authas=" . $target->user . '&show=24',
+            'ThemeNav redirect carries authas and show through the BML page'
+        );
+        $res = $cb->(
+            POST $theme_nav_url,
+            Content => [
+                lj_form_auth              => 'invalid',
+                'Widget[ThemeNav]_search' => 'denied search',
+            ]
+        );
+        ok( !$res->header('Location'), 'invalid ThemeNav token does not redirect' );
+
         for my $path ( '/customize/', '/customize/options' ) {
             $res = $cb->( GET $path . $query );
             my ($page_token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;

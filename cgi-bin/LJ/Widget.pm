@@ -292,11 +292,18 @@ sub handle_post {
 
     my %res;
 
-    while ( my ( $class, $fields ) = each %$per_widget ) {
+    for my $widget (@widgets) {
+        $widget =~ s/^(?:LJ::Widget::)?//;
+        my $fields = $per_widget->{$widget} or next;
+
         eval {
-            %res = "LJ::Widget::$class"->handle_post( $fields, %{ $widget_opts{$class} or {} } );
+            %res = "LJ::Widget::$widget"->handle_post( $fields, %{ $widget_opts{$widget} or {} } );
         }
-            or "LJ::Widget::$class"->handle_error( $@ => $errorsref );
+            or "LJ::Widget::$widget"->handle_error( $@ => $errorsref );
+
+        # A redirect result is a URL, not a response. The page/controller that
+        # called dispatch must return its own BML or DW::Request redirect.
+        last if $res{redirect};
     }
 
     return %res;
@@ -765,7 +772,9 @@ Code that's run when a widget that POSTs is submitted.  This should be called
 on the parent class instead of on the specific widget, and the widget(s) you
 want to be handled should be passed as parameters.  The parent class method
 calls the subclass methods appropriately.  Returns the hash returned from the
-last processed widget.  Can be subclassed.
+last processed widget. A C<redirect> result contains a URL; dispatch stops and
+the calling BML page or controller must turn it into its own redirect response.
+Can be subclassed.
 
 =item C<handle_post_and_render>
 

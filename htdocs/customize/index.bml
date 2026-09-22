@@ -64,8 +64,10 @@ body<=
 
             return BML::redirect("$LJ::SITEROOT/customize/options$getextra");
         }
-        my @errors = LJ::Widget->handle_post(\%POST, qw(JournalTitles ThemeChooser ThemeNav LayoutChooser));
-        $ret .= LJ::bad_input(@errors) if @errors;
+        my %post_result = LJ::Widget->handle_post(\%POST, qw(JournalTitles ThemeChooser ThemeNav LayoutChooser));
+        # The widget returns a URL; this BML page owns the legacy response.
+        return BML::redirect( $post_result{redirect} ) if $post_result{redirect};
+        $ret .= LJ::bad_input( LJ::Widget->errors ) if LJ::Widget->errors;
     }
 
     $ret .= "<form action='$LJ::SITEROOT/customize/' method='get' class='theme-switcher'>";

@@ -9,6 +9,7 @@ use HTTP::Request::Common;
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use DW::Request::Standard;
 use LJ::Widget;
+use LJ::Widget::ThemeNav;
 
 {
 
@@ -23,6 +24,26 @@ use LJ::Widget;
         return ( saved => 1 );
     }
     sub authas { 1 }
+}
+
+{
+
+    package LJ::Widget::RedirectTest;
+    our @ISA  = (q{LJ::Widget});
+    our $seen = 0;
+
+    sub handle_post {
+        $seen++;
+        return ( redirect => q{/redirected} );
+    }
+}
+{
+
+    package LJ::Widget::AfterRedirectTest;
+    our @ISA  = (q{LJ::Widget});
+    our $seen = 0;
+
+    sub handle_post { $seen++ }
 }
 
 sub request {
@@ -107,9 +128,51 @@ sub request {
     }
     is( scalar @LJ::Widget::RequestTest::seen, 3, 'verified AJAX authorization permits dispatch' );
     LJ::Widget->handle_post( $r->post_args, 'RequestTest' );
-    is( scalar @LJ::Widget::RequestTest::seen, 3, 'AJAX authorization does not escape its scope' );
+    is( scalar @LJ::Widget::RequestTest::seen, 3, q{AJAX authorization does not escape its scope} );
+
+    $r = request(
+        POST q{http://localhost/example},
+        Content => [
+            lj_form_auth                              => q{valid},
+            q{Widget[RedirectTest]_submit}            => 1,
+            q{Widget[AfterRedirectTest]_must_not_run} => 1,
+        ]
+    );
+    my %redirect_result =
+        LJ::Widget->handle_post( $r->post_args, qw(RedirectTest AfterRedirectTest) );
+    is( $redirect_result{redirect}, q{/redirected}, q{widget redirect result is propagated} );
+    is( $LJ::Widget::RedirectTest::seen, 1, q{redirecting widget dispatched} );
+    is( $LJ::Widget::AfterRedirectTest::seen, 0, q{redirect stops later widget mutations} );
+
+    $r =
+        request( POST
+q{http://localhost/customize/?authas=team%2Bone&show=24&show=48&search=old&page=2&page=3}
+        );
+    my %theme_nav_result = LJ::Widget::ThemeNav->handle_post( { search => q{new search} } );
+    is(
+        $theme_nav_result{redirect},
+        "$LJ::SITEROOT/customize/?search=new+search&authas=team%2Bone&show=24&show=48",
+        q{ThemeNav search preserves repeated encoded authas and show query values}
+    );
+    %theme_nav_result = LJ::Widget::ThemeNav->handle_post( { page => 4 } );
+    is(
+        $theme_nav_result{redirect},
+        "$LJ::SITEROOT/customize/?authas=team%2Bone&show=24&show=48&search=old&page=4",
+        q{ThemeNav page redirect preserves raw non-page query values}
+    );
 
     # The BML renderer temporarily supplies its legacy error array to the cache.
+    $r =
+        request( POST
+            q{http://localhost/customize/?page=2&mypage=2&search=homepage=2&page=3&encoded=page%3D2}
+        );
+    %theme_nav_result = LJ::Widget::ThemeNav->handle_post( { page => 4 } );
+    is(
+        $theme_nav_result{redirect},
+        "$LJ::SITEROOT/customize/?mypage=2&search=homepage=2&encoded=page%3D2&page=4",
+        q{ThemeNav removes only complete repeated page query parameters}
+    );
+
     my @legacy;
     DW::Cache->request->set( 'widget', 'errors', \@legacy );
     LJ::Widget->error('legacy page error');
