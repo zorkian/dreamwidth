@@ -32,9 +32,14 @@ work. Passing helper or protocol tests alone does not prove web-form parity.
 - Draft/preview source `f7c7b285a` is queued for independent review; it does not
   authorize deleting legacy update/edit/preview/draft endpoints.
 
-The bounded implementation fixes empty-body localization, maxlength and
-accessible names with actual HTTP/browser evidence. Candidate followups
-`9cd637697` and `1e934ae71` remove the proposed duplicate block and use the
-existing full empty-body translation key; independent review remains pending.
+The bounded rendering range through `f36190dd1` is independently clear and
+integrated as `0aad3e37f`: existing full empty-body key, native maxlength and
+translated date/time labels. No extra general-error block remains. Independent
+17 committed assertions and16 temporary probe assertions pass; the committed
+unchanged-entry check now resets singletons. Browser names remain in gate4.
+
+Gate1 source `afbbfa240` is independently clear (35 assertions), integrated as
+`f07bac73b`. Gate5 HTTP source `54553b668` is independently clear (61 assertions),
+integrated as `558ba0609`; this does not replace actual browser mode evidence.
 The remaining roundtrip gates follow using disposable owned entries and fresh
 reads; no public editor cutover is approved by this document.

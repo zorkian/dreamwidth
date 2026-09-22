@@ -1194,3 +1194,19 @@ checks, after widgets Terra completes customization1/4.
 - Draft/preview `f7c7b285a` independently passes the browser but needs fresh entry
   count, visible preview DOM text and exact dialog-count assertions. It remains
   unintegrated. Owned-edit `afbbfa240` is queued separately for Sol.
+
+### Ordinary editor HTTP parity and rendering integrated
+
+- Sol cleared owned-edit `afbbfa240` (35 assertions) and mode HTTP
+  `54553b668` (61), integrated as `f07bac73b` and `558ba0609`. Browser mode
+  parity remains distinct and pending.
+- Sol cleared final rendering range through `f36190dd1`, integrated as
+  `0aad3e37f`. Existing full empty-body translation, dynamic current-field
+  limits and translated date/time labels preserve outer-wrapper errors.
+  The fresh-entry regression now resets the singleton cache.
+- Foreman combined4 files /116 tests pass in container
+  `/tmp/bml-editor-parity-integrated.log`; earlier owned-edit+picker run
+  passes162 in `/tmp/bml-entry-edit-integrated.log`. Native comment integration
+  full tidy1075/compile1605 pass. All commits remain local.
+- Draft correction `1929db445` is under independent browser recheck; timestamp
+  browser proof and duplicate FCK dialog consolidation are active separately.
