@@ -238,3 +238,37 @@ Astra/Terra/Sol roles, environment/reproduction details, and continuation criter
 No agents have started and no independent Sol review has occurred. Verified
 screenshots are now committed under doc/bml-evidence/2026-09-21, so the handoff
 does not depend on the original /tmp evidence directory.
+
+## 2026-09-22 Astra implementation resumed
+
+- User authorized implementation under Astra coordination, two Terra implementers
+  and an independent Sol reviewer, all visible in Herdr. New work remains local;
+  checkpoint publication authorization does not authorize further pushes.
+- Foreman checkout/branch: `bml-astra-foreman-20260922`, starting at
+  `595a54928a25758e0326e627a126774dc6655d2f`. The parent checkout and preexisting
+  worktrees/containers are not used for implementation or tests.
+- Verified `HERDR_ENV=1`, Docker availability, and successful isolated
+  devcontainer startup. Setup seeded development accounts and compiled themes
+  were available: customization integration tests ran rather than skipped.
+- The shell sandbox fails with `bwrap: loopback: Failed RTM_NEWADDR`; reviewed
+  host escalations work. Worker launches retain workspace-write sandboxing and
+  on-request approval. No approval bypass was used.
+- Reproduced the checkpoint suite: 261 tests in 10 files passed. Full format
+  apply/check passed with 1,031 assertions; compilation passed with 1,597
+  assertions including existing skips. Existing uninitialized-value warnings
+  remain in customization rendering.
+- Installed browser prerequisites using `bin/dev/screenshot`; login returned
+  HTTP 200. The first access-filter browser run found the image's prebuilt static
+  assets lacked `access-filters.js`. After `bin/build-static.sh`, the access-filter
+  flow passed, as did personal/community title RPC persistence/restoration and
+  actual rich-text image insert/edit/preview flows.
+- Terra widget worker: `bml-terra-widgets-20260922`, Herdr workspace `w6`.
+  Owns resource ordering, initialization and explicit DOM-helper compatibility.
+- Terra ThemeNav worker: `bml-terra-themenav-20260922`, workspace `w7`.
+  Owns request/query handling and explicit widget redirect propagation.
+- Sol reviewer: `bml-sol-review-20260922`, workspace `w8`. Reviewing fixed range
+  `d9ea4bea6..595a54928` independently; review is pending, not yet a pass.
+- Each worker has a separate checkout and must use its own devcontainer.
+  [BML-CUSTOMIZE-ACCEPTANCE.md](BML-CUSTOMIZE-ACCEPTANCE.md) records the next
+  controller/template package's acceptance gate, including links-list behavior
+  missing from the earlier rendering baseline.
