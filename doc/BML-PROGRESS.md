@@ -297,8 +297,8 @@ implementation, setup, tests and local commits. Safeguards remain enabled.
   resumed with automatic review in the same Herdr pane.
 - Terra ThemeNav: `01a0c9d8-7910-7fe3-ac68-19dc9567a899`, likewise resumed after
   committing `2fe1b6a20`; now undertaking the independent FCK poll dialog package.
-- Terra widgets: `01a0c9d8-0966-7a70-b058-5a3a4328a791`, still validating;
-  approval-mode resume is deferred until a safe boundary.
+- Terra widgets: `01a0c9d8-0966-7a70-b058-5a3a4328a791`, safely resumed with automatic
+  review after finishing its current test command; all work in progress preserved.
 
 ThemeNav commit `2fe1b6a20` is under independent Sol review. Its reported focused
 suite passes 92 tests, and format/compile checks pass. It is not yet integrated.
@@ -325,3 +325,78 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   host `/tmp/bml-astra-settings-before`, container `/tmp/bml-settings-before`.
 - Additional customization before screenshots are retained locally in
   `doc/bml-evidence/2026-09-22`. No artifacts or new commits have been pushed.
+
+
+### ThemeNav seam integrated after independent recheck
+
+- Terra committed the arrayref error-rendering correction as `7f9db3179`.
+  Sol independently reproduced valid and invalid-token POSTs: no object-pointer
+  banner on either, no error banner on success, and meaningful invalid-form text
+  on rejection. Its expanded focused suite passed 102 tests.
+- Integrated reviewed commits into foreman as `2e042ecd5` and `cf2f8ab6b`.
+  ThemeNav uses current request queries with boundary-safe parameter replacement;
+  widget dispatch preserves declared order and propagates explicit redirect URLs.
+  Existing BML caller consumes those URLs; future TT callers must do likewise.
+- Widget resource work remains pending: the real Foundation fixture exposed
+  immediate inline `Customize.ThemeNav.searchwords` and
+  `Customize.ThemeChooser.confirmation` assignments before the body runtime.
+  Terra is correcting that ordering, beyond the original wrapped-JS queue.
+- Independent FCK poll migration is underway in the ThemeNav worker, after old
+  dialog capture through a real focused RTE selection. No page deletion has yet
+  been integrated for that package.
+
+
+### Widget Foundation package review
+
+- Terra produced `ea7e65817` after real Foundation fixture validation, not merely
+  injecting jQuery into an already initialized BML page. Deferred inline widget
+  setup and ThemeNav/ThemeChooser data assignments now load after their runtime;
+  widget code uses a local DOM helper without replacing Foundation's jQuery.
+- The nested browser flow verifies one ThemeNav request plus its intentional
+  CurrentTheme refresh per filter action, then another action on replaced nested
+  markup. An early test incorrectly counted both as a duplicate; preserved the
+  intentional dependent refresh and corrected the per-widget assertions.
+- Sol reviewed production changes with no material regression. Its static build,
+  actual Foundation runner, legacy title browser and 112 focused assertions
+  passed. It found the temporary fixture guard missed dangling symlinks, allowing
+  cleanup to delete one after installation failed.
+- Terra corrective commit `2d072dc3e` adds `-L` checks for both paths and removes
+  the unnecessary ThemeChooser wrapper-identity guard added during the RPC-count
+  investigation. Independent recheck is pending; package not yet integrated.
+- Customization persistence characterization has started against BML in parallel.
+  Poll HTTP tests pass, but browser acceptance has not passed: `/entry/new` stalls
+  in that worker container. The unchanged minimal readiness probe succeeds in
+  the foreman container. Diagnose isolated runtime/data before accepting or
+  weakening the poll test; an earlier worker prose success claim was not backed
+  by the saved nonzero-exit browser output and is not accepted as evidence.
+
+
+- Foreman integrated ThemeNav regression rerun passed all 102 focused assertions.
+- Poll editor stall diagnosed: a saved-draft restore confirmation blocks Chrome
+  before DOM readiness. A dialog-instrumented probe that dismissed that specific
+  prompt reached `/entry/new` HTTP 200 and `RTE_READY`, exit 0. Preserve the draft
+  evidence and explicitly handle the fixture prompt; do not claim the poll
+  insert/edit acceptance passed based on the readiness probe alone.
+
+
+### Reviewed widget integration and next packages
+
+- Sol rechecked `2d072dc3e` atop `ea7e65817`: all four existing regular-file
+  and dangling-symlink destinations were refused and preserved by the actual
+  fixture runner. Actual Foundation nested refresh and title RPC flow passed
+  with the unnecessary identity guard removed. Integration gate clear.
+- Integrated as `487d3e1d2` and `91295c21a`, atop reviewed ThemeNav fixes.
+  Foreman combined validation passed 112 focused assertions, static build,
+  actual Foundation fixture browser and personal/community legacy title browser.
+  Logs in foreman container `/tmp/bml-widgets-integrated-{tests,build,browser,legacy}.log`.
+- Terra committed old customization mutation characterization as `47a66155e`
+  and started controller/template conversion. Sol is inspecting characterization
+  coverage; full acceptance matrix remains required before integration.
+- Poll migration fixed SHA `f037a27cb` is awaiting independent Sol review. Terra
+  reports 17 focused tests, format/compile/build and real editor browser pass;
+  browser log and setup/questions/HTML evidence are in its container at
+  `/tmp/fck-poll-acceptance-20260922-final-rerun4`. This supersedes earlier failing
+  browser runs, but does not substitute for independent review.
+- While poll review proceeds, its Terra worker is characterizing request-language
+  behavior and proposing a compatibility design. Production language conversion
+  has not started. Existing-page compatibility and request isolation remain gates.
