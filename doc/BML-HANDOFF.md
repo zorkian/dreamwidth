@@ -51,9 +51,9 @@ Bookmark WIP still needs complete ownership/RPC/browser acceptance and review.
 
 Native Event `eb65a9f66` and S2 `cd45ffb4` are independently cleared and
 integrated as `f4b760a3e` and `5249750db`. Foreman tests pass118 and16 respectively;
-combined formatting1054 and compile1603 pass. Settings is complete as described above. FAQ native candidate `656b2cbea`
-plus test corrections `7c3d81367`/`d719fae1c` awaits final Sol recheck of the
-process-global modification-time isolation assertion. Themenav Terra proceeds
+combined formatting1054 and compile1603 pass. Settings is complete as described above. FAQ sources `656b2cbea`, `7c3d81367` and `d719fae1c` are independently
+cleared and integrated as `4f7832ea4`; foreman passes97 tests, tidy1059 and
+compile1605, including process-global modification-time isolation. Themenav Terra proceeds
 with the independently audited five direct DW::Request call sites in Login,
 Administration, Config and S2 FriendsPage (plus middleware comment/tests).
 Widgets Terra continues bookmark browser acceptance; its latest timeout was a

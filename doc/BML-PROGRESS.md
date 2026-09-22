@@ -953,3 +953,23 @@ checks, after widgets Terra completes customization1/4.
   base_recent_mod global unchanged, not merely that HTTP has no Last-Modified.
   Final independent recheck pending. Direct request-context consumers are the
   next active Themenav package; bookmark browser work remains active in widgets.
+
+### FAQ integrated; runtime and bookmark reviews
+
+- FAQ source `656b2cbea` plus corrections `7c3d81367`/`d719fae1c` is
+  independently clear and integrated as `4f7832ea4`. The final test proves
+  native FAQ rendering does not mutate BML process-global modification time;
+  Sol proved that assertion fails on the old handler. Foreman regression passes
+  four files /97 tests, tidy1059 and compile1605 in
+  `/tmp/bml-faq-integrated{,-tidy,-compile}.log`.
+- Native request consumers `fdace9826` await Sol review. The separate proposed
+  UniqCookie package was twice rejected by automatic approval review as outside
+  the prior bounded package, even after checking plan line96 explicitly lists
+  that module. No changes were made to it; explicit scope clarification is
+  pending while other work continues. Themenav audits PageStats read-only.
+- Bookmark `4caf02a83` remains unintegrated. Sol found the new legacy button
+  duplicated the image-only InboxItem_Bookmark class, causing JS initialization
+  to read undefined button.src. Correction `12f01f135` removes the duplicate
+  class and adds JS-enabled legacy RPC/reload coverage; Sol recheck pending.
+  Widgets then continues actual maintainer characterization/implementation on
+  its preserved separate branch, with itemid BML fallback retained.
