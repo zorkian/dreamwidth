@@ -13,3 +13,7 @@ render timestamps differ because both runs use disposable fixtures.
 This closes the ordinary six-view replay for the S2 request-note conversion;
 it does not approve removal of explicit journal adapters or BML language setup.
 Runner and log: `/tmp/bml-journal-native.js` and `.log` in foreman container.
+
+The first 500 captured body characters match the before capture for all six
+views after normalizing disposable usernames. This is a bounded text comparison,
+not a whole-document or pixel-equivalence assertion.
