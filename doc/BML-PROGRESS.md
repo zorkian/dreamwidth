@@ -705,3 +705,29 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   preservation; themenav Terra will cover filters, subtitles and display resets
   in separate new test files after its clean Mobile correction. Sol is reviewing
   the original access-filter checkpoint while these implementation tasks run.
+
+- Foreman integrated settings browser rerun also passes
+  (`/tmp/bml-settings-unsaved-integrated.log`), including absent legacy Settings
+  runtime and discarded unsaved choice. Mobile follow-up `b45bc71b1` remains
+  failing WIP too: the invalid-CSRF response is an error page without the form,
+  so the independent reset flow must begin with a fresh authenticated GET.
+
+### Next native-consumer package boundaries
+
+Source inspection identifies a small global-key group suitable after current
+acceptance work: NotificationMethod Email/Inbox titles, AccountStatistics expiry
+text, and Setting::Display::AccountLevel status. Test actual methods with a
+request getter, substitutions and nonweb fallback; no email delivery is needed.
+Do not classify larger consumers as equivalent one-line replacements:
+
+- InboxFolderNav also emits literal BML ML and needlogin tags; converting its
+  two direct ml calls alone does not make its rendered output BML-independent.
+- FAQ search uses BML language selection as well as ml; FAQ browsing uses
+  language-default and modification-time APIs. Preserve language choices and
+  caching headers through native request APIs, with handler-level tests.
+- S2 initializes language through BML before rendering and uses request-adapter
+  methods as well as global cut-label translations. Preserve journal/default
+  language behavior and sequential request isolation when replacing that setup.
+- LJ::Lang::get_lang_names computes an unused translated name, while set_lang
+  still forwards to BML. Audit actual callers before changing/removing either;
+  a source-only search is not acceptance for externally callable behavior.
