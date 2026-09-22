@@ -233,4 +233,40 @@ test_psgi $app, sub {
         $before, 'privileged inspection POST cannot mutate owner subscriptions' );
 };
 
+test_psgi $app, sub {
+    my $send   = shift;
+    my $user   = temp_user();
+    my $cookie = settings_cookie($user);
+    my $cb     = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+
+    my $shortcuts_url = '/manage/settings/?cat=shortcuts';
+    my $res           = $cb->( GET $shortcuts_url );
+    my ($form) = settings_form( $res->content, $shortcuts_url );
+    ok( $form, 'shortcuts category has a rendered save form' ) or return;
+    $form->value( 'DW__Setting__Shortcuts_val', 1 );
+    my $request = $form->click;
+    $request->uri( 'http://localhost' . $shortcuts_url );
+    $res = $cb->($request);
+    like( $res->content, qr/successfully saved/i, 'shortcuts save has a success response body' );
+    is( LJ::load_userid( $user->id, 1 )->prop('opt_shortcuts'),
+        'Y', 'shortcuts choice persists on a forced fresh user' );
+
+    my $privacy_url = '/manage/settings/?cat=display';
+    $res = $cb->( GET $privacy_url );
+    ($form) = settings_form( $res->content, $privacy_url );
+    ok( $form, 'display category has a rendered save form' ) or return;
+    my $safe_key = 'LJ__Setting__SafeSearch_safesearch';
+    ok( defined $form->value($safe_key), 'display form renders SafeSearch validation control' )
+        or return;
+    $form->value( $safe_key, 'not-valid' );
+    $request = $form->click;
+    $request->uri( 'http://localhost' . $privacy_url );
+    $res = $cb->($request);
+    like( $res->content, qr/invalid/i, 'invalid display value has useful validation text' );
+    unlike( $res->content, qr/value=['"]not-valid['"]/,
+        'legacy select validation does not render an invalid non-option value' );
+    unlike( LJ::load_userid( $user->id, 1 )->prop('safe_search') || '',
+        qr/not-valid/, 'invalid display value does not persist' );
+};
+
 done_testing;
