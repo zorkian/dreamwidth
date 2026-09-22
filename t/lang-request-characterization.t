@@ -3,7 +3,11 @@
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
+use lib "$ENV{LJHOME}/cgi-bin";
 use Test::More;
+use HTTP::Request::Common;
+use Plack::Middleware::DW::RequestWrapper;
+use Plack::Test;
 
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use DW::BML;
@@ -80,6 +84,30 @@ subtest 'source-language cold and warm requests agree' => sub {
     like( $cold, qr/3/, 'cold lookup loads scoped source text with substitution' );
     is( $warm, $cold, 'warm request lookup is compatible with cold lookup' );
     LJ::end_request();
+};
+
+subtest 'RequestWrapper sequential PSGI requests retain legacy BML scope' => sub {
+    my $app = Plack::Middleware::DW::RequestWrapper->wrap(
+        sub {
+            my $env = shift;
+            BML::set_language( 'en', sub { return $_[1]; } );
+            if ( $env->{PATH_INFO} eq '/first' ) {
+                BML::set_language_scope('/first.bml');
+            }
+            my $body = LJ::Lang::ml('.key');
+            return [ 200, [ 'Content-Type' => 'text/plain' ], [$body] ];
+        }
+    );
+    test_psgi $app, sub {
+        my $cb = shift;
+        is( $cb->( GET '/first' )->content, '/first.bml.key', 'first PSGI request has BML scope' );
+    TODO: {
+            local $TODO =
+                'RequestWrapper must clear BML-derived language state during native migration';
+            is( $cb->( GET '/second' )->content,
+                '/second.tt.key', 'second PSGI request is isolated from BML scope' );
+        }
+    };
 };
 
 subtest 'sequential requests expose the global BML scope migration gap' => sub {
