@@ -45,7 +45,8 @@ integrated as `558ba0609`; this does not replace actual browser mode evidence.
 The remaining roundtrip gates follow using disposable owned entries and fresh
 reads; no public editor cutover is approved by this document.
 
-Gate4 candidate `fdbb67460` passes15 HTTP assertions but remains held: add
-reloaded backdating-checkbox on/off assertions, and enable the Display Date
-panel before browser visibility/accessible-label checks. Its original browser
-assertions inspected hidden controls; no new production defect is asserted.
+Gate4 through `013cc57da` is independently clear and integrated as `8823c34c1`.
+Parsed checkbox states after both reloads and visible desktop/narrow panel
+labels pass. Foreman timestamp/rendering34 assertions and actual browser pass;
+captures are in entry-displaydate-native. Gate5 browser remains held on precise
+initial-state, no-op and exact-body proof corrections to `a6889cd94`.

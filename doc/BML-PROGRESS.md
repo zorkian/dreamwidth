@@ -1244,3 +1244,13 @@ checks, after widgets Terra completes customization1/4.
   real nested alias and direct GET/POST tests; independent confirmation queued.
 - Timestamp correction `013cc57da` awaits Sol recheck. No held inbox work or
   external Journal hook interface has been changed.
+
+### Timestamp acceptance integrated
+
+- Sol cleared `013cc57da` atop `fdbb67460`; integrated `8823c34c1`. Foreman
+  timestamp/rendering2 files /34 assertions and desktop/narrow visible-control
+  browser pass. Capture inspection confirms visible fitting narrow controls.
+  Evidence: `entry-displaydate-native`; host browser log
+  `/tmp/bml-entry-displaydate-browser.log`.
+- Sol independently confirmed FCK `dd207c99c` nested aliases return404; root
+  routes pass. It remains held pending the already-assigned route correction.
