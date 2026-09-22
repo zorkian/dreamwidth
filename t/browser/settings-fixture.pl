@@ -15,7 +15,8 @@ $user->set_password($password);
 $comm->set_password($password);
 LJ::set_rel( $comm, $user, 'A' );
 my $active = $user->subscribe( event => 'JournalNewEntry', journalid => 0, method => 'Inbox' );
-my $inactive = $user->subscribe( event => 'AddedToCircle', journal => $user, method => 'Inbox', arg1 => 42 );
+my $inactive =
+    $user->subscribe( event => 'AddedToCircle', journal => $user, method => 'Inbox', arg1 => 42 );
 $inactive->_deactivate;
 print encode_json(
     {
@@ -30,9 +31,16 @@ print encode_json(
 ) . "\n";
 $| = 1;
 my $command = <>;    # Keep LJ::Test fixtures alive until the browser closes stdin.
+
 if ( $command && $command =~ /verify/ ) {
     my @subs = LJ::load_userid( $user->id, 1 )->subscriptions;
-    my %ids = map { $_->id => 1 } @subs;
-    print encode_json({ active => $ids{ $active->id } ? 1 : 0, inactive => $ids{ $inactive->id } ? 1 : 0, usermsg => LJ::load_userid( $user->id, 1 )->prop('opt_usermsg') }) . "\n";
-    <>;    # Browser closes stdin after it has consumed verification.
+    my %ids  = map { $_->id => 1 } @subs;
+    print encode_json(
+        {
+            active   => $ids{ $active->id }   ? 1 : 0,
+            inactive => $ids{ $inactive->id } ? 1 : 0,
+            usermsg => LJ::load_userid( $user->id, 1 )->prop('opt_usermsg')
+        }
+    ) . "\n";
+    <>;              # Browser closes stdin after it has consumed verification.
 }
