@@ -507,11 +507,16 @@ sub remove_text {
 
     $dbh->do( "DELETE FROM ml_items WHERE dmid=? AND itid=?", undef, $dmid, $itid );
 
-    my @txtids = ();
-    my $sth    = $dbh->prepare("SELECT txtid FROM ml_latest WHERE dmid=? AND itid=?");
+    # Only invalidate languages whose latest rows are being removed.  This
+    # includes child fallback rows even when the caller names just the root.
+    my ( @txtids, @lncodes );
+    my $sth = $dbh->prepare(
+              "SELECT l.txtid, lang.lncode FROM ml_latest l JOIN ml_langs lang ON l.lnid=lang.lnid "
+            . "WHERE l.dmid=? AND l.itid=?" );
     $sth->execute( $dmid, $itid );
-    while ( my $txtid = $sth->fetchrow_array ) {
-        push @txtids, $txtid;
+    while ( my ( $txtid, $lang ) = $sth->fetchrow_array ) {
+        push @txtids,  $txtid;
+        push @lncodes, $lang;
     }
 
     $dbh->do( "DELETE FROM ml_latest WHERE dmid=? AND itid=?", undef, $dmid, $itid );
@@ -521,10 +526,10 @@ sub remove_text {
         undef, $dmid, @txtids );
 
     # get_text_multi uses lowercase process and memcache keys.
-    if ($lncode) {
-        my $cache_code = lc $itcode;
-        LJ::MemCache::delete("ml.${lncode}.${dmid}.${cache_code}");
-        delete $TXT_CACHE{"ml.${lncode}.${dmid}.${cache_code}"};
+    my $cache_code = lc $itcode;
+    for my $lang (@lncodes) {
+        LJ::MemCache::delete("ml.${lang}.${dmid}.${cache_code}");
+        delete $TXT_CACHE{"ml.${lang}.${dmid}.${cache_code}"};
     }
 
     return 1;
