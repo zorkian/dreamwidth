@@ -11,7 +11,7 @@ template="$template_dir/widget-foundation.tt"
 
 # The runner owns only files it creates. Refuse to touch a pre-existing fixture
 # destination, which might belong to another developer or test process.
-if [ -e "$controller" ] || [ -e "$template" ]; then
+if [ -e "$controller" ] || [ -L "$controller" ] || [ -e "$template" ] || [ -L "$template" ]; then
     echo "widget Foundation fixture destination already exists" >&2
     exit 1
 fi
