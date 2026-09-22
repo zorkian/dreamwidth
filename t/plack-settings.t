@@ -513,4 +513,71 @@ test_psgi $app, sub {
     );
 };
 
+test_psgi $app, sub {
+    require DW::API::Key;
+    my $send   = shift;
+    my $user   = temp_user();
+    my $cookie = settings_cookie($user);
+    my $url    = '/manage/settings/?cat=mobile';
+    my $res    = $send->( GET $url, Cookie => $cookie );
+    my ($form) = settings_form( $res->content, $url );
+    ok( $form, 'mobile API-key form renders' ) or return;
+    my $gen = 'DW__Setting__ApiKeyGenerate_keygen';
+    ok( grep( { ( $_->name || '' ) eq $gen } $form->inputs ), 'API-key generate checkbox renders' )
+        or return;
+    $form->value( $gen, 1 );
+    my $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    is( scalar @{ DW::API::Key->get_keys_for_user( LJ::load_userid( $user->id, 1 ) ) },
+        1, 'valid API-key generate creates exactly one key' );
+    ($form) = settings_form( $res->content, $url );
+    my $del = 'DW__Setting__ApiKeyDelete_keydel0';
+    my ($delete_input) = grep { ( $_->name || '' ) eq $del } $form->inputs;
+    ok( $delete_input, 'fresh mobile GET offers generated key deletion' ) or return;
+    my ($input_tag) = $res->content =~ /(<input[^>]+name=["']\Q$del\E["'][^>]*>)/;
+    my ($key)       = ( $input_tag || '' ) =~ /value=["']([^"']+)/;
+    ok( defined $key, 'rendered delete control includes exact key value' ) or return;
+    $res = $send->(
+        POST $url,
+        Cookie  => $cookie,
+        Content => [ lj_form_auth => $form->value('lj_form_auth'), $del => $key ]
+    );
+    is( scalar @{ DW::API::Key->get_keys_for_user( LJ::load_userid( $user->id, 1 ) ) },
+        0, 'valid API-key delete removes exact generated key' );
+    ($form) = settings_form( $res->content, $url );
+    $form->value( $gen,           1 );
+    $form->value( 'lj_form_auth', 'invalid' );
+    $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    is( scalar @{ DW::API::Key->get_keys_for_user( LJ::load_userid( $user->id, 1 ) ) },
+        0, 'invalid CSRF cannot generate key' );
+    $res = $send->( GET $url, Cookie => $cookie );
+    ($form) = settings_form( $res->content, $url );
+    my $reset = 'DW__Setting__ResetReplyEmail_resetreplyemail';
+    ok( grep( { ( $_->name || '' ) eq $reset } $form->inputs ),
+        'reset reply email checkbox renders' )
+        or return;
+    my $before = LJ::load_userid( $user->id, 1 )->prop('emailpost_auth') || '';
+    $form->value( $reset, 1 );
+    $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    my $after = LJ::load_userid( $user->id, 1 )->prop('emailpost_auth') || '';
+    isnt( $after, $before, 'valid reply-email reset changes emailpost auth' );
+    ($form) = settings_form( $res->content, $url );
+    $form->value( $reset,         1 );
+    $form->value( 'lj_form_auth', 'invalid' );
+    $req = $form->click;
+    $req->uri( 'http://localhost' . $url );
+    $req->header( Cookie => $cookie );
+    $res = $send->($req);
+    is( LJ::load_userid( $user->id, 1 )->prop('emailpost_auth') || '',
+        $after, 'invalid CSRF preserves reply-email auth' );
+};
+
 done_testing;
