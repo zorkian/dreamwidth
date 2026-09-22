@@ -10,7 +10,7 @@ No engine deletion or public editor/inbox cutover is implied.
 | S2 journal-note consumers | Read current DW request note directly; remove genuinely unused request locals | Sequential journals A/B, missing/no request, ordinary userpic hook arguments and return bytes, frozen-time DateTime output, actual cleaner embed callback |
 | OPML default-user redirect | Use current request redirect with same destination/status contract | Actual logged-in no-user GET Location; explicit user output unchanged; no BML request environment dependency |
 | Shared authas labels | Replace two global BML ML lookups with native full-key lookup | Actual selector labels through request getter and no-request fallback; existing selection and output escaping unchanged |
-| std_max_length language selection | Use native effective language with preserved language-code mapping | English/default80, listed languages100, other80, successive request languages, background fallback; actual JournalTitles truncation boundary |
+| std_max_length language selection | Use raw native request-context language with preserved language-code mapping | English/default80, listed languages100, other80, successive request languages, background fallback; actual JournalTitles truncation boundary |
 | Control strip global labels | Native full-key lookups without changing selection/hook/link behavior | Actual personal/community/logged-out strip, custom getter/substitution and userpic labels, identical selected links and default output |
 
 ## Deliberate separations
@@ -34,3 +34,17 @@ No engine deletion or public editor/inbox cutover is implied.
 - Scope, hooks, substitutions and old translation identifiers are compatibility
   contracts. Tests should invoke actual functions/handlers, not assert source
   grep removal as a substitute for behavior.
+
+## Text-length audit follow-up
+
+Sol read-only audit confirms three active effects of `std_max_length`: legacy
+entry-form current_location and current_music maxlength attributes, and trimming
+of all four JournalTitles properties. Read raw `LJ::Lang::request_context` language;
+do not use effective/default language, which would change no-request behavior
+when the configured default is one of the 100-character languages. Preserve the
+existing mapping: absent context/language, debug, English and unlisted codes80;
+listed codes100. Sequential en/ru/reset/debug coverage must prove isolation.
+
+Required concrete acceptance: render both entry-form maxlength values, and save
+105-character JournalTitles values under English and Russian, verifying exact
+80/100-character forced-fresh stored values. This package is not implemented yet.
