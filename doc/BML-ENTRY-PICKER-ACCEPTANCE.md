@@ -79,3 +79,16 @@ narrow images were visually inspected. The extensionless legacy page visibly
 shows `[missing string /editjournal.title]` whereas explicit .bml renders its
 title. Record that translation gap and require correct translated headings in the
 replacement; the browser baseline alone does not certify translation parity.
+
+## Temporary extraction dispatch boundary
+
+Current `DW::Routing::_call_hash` propagates an undefined controller result and
+`app.psgi::_handle_request` then uses its existing BML fallback. A picker route
+can therefore decline GET/POST itemid requests before actor preparation or
+rendering, leaving the original URL, body and method available to the retained
+editor. This avoids adding a new BML-calling adapter or redirecting mutation
+bodies. Prove that behavior through real request tests before using it, including
+POST itemid with synthesized submit_value and invalid/missing CSRF. Returning
+undefined must be deliberate only for retained legacy editor requests; picker
+errors need explicit responses. Remove this temporary decline path when editor
+parity and the legacy page retirement gate are complete.
