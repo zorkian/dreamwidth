@@ -611,3 +611,27 @@ injecting jQuery after legacy page initialization alone is insufficient evidence
   for Sol review. Terra returned to independent settings category/browser work;
   customization Terra continues distinct selection, property/reset and denial
   acceptance. All branches, worker sessions and containers remain preserved.
+
+- Sol cleared native services `6603f2cda`: five-file language/service suite passed
+  48 assertions, tidy 1,039 and compile 1,599. Integrated as `ba3604b24`; foreman
+  service plus poll tests pass (`/tmp/bml-native-services-integrated.log`).
+- Sol cleared settings receiver TODO baseline `86b144d66`: 22 assertions pass
+  with two intended legacy off-origin redirect TODO failures. This records the
+  required receiving-controller fix, not approval to retain the vulnerability.
+- Foreman picker characterization started at `bd4b87237` and expanded through
+  `7ab7d3a28`, `b007ec369`, `95fcdf04c`. It now passes 64 real-session assertions,
+  including community managers, read-only journals and retained other-poster
+  editor controls. Sol identified missing direct BML POST and exact-latest checks;
+  fixes use real distinct protocol event dates and direct alias submissions.
+  Bodies are snapshotted before requests and entry singletons reset before reads.
+  Final recheck pending. Logs `/tmp/bml-entry-picker-{snapshot,order}.log`.
+- Customization acceptance `25959d094` improved preview/theme/layout identity;
+  `6f6bf5b95` added browser property/reset and denied-mutation coverage. Foreman
+  found its denial form selector could choose unrelated forms with missing IDs.
+  `b18a5070` adds real apply-control guards and more reset/CSRF assertions, but its
+  initial focused rerun exposed incomplete reset payload fixtures. Terra is
+  correcting those using complete rendered forms; no integration yet.
+- Visual inspection of the migrated 390px Links List page found cramped controls
+  and overflow. Legacy colors/mobile evidence is already similarly constrained;
+  matched Links List comparison is underway. No new visual regression is asserted
+  from an unmatched screenshot, and JS-only passes do not close visual acceptance.
