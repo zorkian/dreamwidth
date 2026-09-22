@@ -39,3 +39,31 @@ Do not delete the endpoint solely on current broken static dispatch or toolbar
 absence. Consolidation must explicitly account for ImageButton and the legacy
 upload shell. This audit does not authorize enabling, changing or certifying an
 external upload service, nor claim production traffic is absent.
+
+## Active bundle correction and real browser evidence (2026-09-22)
+
+The earlier reference to both distributed bundles was incomplete: the `_2.js`
+files contain alternate relative URLs, but the active `editor/fckeditor.html`
+loads `js/fckeditorcode_gecko.js` or `js/fckeditorcode_ie.js` without the numeric
+suffix. Both active bundles already route ImageButton to the root
+`/imguploadrte.bml?ImageButton`. The legacy fck_startup.js references `_1.js`
+(which loads `_2.js`); no current HTML loader reference to fck_startup.js was
+found. The fcksource=true debug path chooses fckeditor.original.html and separate
+_source scripts, not this old split-bundle loader. This is source reachability
+evidence, not deployed overlay or external-client traffic evidence.
+
+A real modern-editor browser probe at foreman `0f98984fc` confirmed that
+`Commands.GetCommand('ImageButton').Execute()` opens the migrated root dialog.
+Entering a local image URL and alt text inserted an actual INPUT type=image
+with the expected src/alt, with no JS exceptions. The probe used the reviewed
+disposable image fixture and awaited cleanup; no upload or external service
+request occurred. Evidence in foreman container `8d7783a043d8`:
+`/tmp/bml-imagebutton-root.log`; host/container script
+`/tmp/bml-alternate-image-browser.js`.
+
+The initial probe expected the alternate frame and failed; its diagnostic
+frame list established the root URL. Those logs are retained as
+`/tmp/bml-alternate-image-browser{,-diagnostic}.log`. They are corrected audit
+assumptions, not product failures. Do not claim that the active ImageButton
+currently displays source. Direct alternate-URL source delivery and its extra
+upload shell remain separate, previously documented disposition concerns.
