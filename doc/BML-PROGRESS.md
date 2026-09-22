@@ -1172,3 +1172,10 @@ checks, after widgets Terra completes customization1/4.
   remove the unnecessary duplicate error block.
 - Separate Terra work continues on real owned-entry save/reload and timestamp
   parity. Draft/preview `f7c7b285a` and comment metadata `5994d6271` await Sol.
+
+- Foreman Journal/feed integration passes3 files /49 tests in container
+  `/tmp/bml-journal-feed-integrated.log`. Native SiteScheme real-browser replay
+  passes both immediate-response and fresh-reload theme classes for purple/red,
+  with no JS/resource failures and completed disposable fixture cleanup. Four
+  captures are saved in `sitescheme-native`; browser log is on the host at
+  `/tmp/bml-sitescheme-browser.log`.
