@@ -17,6 +17,10 @@ use LJ::Lang;
 use DW::Controller::MassPrivacy;
 use DW::Controller::RPC::CutExpander;
 use DW::Controller::Customize::Advanced;
+use DW::Setting::Display::AccountLevel;
+use DW::Widget::AccountStatistics;
+use LJ::NotificationMethod::Email;
+use LJ::NotificationMethod::Inbox;
 
 sub request {
     my ($query) = @_;
@@ -174,6 +178,151 @@ subtest 'Advanced layer browser formats object values with its full template key
         'object formatting resolves the full TT key before template rendering'
     );
     DW::Request->reset;
+};
+
+{
+
+    package NativeLanguageCallers::AccountUser;
+
+    sub new { bless { @_ > 1 ? @_ : () }, shift }
+    sub tags   { return $_[0]->{tags}   || {}; }
+    sub id     { return $_[0]->{id}     || 1; }
+    sub userid { return $_[0]->{userid} || 1; }
+}
+
+subtest 'native account and notification methods use request-local translation getters' => sub {
+    my $r = request();
+    my @calls;
+    LJ::Lang::set_request_context(
+        lang   => 'en',
+        getter => sub {
+            my ( $lang, $code, $unused, $vars ) = @_;
+            $vars ||= {};
+            push @calls, [ $code, $vars ];
+            return "native:$code" unless keys %$vars;
+            return join ':', 'native', $code,
+                map { defined $vars->{$_} ? $vars->{$_} : '' } qw(type date status exptime);
+        },
+    );
+
+    is(
+        LJ::NotificationMethod::Email->title,
+        'native:notification_method.email.title',
+        'email title uses the request getter'
+    );
+    is(
+        LJ::NotificationMethod::Inbox->title,
+        'native:notification_method.inbox.title',
+        'inbox title uses the request getter'
+    );
+
+    my $user = NativeLanguageCallers::AccountUser->new;
+    my $stats_vars;
+    local *LJ::get_remote                       = sub { return $user; };
+    local *LJ::Memories::count                  = sub { return 0; };
+    local *DW::Pay::get_account_type_name       = sub { return 'Premium'; };
+    local *DW::Pay::get_account_expiration_time = sub { return 1_704_067_200; };
+    local *DW::Template::template_string        = sub {
+        my ( $class, $template, $vars ) = @_;
+        is( $template, 'widget/accountstatistics.tt', 'account statistics reaches its template' );
+        $stats_vars = $vars;
+        return 'RENDERED';
+    };
+    is( DW::Widget::AccountStatistics->render_body,
+        'RENDERED', 'expiring account statistics renders' );
+    like(
+        $stats_vars->{accttype_string},
+        qr/^native:widget\.accountstatistics\.expires_on:Premium:/,
+        'expiring account text uses request getter substitutions'
+    );
+
+    local *DW::Pay::get_paid_status =
+        sub { return { typeid => 7, expiresin => 1, expiretime => '2030-01-02 03:04:05' }; };
+    local *DW::Pay::type_name = sub { return 'Premium'; };
+    local *LJ::mysql_time     = sub { return '2030-01-02 03:04:05'; };
+    like(
+        DW::Setting::Display::AccountLevel->option($user),
+        qr/^native:setting\.display\.accounttype\.status:.*Premium.*:2030-01-02 03:04:05$/,
+        'expiring account-level option uses request getter substitutions'
+    );
+
+    is_deeply(
+        [ map { $_->[0] } @calls ],
+        [
+            'notification_method.email.title',     'notification_method.inbox.title',
+            'widget.accountstatistics.expires_on', 'setting.display.accounttype.status',
+        ],
+        'all migrated methods use the native request getter'
+    );
+    DW::Request->reset;
+};
+
+subtest 'account translation callers preserve permanent, free, and nonweb behavior' => sub {
+    my $user = NativeLanguageCallers::AccountUser->new;
+    my $stats_vars;
+    local *LJ::get_remote                       = sub { return $user; };
+    local *LJ::Memories::count                  = sub { return 0; };
+    local *DW::Template::template_string        = sub { $stats_vars = $_[2]; return 'RENDERED'; };
+    local *DW::Pay::get_account_type_name       = sub { return 'Premium'; };
+    local *DW::Pay::get_account_expiration_time = sub { return 0; };
+    is( DW::Widget::AccountStatistics->render_body,
+        'RENDERED', 'permanent account statistics renders' );
+    is( $stats_vars->{accttype_string},
+        'Premium', 'permanent account has no expiration translation' );
+
+    local *DW::Pay::get_account_type_name = sub { return undef; };
+    is( DW::Widget::AccountStatistics->render_body, 'RENDERED', 'free account statistics renders' );
+    ok( !defined $stats_vars->{accttype_string}, 'free account has no account-level text' );
+
+    local *DW::Pay::get_paid_status =
+        sub { return { typeid => 7, permanent => 1, expiresin => 0 }; };
+    local *DW::Pay::type_name = sub { return 'Premium'; };
+    is(
+        DW::Setting::Display::AccountLevel->option($user),
+        '<strong>Premium</strong>',
+        'permanent account-level option has no expiration translation'
+    );
+    local *DW::Pay::get_paid_status = sub { return undef; };
+    local *DW::Pay::default_typeid  = sub { return 0; };
+    local *DW::Pay::type_name       = sub { return 'Free'; };
+    is( DW::Setting::Display::AccountLevel->option($user),
+        '<strong>Free</strong>', 'free account-level option has no expiration translation' );
+
+    local *LJ::Lang::get_text = sub {
+        my ( $lang, $code, $unused, $vars ) = @_;
+        $vars ||= {};
+        return "background:$lang:$code:$vars->{type}"
+            if $code eq 'widget.accountstatistics.expires_on';
+        return "background:$lang:$code";
+    };
+    is(
+        LJ::NotificationMethod::Email->title,
+        'background:en:notification_method.email.title',
+        'nonweb email title uses native default lookup'
+    );
+    is(
+        LJ::NotificationMethod::Inbox->title,
+        'background:en:notification_method.inbox.title',
+        'nonweb inbox title uses native default lookup'
+    );
+    local *DW::Pay::get_account_type_name       = sub { return 'Premium'; };
+    local *DW::Pay::get_account_expiration_time = sub { return 1_704_067_200; };
+    is( DW::Widget::AccountStatistics->render_body,
+        'RENDERED', 'nonweb expiring account statistics renders' );
+    is(
+        $stats_vars->{accttype_string},
+        'background:en:widget.accountstatistics.expires_on:Premium',
+        'nonweb account statistics uses the native default lookup'
+    );
+    local *DW::Pay::get_paid_status =
+        sub { return { typeid => 7, expiresin => 1, expiretime => '2030-01-02 03:04:05' }; };
+    local *DW::Pay::type_name = sub { return 'Premium'; };
+    local *LJ::mysql_time     = sub { return '2030-01-02 03:04:05'; };
+    is(
+        DW::Setting::Display::AccountLevel->option($user),
+        'background:en:setting.display.accounttype.status',
+        'nonweb account-level option uses native default lookup'
+    );
 };
 
 done_testing;
