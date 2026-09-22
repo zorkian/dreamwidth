@@ -1,0 +1,109 @@
+[
+  {
+    "name": "anonymous-display",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-account",
+    "path": "/manage/settings/?cat=account",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-display",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-notifications",
+    "path": "/manage/settings/?cat=notifications",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-mobile",
+    "path": "/manage/settings/?cat=mobile",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-shortcuts",
+    "path": "/manage/settings/?cat=shortcuts",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-privacy",
+    "path": "/manage/settings/?cat=privacy",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-history",
+    "path": "/manage/settings/?cat=history",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-othersites",
+    "path": "/manage/settings/?cat=othersites",
+    "status": 200,
+    "errors": [
+      "Cannot set properties of undefined (setting 'display')"
+    ],
+    "failures": []
+  },
+  {
+    "name": "community-account",
+    "path": "/manage/settings/?authas=test_comm&cat=account",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "community-community",
+    "path": "/manage/settings/?authas=test_comm&cat=community",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "community-display",
+    "path": "/manage/settings/?authas=test_comm&cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "community-privacy",
+    "path": "/manage/settings/?authas=test_comm&cat=privacy",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "unauthorized",
+    "path": "/manage/settings/?authas=test_paid&cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  },
+  {
+    "name": "personal-display-mobile",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": []
+  }
+]
