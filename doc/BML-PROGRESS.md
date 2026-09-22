@@ -1035,3 +1035,20 @@ checks, after widgets Terra completes customization1/4.
   delimiter is restored and the regression now runs the real TT body rather
   than mocking it away. S2 request-note rendering migration proceeds separately
   from base `2e57379dc`, with existing adapter/language initialization retained.
+
+### Native S2 rendering replay and admin FAQ complete
+
+- Sol cleared admin FAQ `a3b51c425` + `a7a14e557`; integrated as `c39b78ca1`.
+  Foreman actual-template/native FAQ/category suites pass 4 files / 92 tests
+  in `/tmp/bml-admin-faq-integrated.log`.
+- Sol cleared S2 request-note rendering `c2204e313`; integrated as `0bceb2942`.
+  Focused rendering/native-language/color suites pass 3 files / 19 tests in
+  `/tmp/bml-s2-integrated.log`. After a clean server restart, all six journal
+  views return 200 with no page errors or failed resources. Disposable helper
+  exits successfully; screenshots/results are in `journal-rendering-native`.
+- Combined formatting 1063 and compile 1605 pass in
+  `/tmp/bml-rendering-{tidy,compile}.log`. No production deployment or push.
+- Authas label conversion `11ec1c696` is with Sol for independent review.
+  Terra continues ordinary control-strip translations and maintainer UI
+  rendering acceptance. Restricted inbox work remains held; the UniqCookie
+  approval question is still unanswered and no authorization is inferred.
