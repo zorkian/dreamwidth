@@ -1821,10 +1821,20 @@ general /userinfo.bml.syndinfo.body
 general /userinfo.bml.userinfo.body
 general lostinfo.text
 
+general /customize/index.bml.btn.nextpage
+general /customize/index.bml.setstyle.comm
+general /customize/index.bml.setstyle.user
+general /customize/index.bml.setsiteskin
+general /customize/index.bml.title
+general /customize/index.bml.title.comm
+general /customize/index.bml.title2
 general /customize/index.bml.s2.advanced.denied
 general /customize/index.bml.s2.advanced.permitted
 general /customize/index.bml.setsiteskin.desc
 general /customize/index.bml.setsiteskin.desc.comm
+general /customize/options.bml.advanced
+general /customize/options.bml.title
+general /customize/options.bml.title.comm
 
 general /stats.bml.age.desc
 general /stats.bml.age.header

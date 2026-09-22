@@ -35,6 +35,25 @@ test_psgi $app, sub {
         is( $res->code, 200, 'authorized personal/community theme browser' );
         like( $res->content, qr/id="journaltitle"/, 'title widget renders' );
         is( $target->prop('stylesys'), 2, 'S2 enabled' );
+        for my $alias (qw(/customize /customize/ /customize/index /customize/index.bml)) {
+            my $alias_res = $cb->( GET $alias . $query );
+            is( $alias_res->code, 200, "$alias legacy index alias renders" );
+            like( $alias_res->content, qr/id="journaltitle"/,
+                "$alias retains customization controls" );
+            my ($alias_token) =
+                $alias_res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
+            my $alias_title = 'Alias ' . $alias . ' ' . $target->user;
+            $alias_res = $cb->(
+                POST $alias . $query,
+                Content => [
+                    lj_form_auth                        => $alias_token,
+                    'Widget[JournalTitles]_which_title' => 'journaltitle',
+                    'Widget[JournalTitles]_title_value' => $alias_title,
+                ]
+            );
+            is( LJ::load_userid( $target->id )->prop('journaltitle'),
+                $alias_title, "$alias POST retains widget body dispatch" );
+        }
         my $style = LJ::S2::load_style( $target->prop('s2_style') );
         is( $style->{userid}, $target->id, 'style belongs to effective user' );
         my ($token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
@@ -71,7 +90,7 @@ test_psgi $app, sub {
         );
         ok( !$res->header('Location'), 'invalid ThemeNav token does not redirect' );
 
-        for my $path ( '/customize/', '/customize/options' ) {
+        for my $path ( '/customize/', '/customize/options', '/customize/options.bml' ) {
             $res = $cb->( GET $path . $query );
             my ($page_token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
             my $title = 'Characterized ' . $path . ' ' . $target->user;
@@ -114,6 +133,92 @@ test_psgi $app, sub {
             unlike( $res->content, qr/\[Error:|BML ERROR|Invalid user\./, 'no rendering failure' );
         }
     }
+
+    # A formerly generated current-style name must be renamed only on the
+    # effective journal when the controller prepares the customization page.
+    my $migration_url = '/customize/?as=' . $u->user . '&authas=' . $u->user;
+    $res = $cb->( GET $migration_url );
+    my $migration_style = LJ::S2::load_style( $u->prop('s2_style') );
+    my $migration_theme = LJ::Customize->get_current_theme($u);
+    my $old_name        = $migration_theme->old_style_name_for_theme;
+    my $new_name        = $migration_theme->new_style_name_for_theme;
+    isnt( $old_name, $new_name, 'fixture theme has distinct legacy and current style names' );
+    LJ::S2::rename_user_style( $u, $migration_style->{styleid}, $old_name );
+    is( LJ::S2::load_style( $migration_style->{styleid}, skip_layer_load => 1 )->{name},
+        $old_name, 'fixture has the stale current-style name' );
+    $res = $cb->( GET $migration_url );
+    is( $res->code, 200, 'style-name migration page renders' );
+    is( LJ::S2::load_style( $u->prop('s2_style'), skip_layer_load => 1 )->{name},
+        $new_name, 'prepare migrates the stale current-style name on a fresh load' );
+
+    # Saving a real options control creates a nonzero user layer for the
+    # effective journal; ownership must remain journal-local.
+    my $layer_options =
+        '/customize/options?as=' . $u->user . '&authas=' . $u->user . '&group=customcss';
+    $res = $cb->( GET $layer_options );
+    my ($layer_token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
+    $res = $cb->(
+        POST $layer_options,
+        Content => [
+            lj_form_auth                     => $layer_token,
+            'Widget[S2PropGroup]_custom_css' => '/* ownership fixture */',
+        ]
+    );
+    my $layer_style = LJ::S2::load_style( LJ::load_user( $u->user, 'force' )->prop('s2_style') );
+    my $foreign_user_layerid = $layer_style->{layer}{user};
+    ok( $foreign_user_layerid, 'real options save creates a nonzero foreign user layer' );
+    my $foreign_user_layer = LJ::S2::load_layer( LJ::get_db_writer(), $foreign_user_layerid );
+    is( $foreign_user_layer->{userid}, $u->id,
+        'foreign nonzero user layer belongs to its journal' );
+
+    # Reuse the already-authorized owner/community relationship: the controller
+    # must repair a managed community pointing at the owner's foreign style.
+    my $foreign_styleid = $u->prop('s2_style');
+    my $foreign_style   = LJ::S2::load_style($foreign_styleid);
+    my $foreign_name    = $foreign_style->{name};
+    my $foreign_layers  = join ':',
+        map { $foreign_style->{layer}{$_} || 0 } qw(core layout theme user);
+    is( $foreign_style->{layer}{user},
+        $foreign_user_layerid, 'foreign style carries the nonzero foreign user layer' );
+    $comm->set_prop( s2_style => $foreign_styleid );
+    my $foreign_target_url = '/customize/?as=' . $u->user . '&authas=' . $comm->user;
+    $res = $cb->( GET $foreign_target_url );
+    is( $res->code, 200, 'managed foreign-style target customization page renders' );
+    like( $res->content, qr/id="journaltitle"/,
+        'managed foreign-style request reaches customization controls' );
+    my $fresh_comm   = LJ::load_userid( $comm->id, 1 );
+    my $target_style = LJ::S2::load_style( $fresh_comm->prop('s2_style') );
+    isnt( $target_style->{styleid}, $foreign_styleid, 'foreign style reference is replaced' );
+    is( $target_style->{userid}, $comm->id, 'replacement style belongs to effective target' );
+    my $target_options =
+        '/customize/options?as=' . $u->user . '&authas=' . $comm->user . '&group=customcss';
+    $res = $cb->( GET $target_options );
+    my ($target_layer_token) = $res->content =~ /name=['"]lj_form_auth['"][^>]*value=['"]([^'"]+)/;
+    $res = $cb->(
+        POST $target_options,
+        Content => [
+            lj_form_auth                     => $target_layer_token,
+            'Widget[S2PropGroup]_custom_css' => '/* repaired target layer */',
+        ]
+    );
+    $fresh_comm   = LJ::load_userid( $comm->id, 1 );
+    $target_style = LJ::S2::load_style( $fresh_comm->prop('s2_style') );
+    my $target_user_layer = LJ::S2::load_layer( LJ::get_db_writer(), $target_style->{layer}{user} );
+    ok( $target_style->{layer}{user},
+        'repaired effective target has a nonzero user layer after options save' );
+    is( $target_user_layer->{userid},
+        $comm->id, 'repaired effective target user layer belongs to the community' );
+    $foreign_style = LJ::S2::load_style($foreign_styleid);
+    is( $foreign_style->{userid}, $u->id,        'foreign style ownership remains unchanged' );
+    is( $foreign_style->{name},   $foreign_name, 'foreign style name remains unchanged' );
+    is( join( ':', map { $foreign_style->{layer}{$_} || 0 } qw(core layout theme user) ),
+        $foreign_layers, 'foreign style layer state remains unchanged' );
+    $foreign_user_layer = LJ::S2::load_layer( LJ::get_db_writer(), $foreign_user_layerid );
+    is( $foreign_user_layer->{userid},
+        $u->id, 'foreign nonzero user layer ownership remains unchanged' );
+    is( LJ::load_user( $u->user, 'force' )->prop('s2_style'),
+        $foreign_styleid, 'foreign journal retains its style reference after target repair' );
+
     $res = $cb->( GET '/customize/?as=' . $u->user . '&authas=' . $stranger->user );
     unlike( $res->content, qr/id="journaltitle"/, 'unmanaged user denied' );
     ok( !$stranger->prop('s2_style'), 'denied access does not create a style' );
