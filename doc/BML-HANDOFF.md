@@ -1,3 +1,19 @@
+## Public share browser replay passed; test-only fixes active
+
+Foreman public-share session94174 PASS (/tmp/bml-share-public-browser.log),
+owned fixture/server check empty, captures preserved under update-share-public.
+Combined HTTP305 remains held only for stale expectations in legacy GET handler
+and terminal tests; Themes is fixing those on the preserved public-share branch.
+No production regression was found by Sol or foreman browser.
+
+Sol919 altlogin baseline61 PASS but held for two finite proofs: GET password-like
+marker must remain absent/blank; actual remote formatting default Aoff/Bon must
+render independently of hook override. Themes handles after share-suite fix, then
+callable-only renderer. Sol source-only TT presentation seam audit underway to
+avoid changing default modal/auth behavior. Widgets callable failed-auth continuation
+still WIP; exact auth/update_fields counts/order and shared flat refs required.
+No active root tests remain. Never infer public anonymous/altlogin activation.
+
 ## Public share source integrated; combined test correction pending
 
 Sol fa1767d51bdf087dc50e8caf756ec11224723e02 CLEAR source/160/browser and

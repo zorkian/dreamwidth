@@ -2350,3 +2350,9 @@ was included in this package.
   cleanup; six screenshots preserved in anonymous-update-callable. Native390
   visually usable with exactly one date error and retained content. Full tidy1166
   and compile1607 PASS. No active root validation processes at this checkpoint.
+
+- Public share root94a035428 browser replay PASS with cleanup and preserved captures.
+  Broader six-suite305 found stale legacy-share fallback assertions; test-only
+  correction remains required before combined integration is marked green.
+- Altlogin baseline919 is not yet accepted: Sol61 passes but requires password-marker
+  exclusion and explicit remote formatting-default render assertions.
