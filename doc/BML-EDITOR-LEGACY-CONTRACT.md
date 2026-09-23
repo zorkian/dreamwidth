@@ -65,3 +65,14 @@ choice. Do not silently infer that the commented example setting is unused.
 Moderated posting and selected crossposting also remain distinct from the
 private owned-entry baseline above; external crosspost delivery must be
 stubbed during acceptance.
+
+## Moderated community posting baseline
+
+`t/plack-entry-moderated-post.t` uses an authorized ordinary poster with a
+community `P` posting relation but no `N` preapproval relation.  Its real
+legacy `/update`, legacy `/update.bml`, and native `/entry/new` submissions
+all create one community-cluster moderation request, retain the exact target,
+poster, subject, body, location, and music metadata, and publish no `log2`
+entry.  All three clear the saved draft body; the retained legacy forms leave
+`draft_properties` in place while the native form clears them.  This observed
+difference remains explicit pending a separate parity decision.
