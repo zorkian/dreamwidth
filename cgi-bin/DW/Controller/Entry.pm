@@ -376,6 +376,7 @@ sub legacy_community_edit_get_handler {
     my $entry   = LJ::Entry->new( $journal, ditemid => $ditemid );
     return undef unless $entry && $entry->valid && $entry->ditemid == $ditemid;
     return undef unless $entry->visible_to($actor) && $entry->editable_by($actor);
+    return undef if $opts{same_poster_only} && !$entry->poster->equals($actor);
     my $path   = '/entry/' . $journal->user . '/' . $ditemid . '/edit';
     my $action = LJ::create_url( $path, keep_query_string => 1 );
 

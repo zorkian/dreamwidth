@@ -34,7 +34,14 @@ sub entry_picker_handler {
 
     if ( defined $get->{itemid} || defined $post->{itemid} ) {
         require DW::Controller::Entry;
-        return DW::Controller::Entry::legacy_owned_edit_get_handler() if $r->method eq 'GET';
+        if ( $r->method eq 'GET' ) {
+            my $rendered = DW::Controller::Entry::legacy_owned_edit_get_handler();
+            return $rendered if defined $rendered;
+            $rendered =
+                DW::Controller::Entry::legacy_community_edit_get_handler( same_poster_only => 1 );
+            return $rendered if defined $rendered;
+            return undef;
+        }
         return DW::Controller::Entry::legacy_owned_edit_handler();
     }
 
