@@ -2400,3 +2400,12 @@ are separately observed through hooks and force-fresh state. B owns the private
 entry and formatting change; A draft property clears while frozen properties
 and editor preferences remain. Wrong/empty password rows prove exact retained
 errors and unchanged seeded state. No production or authentication policy change.
+
+## Unused native alternate-login mapper (2026-09-23)
+
+Solde55 CLEAR integrated7410b2fc9. Native HMV parsing and explicit separate flat
+hook snapshot remain unused by routes; mixed actions are rejected, caller props
+are isolated, trusted timezone deletion is preserved, and crosspost is suppressed.
+Root5pure suites20top-level PASS, tidy1174 and compile1607 PASS. No authentication,
+hook invocation, save, or public interface change. Separate retained mutation
+characterization37e6 remains under review.

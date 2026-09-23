@@ -1,3 +1,18 @@
+## Mapper integration and remaining public matrix review
+
+Solde55cfe7caec690d48bbfd5b3ed328faf5b677d8 CLEAR; integrated7410b2fc9.
+Root five pure suites20 top-level PASS, full tidy1174 and compile1607 PASS.
+Logs /tmp/bml-altlogin-mapper-{integrated,tidy,compile}.log in root container.
+No mapper caller/hooks/auth/save/routes; no complete raw-hook ABI claim.
+
+Sol reviewing public anonymous corrections88d..f6bd now; Widgets final classifier
+WIP passes447+ assertions and is finishing after compaction. No public route
+integration yet. Test-only retained hook mutation37e6fb87cc08e057b03acc782263964d635cb095
+is queued after current Sol review,2files7top-level PASS. Themes branch clean.
+All root test sessions28506/27120 completed; root has no active test process.
+Keep existing models despite optional rate menus; no deployment/held-interface
+authorization changes.
+
 ## Current immutable queue
 
 Unused native alternate-login mapperde55cfe7caec690d48bbfd5b3ed328faf5b677d8
