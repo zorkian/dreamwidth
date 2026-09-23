@@ -146,15 +146,13 @@ test_psgi $app, sub {
     );
 };
 
-# --- /entry/preview: preview_handler/_render_preview are fully native (F2
-# deleted legacy_preview_handler and the /preview/entry.bml route along with
-# it), resolving both keys under /entry/preview.tt --
-# .entry.preview_warn_text via a direct LJ::Lang::ml() call
-# (Entry.pm's _render_preview), .title via the template's own relative
-# resolution (views/entry/preview.tt's sections.windowtitle). preview_handler
-# needs a real style/request context this test does not build; asserting the
-# exact fully-qualified keys it uses resolve correctly is equivalent and
-# direct. ---
+# --- /entry/preview: preview_handler/_render_preview resolve both keys
+# under /entry/preview.tt -- .entry.preview_warn_text via a direct
+# LJ::Lang::ml() call (Entry.pm's _render_preview), .title via the
+# template's own relative resolution (views/entry/preview.tt's
+# sections.windowtitle). preview_handler needs a real style/request context
+# this test does not build; asserting the exact fully-qualified keys it
+# uses resolve correctly is equivalent and direct. ---
 {
     is(
         LJ::Lang::ml('/entry/preview.tt.title'),
@@ -169,10 +167,8 @@ test_psgi $app, sub {
 }
 
 # --- The no-JS altlogin credential branch of views/entry/login.tt (its
-# .username/.password strings, relocated from /update.bml.*) has no
-# reachable native caller at all (legacy_update_altlogin_get_handler, its
-# only caller, is gone along with the rest of F2's deletions). Render the
-# template directly to prove the relocation itself is correct, without
+# .username/.password strings, relocated from /update.bml.*) has no live
+# caller; render the template directly and pin its relocated text, without
 # claiming any live route exercises it. ---
 {
     my $html = DW::Template->template_string( 'entry/login.tt',
@@ -183,11 +179,9 @@ test_psgi $app, sub {
 }
 
 # --- widget.userpicselector.link.view_thumbnails (relocated from
-# /update.bml.* to the global bin/upgrading/en.dat scope) has no caller at
-# all now: LJ::Widget::UserpicSelector and its only caller, LJ::entry_form,
-# are both gone (F2's deletions). Asserting the key still resolves to its
-# exact English text is a residual snapshot of the relocation, not a claim
-# that anything currently reads it. ---
+# /update.bml.* to the global bin/upgrading/en.dat scope) has no live
+# caller; the assertion only pins its relocated text, not a claim that
+# anything currently reads it. ---
 is(
     LJ::Lang::ml('widget.userpicselector.link.view_thumbnails'),
     'View Thumbnails',

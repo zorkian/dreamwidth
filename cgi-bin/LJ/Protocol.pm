@@ -568,8 +568,8 @@ sub sendmessage {
 
     # Protocol error text is a wire contract, not a rendered page: force
     # English regardless of the sender's negotiated language. getter => undef
-    # matches BML::set_language's old forwarding exactly, discarding any
-    # getter already on the request (doc/BML-TRANSLATION-SHIM.md §4).
+    # discards any getter already on the request; set_request_context merges
+    # keys, so omitting it would keep one (doc/BML-TRANSLATION-SHIM.md §4).
     LJ::Lang::set_request_context( lang => 'en', getter => undef );
 
     foreach my $to (@to) {

@@ -1,8 +1,7 @@
 #!/usr/bin/perl
-# Proves LJ::Protocol.pm:563's native LJ::Lang::set_request_context(lang =>
-# 'en', getter => undef) call in sendmessage reproduces exactly what the
-# BML::set_language('en') call it replaced used to do: force English and
-# discard any getter already on the request, not just the language.
+# Proves LJ::Protocol.pm:563's LJ::Lang::set_request_context(lang => 'en',
+# getter => undef) call in sendmessage forces English and discards any
+# getter already on the request, not just the language.
 #
 # Message sending between two disposable temp users is not a moderation
 # action (no report/ban/sysban call is on this path): the chosen failure --
@@ -85,9 +84,7 @@ subtest
 
     # LJ::Protocol.pm:563 forces LJ::Lang::set_request_context(lang => 'en',
     # getter => undef) directly -- explicitly overwriting the existing getter
-    # key, not just the language, to match what BML::set_language('en')'s old
-    # forwarding produced (DW::BML.pm's override never resolves a getter for
-    # a non-BML-page request like this one). LJ::Lang::ml()'s own fallback
+    # key, not just the language. LJ::Lang::ml()'s own fallback
     # ($context->{getter} || \&LJ::Lang::get_text) then uses the real native
     # getter. So the failure text is genuine, properly-translated English --
     # not the ru language, and not routed through the custom recorder getter
@@ -99,9 +96,8 @@ subtest
     is( scalar(@calls), 0,
 'the custom getter installed before sendmessage never fires for this lookup -- it was overwritten'
     );
-    is( LJ::Lang::request_context()->{getter}, undef,
-'the request getter is explicitly undef after sendmessage, exactly as BML::set_language\'s old forwarding left it'
-    );
+    is( LJ::Lang::request_context()->{getter},
+        undef, 'the request getter is explicitly undef after sendmessage' );
 
     is(
         LJ::Lang::ml('error.message.individual'),
