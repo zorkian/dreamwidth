@@ -45,6 +45,12 @@ users persists). Nothing external was touched.
   short-circuit). Root validation (allowlist only, no moderation suites):
   14 files 432 PASS incl. t/plack-bml-runtime-callers.t; tidy/compile logs
   /tmp/bml-runtime-callers-integrated-*.log.
+- W7-A dead RPC fallback removal a6641ec27 bml-opus-review CLEAR; integrated
+  on root as the next commit. DEPLOY GATE (concrete): production
+  etc/config*.pl or ext/local may populate %LJ::AJAX_URI_MAP (the removed
+  comment named /__rpc_delcomment and /__rpc_talkscreen as Apache-era
+  mappings); if so those URIs now reach the router instead of BML. Check with
+  BETA_FEATURES and the hook list at deploy time.
 - W6 engine retirement audit 18affb0c3 (docs only, not independently
   reviewed) integrated as doc/BML-ENGINE-RETIREMENT.md: the app.psgi
   %LJ::AJAX_URI_MAP fallback is dead; DW::BML::RequestAdapter remains

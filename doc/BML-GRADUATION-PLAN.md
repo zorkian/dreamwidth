@@ -35,6 +35,9 @@ and config unknowns stay explicit gates.
   `after_entry_post_extra_*`, `entry_deleted_page_extras`, `entryforminfo`,
   `LJ::Local::BMLInit`. Until checked, F2 keeps the `.text` files and does not
   assert those hooks unused.
+- Production may populate `%LJ::AJAX_URI_MAP` (Apache-era `/__rpc_delcomment`,
+  `/__rpc_talkscreen`); the in-tree fallback was dead and is removed (W7-A),
+  so any such mapping must be checked at deploy time.
 - The transitional old-schema POST handler is a deliberate retained dependency
   on the legacy decoder; its removal date is a separate user decision.
 
