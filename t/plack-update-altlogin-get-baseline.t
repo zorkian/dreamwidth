@@ -169,15 +169,21 @@ my $auth_calls;
             is( $form->value('user'), 'hook <user> & "quote"',
                 "$path uses post-hook user prefill" );
             is( $form->value('password') // '', '', "$path keeps password blank" );
-            unlike(
-                $res->content,
-                qr/encoded(?:&lt;|<)password-marker(?:&gt;|>)/,
-                "$path never reflects decoded password-like GET input"
+            my ($update_form_html) =
+                $res->content =~ m{(<form[^>]+id=['"]updateForm['"][\s\S]*?</form>)}i;
+            unlike( $update_form_html || '',
+                qr/password-marker/i,
+                "$path keeps the password marker out of every updateForm control" );
+            is(
+                $form->action,
+                'http://localhost/update?altlogin=1',
+                "$path keeps the normalized retained updateForm action"
             );
+            if ( $path =~ /case=snapshot/ ) {
+                like( $res->content, qr/password-marker/i,
+                    'the supplied marker is retained only by generic logout returnto navigation' );
+            }
 
-            # Retained BML still includes the raw query in generic returnto links;
-            # the blank control and decoded-marker assertion above characterize
-            # the actual legacy credential surface without claiming otherwise.
             like(
                 $res->content,
                 qr/hook\s+&lt;user&gt;\s+&amp;\s+&quot;quote&quot;/,
