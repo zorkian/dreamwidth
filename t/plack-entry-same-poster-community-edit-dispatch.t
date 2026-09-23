@@ -54,14 +54,14 @@ my $cookie =
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'samePosterDispatch';
-my ( $personal_calls, $community_calls ) = ( 0, 0 );
+my ( $personal_calls, $community_calls, @dispatch_order ) = ( 0, 0 );
 my $personal  = \&DW::Controller::Entry::legacy_owned_edit_handler;
 my $community = \&DW::Controller::Entry::legacy_same_poster_community_edit_handler;
 no warnings 'redefine';
 local *DW::Controller::Entry::legacy_owned_edit_handler =
-    sub { ++$personal_calls; return $personal->(@_) };
+    sub { ++$personal_calls; push @dispatch_order, 'personal'; return $personal->(@_) };
 local *DW::Controller::Entry::legacy_same_poster_community_edit_handler =
-    sub { ++$community_calls; return $community->(@_) };
+    sub { ++$community_calls; push @dispatch_order, 'community'; return $community->(@_) };
 
 test_psgi $app, sub {
     my $send    = shift;
@@ -98,10 +98,12 @@ test_psgi $app, sub {
         $post->header( Referer => "http://localhost$path" );
         $post->header( Cookie  => $cookie );
         $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
         $res            = $send->($post);
         is( $res->code,       200, "$suffix public save succeeds" );
         is( $personal_calls,  1,   "$suffix calls personal handler first" );
         is( $community_calls, 1,   "$suffix calls community handler after personal decline" );
+        is_deeply( \@dispatch_order, [qw(personal community)], "$suffix preserves handler order" );
         like(
             $res->content,
             qr{href="/entry/\Q@{[$comm->user]}\E/\Q@{[$target->ditemid]}\E/edit"},
@@ -140,9 +142,12 @@ test_psgi $app, sub {
         $post->header( Referer => "http://localhost$delete_path" );
         $post->header( Cookie  => $cookie );
         $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
         $res            = $send->($post);
         is( $personal_calls,  1, "$suffix delete calls personal handler first" );
         is( $community_calls, 1, "$suffix delete calls community handler after personal decline" );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$suffix delete preserves handler order" );
         like(
             $res->content,
             qr/edited-entry-extra|success/i,
@@ -169,14 +174,51 @@ test_psgi $app, sub {
     $post->header( Referer => "http://localhost$retry_path" );
     $post->header( Cookie  => $cookie );
     $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
     $res            = $send->($post);
     is( $personal_calls,  1, 'invalid attempt calls personal handler first' );
     is( $community_calls, 1, 'invalid attempt calls community handler' );
+    is_deeply( \@dispatch_order, [qw(personal community)],
+        'invalid attempt preserves handler order' );
     like( $res->content, qr/id="js-post-entry"/,
         'invalid attempt returns native retry, never BML fallback' );
     like( $res->content, qr/not-a-year/, 'native retry retains raw date' );
     is( fresh( $comm, $retry->ditemid )->subject_raw,
         'retry old', 'invalid attempt leaves persisted entry unchanged' );
+    my $declined = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'declined old',
+        body     => 'declined body',
+        security => 'public'
+    );
+    my $declined_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $declined->ditemid;
+    $res  = $retained_get->($declined_path);
+    $form = form_from( $res->content );
+    ok( $form, 'declined action harvests retained form' );
+    my $token = $form->value('lj_form_auth');
+
+    for my $case ( [ 'no action', undef ], [ 'unknown action', 'action:unsupported' ] ) {
+        my @pairs = (
+            itemid       => $declined->ditemid,
+            usejournal   => $comm->user,
+            lj_form_auth => $token,
+            subject      => 'declined changed',
+            event        => 'declined changed body'
+        );
+        push @pairs, ( $case->[1] => '1' ) if defined $case->[1];
+        $post = POST $declined_path, \@pairs;
+        $post->header( Cookie  => $cookie );
+        $post->header( Referer => "http://localhost$declined_path" );
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($post);
+        unlike( $res->content, qr/id="js-post-entry"/,
+            "$case->[0] remains outside native retry rendering" );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$case->[0] reaches both resolvers then BML" );
+        is( fresh( $comm, $declined->ditemid )->subject_raw,
+            'declined old', "$case->[0] leaves target unchanged" );
+    }
     my $personal_entry = $poster->t_post_fake_entry(
         subject  => 'personal old',
         body     => 'personal body',
@@ -192,9 +234,12 @@ test_psgi $app, sub {
     $post->header( Referer => "http://localhost$personal_path" );
     $post->header( Cookie  => $cookie );
     $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
     $res            = $send->($post);
     is( $personal_calls,  1, 'personal save calls personal handler' );
     is( $community_calls, 0, 'personal save never calls community handler' );
+    is_deeply( \@dispatch_order, ['personal'],
+        'personal save stops at the defined personal response' );
     is(
         fresh( $poster, $personal_entry->ditemid )->subject_raw,
         'personal changed',
