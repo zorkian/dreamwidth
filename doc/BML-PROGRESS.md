@@ -2275,3 +2275,11 @@ Sol82 production plus66/4c finite tests CLEAR, final95 assertions. Integrated as
 d5d91fc4f..a88bb4e97. Foreman action/maintainer/property/community dispatch four-file
 regression387 PASS. Only three property values are written by the callable;
 no public route or manager delete/report change. Browser gate remains separate.
+
+### Callable manager browser accepted
+
+Sol4a CLEAR; integrated1e7bd2faa. Foreman normal replay PASS and owned-process
+check empty; desktop/narrow captures preserved under manager-property-callable.
+Retained layout/title baseline remains visible, without changed GET markup.
+Callable integration formatting1157 and compilation1607 passed. Public property
+POST activation is the next separate finite gate.

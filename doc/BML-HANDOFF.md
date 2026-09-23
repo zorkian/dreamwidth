@@ -1,3 +1,19 @@
+## Callable manager browser accepted and replayed
+
+Sol4a116591173b5ed43d8b2f166566b24ee38ace41 CLEAR; integrated1e7bd2faa.
+Foreman normal browser PASS (/tmp/bml-manager-property-browser.log), session12143
+complete, owned node/fixture/server/Chrome process check empty. Captures preserved
+under manager-property-callable; narrow capture inspected. It retains the old BML
+layout overflow and extensionless title missing-string baseline; no markup change
+or native manager GET claim. Callable integration tidy1157/compile1607 PASS
+(/tmp/bml-manager-callable-{tidy,compile}.log), session49928 complete.
+
+Themes may commit public property-only candidate once its finite validations pass.
+Widgets anonymous owner callable5020a4e0cc7ef2f40e87bc61431ee6bf32374e07 is queued
+Sol source review with a worker followup pending around login-failure context and
+initial invalid GET target ordering. No anonymous integration/public activation.
+No root validation processes remain active.
+
 ## Manager callable HTTP integrated
 
 Sol final4c4313af47163f882b1d090c41b7e6df7f1d0b7f CLEAR95; integrated production82
