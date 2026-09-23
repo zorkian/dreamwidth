@@ -1,3 +1,18 @@
+## Pending public readonly and next independent slices
+
+Public readonly4493a7212e2186bb6662b61f4b5e800b9b820a99 is committed and in
+Sol review; dispatch is after altlogin/share exclusions, preserving same flat
+GET ref and raw canonical action. Worker combined100/browser/tidy/compile PASS;
+not integrated. Themes next slice is invalid GET usejournal terminal rendering,
+preserving /update.bml.title2 and invalidusejournal body before remote/beta,
+with separate callable and public proofs; no POST/auth/share behavior changes.
+
+Widgets same-poster community POST opt-in remains WIP. Sol source correction:
+log_event remote is original session remote; spam_check/_do_edit actor remains
+effective poster. Personal defaults unchanged. No BML fallback after save attempt;
+use existing native retry. Root clean through prior9490d63c8; no active root test
+processes. All external/platform holds remain unchanged.
+
 ## Readonly callable and Web headings accepted
 
 Sol readonlye30/b7/843 CLEAR; integrated0fa540eb3/95fc0245e/b5e3183d1. Corrected

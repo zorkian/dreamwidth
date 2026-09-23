@@ -157,3 +157,12 @@ that could execute the request twice. Native retry is the deliberate migration
 contract already accepted for personal edits; preserve community context and
 raw invalid input through that same renderer. The earlier matrix suggestion to
 retain BML error output after protocol failure does not apply to this package.
+
+## Independent source handoff correction
+
+Sol confirmed one identity distinction for the opt-in helper: the deletion log
+records the original session remote, while spam_check and canonical edit use the
+effective poster. Use the supplied session_remote for log_event when present,
+with the existing remote fallback so personal defaults remain unchanged. Test
+this as an explicit callable-context contract; do not invent a granted authas
+policy fixture or broaden routing permissions to make that test possible.
