@@ -1,3 +1,19 @@
+## Anonymous callable browser accepted
+
+Sol d2dc5a1674a8a1708699be710864bde2919bd015 CLEAR, integrated afeafd8ca.
+Foreman no-submit browser replay exited0 (/tmp/bml-anonymous-callable-browser.log),
+owned helper/server/Chrome check empty. Desktop/390 captures preserved under
+update-anonymous-callable; narrow subject/RTE/controls visually fit. Native login
+modal stays closed; this is render-only evidence, not authentication or public
+schema acceptance. Root session30346 complete.
+
+Public community production1d6/core98 is source/core-clear only. Widget tests now
+through1c9e88c7034d0379de0b3fb2c05ffe6d41d868ed (87 worker assertions) still lack
+final configured-spellcheck/precedence/isolation rows and plain-app browser. Keep
+unintegrated. Themes corrects source-only anonymous POST audit to distinguish
+fields actually forwarded from fields merely mentioned; no auth tests or route.
+Sol audits only retained manager property-save source, excluding delete/report.
+
 ## Callable community browser accepted and integrated
 
 Sol86165dd08 + lifecycle6157821d CLEAR; integrated936b31e35/7b05844c5.

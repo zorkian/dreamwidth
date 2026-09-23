@@ -2231,3 +2231,10 @@ Sol861+615 CLEAR, integrated936b31e35/7b05844c5. EOF lifecycle correction reject
 pending reads if the fixture exits before data. Foreman normal browser PASS, no
 helpers; desktop/narrow captures preserved and390px retry inspected. Integrated
 full tidy1151/compile1607 PASS. Public community POST matrix remains separate.
+
+### Anonymous callable browser accepted
+
+Sol d2dc5a167 CLEAR, integratedafeafd8ca. Foreman no-submit browser exit0 with
+empty owned-process check; desktop/narrow captures preserved and390px form
+visually checked. Exact title/content/RTE/target and fresh-state behavior passed.
+Public anonymous activation and POST compatibility remain separate gates.
