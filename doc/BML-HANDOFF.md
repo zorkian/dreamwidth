@@ -1,3 +1,21 @@
+## Public same-poster community POST integrated and validated
+
+Sol finaled191efce6294be8edfa2a80e6b38a356426c5e3 HTTP123 CLEAR, with previously
+cleared browser979. Integrated source1d through final corrections as rootbbd359599
+through2e4a449f6; duplicate EOF fixf165 omitted because root already has615.
+Foreman five-suite regression519 PASS (/tmp/bml-community-post-integrated.log).
+Real production-POST browser PASS (/tmp/bml-community-public-browser.log), owned
+fixture/server check empty. Four captures preserved in community-edit-post-public;
+390px native retry visually inspected: one useful error, content/community and
+controls visible/in bounds. Full tidy1154 and compile1607 PASS
+(/tmp/bml-community-public-{tidy,compile}.log). Root sessions31556/69983/16698 done.
+
+Anonymous final baseline2cb742c854a9442d9562aef8ed4b8b99b22c3789 (207/69/8beed)
+is queued Sol, worker68 PASS; not yet integrated. Themes restores its safely
+stashed manager-property WIP after correction. Widgets works on the separate
+anonymous retry-render prerequisite then successful-password callable composition
+from7ed6ece2c. No public anonymous route or manager activation, no publishing.
+
 ## Anonymous ordinary composition handoff
 
 BML-ANONYMOUS-POST-COMPOSITION.md preserves Sol's corrected source-only design.

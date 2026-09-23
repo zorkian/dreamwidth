@@ -2238,3 +2238,12 @@ Sol d2dc5a167 CLEAR, integratedafeafd8ca. Foreman no-submit browser exit0 with
 empty owned-process check; desktop/narrow captures preserved and390px form
 visually checked. Exact title/content/RTE/target and fresh-state behavior passed.
 Public anonymous activation and POST compatibility remain separate gates.
+
+### Public same-poster community POST accepted
+
+Sol final HTTPed191 and browser979 CLEAR; integratedbbd359599..2e4a449f6.
+Foreman five suites519 PASS, real browser PASS, full tidy1154/compile1607 PASS.
+Desktop/390 captures preserved under community-edit-post-public, narrow retry
+visually checked and helper cleanup empty. Both aliases now try personal then
+same-poster community adapters before retained BML; accepted failures stay on
+native retry. Manager/reporting and other excluded contexts remain retained.
