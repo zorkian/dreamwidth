@@ -1,3 +1,17 @@
+## Active worker checkpoint
+
+Callable community browser commit 86165dd0898489a13dce47c33f7428ee90022cbb
+is queued with Sol. Worker normal/named-failure runs and in-container cleanup
+passed; reviewer also checks clean fixture exit before startup JSON. Do not
+integrate until exact browser gate is clear. Widgets has resumed separate public
+EntryPicker composition and finite HTTP matrix, with no manager/report mutations.
+
+Themes anonymous callable renderer remains uncommitted WIP on its isolated
+branch. Focused 60 tests pass after visible username prefill and post-hook read
+ordering were corrected. Final adjacent/tidy/compile checks and immutable review
+are pending. Native credential schema and public authentication remain separate.
+Root clean at bb40cfd52 before this documentation checkpoint; no root processes.
+
 ## Finite public community POST matrix preserved
 
 BML-COMMUNITY-POST-ACTIVATION.md records Sol source-only routing requirements
