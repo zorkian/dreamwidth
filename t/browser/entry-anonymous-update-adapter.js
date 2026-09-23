@@ -1,4 +1,4 @@
-// Browser acceptance for callable anonymous retained update posting.
+// Browser acceptance for public anonymous retained update posting.
 // Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -321,7 +321,7 @@ async function closeChild(child, done, label) {
         if (process.env.ANONYMOUS_UPDATE_INTENTIONAL_FAIL) throw Error('intentional anonymous update cleanup failure');
         assert.deepEqual(errors, [], 'anonymous update browser flow has no JavaScript errors');
         assert.deepEqual(failures, [], 'anonymous update browser flow has no failed or error resources');
-        console.log('PASS anonymous update callable browser');
+        console.log('PASS anonymous update public browser');
     } finally {
         try { if (browser) await browser.close(); }
         finally {
