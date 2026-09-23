@@ -2469,3 +2469,7 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   'inbox' beta from production config.
 - W4 entry string relocation integrated as706e720fa/17c82a952 (Opus FINAL CLEAR);
   native entry pages read no retiring .bml.text scope. Root7files353 PASS.
+- T2 entry cutover + T3 adapter deletion landed atomically asc23833502..508229ae9
+  (Opus CLEAR / HELD-then-fixed). Old /update and /editjournal redirect GET to native
+  and carry over old POSTs without saving. Root sweep30files1132 PASS, tidy1107,
+  compile1603. W5 runtime-caller conversions (6 commits) queued for review.

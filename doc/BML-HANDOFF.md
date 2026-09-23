@@ -75,7 +75,28 @@ below this line predate the resume.
   /tmp/bml-entry-strings-integrated-*.log. Reviewer's first W4 review caught
   a W4-introduced picker regression (four editjournal.tt keys missing) that
   the worker had reported as pre-existing; fixed and covered.
-- T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
+- T2 entry cutover range dd4705a74 + 049fe9977 + 85f839e2f + 6e88be647
+  bml-opus-review FINAL CLEAR (conditional on atomic T3) and T3 entry adapter
+  deletion b2b432517 HELD only for restoring three tests of kept helpers;
+  landed atomically on root as c23833502, a669da35c, 99985af19, bf9e56d30
+  (T2), abdd80ce7 (T3 with the predicted Entry.pm conflict resolved by
+  deleting the legacy_edit branch), 087f8b2f8 (foreman: maintainer picker-key
+  subtest inverted for W4's relocated keys) and 508229ae9 (foreman: restores
+  t/entry-legacy-decoder.t, t/plack-entry-legacy-new-rerender.t,
+  t/entry-legacy-owned-edit-rerender.t per the reviewer). /update and
+  /editjournal?itemid now redirect GET to native and render old-schema POSTs
+  as a no-save carry-over (community custom security -> private with notice,
+  old friends -> access, logged-out edit keeps body with an edit-specific
+  duplicate-post notice, not-editable shows escaped content read-only,
+  usejournal/journal canonicalised before redirect). 36 legacy subs, 53 legacy
+  suites and 43 browser fixtures removed; decode_entry_form, prepare_entry_form,
+  formdata_from_legacy, legacy_new_rerender, legacy_owned_edit_rerender,
+  legacy_carryover_unrecoverable and legacy_preview_handler kept with
+  callers. Root validation: 30-file entry+inbox sweep 1132 PASS, tidy1107,
+  compile1603, build PASS: /tmp/bml-t2t3-integrated-*.log. Reviewer root
+  recheck of f89f4029c..508229ae9 requested. Orphan strings now:
+  views/editjournal.tt.text .success.editedstillsuspended (F2 cleanup).
+- (historical) T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
   (community custom-security carry-over fell back to public; logged-out or
   not-editable /editjournal carry-over lost the body) plus the condition that
   the 13 retired-route tests are deleted in the same landing; fix in progress
