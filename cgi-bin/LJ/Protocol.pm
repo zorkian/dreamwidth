@@ -14,6 +14,7 @@
 # part of this distribution.
 
 use strict;
+use DW::BML;
 use DW::Request;
 no warnings 'uninitialized';
 
@@ -2332,8 +2333,21 @@ sub getevents {
 
     my $reject_code = $LJ::DISABLE_PROTOCOL{getevents};
     if ( ref $reject_code eq "CODE" ) {
-        my $apache_r = eval { BML::get_request() };
-        my $errmsg   = $reject_code->( $req, $flags, $apache_r );
+
+        # Held external callback ABI (doc/BML-PROTOCOL-PAGESTATS.md): must
+        # keep receiving the same shape BML::get_request() (DW/BML.pm:
+        # 231-236) has always returned here. $Apache::BML::r is only ever
+        # locally set inside DW::BML::render (DW/BML.pm:633) and Apache::BML's
+        # retired mod_perl handler, neither reachable during a live Plack
+        # request (DW::BML::render 403s any _config.bml access before that
+        # point, and Apache::BML's own handler is unused under Plack), so in
+        # practice this was already always either a DW::BML::RequestAdapter
+        # over the current DW::Request, or undef.
+        my $apache_r = do {
+            my $r = eval { DW::Request->get };
+            $r ? DW::BML::RequestAdapter->new($r) : undef;
+        };
+        my $errmsg = $reject_code->( $req, $flags, $apache_r );
         if ($errmsg) { return fail( $err, "311", $errmsg ); }
     }
 
