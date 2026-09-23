@@ -820,6 +820,11 @@ sub legacy_update_readonly_get_handler {
         $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
     }
 
+    my $usejournal =
+        exists $opts{usejournal}
+        ? $opts{usejournal}
+        : LJ::canonical_username( $get->{usejournal} || '' );
+
     return legacy_update_get_render(
         remote        => $remote,
         get           => $prefill,

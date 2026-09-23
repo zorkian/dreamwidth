@@ -50,7 +50,6 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
             remote     => $u,
             get        => $get,
             datetime   => '2026-09-23 04:05',
-            usejournal => $u->user,
             action_url => '/entry/new?encoded=one%2Ftwo&repeated=first&repeated=second',
         );
         $r->status(200);
@@ -69,6 +68,11 @@ LJ::Hooks::are_hooks('update_fields');
             my ($get) = @_;
             ++$hook_calls;
             push @hook_refs, refaddr($get);
+            if ( $get->{case} && $get->{case} eq 'target' ) {
+                $get->{usejournal} = $u->user;
+                $get->{subject}    = 'hook must not replace the pre-hook snapshot';
+                return {};
+            }
             return { subject => 'hook subject', event => 'hook event', tags => 'hook tags' };
         }
     ];
@@ -77,14 +81,18 @@ LJ::Hooks::are_hooks('update_fields');
         my $send = shift;
         local $LJ::HELPURL{readonly} = 'https://help.example.invalid/readonly';
         my $res =
-            $send->( GET '/__readonly?subject=get&event=get&prop_taglist=get&encoded=one%2Ftwo' );
+            $send->( GET
+'/__readonly?case=target&usejournal=ignored&subject=get&event=get&prop_taglist=get&encoded=one%2Ftwo'
+            );
         is( $res->code, 200, 'readonly callable renders a real response' );
         my $f = form( $res->content );
         ok( $f, 'readonly callable renders the native entry form' )
             or BAIL_OUT('native form absent');
-        is( $f->value('subject'), 'hook subject', 'hook subject overrides prefill' );
-        is( $f->value('event'),   'hook event',   'hook event overrides prefill' );
-        is( $f->value('taglist'), 'hook tags',    'hook tag list overrides prefill' );
+        is( $f->value('subject'), 'get', 'pre-hook subject snapshot survives hook mutation' );
+        is( $f->value('event'),   'get', 'pre-hook event snapshot remains retained' );
+        is( $f->value('taglist'), 'get', 'pre-hook tag snapshot remains retained' );
+        is( $f->value('usejournal'),
+            $u->user, 'post-hook target mutation selects the retained journal' );
         is( $f->value('editor'), 'rte0', 'readonly form retains legacy rich editor mapping' );
         is( $f->value('entrytime_date'), '2026-09-23', 'readonly form retains supplied date' );
         is( $f->value('entrytime_time'), '04:05',      'readonly form retains supplied time' );
@@ -142,6 +150,8 @@ is_deeply(
     { subject => 'readonly draft subject', editor => 'markdown0' },
     'readonly rendering preserves draft properties'
 );
+is( $fresh->prop('entry_editor'),
+    'always_rich', 'readonly rendering preserves legacy editor preference' );
 is( $fresh->entry_editor2, 'markdown0', 'readonly rendering preserves native editor preference' );
 
 my $boundary = Plack::Middleware::DW::RequestWrapper->wrap(
