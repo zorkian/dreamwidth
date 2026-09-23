@@ -29,7 +29,13 @@ below this line predate the resume.
 - T1 native manager moderation 6648e8681 + correction e2b961a02 under review;
   a further test-only commit is required so the deletespam test stubs
   LJ::mark_entry_as_spam (a local spamreports write is a moderation side
-  effect; tests stay inert per user boundary).
+  effect; tests stay inert per user boundary). Reviewer mutation test showed
+  that with an inert stub only recorder call counts catch a removed guard, so
+  the stub commit must assert 0 calls for every denial case and exactly 1 for
+  the manager happy path. Disclosure: before the boundary was restated, one
+  reviewer probe and one run of the 6648 test each wrote a local spamreports
+  row for disposable fixtures in reviewer container 904e68156988; nothing
+  external; rows left in place.
 - T2 entry cutover (themenav) and W2 inbox cutover (widgets) in progress on
   bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
 - Obsolete preserved branches (not integrated): hook composition 5d282324c,
