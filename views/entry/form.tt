@@ -253,7 +253,7 @@ postFormInitData.strings = {
                 <li>
                 [%- form.submit(
                         value = dw.ml(action.edit ? '.button.edit.quick' : '.button.post.quick')
-                        name = submit_action_name
+                        name = submit_action_name || "action:post"
                         )
                 %]</li>[%- FOREACH level = security;
                         level.label = dw.ml( level.label );
@@ -399,7 +399,7 @@ postFormInitData.strings = {
         <div class="columns">
             <div class="button-bar">
                 [%- form.submit( value = dw.ml(action.edit ? '.button.edit' : '.button.post')
-                                 name = submit_action_name
+                                 name = submit_action_name || "action:post"
                                  class = "button left"
                                  )
                 -%]

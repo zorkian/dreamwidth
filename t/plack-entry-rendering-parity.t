@@ -71,6 +71,8 @@ qr/name=["']current_location["'][^>]*maxlength=["']80["']|maxlength=["']80["'][^
     my ($form) = grep { ( ( $_->attr('id') || '' ) eq 'js-post-entry' ) }
         HTML::Form->parse( $res->content, 'http://localhost' . $path );
     ok( $form, 'actual edit form parses' ) or return;
+    my @edit_posts = grep { ( $_->name || '' ) eq 'action:post' } $form->inputs;
+    is( scalar @edit_posts, 2, 'both native edit submit controls retain action:post' );
     $form->value( 'subject',        'Retained invalid title' );
     $form->value( 'event',          '' );
     $form->value( 'entrytime_date', 'not-a-date' );
