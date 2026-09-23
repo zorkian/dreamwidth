@@ -1791,7 +1791,11 @@ sub _edit {
 
             my %edit_res = _do_edit(
                 $ditemid,
-                { event  => '' },
+                {
+                    event     => '',
+                    security  => $entry->security,
+                    allowmask => $entry->allowmask,
+                },
                 { poster => $remote, journal => $journal },
                 warnings => $warnings,
             );

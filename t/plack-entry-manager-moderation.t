@@ -38,6 +38,14 @@ sub cookie_for {
         . $session->loggedin_cookie_string;
 }
 
+sub capture_warnings {
+    my ($code) = @_;
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+    my $result = $code->();
+    return ( \@warnings, $result );
+}
+
 sub maintainer_form {
     my ($content) = @_;
     return ( grep { $_->find_input('action:savemaintainer') }
@@ -50,11 +58,16 @@ my $poster = temp_user();
 $poster->update_self( { status => 'A' } );
 my $outsider = temp_user();
 $outsider->update_self( { status => 'A' } );
+my $member = temp_user();
+$member->update_self( { status => 'A' } );
 my $comm = temp_comm();
 LJ::set_rel( $comm, $manager, 'A' );
+LJ::set_rel( $comm, $member,  'P' );
 
 my $manager_cookie  = cookie_for($manager);
 my $outsider_cookie = cookie_for($outsider);
+my $member_cookie   = cookie_for($member);
+my $poster_cookie   = cookie_for($poster);
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'managerModeration';
 
 test_psgi $app, sub {
@@ -69,6 +82,27 @@ test_psgi $app, sub {
         my ($req) = @_;
         $req->header( Cookie => $outsider_cookie );
         return $send->($req);
+    };
+    my $as_member = sub {
+        my ($req) = @_;
+        $req->header( Cookie => $member_cookie );
+        return $send->($req);
+    };
+    my $as_poster = sub {
+        my ($req) = @_;
+        $req->header( Cookie => $poster_cookie );
+        return $send->($req);
+    };
+
+    # A valid CSRF token isn't tied to the page that issued it, only the
+    # session, so a token lifted from an unrelated page still isolates the
+    # authorization guards under test from the CSRF guard.
+    my $valid_token_for = sub {
+        my ($cb)   = @_;
+        my $res    = $cb->( GET '/entry/new' );
+        my ($form) = grep { $_->find_input('lj_form_auth') }
+            HTML::Form->parse( $res->content, 'http://localhost' );
+        return $form ? $form->value('lj_form_auth') : undef;
     };
 
     subtest 'manager deletes another poster entry through the maintainer form' => sub {
@@ -97,11 +131,13 @@ test_psgi $app, sub {
         # than being removed outright.
         $form->value( 'prop_opt_nocomments_maintainer', 1 );
         $form->action( 'http://localhost' . $url );
-        my $res = $as_manager->( $form->click('action:delete') );
+        my ( $warnings, $res ) =
+            capture_warnings( sub { $as_manager->( $form->click('action:delete') ) } );
         is( $res->code, 200,
             'manager delete POST returns the delete handler response, not a redirect' );
         ok( !$res->header('Location'),
             'manager delete response is not the savemaintainer redirect' );
+        is_deeply( $warnings, [], 'manager delete produces no warnings' );
         my $deleted = fresh_entry( $comm, $entry->ditemid );
         ok( !$deleted->valid, 'forced-fresh read proves the entry is actually deleted' );
     };
@@ -118,8 +154,10 @@ test_psgi $app, sub {
         ok( $form, 'maintainer form parses for spam-delete case' )
             or BAIL_OUT('maintainer form missing');
         $form->action( 'http://localhost' . $url );
-        my $res = $as_manager->( $form->click('action:deletespam') );
+        my ( $warnings, $res ) =
+            capture_warnings( sub { $as_manager->( $form->click('action:deletespam') ) } );
         is( $res->code, 200, 'manager delete-as-spam POST returns the delete handler response' );
+        is_deeply( $warnings, [], 'manager delete-as-spam produces no warnings' );
         my $deleted = fresh_entry( $comm, $entry->ditemid );
         ok( !$deleted->valid,
             'forced-fresh read proves the entry is deleted after delete-as-spam' );
@@ -160,7 +198,69 @@ test_psgi $app, sub {
             'Non-manager target body',
             'unauthorized attempt leaves the entry body unchanged'
         );
+
+        # A valid CSRF token alone must not be enough: these cases isolate the
+        # can_manage/editable_by/poster authorization guards themselves from
+        # the CSRF guard exercised above.
+        my $dbh        = LJ::get_db_writer();
+        my $spam_count = sub {
+            my ($count) = $dbh->selectrow_array(
+                'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
+                undef, $comm->userid, $poster->userid );
+            return $count;
+        };
+        my $before_spam_count = $spam_count->();
+
+        for my $case (
+            [ 'outsider',           $as_outsider, $outsider_cookie ],
+            [ 'non-manager member', $as_member,   $member_cookie ],
+            )
+        {
+            my ( $label, $as, $cookie ) = @$case;
+            my $token = $valid_token_for->($as);
+            ok( $token, "$label has a real CSRF token to attempt with" );
+
+            for my $action (qw(action:delete action:deletespam)) {
+                my $post_res =
+                    $as->( POST $url, Content => [ $action => 1, lj_form_auth => $token ] );
+                my $after = fresh_entry( $comm, $entry->ditemid );
+                ok( $after->valid,
+                    "$label with a VALID token and $action still cannot delete another poster entry"
+                );
+                is(
+                    $after->event_raw,
+                    'Non-manager target body',
+                    "$label with a VALID token and $action leaves the entry body unchanged"
+                );
+            }
+        }
+        is( $spam_count->(), $before_spam_count,
+            'no non-manager attempt, with any token, recorded a spamreports row' );
     };
+
+    subtest
+        'a non-manager poster sending delete-as-spam on their own entry records no spam report' =>
+        sub {
+        my $own_entry = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject => 'Poster own deletespam subject',
+            body    => 'Poster own deletespam body',
+        );
+        my $url   = '/entry/' . $comm->user . '/' . $own_entry->ditemid . '/edit';
+        my $token = $valid_token_for->($as_poster);
+        ok( $token, 'poster has a real CSRF token' );
+
+        my $dbh = LJ::get_db_writer();
+        my ($before) = $dbh->selectrow_array(
+            'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
+            undef, $comm->userid, $poster->userid );
+        $as_poster->( POST $url, Content => [ 'action:deletespam' => 1, lj_form_auth => $token ] );
+        my ($after) = $dbh->selectrow_array(
+            'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
+            undef, $comm->userid, $poster->userid );
+        is( $after, $before,
+            'a poster sending deletespam on their own entry records no spamreports row' );
+        };
 
     subtest 'a poster deleting their own community entry is unaffected' => sub {
         my $own_entry = $manager->t_post_fake_comm_entry(
