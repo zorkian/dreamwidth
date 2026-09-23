@@ -331,6 +331,45 @@ test_psgi $app, sub {
     is( $res->code, 200, 'itemless picker POST returns its selector result' );
     is_deeply( \@dispatch_order, [], 'itemless picker POST calls neither edit resolver' );
 
+    my $gated = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'gated old',
+        body     => 'gated body',
+        security => 'public'
+    );
+    my $gated_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $gated->ditemid;
+    for my $gate ( 'beta', 'readonly' ) {
+        my $guard = sub {
+            $post = POST $gated_path,
+                [
+                itemid        => $gated->ditemid,
+                usejournal    => $comm->user,
+                'action:save' => 'Save Changes',
+                lj_form_auth  => 'invalid-gate-token'
+                ];
+            $post->header( Cookie  => $cookie );
+            $post->header( Referer => "http://localhost$gated_path" );
+            $personal_calls = $community_calls = 0;
+            @dispatch_order = ();
+            $res            = $send->($post);
+            unlike( $res->content, qr{id="js-post-entry"}, "$gate gate remains BML-owned" );
+            is_deeply( \@dispatch_order, [qw(personal community)],
+                "$gate gate declines through both resolvers" );
+            is( fresh( $comm, $gated->ditemid )->subject_raw,
+                'gated old', "$gate gate leaves target unchanged" );
+        };
+        if ( $gate eq 'beta' ) {
+            local *LJ::BetaFeatures::user_in_beta = sub { 1 };
+            $guard->();
+        }
+        else {
+            my $is_readonly = \&LJ::User::is_readonly;
+            local *LJ::User::is_readonly =
+                sub { return 1 if $_[0]->equals($poster); return $is_readonly->(@_) };
+            $guard->();
+        }
+    }
+
     my $personal_entry = $poster->t_post_fake_entry(
         subject  => 'personal old',
         body     => 'personal body',
