@@ -17,5 +17,4 @@ die $@ unless ref $app eq 'CODE';
 
 # Plain application server: public routing owns same-poster community GET activation.
 
-
 Starman::Server->new->run( $app, { port => $port, host => '127.0.0.1', workers => 1 } );
