@@ -1,3 +1,24 @@
+## Manager final callable review and anonymous composition in progress
+
+Manager production82 and finite test correction66 are source/behavior clear;
+Sol independently ran94 assertions. Remaining reporter-stub safety fix is
+4c4313af47163f882b1d090c41b7e6df7f1d0b7f: count only, never delegate reporting,
+plus no hook calls after the direct unsupported-action loop. Worker95 PASS;
+Sol narrow recheck queued. Separate callable browser4a116591173b5ed43d8b2f166566b24ee38ace41
+has normal, named-failure and clean-EOF evidence; independent replay queued.
+The earlier browser cleanup hang has a submitted correction, not yet accepted.
+
+Themes prepares the finite public property-only dispatch on an isolated branch;
+activation stays uncommitted pending callable/browser clearance. GET and manager
+delete/report surfaces stay retained. No valid delete/report action is authorized
+in this package. Public finite matrix is BML-MANAGER-PROPERTY-PUBLIC-POST.md.
+
+Widgets continues uncommitted successful-password anonymous owner POST composition.
+Current focused WIP has60 passing assertions, but source/acceptance review remains
+pending. Initial invalid GET target ordering and protocol-login failure scope were
+flagged for the worker; do not integrate WIP or activate anonymous routes.
+Root53c3ccf37 has no active validation processes. Existing accepted gates stay closed.
+
 ## Anonymous retry prerequisite accepted
 
 Sol dc7db44d222c928cffe7d418a3447560a9f60fac CLEAR; integratedf26b50442.

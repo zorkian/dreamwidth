@@ -2260,3 +2260,11 @@ preservation are now nonvacuously characterized. No native POST route is activat
 Sol dc7 CLEAR, integratedf26b50442. Foreman three renderer suites78 PASS. Explicit
 anonymous username retention preserves native hidden/visible controls and blank
 passwords without adding authentication, saves, hooks or route registration.
+
+### Manager callable final corrections under review
+
+Sol66 independently passed94 assertions and cleared the original finite gaps.
+Tiny test-only4c replaces the report delegate with a zero-effect counter and adds
+post-loop no-hook proof (worker95 PASS). Callable browser4a has worker normal,
+named-failure and clean-EOF passes. Both immutable commits are queued for Sol;
+public activation remains uncommitted while its finite matrix is prepared.
