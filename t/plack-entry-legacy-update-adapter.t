@@ -877,4 +877,43 @@ for my $token_case ( [ missing => undef ], [ invalid => 'not-a-token' ] ) {
     like($res->content,qr/(?:Invalid form submission|invalid form)/i,"$label spellcheck token visibly errors");
 }
 
+
+
+# Ordinary absent controls inherit only retained GET defaults; explicit empties
+# deliberately override them. Use showform so this remains nonpersisting.
+for my $case ( [ absent => 0 ], [ empty => 1 ] ) {
+    my ($label,$empty)=@$case;
+    my $path='/update?subject=GET-subject&event=GET-body&prop_taglist=GET-tag&prop_current_location=GET-location';
+    my @f=(showform=>1,lj_form_auth=>$valid_form_auth,security=>'public');
+    push @f,(subject=>'',event=>'',prop_taglist=>'') if $empty;
+    my $req=POST($path,\@f); $req->header(Referer=>'http://localhost/update');
+    my $res; test_psgi $adapter_app,sub{$res=shift->($req);};
+    my $form=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($res->content,'http://localhost/entry/new'))[0];
+    ok($form,"$label ordinary rerender parses");
+    is($form->value('subject'),$empty?'':'GET-subject',"$label subject retention");
+    is($form->value('event'),$empty?'':'GET-body',"$label body retention");
+    is($form->value('taglist'),$empty?'':'GET-tag',"$label tag retention");
+    is($form->value('current_location'),'',"$label ignores arbitrary GET metadata");
+}
+
+
+
+{ package LegacyTransformFixture::Account; sub new { my $class = shift; bless {@_}, $class } sub acctid { $_[0]{id} } sub displayname { $_[0]{name} } sub password { $_[0]{password} } sub xpostbydefault { $_[0]{default} } }
+
+# Transform xpost controls retain truthy GET fallback when the submitted
+# legacy selection/credential is explicitly empty.
+my @xpost_accounts=(LegacyTransformFixture::Account->new(id=>41,name=>'Rendered account',password=>'',default=>0));
+my $xpost_path='/update?subject=GET&event=GET&prop_xpost_check=1&prop_xpost_41=1&prop_xpost_password_41=GET-secret';
+my $xpost_req=POST($xpost_path,[transform=>'xpostfallback',lj_form_auth=>$valid_form_auth,subject=>'POST',event=>'POST',prop_xpost_check=>'',prop_xpost_41=>'',prop_xpost_password_41=>'']);
+$xpost_req->header(Referer=>'http://localhost/update');
+my $xpost_res;
+my $prepared_xpost;
+{ no warnings 'redefine'; local *DW::External::Account::get_external_accounts=sub { @xpost_accounts }; my $orig_prepare=\&DW::Entry::Legacy::prepare_rerender_entry_form; local *DW::Entry::Legacy::prepare_rerender_entry_form=sub { my $prepared=$orig_prepare->(@_); $prepared_xpost=$prepared; return $prepared; }; my $rh=\&LJ::Hooks::run_hooks; local *LJ::Hooks::run_hooks=sub { my($n,@a)=@_; return if $n eq 'transform_update_xpostfallback'; return $rh->($n,@a); }; test_psgi $adapter_app,sub{$xpost_res=shift->($xpost_req);}; }
+my $xpost_form=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($xpost_res->content,'http://localhost/entry/new'))[0];
+ok($xpost_form,'transform empty-xpost fallback rerender parses');
+is($xpost_form->value('crosspost_entry'),1,'empty transform xpost master inherits GET selection');
+my @xpost_passwords=map { $_->value } grep {($_->name||'') eq 'crosspost_password_41'} $xpost_form->inputs;
+is($prepared_xpost->{canonical}{crosspost}{41}{password},'GET-secret','empty transform xpost credential inherits GET value before native rendering');
+is($xpost_passwords[0],'','native crosspost password control deliberately does not reflect a secret');
+
 done_testing;
