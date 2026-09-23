@@ -234,11 +234,11 @@ postFormInitData.strings = {
                     placeholder = dw.ml(".event.placeholder")
                 ) -%]
                 <div class="entry-image-insert" data-image-insert hidden>
-                    <label for="entry-image-url">[% dw.ml('/imgupload.bml.insertimage.url') %]</label>
+                    <label for="entry-image-url">[% dw.ml('.insertimage.url') %]</label>
                     <input id="entry-image-url" type="text" inputmode="url">
-                    <label for="entry-image-alt">[% dw.ml('/imgupload.bml.insertimage.alt.label') %]</label>
+                    <label for="entry-image-alt">[% dw.ml('.insertimage.alt.label') %]</label>
                     <input id="entry-image-alt" type="text">
-                    <small>[% dw.ml('/imgupload.bml.insertimage.alt.body') %] [% image_alt_faq %].</small>
+                    <small>[% dw.ml('.insertimage.alt.body') %] [% image_alt_faq %].</small>
                     <button type="button" data-image-insert-confirm>[% dw.ml('.image.insert') %]</button>
                     <button type="button" data-image-insert-cancel>[% dw.ml('.image.cancel') %]</button>
                 </div>

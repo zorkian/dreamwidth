@@ -39,7 +39,7 @@ sub dialog_handler {
     my $r   = $rv->{r};
     my $get = $r->get_args;
 
-    my $label = LJ::Lang::ml('/imgupload.bml.insertimage.alt.faqlink');
+    my $label = LJ::Lang::ml('/entry/image-dialog.tt.insertimage.alt.faqlink');
     $rv->{faq} = LJ::Hooks::run_hook( 'faqlink', 'alttext', $label ) || $label;
 
     # The old dialog assigns window.onload repeatedly, retaining the final upload.

@@ -5451,6 +5451,8 @@ widget.themenav.switchtos1=Switch to old style system (S1)
 
 widget.themenav.title2=Select a New Theme
 
+widget.userpicselector.link.view_thumbnails=View Thumbnails
+
 widget.usertagcloud.title=Tag Cloud
 
 xpost.delete.error=Error deleting crossposted entry at [[username]]@[[server]]:  [[error]]

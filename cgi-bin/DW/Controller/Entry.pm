@@ -1625,8 +1625,8 @@ sub _init {
     $vars = {
         remote        => $u,
         image_alt_faq => LJ::Hooks::run_hook( 'faqlink', 'alttext',
-            LJ::Lang::ml('/imgupload.bml.insertimage.alt.faqlink') )
-            || LJ::Lang::ml('/imgupload.bml.insertimage.alt.faqlink'),
+            LJ::Lang::ml('/entry/form.tt.insertimage.alt.faqlink') )
+            || LJ::Lang::ml('/entry/form.tt.insertimage.alt.faqlink'),
 
         moodtheme => \%moodtheme,
         moods     => \@moodlist,
@@ -2570,7 +2570,7 @@ sub _do_edit {
         $opts{legacy_edit_deleted_extras} = LJ::Hooks::run_hook('entry_deleted_page_extras');
     }
     elsif ( $legacy_edit && $legacy_edit->{entry_was_suspended} ) {
-        $warnings->add( undef, '/editjournal.bml.success.editedstillsuspended' );
+        $warnings->add( undef, '/editjournal.tt.success.editedstillsuspended' );
     }
 
     my $poststatus = {
@@ -2760,7 +2760,7 @@ sub _render_preview {
     my ( $r, $u, $up, $form_req, %opts ) = @_;
     my $styleid;
     my $siteskinned   = 1;
-    my $preview_scope = $opts{legacy} ? '/preview/entry.bml' : '/entry/preview.tt';
+    my $preview_scope = $opts{legacy} ? $opts{ml_scope} : '/entry/preview.tt';
 
     # check for spam domains
     LJ::Hooks::run_hooks( 'spam_check', $up, $form_req, 'entry' ) unless $opts{legacy};
@@ -3096,7 +3096,7 @@ sub legacy_preview_handler {
             opt_noemail      => $legacy{prop_opt_noemail},
         },
     };
-    return _render_preview( $r, $u, $up, $form_req, legacy => 1 );
+    return _render_preview( $r, $u, $up, $form_req, legacy => 1, ml_scope => '/preview/entry.bml' );
 }
 
 =head2 C<< DW::Controller::Entry::options_handler( ) >>

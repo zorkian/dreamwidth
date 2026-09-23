@@ -123,7 +123,7 @@ sub render_body {
 
         my $viewthumbnails_link = '';
         if ( $opts->{entry_js} ) {
-            my $thumbnail_text = LJ::Lang::ml('/update.bml.link.view_thumbnails');
+            my $thumbnail_text = LJ::Lang::ml('widget.userpicselector.link.view_thumbnails');
             $viewthumbnails_link = qq {
                 var ml = new Object();
                 ml.viewthumbnails_link = "$thumbnail_text";

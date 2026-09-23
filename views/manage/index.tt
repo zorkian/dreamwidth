@@ -193,7 +193,7 @@ UNLESS u.is_identity; entryitems.unshift(
   {
     href = dw.create_url( '/editjournal', args => { usejournal => u.user } )
     title = dw.ml( '.entries.edit.about' )
-    text = dw.ml( '/editjournal.bml.title' )
+    text = dw.ml( '/editjournal.tt.title' )
   } ); END;
 
 IF use_tags && ! u.is_identity; entryitems.push(

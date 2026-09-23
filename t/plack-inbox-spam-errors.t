@@ -59,6 +59,11 @@ sub ban_calls_for {
         grep { $_->[0] == $owner->userid && $_->[1] == $target->userid && $_->[2] eq 'B' } @$calls;
 }
 
+sub ban_log_calls_for {
+    my ( $calls, $target ) = @_;
+    return grep { $_->[0] == $target->userid } @$calls;
+}
+
 test_psgi $app, sub {
     my $send = shift;
     my $cb   = sub {
@@ -67,12 +72,19 @@ test_psgi $app, sub {
         return $send->($request);
     };
 
-    # A user ban is a moderation action like a spam report: stub it as an
-    # inert recorder and assert call count/args, not real relationship state,
-    # so this test never actually bans a disposable fixture user.
+    # A user ban is a moderation action like a spam report: stub both the
+    # relationship write and the userlog event as inert recorders and assert
+    # call count/args, not real relationship/log state, so this test never
+    # actually bans or logs against a disposable fixture user.
     my @ban_calls;
+    my @ban_log_calls;
     no warnings 'redefine';
-    local *LJ::set_rel = sub { push @ban_calls, [@_]; return 1; };
+    local *LJ::set_rel         = sub { push @ban_calls, [@_]; return 1; };
+    local *LJ::User::log_event = sub {
+        my ( $u, $evt, $args ) = @_;
+        push @ban_log_calls, [ $args->{actiontarget}, $evt ] if $evt eq 'ban_set';
+        return 1;
+    };
 
     for my $case ( [ 'neither', 0, 0 ], [ 'spam', 1, 0 ], [ 'ban', 0, 1 ], [ 'both', 1, 1 ], ) {
         my ( $name, $spam, $ban ) = @$case;
@@ -110,12 +122,16 @@ test_psgi $app, sub {
             ok( !$response->header('Location'), 'neither action does not redirect away its error' );
             is( $report_calls, 0, 'neither action does not report spam' );
             is( scalar ban_calls_for( \@ban_calls, $sender ), 0, 'neither action does not ban' );
+            is( scalar ban_log_calls_for( \@ban_log_calls, $sender ),
+                0, 'neither action does not log a ban event' );
         }
         else {
             is( $response->code, 303,   "$name selected action redirects to inbox" );
             is( $report_calls,   $spam, "$name calls reporting exactly when spam is selected" );
             is( scalar ban_calls_for( \@ban_calls, $sender ),
                 $ban, "$name calls the ban action exactly when its own choice selects it" );
+            is( scalar ban_log_calls_for( \@ban_log_calls, $sender ),
+                $ban, "$name logs a ban_set event exactly when its own choice selects it" );
         }
         ok( fresh_message($msg)->valid, "$name leaves the original message available" );
     }

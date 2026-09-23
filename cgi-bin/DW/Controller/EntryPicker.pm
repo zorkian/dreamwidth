@@ -66,7 +66,7 @@ sub entry_picker_handler {
     my $journal = $u;
     if ($usejournal) {
         $journal = LJ::load_user($usejournal);
-        return error_ml('/editjournal.bml.error.nocomm') unless $journal && $journal->is_comm;
+        return error_ml('/editjournal.tt.error.nocomm') unless $journal && $journal->is_comm;
     }
 
     my %context;
@@ -113,7 +113,7 @@ sub entry_picker_handler {
                 usejournal => $usejournal || '',
             },
         },
-        { ml_scope => '/editjournal.bml' }
+        { ml_scope => '/editjournal.tt' }
     );
 }
 
@@ -134,11 +134,11 @@ sub _select_entries {
         $selector{selecttype} = 'day';
     }
     else {
-        return error_ml('/editjournal.bml.error.getting');
+        return error_ml('/editjournal.tt.error.getting');
     }
 
     my ( $entries, $res ) = _get_entries( $u, $journal, $usejournal, \%selector, $rv->{remote} );
-    return error_ml('/editjournal.bml.error.getting') unless $res->{success} eq 'OK';
+    return error_ml('/editjournal.tt.error.getting') unless $res->{success} eq 'OK';
 
     if ( $res->{events_count} == 1 ) {
         my $ditemid = ( $res->{events_1_itemid} << 8 ) + $res->{events_1_anum};
@@ -168,7 +168,7 @@ sub _select_entries {
                     usejournal => $usejournal || '',
                 },
             },
-            { ml_scope => '/editjournal.bml' }
+            { ml_scope => '/editjournal.tt' }
         );
     }
 
@@ -188,7 +188,7 @@ sub _select_entries {
                 usejournal => $usejournal || '',
             },
         },
-        { ml_scope => '/editjournal.bml' }
+        { ml_scope => '/editjournal.tt' }
     );
 }
 

@@ -1,7 +1,4 @@
 ;; -*- coding: utf-8 -*-
-;; The native picker deliberately uses /editjournal.bml translation keys while
-;; the retained itemid editor remains a BML consumer; this copied TT source is
-;; not the active lookup scope.
 
 .btn.proceed=Proceed
 
@@ -30,6 +27,8 @@
 .recententries=Most recent entries
 
 .recententry=Most recent entry
+
+.success.editedstillsuspended=Please note that your entry is still suspended.
 
 .title=Edit Entries
 

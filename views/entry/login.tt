@@ -17,13 +17,13 @@ the same terms as Perl itself.  For a copy of the license, please reference
 [%- IF legacy_altlogin -%]
 <fieldset id="altlogin_wrapper" class="legacy-altlogin-auth">
     [%- form.textbox(
-        label = dw.ml( "/update.bml.username" )
+        label = dw.ml( ".username" )
         name = "user"
         id = "altlogin_username"
         value = legacy_altlogin.username
     ) -%]
     [%- form.password(
-        label = dw.ml( "/update.bml.password" )
+        label = dw.ml( ".password" )
         name = "password"
         id = "altlogin_password"
         value = ""

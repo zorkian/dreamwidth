@@ -355,7 +355,11 @@ qr{^http://localhost/entry/\Q@{[$comm->user]}\E/\Q@{[$own_entry->ditemid]}\E/edi
     }
 };
 
-subtest 'picker retains legacy language keys with a request getter' => sub {
+subtest 'picker resolves its own native language keys with a request getter' => sub {
+
+    # The picker resolves through its own native /editjournal.tt scope,
+    # distinct from the /editjournal.bml scope the retained itemid editor
+    # still uses; same English text, separate key homes.
     no warnings 'redefine';
     local *LJ::Lang::get_text = sub {
         my ( $lang, $code ) = @_;
@@ -367,17 +371,17 @@ subtest 'picker retains legacy language keys with a request getter' => sub {
         my $res = $cb->( GET '/editjournal' );
         like(
             $res->content,
-            qr/picker-legacy-key:\/editjournal\.bml\.title/,
-            'normal picker render resolves its title through the retained BML key'
+            qr/picker-legacy-key:\/editjournal\.tt\.title/,
+            'normal picker render resolves its title through its own native key'
         );
         $res = $cb->( GET '/editjournal?usejournal=' . $outsider->user );
         like(
             $res->content,
-            qr/picker-legacy-key:\/editjournal\.bml\.error\.nocomm/,
-            'picker error response resolves through the retained BML error key'
+            qr/picker-legacy-key:\/editjournal\.tt\.error\.nocomm/,
+            'picker error response resolves through its own native error key'
         );
-        unlike( $res->content, qr/editjournal\.tt\.error\./,
-            'error response never asks the getter for a template filename key' );
+        unlike( $res->content, qr/editjournal\.bml\.error\./,
+            'error response never asks the getter for the retired BML scope' );
     };
 };
 
