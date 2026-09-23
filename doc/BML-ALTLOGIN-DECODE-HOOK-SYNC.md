@@ -2,6 +2,22 @@
 
 Source checkpoint: `03fb92456`. This is a source-only design. It adds no route, auth, request, hook execution, save, or deployment-interface decision.
 
+## Current disposition after characterization and pure delta review
+
+The known-field-only synchronization proposal below is historical and is not
+an implementation contract. Accepted characterization `37e6fb87` proves that
+arbitrary second-argument top-level and `prop_*` additions, changes, and deletions
+reach canonical data. Accepted unused helper `05d595f1` preserves those observed
+deltas while retaining canonical-only properties absent from both snapshots.
+Do not add a known-field filter that silently discards extension mutations.
+
+A future caller must capture deeply independent, serializable before/after
+snapshots to use that helper. Scalar-only or shared-reference snapshots cannot
+prove nested mutation history. Native editor/date trust reconciliation and the
+purpose-shaped raw first argument remain separate composition prerequisites;
+the unused mapper and delta helper do not themselves invoke a hook or authorize
+public activation. The earlier field table remains useful as an inventory only.
+
 ## Existing ABI and invariant
 
 `DW::Entry::Legacy::decode_entry_form` runs `decode_entry_form($raw_post, $decoded_request)` only after it has decoded the retained form. The first argument is the old form-shaped input. The second argument is the mutable flat protocol request; that same flat reference later reaches retained spam and success hooks. Mutating the first argument after decode has no automatic persistence effect.
