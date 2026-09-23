@@ -50,7 +50,11 @@ below this line predate the resume.
   303, and a stale compose tab now sends). Root seven suites 270 PASS; logs
   /tmp/bml-inbox-cutover-integrated-*.log. Non-blocking items (old .bml
   variants not canonicalized, /inbox/new/ trailing-slash POST, inert user-ban
-  stub in spam-errors test, orphan .beta.on) folded into W3.
+  stub in spam-errors test, orphan .beta.on) folded into W3. Foreman visual
+  check on root: GET /inbox/ as a seeded user renders the native page at 1280
+  and 390 (captures in doc/bml-evidence/2026-09-23/inbox-native-cutover);
+  anonymous /inbox/ and /inbox/new redirect to login. Full tidy/compile PASS
+  for the integration.
 - T2 entry cutover (themenav, rebasing/squashing onto root) and W3 inbox legacy
   removal (widgets) in progress on
   bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
