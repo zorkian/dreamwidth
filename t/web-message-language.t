@@ -132,23 +132,6 @@ subtest 'debug preserves full global keys without a getter' => sub {
     );
 };
 
-subtest 'bad_input retains legacy error-object behavior without a heading lookup' => sub {
-    my @calls;
-    request();
-    native_context( 'BAD', \@calls );
-    my $nested = LJ::errobj( 'Multiple',
-        errors => [ LJ::errobj('nested error one'), LJ::errobj('nested error two') ], );
-    my $html = LJ::bad_input( 'plain error', $nested );
-    like( $html, qr/\A<\?badcontent\?>/, 'bad_input retains its legacy processing token' );
-    like( $html, qr/plain error/,        'bad_input retains the supplied plain error bullet' );
-    like(
-        $html,
-        qr/nested error one.*nested error two/s,
-        'bad_input retains nested/multiple error bullets'
-    );
-    is_deeply( \@calls, [], 'bad_input does not look up either migrated heading' );
-};
-
 subtest 'actual entry_form reaches the native error heading once' => sub {
     my $user = temp_user();
     $user->update_self( { status => 'A' } );

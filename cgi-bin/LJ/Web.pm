@@ -251,25 +251,20 @@ sub make_authas_select {
 
 # <LJFUNC>
 # name: LJ::help_icon
-# des: Returns BML to show a help link/icon given a help topic, or nothing
+# des: Returns HTML to show a help link/icon given a help topic, or nothing
 #      if the site hasn't defined a URL for that topic.  Optional arguments
-#      include HTML/BML to place before and after the link/icon, should it
+#      include HTML to place before and after the link/icon, should it
 #      be returned.
 # args: topic, pre?, post?
 # des-topic: Help topic key.
 #            See etc/config-local.pl, or [special[helpurls]] for examples.
-# des-pre: HTML/BML to place before the help icon.
-# des-post: HTML/BML to place after the help icon.
+# des-pre: HTML to place before the help icon.
+# des-post: HTML to place after the help icon.
 # </LJFUNC>
 sub help_icon {
-    my $topic = shift;
-    my $pre   = shift;
-    my $post  = shift;
-    return "" unless ( defined $LJ::HELPURL{$topic} );
-    return "$pre<?help $LJ::HELPURL{$topic} help?>$post";
+    return help_icon_html(@_);
 }
 
-# like help_icon, but no BML.
 sub help_icon_html {
     my $topic = shift;
     my $url   = $LJ::HELPURL{$topic} or return "";
@@ -279,26 +274,6 @@ sub help_icon_html {
           "$pre<a href=\"$url\" class=\"helplink\" target=\"_blank\">"
         . LJ::img( 'help', '' )
         . "</a>$post";
-}
-
-# <LJFUNC>
-# name: LJ::bad_input
-# des: Returns common BML for reporting form validation errors in
-#      a bulleted list.
-# returns: BML showing errors.
-# args: error*
-# des-error: A list of errors
-# </LJFUNC>
-sub bad_input {
-    my @errors = @_;
-    my $ret    = "";
-    $ret .= "<?badcontent?>\n<ul>\n";
-    foreach my $ei (@errors) {
-        my $err = LJ::errobj($ei) or next;
-        $ret .= $err->as_bullets;
-    }
-    $ret .= "</ul>\n";
-    return $ret;
 }
 
 # <LJFUNC>
