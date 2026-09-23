@@ -146,12 +146,15 @@ test_psgi $app, sub {
     );
 };
 
-# --- /entry/preview: native previews resolve through /entry/preview.tt;
-# legacy previews (via legacy_preview_handler) keep resolving through the
-# retained /preview/entry.bml scope, since that page still exists. Both
-# scopes carry byte-identical English text. preview_handler needs a real
-# style/request context this test does not build; asserting the exact
-# fully-qualified keys it uses resolve correctly is equivalent and direct. ---
+# --- /entry/preview: preview_handler/_render_preview are fully native (F2
+# deleted legacy_preview_handler and the /preview/entry.bml route along with
+# it), resolving both keys under /entry/preview.tt --
+# .entry.preview_warn_text via a direct LJ::Lang::ml() call
+# (Entry.pm's _render_preview), .title via the template's own relative
+# resolution (views/entry/preview.tt's sections.windowtitle). preview_handler
+# needs a real style/request context this test does not build; asserting the
+# exact fully-qualified keys it uses resolve correctly is equivalent and
+# direct. ---
 {
     is(
         LJ::Lang::ml('/entry/preview.tt.title'),
@@ -167,10 +170,10 @@ test_psgi $app, sub {
 
 # --- The no-JS altlogin credential branch of views/entry/login.tt (its
 # .username/.password strings, relocated from /update.bml.*) has no
-# reachable native caller today (legacy_update_altlogin_get_handler is a
-# retiring legacy_* seam, and T2's carry-over handler explicitly passes no
-# legacy_altlogin). Render the template directly to prove the relocation
-# itself is correct, without claiming any live route exercises it. ---
+# reachable native caller at all (legacy_update_altlogin_get_handler, its
+# only caller, is gone along with the rest of F2's deletions). Render the
+# template directly to prove the relocation itself is correct, without
+# claiming any live route exercises it. ---
 {
     my $html = DW::Template->template_string( 'entry/login.tt',
         { legacy_altlogin => { username => 'relocationtestuser' }, remote => $u } );
@@ -179,12 +182,12 @@ test_psgi $app, sub {
     like( $html, qr/Password:/,     'relocated .password text renders in the altlogin branch' );
 }
 
-# --- LJ::Widget::UserpicSelector's entry_js branch (its
-# .link.view_thumbnails string, relocated from /update.bml.* to the global
-# bin/upgrading/en.dat scope). Its only current caller, LJ::entry_form, is
-# itself a retiring legacy helper (F2's deletion list); asserting the exact
-# key it calls resolves correctly is direct and avoids needing to reproduce
-# LJ::entry_form's own full request/output-parameter calling convention. ---
+# --- widget.userpicselector.link.view_thumbnails (relocated from
+# /update.bml.* to the global bin/upgrading/en.dat scope) has no caller at
+# all now: LJ::Widget::UserpicSelector and its only caller, LJ::entry_form,
+# are both gone (F2's deletions). Asserting the key still resolves to its
+# exact English text is a residual snapshot of the relocation, not a claim
+# that anything currently reads it. ---
 is(
     LJ::Lang::ml('widget.userpicselector.link.view_thumbnails'),
     'View Thumbnails',
