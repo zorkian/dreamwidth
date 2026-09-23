@@ -2034,3 +2034,14 @@ local routing restoration,493 HTTP and normal/named-failure browser PASS.
 Integratedfa4e13737. Foreman combined four affected/nativeGET suites493 PASS in
 /tmp/bml-owned-get-fixture-integrated.log. Public owned GET activation remains
 separate active work. Update GET browserb2 remains under independent replay.
+
+### Public personal-owned GET and renderer extraction accepted
+
+Sol e16 and727 CLEAR; integratedb92d6bd49/5c91b54a2. Maintainer template call
+extraction preserves direct native behavior and supports explicit canonical
+form action. The public item-bearing GET branch now invokes the cleared narrow
+personal-owner renderer; excluded requests retain BML, POST remains unchanged.
+Foreman five focused suites571 PASS. Update GET browser dc3/b2 separately
+accepted and integrated6e1a52ac1/009a844b8, real foreman replay PASS; desktop and
+390px evidence preserved under legacy-update-get. Public update GET remains
+separate. Next: community callable GET and retained update-form test composition.

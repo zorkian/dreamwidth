@@ -1,3 +1,20 @@
+## Latest accepted GET integrations
+
+Update GET callable browser dc3/b2 independently CLEAR, integrated6e1a52ac1/
+009a844b8. Foreman actual browser PASS; no fixture/server remains. Desktop and
+390px captures preserved under doc/bml-evidence/2026-09-23/legacy-update-get.
+Maintainer renderer extractione16 CLEAR, integratedb92d6bd49. Public personal
+owned GET activation727 CLEAR, integrated5c91b54a2: actual app GET now uses the
+accepted narrow native renderer, while excluded contexts retain BML and POST
+is unchanged. Foreman five focused suites571 PASS in
+/tmp/bml-owned-get-public-integrated.log. Formatting/compile run92196 pending.
+
+Active: Widgets callable-only community GET atop e16; Themes test-only retained
+update-form prerequisite per /tmp/bml-update-get-activation-tests.md, then
+separate public update GET activation. Sol audits remaining ordinary update GET
+rendering fallbacks while these implementations proceed. External Journal hook
+decision and held restrictions remain unchanged. No push or deployment.
+
 ## Latest fixture prerequisite integration
 
 Sol860303fd independently clear, integratedfa4e13737. Foreman493 HTTP PASS in
