@@ -1,3 +1,28 @@
+## Current review queue and active work
+
+Root HEAD before this ledger update3a7088a5c; code throughd77e85b20 is accepted,
+combined4files302/tidy1128/compile1607 PASS; all root sessions complete.
+
+1. Sol reviews fixture prerequisite860303fd978b16ca063bf994a0a9162dce284576:
+   scoped retained BML GET / captured production POST helper, affected legacy
+   HTTP suites+unchanged callable GET and retained browser normal/intentional
+   pass, full tidy/compile pass. Not integrated yet.
+2. Sol then reviews update GET browserdc3a781bd..b2c2da7cb7f46f7e8143cdbd5ed691af236bab2f
+   with ec6 correction cherry-picked asf7f3f687b. Final empty-first-draft,
+   implemented seed_draft protocol and modal ordering fix normal0/namedfailure1,
+   no helper. Narrow capture visually shows RTE/prefill and fitting controls.
+   Not integrated yet; earlier dc3 failures are preserved historical WIP.
+3. Themes continues separate public personal-owned GET activation atop860;
+   legacy fixture overlay remains confined to old-schema tests, public native
+   GET tests/browser must use actual app without overlay. Sol/browser gate03362
+   already clear. No BML deletion or push.
+4. Widgets starts callable-only community GET per BML-COMMUNITY-EDIT-GET.md on
+   a new branch from3a7088a5c: ordinary same-poster edit and existing property-only
+   maintainer render; no POST/policy/deletespam/public activation change.
+
+The browser timeout previously attributed to FCK was a harness/fixture mismatch,
+now corrected inb2. Held inbox and external Journal hook questions remain held.
+
 ## Latest: callable update GET wrapper integrated
 
 Sol final a349/7aa/ec6 CLEAR after the actual default-only crosspost map and
