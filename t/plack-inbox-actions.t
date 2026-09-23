@@ -115,8 +115,11 @@ test_psgi $app, sub {
     $data = from_json( $res->content );
     ok( $data->{success}, 'a real view request still succeeds' );
 
-    # --- Item 6: /__rpc_esn_inbox requires lj_form_auth for every mutating
-    # mode, but not for the unauthenticated nav-count poll. ---
+    # --- W3: /__rpc_esn_inbox no longer has any mutating mode at all (they
+    # were esn_inbox.js's, and esn_inbox.js is deleted with the legacy inbox
+    # pages it belonged to). Only the unauthenticated nav-count poll remains;
+    # every other action name -- including the old mutating ones -- is
+    # rejected regardless of whether a valid token is supplied. ---
 
     my $esn_res = $cb->( POST '/__rpc_esn_inbox', Content => [ action => 'get_unread_items' ], );
     is( $esn_res->code, 200, 'get_unread_items returns HTTP 200 with no token' );
@@ -124,30 +127,21 @@ test_psgi $app, sub {
     ok( !$esn_data->{error},              'get_unread_items succeeds unauthenticated' );
     ok( exists $esn_data->{unread_count}, 'get_unread_items reports an unread count' );
 
-    for my $bad_token ( undef, 'invalid-token' ) {
-        my @payload = ( action => 'mark_all_read', cur_folder => 'all' );
-        push @payload, lj_form_auth => $bad_token if defined $bad_token;
-        my $bad_res = $cb->( POST '/__rpc_esn_inbox', Content => \@payload );
-        is( $bad_res->code, 200, 'mutating call without a valid token still returns HTTP 200' );
-        my $bad_data = from_json( $bad_res->content );
-        ok( $bad_data->{error}, 'mutating call without a valid token is rejected' );
+    for my $case (
+        [ 'mark_all_read',           undef ],
+        [ 'mark_all_read',           $token ],
+        [ 'toggle_bookmark',         $token ],
+        [ 'set_default_expand_prop', $token ],
+        )
+    {
+        my ( $removed_action, $maybe_token ) = @$case;
+        my @payload = ( action => $removed_action, cur_folder => 'all' );
+        push @payload, lj_form_auth => $maybe_token if defined $maybe_token;
+        my $res = $cb->( POST '/__rpc_esn_inbox', Content => \@payload );
+        is( $res->code, 200, "removed action $removed_action still returns HTTP 200" );
+        my $data = from_json( $res->content );
+        ok( $data->{error}, "removed action $removed_action is rejected regardless of a token" );
     }
-
-    # The item 1 tests above used delete_all and cleared the inbox; seed a
-    # fresh item to verify the item 6 CSRF-gated mutation actually happens.
-    $inbox->enqueue( event => LJ::Event::AddedToCircle->new( $u2, $u, 2 ) );
-    is( $u->notification_inbox->unread_count,
-        1, 'seeded item is unread before the authenticated mutating call' );
-
-    my $good_res = $cb->(
-        POST '/__rpc_esn_inbox',
-        Content => [ action => 'mark_all_read', cur_folder => 'all', lj_form_auth => $token ],
-    );
-    is( $good_res->code, 200, 'mutating call with a valid token returns HTTP 200' );
-    my $good_data = from_json( $good_res->content );
-    ok( !$good_data->{error}, 'mutating call with a valid token is accepted' );
-    is( $u->notification_inbox->unread_count,
-        0, 'mutating call with a valid token actually performed the mutation' );
 };
 
 done_testing;

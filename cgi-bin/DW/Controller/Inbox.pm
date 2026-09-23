@@ -40,9 +40,31 @@ DW::Routing->register_string( '/inbox/markspam', \&markspam_handler, app => 1 );
 # a GET there still redirects to the canonical URL (see _redirect_old_get
 # below), but a POST must never hit a redirect, since a 303/302 turns a
 # browser's POST into a bodyless GET and silently discards the submission.
-DW::Routing->register_string( '/inbox/new',          \&index_handler,    app => 1 );
-DW::Routing->register_string( '/inbox/new/compose',  \&compose_handler,  app => 1 );
-DW::Routing->register_string( '/inbox/new/markspam', \&markspam_handler, app => 1 );
+# The trailing-slash form is registered explicitly with no_redirects too,
+# since register_string's own default page/ -> page redirect is just as
+# body-dropping for a POST as the register_redirect it replaces.
+DW::Routing->register_string( '/inbox/new',  \&index_handler, app => 1, no_redirects => 1 );
+DW::Routing->register_string( '/inbox/new/', \&index_handler, app => 1, no_redirects => 1 );
+DW::Routing->register_string(
+    '/inbox/new/compose', \&compose_handler,
+    app          => 1,
+    no_redirects => 1
+);
+DW::Routing->register_string(
+    '/inbox/new/compose/', \&compose_handler,
+    app          => 1,
+    no_redirects => 1
+);
+DW::Routing->register_string(
+    '/inbox/new/markspam', \&markspam_handler,
+    app          => 1,
+    no_redirects => 1
+);
+DW::Routing->register_string(
+    '/inbox/new/markspam/', \&markspam_handler,
+    app          => 1,
+    no_redirects => 1
+);
 
 DW::Routing->register_rpc( 'inbox_actions', \&action_handler, format => 'json' );
 
@@ -51,9 +73,14 @@ my $PAGE_LIMIT = 15;
 # A GET to a retained /inbox/new* link still redirects to its canonical URL;
 # a POST there must fall through and be handled natively by the caller
 # instead, since a redirect response would silently drop the submitted body.
+# $r->uri is the raw request path: routing strips a trailing ".bml" only for
+# matching purposes, so an explicit old-link.bml hit (or a trailing slash)
+# must be matched here too, or it would render natively without ever
+# canonicalizing.
 sub _redirect_old_get {
     my ( $r, $old_uri, $canonical ) = @_;
-    return undef unless $r->method eq 'GET' && $r->uri eq $old_uri;
+    return undef unless $r->method eq 'GET';
+    return undef unless $r->uri =~ m{^\Q$old_uri\E(?:\.bml)?/?$};
     return $r->redirect( LJ::create_url( $canonical, keep_args => 1 ) );
 }
 

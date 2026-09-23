@@ -229,6 +229,41 @@ test_psgi $app, sub {
     like( $stale_compose_post->header('Location') || '',
         qr{/inbox$},
         'POST straight to /inbox/new/compose actually sends, landing on the success redirect' );
+
+    # --- Reviewer follow-up: $r->uri is the raw path, so an explicit old
+    # link's .bml suffix (a real historical URL shape) must still
+    # canonicalize on GET rather than quietly rendering at the old path. ---
+    my $bml_suffix_redirect = $cb->( GET '/inbox/new.bml?view=circle' );
+    ok( $bml_suffix_redirect->is_redirect,
+        'GET /inbox/new.bml still redirects to the canonical URL' );
+    like( $bml_suffix_redirect->header('Location') || '',
+        qr{/inbox(?:\?|$)}, '/inbox/new.bml redirects to /inbox' );
+
+    # --- Reviewer follow-up: the trailing-slash form must not fall into
+    # routing's own default page/ -> page redirect, which is exactly as
+    # body-dropping for a POST as the register_redirect this package removed. ---
+    my $trailing_slash_item =
+        $u->notification_inbox->enqueue( event => LJ::Event::AddedToCircle->new( $u2, $u, 2 ) );
+    my $trailing_slash_qid  = $trailing_slash_item->qid;
+    my $trailing_slash_post = $cb->(
+        POST '/inbox/new/',
+        Content => [
+            mark_read                   => 1,
+            "check_$trailing_slash_qid" => $trailing_slash_qid,
+            lj_form_auth                => $index_token,
+        ],
+    );
+    is( $trailing_slash_post->code,
+        200, 'POST to /inbox/new/ (trailing slash) is handled natively, not redirected' );
+    ok( !$trailing_slash_post->header('Location'),
+        'POST to /inbox/new/ (trailing slash) is not a redirect' );
+    ok( $fresh_item_read->($trailing_slash_qid),
+        'POST to /inbox/new/ (trailing slash) actually performs the mutation' );
+
+    my $trailing_slash_get = $cb->( GET '/inbox/new/?view=circle' );
+    ok( $trailing_slash_get->is_redirect, 'GET /inbox/new/ (trailing slash) still redirects' );
+    like( $trailing_slash_get->header('Location') || '',
+        qr{/inbox(?:\?|$)}, '/inbox/new/ redirects to /inbox' );
 };
 
 # --- No user_in_beta('inbox') check remains outside the retained .bml page ---
@@ -274,16 +309,69 @@ test_psgi $app, sub {
         },
         "$ENV{LJHOME}/views/inbox",
     );
+
+    # Scanned as whole-file text (not line-by-line): a register_string(...)
+    # call for a longer path name wraps across lines, and a naive per-line
+    # scan would misreport its continuation line as a stray reference.
     open my $fh, '<', "$ENV{LJHOME}/cgi-bin/DW/Controller/Inbox.pm" or die $!;
-    while ( my $line = <$fh> ) {
-        next unless $line =~ m{/inbox/new\b};
-        next if $line =~ /^\s*#/;    # comments explaining the plumbing are fine
-        next if $line =~ /register_string|register_redirect|_redirect_old_get\(/;
-        push @offenders, "cgi-bin/DW/Controller/Inbox.pm:$.: $line";
-    }
+    local $/;
+    my $inbox_pm = <$fh>;
+    close $fh;
+    ( my $scrubbed = $inbox_pm ) =~ s/^\s*#.*$//mg;
+    $scrubbed =~ s/DW::Routing->register_string\s*\([^;]*?\)\s*;//gs;
+    $scrubbed =~ s/_redirect_old_get\([^;]*?\)/_redirect_old_get(...)/gs;
+    push @offenders,
+        'cgi-bin/DW/Controller/Inbox.pm (unexpected reference outside the deliberate plumbing)'
+        if $scrubbed =~ m{/inbox/new\b};
     is_deeply( \@offenders, [],
 'no stray /inbox/new reference remains outside route registration and the redirect-or-native check'
     );
+}
+
+# --- W3: the legacy .bml pages are gone from disk, but their URLs (routing
+# runs before the BML file-resolution fallback) still resolve natively
+# rather than falling through to a 404. ---
+{
+    for my $deleted (
+        qw(htdocs/inbox/index.bml htdocs/inbox/compose.bml htdocs/inbox/markspam.bml
+        htdocs/inbox/index.bml.text htdocs/inbox/compose.bml.text)
+        )
+    {
+        ok( !-e "$ENV{LJHOME}/$deleted", "$deleted no longer exists on disk" );
+    }
+
+    test_psgi $app, sub {
+        my $send = shift;
+        my $cb = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+
+        my $post_deletion_msg = LJ::Message->new(
+            {
+                journalid => $u2->id,
+                otherid   => $u->id,
+                msgid     => LJ::alloc_global_counter('M'),
+                timesent  => time(),
+                subject   => 'post-deletion cutover fixture',
+                body      => 'body',
+            }
+        );
+        $post_deletion_msg->save_to_db
+            or die 'unable to save post-deletion markspam fixture message';
+
+        for my $path (qw(/inbox/index.bml /inbox/compose.bml /inbox/markspam.bml)) {
+            my $res = $cb->(
+                $path =~ /markspam/
+                ? GET "$path?msgid=" . $post_deletion_msg->msgid
+                : GET $path
+            );
+            is( $res->code, 200,
+                "$path still resolves natively now that the underlying file is gone" );
+        }
+
+        # A genuinely unregistered path under /inbox must still 404 rather
+        # than routing permissively resolving anything under the prefix.
+        my $bogus = $cb->( GET '/inbox/this-path-was-never-registered' );
+        is( $bogus->code, 404, 'an unregistered /inbox/* path still 404s' );
+    };
 }
 
 done_testing;

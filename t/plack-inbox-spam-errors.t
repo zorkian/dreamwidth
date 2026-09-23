@@ -53,6 +53,12 @@ sub fresh_message {
     return LJ::Message->load( { msgid => $msg->msgid, journalid => $owner->id } );
 }
 
+sub ban_calls_for {
+    my ( $calls, $target ) = @_;
+    return
+        grep { $_->[0] == $owner->userid && $_->[1] == $target->userid && $_->[2] eq 'B' } @$calls;
+}
+
 test_psgi $app, sub {
     my $send = shift;
     my $cb   = sub {
@@ -60,6 +66,13 @@ test_psgi $app, sub {
         $request->header( Cookie => $cookie );
         return $send->($request);
     };
+
+    # A user ban is a moderation action like a spam report: stub it as an
+    # inert recorder and assert call count/args, not real relationship state,
+    # so this test never actually bans a disposable fixture user.
+    my @ban_calls;
+    no warnings 'redefine';
+    local *LJ::set_rel = sub { push @ban_calls, [@_]; return 1; };
 
     for my $case ( [ 'neither', 0, 0 ], [ 'spam', 1, 0 ], [ 'ban', 0, 1 ], [ 'both', 1, 1 ], ) {
         my ( $name, $spam, $ban ) = @$case;
@@ -96,13 +109,13 @@ test_psgi $app, sub {
             );
             ok( !$response->header('Location'), 'neither action does not redirect away its error' );
             is( $report_calls, 0, 'neither action does not report spam' );
-            is( LJ::check_rel( $owner, $sender, 'B' ) || 0, 0, 'neither action does not ban' );
+            is( scalar ban_calls_for( \@ban_calls, $sender ), 0, 'neither action does not ban' );
         }
         else {
             is( $response->code, 303,   "$name selected action redirects to inbox" );
             is( $report_calls,   $spam, "$name calls reporting exactly when spam is selected" );
-            is( LJ::check_rel( $owner, $sender, 'B' ) || 0,
-                $ban, "$name persists only its ban choice" );
+            is( scalar ban_calls_for( \@ban_calls, $sender ),
+                $ban, "$name calls the ban action exactly when its own choice selects it" );
         }
         ok( fresh_message($msg)->valid, "$name leaves the original message available" );
     }
@@ -116,7 +129,7 @@ test_psgi $app, sub {
         my $response = $cb->( POST '/inbox/markspam', Content => \@payload );
         unlike( $response->content, qr/Message marked as spam/, 'bad CSRF has no success message' );
         ok( fresh_message($msg)->valid, 'bad CSRF leaves the persisted message available' );
-        is( LJ::check_rel( $owner, $sender, 'B' ) || 0, 0, 'bad CSRF cannot ban the sender' );
+        is( scalar ban_calls_for( \@ban_calls, $sender ), 0, 'bad CSRF cannot ban the sender' );
     }
 
     my $foreign_sender = temp_user();
@@ -125,8 +138,8 @@ test_psgi $app, sub {
     my $foreign_response =
         $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $foreign_msg->msgid );
     is( $foreign_response->code, 303, 'foreign message ID is rejected before a form renders' );
-    is( LJ::check_rel( $owner, $foreign_sender, 'B' ) || 0, 0,
-        'foreign ID cannot alter relations' );
+    is( scalar ban_calls_for( \@ban_calls, $foreign_sender ),
+        0, 'foreign ID cannot alter relations' );
 
     my $outgoing_recipient = temp_user();
     $outgoing_recipient->update_self( { status => 'A' } );
@@ -134,7 +147,7 @@ test_psgi $app, sub {
     my $outgoing_response =
         $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $outgoing_msg->msgid );
     is( $outgoing_response->code, 303, 'outgoing message is rejected before a form renders' );
-    is( LJ::check_rel( $owner, $outgoing_recipient, 'B' ) || 0,
+    is( scalar ban_calls_for( \@ban_calls, $outgoing_recipient ),
         0, 'outgoing message guard cannot create a ban' );
 
     my $missing_response = $cb->( GET 'http://localhost/inbox/markspam?msgid=999999999' );
@@ -151,7 +164,8 @@ test_psgi $app, sub {
             $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $sysban_msg->msgid );
     }
     is( $sysban_response->code, 403, 'sysban guard rejects the confirmation form' );
-    is( LJ::check_rel( $owner, $sysban_sender, 'B' ) || 0, 0, 'sysban guard cannot create a ban' );
+    is( scalar ban_calls_for( \@ban_calls, $sysban_sender ), 0,
+        'sysban guard cannot create a ban' );
 };
 
 done_testing;
