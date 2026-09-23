@@ -45,6 +45,19 @@ users persists). Nothing external was touched.
   short-circuit). Root validation (allowlist only, no moderation suites):
   14 files 432 PASS incl. t/plack-bml-runtime-callers.t; tidy/compile logs
   /tmp/bml-runtime-callers-integrated-*.log.
+- F2 entry legacy page deletion range 8e2f89fe7, 0bd8bfb89, 6a81f04b5,
+  322205da0 (atop 508229ae9) bml-opus-review CLEAR; integrated on root as
+  9f8428871, b46084e34, 2977bd054, 8d03595e9 (clean picks). update.bml,
+  editjournal.bml, imgupload.bml, tools/endpoints/draft.bml, js/entry.js,
+  js/xpost.js, LJ::entry_form, /preview/entry, LJ::Widget::UserpicSelector and
+  the four retired .text files are gone; only htdocs/_config.bml and the two
+  ext/dw-nonfree _config*.bml remain tracked. Root validation (allowlist +
+  plack-bml-runtime-callers + inbox-cutover): 23 files 911 PASS; tidy,
+  compile and build logs /tmp/bml-f2-integrated-*.log. Reviewer browser runs
+  of entry-preview.js and entry-draft-parity.js PASS after restarting their
+  stale dev server. Non-blocking follow-ups: htdocs/stc/imgupload.css is an
+  orphan; a stale old-page preview POST to /preview/entry now 404s (content
+  stays in the tab); deleted .text keys not yet added to deadphrases.dat.
 - W7-A dead RPC fallback removal a6641ec27 bml-opus-review CLEAR; integrated
   on root as the next commit. DEPLOY GATE (concrete): production
   etc/config*.pl or ext/local may populate %LJ::AJAX_URI_MAP (the removed

@@ -2477,3 +2477,5 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   claim correction recorded). Allowlist-only validation14files432 PASS. W6 engine
   retirement audit added (docs). Test-execution boundary restated after reviewer
   disclosures.
+- F2 entry page deletion integrated as9f8428871..8d03595e9 (Opus CLEAR). No BML
+  page remains except the engine _config files. Root allowlist23files911 PASS.
