@@ -107,8 +107,8 @@ Extend existing disposable tests rather than create a new broad matrix.
 
 ## Remaining finite blockers for route retirement
 
-- Native plain-editor image insertion is still being implemented; the legacy image baseline alone does not close it.
-- The external `decode_entry_form` hook has no in-tree implementation but remains an unresolved deployment interface.
+- Native plain-editor image insertion is independently clear and integrated at 59ebe781c, with actual browser insertion, keyboard handling, and disposable-fixture cleanup evidence. It no longer blocks route retirement.
+- The external `decode_entry_form` hook has no in-tree implementation. Native preparation preserves its call and original flat request reference; retiring that extension interface itself remains outside this adapter work.
 - `action:deletespam` needs its own bounded migration if the physical edit BML file is to be deleted.
 - After implementation, repeat the existing legacy/new/edit/crosspost/moderation/delete/spellcheck suites plus one real browser submission through each old alias. No broader editor redesign is required.
 
