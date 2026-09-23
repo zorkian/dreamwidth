@@ -1770,3 +1770,24 @@ checks, after widgets Terra completes customization1/4.
   /tmp/bml-owned-edit-{tidy,compile}.log. No root test process remains active.
   Public route registration remains unchanged; callable update correction and
   ordinary-owned edit adapter continue in worker branches.
+
+
+### Callable owner adapters integrated; real-request acceptance continues
+
+- Owner update752+26c independently clear, integrated13cba88f7/c116f5b44.
+  Invalid-token/untrusted-referer paths return before hook-bearing decode; exact
+  old seed fields survive decode/spam/success; real-token empty body preserves
+  protocol-attempt then spam-hook timing. Sol187 PASS. Browser and public route
+  activation remain separate gates.
+- Edit helperbeb had a concrete raw-POST versus decoded-request bug; final771
+  independently clears it (original reviewer probe5/10 before,10/10 after).
+  Integrated5af39e827/88e2c2cc8. Delete clears decoded and canonical event; raw
+  POST stays separate for crosspost callbacks. Helper26 PASS does not prove
+  real-form routing or persistence; Widgets continues that exact HTTP deliverable.
+- Foreman combined callable/retained/native6files462 PASS in
+  /tmp/bml-callable-adapters-integrated.log; tidy1116 and compile1607 PASS in
+  /tmp/bml-callable-adapters-{tidy,compile}.log. All root test processes completed.
+- Independent next community/moderation handoff preserved at
+  BML-UPDATE-COMMUNITY-INTEGRATION.md (fb550e880). POST usejournal alone selects
+  the save target; absent/empty means owner, named missing/denied never falls
+  back to owner. Existing policy, moderation and extension contracts stay intact.

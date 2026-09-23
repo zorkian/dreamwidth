@@ -61,25 +61,24 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: owner-only callable update adapter 752163c08 is held by Sol for
-   decoder-hook-before-validation ordering, incomplete flat hook request seed,
-   and missing post-attempt hook on empty-body failure. Narrow correction is
-   prioritized; browser harness WIP is preserved. No public route registration.
-2. Widgets: mechanical edit renderer ed03 independently clear and integrated
-   5bead7879, foreman52 PASS. Rerender bdc+755 is clear and integrated cef5672e6/83765695c;
-   edit-success015 is clear and integrated a272189a0. Worker continues a separate
-   callable ordinary-owned save/delete adapter with test-only routing; unsupported
-   maintainer/spam-delete/community actions remain outside this slice.
-3. Sol: completed held findings for752; cleared bdc..755 and015; now audits the next bounded community/moderated
-   update slice while immutable adapter corrections mature.
-   All reviews use immutable commits. Held inbox and external Journal deployment
-   interfaces remain excluded.
+1. Themenav: owner-only callable update752+26c independently clear and integrated
+   13cba88f7/c116f5b44. Browser test-only routing remains active WIP: real old form
+   success and failed-native retry, FCK readiness, disposable cleanup/captures.
+   Complete that before separate community/moderation extension following
+   BML-UPDATE-COMMUNITY-INTEGRATION.md. No public route registration.
+2. Widgets: rerender bdc+755 and success015 are integrated and clear. Callable
+   owned-edit helperbeb+771 is clear and integrated5af39e827/88e2c2cc8; raw decoded
+   hook reference corrected. Worker must finish actual retained-form HTTP wrapper
+   with real persistence for both aliases; helper stub tests alone are insufficient.
+3. Sol: independently cleared current callable corrections and completed bounded
+   community/moderation source handoff. Ready for immutable browser/HTTP packages.
+   Held inbox and pending external Journal interfaces remain excluded.
 
-Current combined-tree rerender102 and edit-success176 PASS, tidy1114 PASS,
-compile1607 PASS. Logs /tmp/bml-owned-edit-rerender-integrated.log,
-/tmp/bml-owned-edit-success-integrated.log and
-/tmp/bml-owned-edit-{tidy,compile}.log in foreman container. No foreman test
-process remains running at this ledger update. All integrations are local only.
+Current combined-tree callable/retained/native6files462 PASS, tidy1116 PASS,
+compile1607 PASS. Logs /tmp/bml-callable-adapters-integrated.log and
+/tmp/bml-callable-adapters-{tidy,compile}.log in foreman container. Earlier shared
+rerender102 and edit-success176 also passed. No root test process is active.
+All integrations remain local, with no public old-route cutover.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
