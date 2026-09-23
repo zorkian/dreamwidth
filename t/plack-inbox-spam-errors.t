@@ -66,7 +66,7 @@ test_psgi $app, sub {
         my $sender = temp_user();
         $sender->update_self( { status => 'A' } );
         my $msg = make_message( $sender, $owner );
-        my $url = 'http://localhost/inbox/new/markspam?msgid=' . $msg->msgid;
+        my $url = 'http://localhost/inbox/markspam?msgid=' . $msg->msgid;
 
         my $get = $cb->( GET $url );
         is( $get->code, 200, "$name renders the actual confirmation form" );
@@ -113,7 +113,7 @@ test_psgi $app, sub {
         my $msg     = make_message( $sender, $owner );
         my @payload = ( confirm => 1, msgid => $msg->msgid, spam => 1 );
         push @payload, lj_form_auth => $token if defined $token;
-        my $response = $cb->( POST '/inbox/new/markspam', Content => \@payload );
+        my $response = $cb->( POST '/inbox/markspam', Content => \@payload );
         unlike( $response->content, qr/Message marked as spam/, 'bad CSRF has no success message' );
         ok( fresh_message($msg)->valid, 'bad CSRF leaves the persisted message available' );
         is( LJ::check_rel( $owner, $sender, 'B' ) || 0, 0, 'bad CSRF cannot ban the sender' );
@@ -123,7 +123,7 @@ test_psgi $app, sub {
     $foreign_sender->update_self( { status => 'A' } );
     my $foreign_msg = make_message( $foreign_sender, $foreign );
     my $foreign_response =
-        $cb->( GET 'http://localhost/inbox/new/markspam?msgid=' . $foreign_msg->msgid );
+        $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $foreign_msg->msgid );
     is( $foreign_response->code, 303, 'foreign message ID is rejected before a form renders' );
     is( LJ::check_rel( $owner, $foreign_sender, 'B' ) || 0, 0,
         'foreign ID cannot alter relations' );
@@ -132,12 +132,12 @@ test_psgi $app, sub {
     $outgoing_recipient->update_self( { status => 'A' } );
     my $outgoing_msg = make_message( $owner, $outgoing_recipient );
     my $outgoing_response =
-        $cb->( GET 'http://localhost/inbox/new/markspam?msgid=' . $outgoing_msg->msgid );
+        $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $outgoing_msg->msgid );
     is( $outgoing_response->code, 303, 'outgoing message is rejected before a form renders' );
     is( LJ::check_rel( $owner, $outgoing_recipient, 'B' ) || 0,
         0, 'outgoing message guard cannot create a ban' );
 
-    my $missing_response = $cb->( GET 'http://localhost/inbox/new/markspam?msgid=999999999' );
+    my $missing_response = $cb->( GET 'http://localhost/inbox/markspam?msgid=999999999' );
     is( $missing_response->code, 303, 'missing message ID is rejected before a form renders' );
 
     my $sysban_sender = temp_user();
@@ -148,7 +148,7 @@ test_psgi $app, sub {
         no warnings 'redefine';
         local *LJ::sysban_check = sub { return 1; };
         $sysban_response =
-            $cb->( GET 'http://localhost/inbox/new/markspam?msgid=' . $sysban_msg->msgid );
+            $cb->( GET 'http://localhost/inbox/markspam?msgid=' . $sysban_msg->msgid );
     }
     is( $sysban_response->code, 403, 'sysban guard rejects the confirmation form' );
     is( LJ::check_rel( $owner, $sysban_sender, 'B' ) || 0, 0, 'sysban guard cannot create a ban' );

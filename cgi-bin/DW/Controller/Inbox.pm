@@ -26,9 +26,25 @@ use DW::Template;
 use DW::FormErrors;
 use LJ::Hooks;
 
-DW::Routing->register_string( '/inbox/new',          \&index_handler,    app => 1 );
-DW::Routing->register_string( '/inbox/new/compose',  \&compose_handler,  app => 1 );
-DW::Routing->register_string( '/inbox/new/markspam', \&markspam_handler, app => 1 );
+# Canonical native inbox URLs. /inbox and /inbox/ are registered separately
+# (like /poll and /poll/ in DW::Controller::Poll) so neither auto-redirects
+# to the other; /inbox/index covers the .bml-suffix-stripped form of the
+# retained /inbox/index.bml link.
+DW::Routing->register_string( '/inbox',       \&index_handler, app => 1, no_redirects => 1 );
+DW::Routing->register_string( '/inbox/',      \&index_handler, app => 1, no_redirects => 1 );
+DW::Routing->register_string( '/inbox/index', \&index_handler, app => 1, no_redirects => 1 );
+DW::Routing->register_string( '/inbox/compose',  \&compose_handler,  app => 1 );
+DW::Routing->register_string( '/inbox/markspam', \&markspam_handler, app => 1 );
+
+# Retained old links redirect to the canonical URLs above, preserving args.
+DW::Routing->register_redirect( '/inbox/new',         '/inbox',         app => 1, keep_args => 1 );
+DW::Routing->register_redirect( '/inbox/new/compose', '/inbox/compose', app => 1, keep_args => 1 );
+DW::Routing->register_redirect(
+    '/inbox/new/markspam', '/inbox/markspam',
+    app       => 1,
+    keep_args => 1
+);
+
 DW::Routing->register_rpc( 'inbox_actions', \&action_handler, format => 'json' );
 
 my $PAGE_LIMIT = 15;
@@ -38,6 +54,7 @@ my $PAGE_LIMIT = 15;
 # makes items_by_view's method-name lookup below safe to call.
 sub _validated_view {
     my ($view) = @_;
+    return 'all' unless defined $view && length $view;
     $view = undef if $view              && $view =~ /\W/;
     $view = undef if $view eq 'archive' && !LJ::is_enabled('esn_archive');
     $view = undef if $view              && !LJ::NotificationInbox->can("${view}_items");
@@ -98,13 +115,16 @@ sub index_handler {
         }
     }
 
-    # Allow bookmarking to work without Javascript
-    # or before JS events are bound
-    if ( $GET->{bookmark_off} && $GET->{bookmark_off} =~ /^\d+$/ ) {
+    # Allow bookmarking to work without Javascript or before JS events are
+    # bound. This mutates state via a plain GET, so (unlike a POST) it is
+    # not covered by controller's automatic form_auth check above and needs
+    # its own token, validated against msg_list.tt's rendered links.
+    my $bookmark_link_auth = LJ::check_form_auth( $GET->{lj_form_auth} );
+    if ( $GET->{bookmark_off} && $GET->{bookmark_off} =~ /^\d+$/ && $bookmark_link_auth ) {
         $errors->add( undef, "$scope.error.max_bookmarks" )
             unless $inbox->add_bookmark( $GET->{bookmark_off} );
     }
-    if ( $GET->{bookmark_on} && $GET->{bookmark_on} =~ /^\d+$/ ) {
+    if ( $GET->{bookmark_on} && $GET->{bookmark_on} =~ /^\d+$/ && $bookmark_link_auth ) {
         $inbox->remove_bookmark( $GET->{bookmark_on} );
     }
 
@@ -154,9 +174,6 @@ sub index_handler {
     $vars->{mark_all}   = $mark_all_text;
     $vars->{delete_all} = $delete_all_text;
     $vars->{errors}     = $errors;
-
-    # TODO: Remove this when beta is over
-    $vars->{dw_beta} = LJ::load_user('dw_beta');
 
     return DW::Template->render_template( 'inbox/index.tt', $vars );
 }
@@ -218,7 +235,12 @@ sub render_items {
     my $vars = {
         messages => \@cleaned_items,
         page     => $page,
-        view     => $view
+        view     => $view,
+
+        # These no-JS bookmark toggle links mutate state via a plain GET, so
+        # they need their own CSRF token; index_handler validates it. Escape
+        # it here since it is embedded directly into a query string.
+        form_auth_token => LJ::eurl( LJ::form_auth(1) ),
     };
 
     return DW::Template->template_string( 'inbox/msg_list.tt', $vars );
@@ -669,6 +691,9 @@ sub compose_handler {
     # Are we sending a copy of the message to the user?
     my $cc_msg_option = $remote->cc_msg;
 
+    my $current_icon_kw = $POST->{prop_picture_keyword};
+    my $current_icon    = LJ::Userpic->new_from_keyword( $remote, $current_icon_kw );
+
     my $vars = {
         errors          => $errors,
         msg_to          => ( $POST->{msg_to} || $GET->{'user'} || undef ),
@@ -685,7 +710,8 @@ sub compose_handler {
         remote          => $remote,
         msg_limit       => $msg_limit,
         subject_limit   => $subject_limit,
-        current_icon_kw => $POST->{prop_picture_keyword},
+        current_icon_kw => $current_icon_kw,
+        current_icon    => $current_icon,
         force           => $force
     };
 

@@ -18,8 +18,6 @@
     </noscript>
 [% END %]
 
-<div class="alert-box secondary">[% ".beta.on" | ml( aopts = "href='$site.root/betafeatures'", user = dw_beta.ljuser_display ) %]</div>
-
 [% BLOCK actions %]
 <div class="header searchhighlight" id="action_row">
     <div class="checkbox">[% form.checkbox(name = 'check_all', class = 'check_all', value = 'check_all', autocomplete = 'off') %]</div>

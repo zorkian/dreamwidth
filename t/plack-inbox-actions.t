@@ -50,7 +50,7 @@ test_psgi $app, sub {
     my $send = shift;
     my $cb   = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
 
-    my $index = $cb->( GET '/inbox/new' );
+    my $index = $cb->( GET '/inbox' );
     is( $index->code, 200, 'inbox index renders' );
     my $token = form_token( $index->content );
     ok( $token, 'inbox index supplies a CSRF token' );

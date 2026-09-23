@@ -42,7 +42,7 @@ local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'inboxComposeErrors';
 test_psgi $app, sub {
     my $send = shift;
     my $cb   = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
-    my $get  = $cb->( GET '/inbox/new/compose' );
+    my $get  = $cb->( GET '/inbox/compose' );
     is( $get->code, 200, 'authenticated compose form renders' );
     my $token = form_token( $get->content );
     ok( $token, 'rendered compose form supplies CSRF token' );
@@ -54,7 +54,7 @@ test_psgi $app, sub {
     );
 
     $recipient->set_prop( 'opt_usermsg', 'N' );
-    my $res = $cb->( POST '/inbox/new/compose', Content => [ @base, lj_form_auth => $token ] );
+    my $res = $cb->( POST '/inbox/compose', Content => [ @base, lj_form_auth => $token ] );
     is( $res->code, 200, 'recipient denial rerenders compose instead of failing' );
     like( $res->content, qr/Subject retained marker/, 'recipient denial retains subject' );
     like( $res->content, qr/Body retained marker/,    'recipient denial retains body' );
@@ -71,7 +71,7 @@ test_psgi $app, sub {
         local *LJ::Message::can_send =
             sub { push @{ $_[1] }, 'Forced can_send failure'; return 0; };
         local *LJ::Message::send = sub { die 'send must not run after can_send failure' };
-        $res = $cb->( POST '/inbox/new/compose', Content => [ @base, lj_form_auth => $token ] );
+        $res = $cb->( POST '/inbox/compose', Content => [ @base, lj_form_auth => $token ] );
         is( $res->code, 200, 'can_send failure rerenders compose' );
         like(
             $res->content,
@@ -91,7 +91,7 @@ test_psgi $app, sub {
         no warnings 'redefine';
         local *LJ::Message::can_send = sub { 1 };
         local *LJ::Message::send     = sub { push @{ $_[1] }, 'Forced send failure'; return 0; };
-        $res = $cb->( POST '/inbox/new/compose', Content => [ @base, lj_form_auth => $token ] );
+        $res = $cb->( POST '/inbox/compose', Content => [ @base, lj_form_auth => $token ] );
         is( $res->code, 200, 'send failure rerenders compose' );
         like( $res->content, qr/Forced send failure/, 'send errors retain their actual sentence' );
         unlike( $res->content, qr/missing string/i, 'send sentence is not treated as an ML key' );
@@ -105,7 +105,7 @@ test_psgi $app, sub {
         my $called = 0;
         no warnings 'redefine';
         local *LJ::Message::send = sub { $called++; die 'delivery must not run for bad CSRF' };
-        $res = $cb->( POST '/inbox/new/compose', Content => \@payload );
+        $res = $cb->( POST '/inbox/compose', Content => \@payload );
         unlike( $res->content, qr/Message Sent/i, 'bad CSRF does not report success' );
         is( $called, 0, 'bad CSRF has no delivery effect' );
     }
@@ -113,7 +113,7 @@ test_psgi $app, sub {
     # The controller never passed subject_limit to the template, so the
     # rendered subject field had no client-side length limit at all.
     my $subject_form =
-        ( HTML::Form->parse( $get->content, 'http://localhost/inbox/new/compose' ) )[0];
+        ( HTML::Form->parse( $get->content, 'http://localhost/inbox/compose' ) )[0];
     ok( $subject_form, 'compose form parses for the subject-limit check' );
     is( $subject_form->find_input('msg_subject')->{maxlength},
         255,
@@ -128,12 +128,12 @@ test_psgi $app, sub {
 
     $recipient->set_prop( 'opt_usermsg', 'N' );    # force the same rerender-on-error path
     my $icon_res = $cb->(
-        POST '/inbox/new/compose',
+        POST '/inbox/compose',
         Content => [ @base, prop_picture_keyword => 'compose-icon-marker', lj_form_auth => $token ]
     );
     is( $icon_res->code, 200, 'icon-reselect error case rerenders compose' );
     my $icon_form =
-        ( HTML::Form->parse( $icon_res->content, 'http://localhost/inbox/new/compose' ) )[0];
+        ( HTML::Form->parse( $icon_res->content, 'http://localhost/inbox/compose' ) )[0];
     ok( $icon_form, 'compose form parses for the icon-reselect check' );
     is( $icon_form->value('prop_picture_keyword'),
         'compose-icon-marker', 'error re-render reselects the icon the user had actually chosen' );
@@ -153,14 +153,14 @@ test_psgi $app, sub {
         . $u_session->loggedin_cookie_string;
     my $u_cb = sub { my $req = shift; $req->header( Cookie => $u_cookie ); return $send->($req); };
 
-    my $get = $u_cb->( GET '/inbox/new/compose' );
+    my $get = $u_cb->( GET '/inbox/compose' );
     is( $get->code, 303, 'unvalidated sender is redirected away from compose' );
     like( $get->header('Location') || '',
         qr{/inbox$}, 'unvalidated sender is redirected to the inbox' );
 
     # index_handler has no validation gate, so it is a valid source for a
     # real CSRF token tied to this same unvalidated session.
-    my $index_get = $u_cb->( GET '/inbox/new' );
+    my $index_get = $u_cb->( GET '/inbox' );
     my $u_token   = form_token( $index_get->content );
     ok( $u_token, 'unvalidated sender can still obtain a real CSRF token elsewhere' );
 
@@ -169,7 +169,7 @@ test_psgi $app, sub {
     local *LJ::Message::send =
         sub { $called++; die 'delivery must not run for an unvalidated sender' };
     my $post = $u_cb->(
-        POST '/inbox/new/compose',
+        POST '/inbox/compose',
         Content => [
             mode         => 'send',
             msg_to       => $recipient->user,
@@ -180,6 +180,48 @@ test_psgi $app, sub {
     );
     is( $post->code, 303, 'unvalidated sender POST is also redirected before composing' );
     is( $called,     0,   'unvalidated sender has no delivery effect' );
+};
+
+# The user_messaging feature flag is a separate gate from sender validation,
+# and now uses its own (previously orphaned) .messaging.disabled string.
+test_psgi $app, sub {
+    my $send = shift;
+    my $cb   = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+
+    my $orig_enabled = \&LJ::is_enabled;
+    no warnings 'redefine';
+    local *LJ::is_enabled = sub {
+        return 0 if $_[0] eq 'user_messaging';
+        return $orig_enabled->(@_);
+    };
+
+    my $get = $cb->( GET '/inbox/compose' );
+    is( $get->code, 303, 'disabled messaging redirects away from compose' );
+    like( $get->header('Location') || '', qr{/inbox$},
+        'disabled messaging redirects to the inbox' );
+
+    # index_handler has no messaging-flag gate, so it is a valid source for a
+    # real CSRF token tied to this same session while messaging is disabled.
+    my $index_get      = $cb->( GET '/inbox' );
+    my $disabled_token = form_token( $index_get->content );
+    ok( $disabled_token,
+        'a real CSRF token is still available elsewhere while messaging is disabled' );
+
+    my $called = 0;
+    local *LJ::Message::send =
+        sub { $called++; die 'delivery must not run while messaging is disabled' };
+    my $post = $cb->(
+        POST '/inbox/compose',
+        Content => [
+            mode         => 'send',
+            msg_to       => $recipient->user,
+            msg_subject  => 'Should never send',
+            msg_body     => 'Should never send',
+            lj_form_auth => $disabled_token,
+        ]
+    );
+    is( $post->code, 303, 'disabled messaging POST is also redirected before composing' );
+    is( $called,     0,   'disabled messaging has no delivery effect' );
 };
 
 done_testing;
