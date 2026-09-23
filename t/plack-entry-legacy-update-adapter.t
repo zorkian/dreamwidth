@@ -74,6 +74,7 @@ local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'legacyUpdateAdapter';
 
 my @adapter_paths;
 my @adapter_altlogin;
+my $valid_form_auth;
 my $adapter_app = Plack::Middleware::DW::RequestWrapper->wrap(
     sub {
         my $r = DW::Request->get;
@@ -103,6 +104,7 @@ for my $index ( 0, 1 ) {
         my $res  = $send->( GET $path, Cookie => $cookie );
         is( $res->code, 200, "$path renders the retained old-schema form" );
         $legacy_form = update_form( $res->content );
+        $valid_form_auth ||= $legacy_form->value('lj_form_auth') if $legacy_form;
         ok( $legacy_form, "$path provides its actual update form" )
             or BAIL_OUT('retained update form missing');
     };
@@ -130,7 +132,8 @@ for my $index ( 0, 1 ) {
     $legacy_form->value( hour                  => '04' );
     $legacy_form->value( min                   => '05' );
     $legacy_form->value( switched_rte_on       => 1 );
-    $legacy_form->value( date_diff             => 1 ) if $legacy_form->find_input('date_diff');
+    $legacy_form->value( date_diff             => 1 )
+        if $index && $legacy_form->find_input('date_diff');
     my $post = $legacy_form->click('action:update');
     $post->uri( 'http://localhost' . $path );
     $post->header( Referer => 'http://localhost' . $path );
@@ -214,6 +217,30 @@ for my $index ( 0, 1 ) {
         "Adapter $index location",
         "$path success hook retains legacy flat metadata"
     );
+    my %expected_seed = (
+        mode       => 'postevent',
+        ver        => $LJ::PROTOCOL_VER,
+        user       => $owner->user,
+        password   => $legacy_form->value('password'),
+        usejournal => $legacy_form->value('usejournal'),
+        xpost      => '0',
+    );
+    for my $request_name (
+        [ decode  => $decoded_request ],
+        [ spam    => $spam_request ],
+        [ success => $success_hooks[1][1]{request} ],
+        )
+    {
+        my ( $name, $request ) = @$request_name;
+        for my $field ( sort keys %expected_seed ) {
+            ok( exists $request->{$field}, "$path $name request retains legacy $field seed" );
+            is( $request->{$field}, $expected_seed{$field},
+                "$path $name request preserves exact legacy $field value" );
+        }
+        ok( !exists $request->{tz},
+            "$path $name request removes the legacy timezone seed after submitted date controls" );
+
+    }
 
     my $fresh_owner = LJ::load_userid( $owner_id, 1 );
     my ($jitemid) = $fresh_owner->selectrow_array(
@@ -252,7 +279,9 @@ for my $case (
         invalid_token =>
             { 'action:update' => 'Update', lj_form_auth => 'invalid', event => 'bad token body' }
     ],
-    [ empty_body => { 'action:update' => 'Update', lj_form_auth => LJ::form_auth(), event => '' } ],
+    [
+        empty_body => { 'action:update' => 'Update', lj_form_auth => $valid_form_auth, event => '' }
+    ],
     [ transform => { transform => 1, 'action:update' => 'Update', event => 'transform body' } ],
     [ preview => { 'action:preview' => 'Preview', event => 'preview body' } ],
     [ showform => { showform => 1, 'action:update' => 'Update', event => 'showform body' } ],
@@ -269,14 +298,26 @@ for my $case (
 {
     my ( $name, $fields, $case_path ) = @$case;
     $case_path ||= '/update';
-    my $res;
-    test_psgi $adapter_app, sub {
-        my $send = shift;
-        $res = $send->( post_to_adapter( $case_path, %$fields ) );
-    };
-    if ( $name eq 'invalid_token' || $name eq 'empty_body' ) {
+    my ( $decode_count, $spam_count, $res ) = ( 0, 0 );
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    {
+        no warnings 'redefine';
+        local *LJ::Hooks::run_hooks = sub {
+            my ($hook_name) = @_;
+            $decode_count++ if $hook_name eq 'decode_entry_form';
+            $spam_count++   if $hook_name eq 'spam_check';
+            return $run_hooks->(@_);
+        };
+        test_psgi $adapter_app, sub {
+            my $send = shift;
+            $res = $send->( post_to_adapter( $case_path, %$fields ) );
+        };
+    }
+    if ( $name eq 'empty_body' ) {
         is( $res->code, 200, "$name gets a native error rerender" );
         like( $res->content, qr/id="js-post-entry"/, "$name response uses the shared native form" );
+        is( $decode_count, 1, "$name invokes the legacy decoder once" );
+        is( $spam_count,   1, "$name invokes post-attempt spam once" );
     }
     else {
         is( $res->code, 418, "$name remains outside the callable adapter slice" );
@@ -285,6 +326,10 @@ for my $case (
             qr/retained BML fallback marker/,
             "$name preserves BML fallback boundary"
         );
+        if ( $name eq 'invalid_token' ) {
+            is( $decode_count, 0, 'invalid token invokes no decoder hook' );
+            is( $spam_count,   0, 'invalid token invokes no post-attempt spam hook' );
+        }
     }
     my $fresh_owner = LJ::load_userid( $owner_id, 1 );
     my ($count) = $fresh_owner->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
@@ -299,23 +344,27 @@ my $missing_referer = POST(
         security        => 'public',
         subject         => 'Missing referer subject',
         event           => 'Missing referer body',
-        lj_form_auth    => LJ::form_auth(),
+        lj_form_auth    => $valid_form_auth,
     ]
 );
+$missing_referer->header( Referer => 'http://untrusted.invalid/update' );
 my $missing_referer_res;
 test_psgi $adapter_app, sub {
     my $send = shift;
     $missing_referer_res = $send->($missing_referer);
 };
-is( $missing_referer_res->code, 200, 'missing referer gets a native error rerender' );
-like( $missing_referer_res->content,
-    qr/id="js-post-entry"/, 'missing referer preserves the shared native retry form' );
+is( $missing_referer_res->code, 418, 'untrusted referer falls through before hook-bearing decode' );
+like(
+    $missing_referer_res->content,
+    qr/retained BML fallback marker/,
+    'untrusted referer retains the BML fallback boundary'
+);
 my $fresh_after_missing_referer = LJ::load_userid( $owner_id, 1 );
 my ($count_after_missing_referer) =
     $fresh_after_missing_referer->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
     undef, $owner_id );
 is( $count_after_missing_referer, $entries_after_success,
-    'missing referer cannot create an entry' );
+    'untrusted referer cannot create an entry' );
 
 is_deeply(
     [ grep { $_ eq '/update' || $_ eq '/update.bml' } @adapter_paths ],

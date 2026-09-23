@@ -307,22 +307,30 @@ sub legacy_update_handler {
         && length $target
         && LJ::canonical_username($target) ne $remote->user;
 
-    my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
-    my $errors   = DW::FormErrors->new;
+    # The retained route rejects token/referer and readonly failures before
+    # decode_entry_form.  The decoder is hook-bearing, so this guard must remain
+    # ahead of preparation rather than using it merely to build a retry form.
+    return undef
+        unless LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer();
+    return undef if $remote->readonly;
+
+    my $prepared = DW::Entry::Legacy::prepare_entry_form(
+        {
+            mode       => 'postevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $remote->user,
+            password   => $legacy_post->{password},
+            usejournal => $legacy_post->{usejournal},
+            tz         => 'guess',
+            xpost      => '0',
+        },
+        $post
+    );
     my $warnings = DW::FormErrors->new;
 
-    $errors->add( undef, 'error.invalidform' )
-        unless LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer();
-    $errors->add( undef, 'bml.badinput.body1' ) unless length $prepared->{canonical}{event};
-    $errors->add_string( undef, $LJ::MSG_READONLY_USER ) if $remote->readonly;
-
-    return legacy_new_rerender(
-        $prepared,
-        remote   => $remote,
-        errors   => $errors,
-        warnings => $warnings,
-    ) if $errors->exist;
-
+    # Do not reject an empty canonical body here.  The old route still makes a
+    # protocol post attempt and then runs its post-attempt spam hook; _do_post
+    # preserves that timing and returns its native retry error.
     # _do_post owns the retained post-attempt and successful extension hooks.
     # Pass the exact flat decoder request there; canonical props are not a
     # replacement for hook-visible legacy fields.
@@ -341,8 +349,9 @@ sub legacy_update_handler {
         },
         legacy_crosspost_callback => _legacy_crosspost_callback( $legacy_post, $legacy_get ),
     );
-    return $post_res{render} if $post_res{status} eq 'ok';
+    return $post_res{render} if ( $post_res{status} || '' ) eq 'ok';
 
+    my $errors = DW::FormErrors->new;
     $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
     return legacy_new_rerender(
         $prepared,
