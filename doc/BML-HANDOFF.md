@@ -1,3 +1,26 @@
+## Public anonymous range integrated; stale retained tests being corrected
+
+Sol40df8aef8fa709e4be6d0d385aac4844f7cafcaf final HTTP697 CLEAR, with prior
+production/plain-app browser gates clear. Integrated fd76..40df as716af91af
+through31c1f0384, excluding already-integrated30b browser prerequisite. Root exact
+build/browser PASS; narrow native retry capture visually inspected, six captures
+preserved under anonymous-update-public. Full tidy1175 and compile1607 PASS.
+
+Root combined5files1131 failed only stale characterization expectations:
+t/plack-anonymous-update-auth-sequence.t12 failures now hit native POST rather
+than retained BML; t/plack-entry-update-activation.t2 shareGET assertions still
+expect BML despite accepted native share. Widgets correcting test-only on root31c
+base: scope retained all-method handler decline/restoration for retained anonymous
+baselines; use inert page stub/native share checks in activation. Do not change
+production. Logs /tmp/bml-anonymous-public-integrated-{prove,build,browser,tidy,compile}.log
+in root8d7783a043d8. Sessions48247/97263/47810 completed; no root tests running.
+
+Delta8b remains unintegrated. Themes correction additionally needs unchanged
+prop_* precedence when props changes, deterministic serialized comparison, deep
+reference boundary and props undef. Sol queued followup after immutable commit.
+Widgets rerender audit was against stale pre-altlogin-template base; must revise
+against31c before use. Existing held external interfaces remain untouched.
+
 ## Delta candidate held; public classifier correction active
 
 Unused delta8b144572fe2b97c6953c0ac695396cc6040d1662 is NOT integrated.

@@ -2418,3 +2418,15 @@ stay raw while decoded-request arbitrary property/top-level changes, additions
 and deletions reach canonical data. Original flat identity, separate canonical
 props and HMV preservation remain proved. Test-only; no hook synchronization,
 authentication, save, route, or public behavior change.
+
+## Public anonymous POST integration (2026-09-23)
+
+Independent final HTTP697 PASS at40df plus previously cleared production and
+plain-app browser integrated through31c1f0384. Root exact browser/build PASS,
+full tidy1175 and compile1607 PASS; six captures preserved in
+anonymous-update-public and narrow native retry visually inspected.
+
+Combined5files1131 exposed stale retained-auth and share expectations only;
+test-only correction is active before combined validation is complete. No
+production rollback or changed authentication policy is indicated. Native-owned
+attempts stay native after first authentication; structural declines retain BML.
