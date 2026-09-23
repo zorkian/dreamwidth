@@ -1617,3 +1617,19 @@ checks, after widgets Terra completes customization1/4.
   Worker normal and named intentional failure/cleanup pass; Sol recheck queued.
 - Legacy success housekeeping is separate preserved WIP, not accepted code.
   The next pure edit action selector also changes no routes or persistence.
+
+
+### Native plain-editor image integration complete
+
+- Independent final gateba1991d4a clear: local successful RTE image retains the
+  escaping assertion; intentional run reaches the named throw, exits1 and leaves
+  no fixture. Production local URL, keyboard Enter/Cancel and FAQ fixes clear.
+- Integrated as59ebe781c. Foreman focused4files56 PASS, static build PASS, actual
+  browser PASS, tidy1105 PASS and compile1607 PASS. Logs in foreman container:
+  /tmp/bml-native-image-{integrated,build,browser,tidy,compile}.log.
+- Foreman inspected desktop/narrow captures in image-insert-native. Legacy
+  imgupload remains only while old posting-page callers remain; shared translation
+  keys are intentionally retained.
+- Separate mapper gate remains held at90fec: raw custom_bit_0/61 were ignored by
+  old decoding but forwarded to native retry. Narrow exact1..60 correction and
+  permanent boundary regression are assigned. No mapper code is integrated yet.

@@ -67,14 +67,15 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    90fec3cdf is queued for Sol; it retains the decoder-normalized subject so the
    old localized placeholder cannot become saved retry text. Next independent
    increment is a pure whitelisted legacy edit action selector; no route changes.
-2. Widgets: native image production through42d0f6f5 is independently clear.
-   Browser correctionba1991d4a replaces an intentionally invalid image URL with
-   a successful local resource before RTE rendering. Worker normal PASS and
-   named intentional failure/cleanup PASS; independent recheck remains pending.
-   The image range is not integrated yet. Preserved Entry.pm housekeeping WIP
-   is restored on its separate branch and active: opt-in legacy success behavior,
-   native defaults unchanged, then raw crosspost callback and moderation tests.
-3. Sol: recheck imageba199, then pure retry mapperc12a30c5a..90fec3cdf.
+2. Widgets: native image throughba1991d4a is independently clear and integrated
+   as59ebe781c. Foreman56 focused/build/browser/tidy1105/compile1607 PASS; desktop
+   and narrow captures are preserved in image-insert-native and inspected.
+   Housekeeping first slice0e88c454b is committed but not accepted: pipeline
+   failure/moderation and raw crosspost callback tests are still being completed.
+3. Sol: imageba199 is clear. Retry mapper90fec is held: it forwards raw custom
+   bits0/61 ignored by the old decoder. Themes is correcting exact1..60 bounds
+   and adding old-decode/native-retry proof. Pure action selectorc475d14a9 is
+   separately queued for review.
    Decoder, normalizer, Protocol notes and native spellcheck are already clear.
    Held inbox work and external deployment interfaces remain excluded.
 
