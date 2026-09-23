@@ -13,3 +13,12 @@ Fixture/server process check was empty after completion. Independent Sol review
 at b2c2da7cb also passed normal and named intentional-failure cleanup runs.
 The harness proves exact prefills/action query and fresh draft preservation,
 including the restore dialog after explicit fixture draft seeding.
+
+## Public route replay
+
+`public-get-1280.png` and `public-get-390.png` are from local9177ba357 after
+accepted public GET activationa0d/ad63/3e2. Server loads plain app.psgi; normal
+browser PASS and fixture/server process checks empty. Foreman visually inspected
+the390px capture: rich editor, subject, posting controls and stacked panels fit.
+Log: `/tmp/bml-public-update-get-browser.log` in container8d7783a043d8.
+Independent Sol normal and named intentional-failure cleanup passed as well.

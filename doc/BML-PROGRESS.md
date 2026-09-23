@@ -2081,3 +2081,14 @@ userpic/native form parity, anonymous isolation, fresh entry/user draft state,
 and explicit absence of unsupported community custom-group controls. Foreman
 four suites352 PASS in /tmp/bml-community-get-integrated.log. Browser and public
 community activation remain separate unaccepted work.
+
+### Public update GET accepted
+
+Sol a0d/ad63/3e2 CLEAR; integrated53f82843f/7963b513d/9177ba357. Eligible GET
+uses cleared native wrapper, non-GET keeps prior handler, excluded requests keep
+BML. Actual alias/query/editor/draft proofs, safe stubbed retained-share prefill,
+actual anonymous credential controls, exact invalid-target error and beta302
+are accepted. Foreman seven suites787 PASS, tidy1134/compile1607 PASS, actual
+plain-app browser PASS/cleanup empty. Public desktop/narrow captures preserved;
+390px visually inspected and usable. Retained update.bml still serves remaining
+contexts; this is not retirement approval.

@@ -1,3 +1,20 @@
+## Latest public update GET integration
+
+Sol a0d94015a/ad63eb656/3e2af975d CLEAR, integrated53f82843f/7963b513d/9177ba357.
+Foreman seven suites787 PASS, tidy1134 PASS, compile1607 PASS; logs
+/tmp/bml-public-update-get-integrated.log and /tmp/bml-public-get-{tidy,compile}.log.
+Actual plain-app browser PASS, cleanup empty; public1280/390 captures preserved
+under legacy-update-get. Narrow capture visually usable. All root sessions
+16269/45137/73964 complete. No BML deletion/push/deployment.
+
+Sol reviews callable community browser6860ee9319f817cb3ef31ecf52bc3bccce420806.
+Widgets implements separate public community GET activation from root9177,
+preserving POST and falling through excluded contexts. Themes private classified
+identity/cannot-post terminal renderer remains active WIP after fixable harness
+failures; must preserve trusted MSG_NO_POST/translated HTML and real request-local
+getter. No route/authentication/anonymous/share/readonly change in that package.
+External Journal deployment-hook question and platform-held work remain held.
+
 ## Latest callable community integration
 
 Sol finalcf2b4032 CLEAR for production6b90 and finite HTTP range. Integrated
