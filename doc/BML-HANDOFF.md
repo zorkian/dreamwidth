@@ -1,3 +1,23 @@
+## Anonymous callable integrated; public manager under review
+
+Sol finalc778a624c814c4eac438ac158c3563fe1c68a7ba CLEAR93 including nonvacuous
+displaydate. Integrated502/8f/ef1/260/c778 as rootb79ea4bf2,ddb515a8a,58d84973c,
+fd8c6954b,d2b7cc6ba. Foreman five anonymous/legacy/native suites614 PASS
+(/tmp/bml-anonymous-callable-integrated.log), session74391 complete. Full tidy and
+compile running session28024, logs /tmp/bml-anonymous-callable-{tidy,compile}.log.
+Widgets continues first callable browser diagnosis (visible legacy submit hit test),
+with browser files uncommitted; no public anonymous route.
+
+Public manager423eee65ce5616328cb898863adba1117abe1520 queued Sol; worker168,
+plain-app normal/named failure, tidy1160/compile1607 passed. Sol HTTP168 passed,
+independent browser underway. Do not integrate until final finite review disposition.
+
+Themes next branch bml-terra-update-share-get-20260923 fromd2b7cc6ba: authenticated
+callable-only share GET render+finite stub tests. Source audit preserved as
+BML-UPDATE-SHARE-GET.md (root2c9c5d221). No URL fetch, public route, anonymous or
+altlogin composition, global prepopulate change, or deployment interface change.
+Preserve manager423 branch for any Sol correction.
+
 ## Anonymous finite persistence review queued
 
 Sol8f60120ec43841e034732a07346f5588c206a56f guard CLEAR85; it declines query

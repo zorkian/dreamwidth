@@ -2283,3 +2283,11 @@ check empty; desktop/narrow captures preserved under manager-property-callable.
 Retained layout/title baseline remains visible, without changed GET markup.
 Callable integration formatting1157 and compilation1607 passed. Public property
 POST activation is the next separate finite gate.
+
+### Anonymous owner callable HTTP accepted
+
+Sol finalc778 CLEAR93; integratedb79ea4bf2..d2b7cc6ba. Foreman five-suite regression
+614 PASS. The new callable accepts only the reviewed successful-password owner
+slice, preserves legacy hook/housekeeping contracts, and sends accepted save errors
+to native retry. Shared _do_post is unchanged. Browser and public activation remain
+separate gates; failed credentials and excluded contexts remain retained BML-owned.
