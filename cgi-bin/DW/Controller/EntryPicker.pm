@@ -46,6 +46,8 @@ sub entry_picker_handler {
         return $rendered if defined $rendered;
         $rendered = DW::Controller::Entry::legacy_same_poster_community_edit_handler();
         return $rendered if defined $rendered;
+        $rendered = DW::Controller::Entry::legacy_manager_property_post_handler();
+        return $rendered if defined $rendered;
         return undef;
     }
 
