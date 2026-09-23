@@ -1,3 +1,15 @@
+## Public community browser diagnosis
+
+Sol source diagnosis: XPostAccount null-master error belongs to pre-existing
+retained manager BML, not native same-poster form. editjournal loads xpost.js;
+disabled_save omits prop_xpost_check but leaves updateForm. Legacy setup invokes
+updater without master. Widgets assigned separate narrow setup guard plus
+no-master/normal-master regression and exact-assets browser validation; no broad
+pageerror suppression. Public354 stays held pending actual-app matrix/browser.
+Terminal public tests still expanding from stubbed preliminaries to required
+real-session finite matrix; do not accept initial13/18 checks as complete.
+All accepted integrations remain local/clean through8b4af07b2.
+
 ## Latest callable community browser integration
 
 Sol6860ee931/c4ee4deea CLEAR, integrated17e74d7e2/98c4e1107. Foreman actual

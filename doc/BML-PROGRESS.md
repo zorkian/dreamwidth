@@ -2110,3 +2110,10 @@ query actions, selected controls including disable-comments, desktop/narrow fit,
 and no JS/network failures. Captures preserved under community-edit-get;390px
 ordinary and manager forms visually inspected. Cleanup empty. Public same-poster
 activation remains separate and manager public GET remains on retained BML.
+
+Public community browser diagnosis: retained manager BML loads xpost.js although
+its disabled-save form omits prop_xpost_check. setUpXpostForm finds updateForm,
+then updater dereferences a null master. Sol source-confirmed this pre-existing
+baseline defect; native same-poster form uses js-post-entry and skips the legacy
+initializer. Separate narrow setup guard/regression assigned; public activation
+still held, no error suppression or removed manager actions accepted.
