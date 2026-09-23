@@ -42,11 +42,12 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         const errors = [];
         const dialogs = [];
         let expectedDialog;
+        let expectedDialogAction = 'accept';
         page.on('pageerror', error => errors.push(error.message));
         page.on('dialog', async dialog => {
             const received = `${dialog.type()}: ${dialog.message()}`;
             dialogs.push(received);
-            if (received === expectedDialog) await dialog.accept();
+            if (received === expectedDialog && expectedDialogAction === 'accept') await dialog.accept();
             else await dialog.dismiss();
         });
 
@@ -155,18 +156,63 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         const entriesAfterPreview = await entryCount();
         assert.equal(entriesAfterPreview, entriesBefore, 'draft and preview flow creates no published entries');
 
+        let heldClear;
+        let intercepting = true;
+        let releaseHeldClear;
+        const clearHeld = new Promise(resolve => { releaseHeldClear = resolve; });
+        await page.setRequestInterception(true);
+        page.on('request', request => {
+            if (!intercepting) return;
+            if (request.method() === 'POST' && request.url().endsWith('/__rpc_draft')
+                && /(?:^|&)clearProperties=1(?:&|$)/.test(request.postData() || '')) {
+                heldClear = request;
+                releaseHeldClear();
+            } else {
+                request.continue();
+            }
+        });
+        expectedDialogAction = 'dismiss';
+        await page.reload({waitUntil: 'domcontentloaded'});
+        await clearHeld;
+        await page.focus('#id-subject-0');
+        await page.keyboard.type('Delayed clear subject marker');
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        assert.ok(heldClear, 'declined restore leaves the real draft-clear request pending');
+        const clearResponse = page.waitForResponse(response => response.url().endsWith('/__rpc_draft')
+            && response.request().method() === 'POST'
+            && /(?:^|&)clearProperties=1(?:&|$)/.test(response.request().postData() || ''));
+        await heldClear.continue();
+        await clearResponse;
+        await page.waitForFunction(() => window.LJDraft
+            && JSON.stringify(LJDraft.savedProperties) === JSON.stringify(LJDraft.currentProperties()));
+        assert.equal(await page.evaluate(() => document.activeElement?.id), 'id-subject-0',
+            'subject remains focused until the clear callback has rebound draft handlers');
+        await page.keyboard.press('Tab');
+        await page.waitForFunction(async () => {
+            const response = await fetch('/__rpc_draft?getProperties=1');
+            const properties = await response.json();
+            return properties.subject === 'Delayed clear subject marker';
+        });
+        intercepting = false;
+        await page.setRequestInterception(false);
+        saved = { draft: (await rpc()).json.draft, properties: await properties() };
+        assert.equal(saved.properties.subject, 'Delayed clear subject marker',
+            'subject typed during delayed clear persists after the clear succeeds');
+
         await rpc({clearProperties: 1, clearDraft: 1});
         saved = { draft: (await rpc()).json.draft, properties: await properties() };
         assert.deepEqual(saved, {draft: '', properties: {}}, 'clear removes saved body and all saved properties');
         const dialogsBeforeClearReload = dialogs.length;
         expectedDialog = undefined;
+        expectedDialogAction = 'accept';
         await page.goto(base + '/entry/new', {waitUntil: 'networkidle0'});
         assert.equal(dialogs.length, dialogsBeforeClearReload, 'cleared draft does not prompt for restoration');
         assert.equal(await page.$eval('#id-subject-0', e => e.value), '', 'cleared draft reload has an empty title');
         assert.equal(await page.$eval('#entry-body', e => e.value), '', 'cleared draft reload has an empty HTML body');
         assert.deepEqual(errors, [], 'draft and preview flow has no page errors');
-        assert.deepEqual(dialogs, [expectedDialog || 'confirm: Restore from saved draft entitled Draft title restore marker?'],
-            'clear/reload adds no extra restoration dialog');
+        assert.deepEqual(dialogs,
+            Array(2).fill('confirm: Restore from saved draft entitled Draft title restore marker?'),
+            'accepted and declined restoration dialogs are the only draft prompts');
         console.log('PASS: draft HTML/RTE save, restore, clear, and preview complete without publishing');
     } finally {
         try { if (browser) await browser.close(); }
