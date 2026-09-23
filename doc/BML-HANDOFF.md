@@ -1,3 +1,18 @@
+## Anonymous candidate held on finite corrections
+
+Sol provisional5020a4e0cc7ef2f40e87bc61431ee6bf32374e07 confirms the missing
+initial invalid GET usejournal guard: omitted POST target plus nonexistent query
+target must decline before login/decode/save/hooks. Widgets has the exact case.
+Finite success proof also needs fresh saved editor/preformatted, valid timestamp/
+backdate and userpic assertions. Shared legacy_suppress_success behavior remains
+under review; explicit anonymous remote undef/master0 must survive all branches.
+Wrong/empty credentials stay BML-owned. Wait corrected immutable tip; no integration.
+
+Manager public candidate first65 tests passed but omitted agreed routing rows.
+Foreman routed full manager invocation/order, contradictory targets, valid-token
+readonly parity, sysban ordering, short circuits and denied-to-valid sequence.
+Worker continues on same isolated branch; no accepted public manager activation yet.
+
 ## Callable manager browser accepted and replayed
 
 Sol4a116591173b5ed43d8b2f166566b24ee38ace41 CLEAR; integrated1e7bd2faa.
