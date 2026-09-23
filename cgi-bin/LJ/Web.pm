@@ -35,6 +35,7 @@ use LJ::Directory::Search;
 use LJ::Directory::Constraint;
 use LJ::PageStats;
 use LJ::JSON;
+use LJ::Lang;
 
 # <LJFUNC>
 # name: LJ::img
@@ -314,7 +315,7 @@ sub error_list {
     my $ret;
     $ret .= "<?errorbar ";
     $ret .= "<strong>";
-    $ret .= BML::ml('error.procrequest');
+    $ret .= LJ::Lang::ml('error.procrequest');
     $ret .= "</strong><ul>";
 
     foreach my $ei (@errors) {
@@ -347,7 +348,7 @@ sub warning_list {
 
     $ret .= "<?warningbar ";
     $ret .= "<strong>";
-    $ret .= BML::ml('label.warning');
+    $ret .= LJ::Lang::ml('label.warning');
     $ret .= "</strong><ul>";
 
     foreach (@warnings) {
