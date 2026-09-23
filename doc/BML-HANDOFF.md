@@ -1,3 +1,12 @@
+## Callable share checks complete; next finite activation prepared
+
+Foreman share tidy1163 and compile1607 PASS, session43129 complete; logs
+/tmp/bml-share-{tidy,compile}.log. Root has no active validation process.
+Source-only public share handoff preserved as BML-UPDATE-SHARE-PUBLIC-ACTIVATION.md:
+altlogin remains BML; share callable is returned directly before ordinary readonly,
+so readonly+share falls back rather than losing prefill. Tests use local factory
+stubs only. Assign Themes after its retained anonymous sequence baseline commits.
+
 ## Callable share integrated; anonymous browser remains active
 
 Sol d7784f3f8 + dd049ba45 CLEAR for callable source, HTTP42+52 and browser
