@@ -287,6 +287,112 @@ sub prepare_altlogin_native_form {
     };
 }
 
+# Build the retained-shaped first decode hook argument for a future native
+# altlogin POST caller. This remains pure and observational: it neither invokes
+# the decoder/hook nor changes the separately prepared legacy_request.
+sub build_altlogin_legacy_raw_post {
+    my (%opts)    = @_;
+    my $post      = $opts{native_post};
+    my $canonical = $opts{canonical};
+    die 'native post must be a Hash::MultiValue'
+        unless blessed($post) && $post->isa('Hash::MultiValue');
+    die 'canonical result must be a hash reference' unless ref $canonical eq 'HASH';
+
+    my $raw = _altlogin_legacy_raw_snapshot($post);
+
+    # Canonical security is authoritative. usemask=1 is ambiguous between the
+    # native access selector and malformed custom bit zero; retain friends so a
+    # retained decoder reproduces the same mask without inventing bit zero.
+    delete $raw->{custom_bit};
+    delete @{$raw}{ map { "custom_bit_$_" } 1 .. 60 };
+    my $security = $canonical->{security} || 'public';
+    if ( $security eq 'private' ) {
+        $raw->{security} = 'private';
+    }
+    elsif ( $security eq 'usemask' ) {
+        my $allowmask = $canonical->{allowmask} || 0;
+        if ( $allowmask == 1 ) {
+            $raw->{security} = 'friends';
+        }
+        else {
+            $raw->{security} = 'custom';
+            for my $bit ( 1 .. 60 ) {
+                $raw->{"custom_bit_$bit"} = 1 if $allowmask & ( 1 << $bit );
+            }
+        }
+    }
+    else {
+        $raw->{security} = 'public';
+    }
+
+    _altlogin_move_raw_field( $raw, 'taglist',              'prop_taglist' );
+    _altlogin_move_raw_field( $raw, 'current_mood',         'prop_current_moodid' );
+    _altlogin_move_raw_field( $raw, 'current_mood_other',   'prop_current_mood' );
+    _altlogin_move_raw_field( $raw, 'current_music',        'prop_current_music' );
+    _altlogin_move_raw_field( $raw, 'current_location',     'prop_current_location' );
+    _altlogin_move_raw_field( $raw, 'opt_screening',        'prop_opt_screening' );
+    _altlogin_move_raw_field( $raw, 'entrytime_outoforder', 'prop_opt_backdated' );
+    _altlogin_move_raw_field( $raw, 'flags_adminpost',      'prop_admin_post' );
+
+    if ( exists $raw->{age_restriction} ) {
+        my $restriction = delete $raw->{age_restriction};
+        $raw->{prop_adult_content} = {
+            none       => 'none',
+            discretion => 'concepts',
+            restricted => 'explicit',
+        }->{$restriction};
+    }
+    _altlogin_move_raw_field( $raw, 'age_restriction_reason', 'prop_adult_content_reason' );
+
+    if ( exists $raw->{entrytime_date} ) {
+        my ( $year, $month, $day ) = split /\D/, delete $raw->{entrytime_date}, -1;
+        $raw->{date_ymd_yyyy} = $year;
+        $raw->{date_ymd_mm}   = $month;
+        $raw->{date_ymd_dd}   = $day;
+    }
+    if ( exists $raw->{entrytime_time} ) {
+        my ( $hour, $min ) = split /\D/, delete $raw->{entrytime_time}, -1;
+        $raw->{hour} = $hour;
+        $raw->{min}  = $min;
+    }
+    if ( delete $raw->{trust_datetime} ) {
+        $raw->{date_diff} = 1;
+    }
+    $raw->{date_diff_nojs} = 1 if $raw->{nojs};
+
+    # Native editor and crosspost names have no retained raw equivalent in the
+    # altlogin presentation. Preserve any unrelated extension field untouched.
+    delete $raw->{editor};
+    delete @{$raw}{ grep { /^crosspost(?:_|$)/ } keys %$raw };
+
+    return $raw;
+}
+
+sub _altlogin_legacy_raw_snapshot {
+    my ($post) = @_;
+    my %raw;
+    $post->each(
+        sub {
+            my ( $name, $value ) = @_;
+            if ( exists $raw{$name} ) {
+                die "cannot NUL-join reference-valued repeated field $name"
+                    if ref $raw{$name} || ref $value;
+                $raw{$name} .= "\0$value";
+            }
+            else {
+                $raw{$name} = _legacy_request_delta_clone_value($value);
+            }
+        }
+    );
+    return \%raw;
+}
+
+sub _altlogin_move_raw_field {
+    my ( $raw, $from, $to ) = @_;
+    return unless exists $raw->{$from};
+    $raw->{$to} = delete $raw->{$from};
+}
+
 # Convert the decoder's legacy-shaped request to the canonical native entry
 # shape.  Retained callers still require the in-place behavior, while a later
 # success renderer needs the original flat request for extension hooks.
