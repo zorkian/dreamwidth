@@ -7,6 +7,7 @@ use Test::More;
 use HTTP::Request::Common;
 use HTML::Form;
 use Plack::Test;
+use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
@@ -22,9 +23,21 @@ die $@ unless ref $native_app eq 'CODE';
 
 my $manager = temp_user();
 $manager->update_self( { status => 'A' } );
+$manager->set_prop( 'entry_editor', 'always_rich' );
+$manager->entry_editor2('markdown0');
+$manager->set_prop( 'entry_draft', '"manager draft body"' );
+$manager->set_prop( 'draft_properties',
+    nfreeze( { subject => 'manager draft subject', editor => 'markdown0' } ) );
 my $poster = temp_user();
 $poster->update_self( { status => 'A' } );
-my $comm = temp_comm();
+$poster->set_prop( 'entry_editor', 'always_plain' );
+$poster->entry_editor2('html_raw0');
+$poster->set_prop( 'entry_draft', '"poster draft body"' );
+$poster->set_prop( 'draft_properties',
+    nfreeze( { subject => 'poster draft subject', editor => 'html_raw0' } ) );
+my $manager_id = $manager->id;
+my $poster_id  = $poster->id;
+my $comm       = temp_comm();
 LJ::set_rel( $comm, $manager, 'A' );
 
 my $own = $manager->t_post_fake_comm_entry(
@@ -350,7 +363,33 @@ is(
 );
 is( $fresh->prop('opt_nocomments_maintainer'),
     1, 'GET does not mutate maintainer comment override' );
-is( $fresh->prop('entry_draft'), undef, 'GET does not create a draft body' );
-is_deeply( $fresh->prop('draft_properties'), undef, 'GET does not create draft properties' );
+my $fresh_own = LJ::Entry->new( $comm, ditemid => $own->ditemid );
+is( $fresh_own->event_raw,   'own body',    'GET does not mutate same-poster body' );
+is( $fresh_own->subject_raw, 'own subject', 'GET does not mutate same-poster subject' );
+is( $fresh_own->security,    'public',      'GET does not mutate same-poster security' );
+
+my $fresh_manager = LJ::load_userid( $manager_id, 1 );
+is( $fresh_manager->prop('entry_editor'), 'always_rich',
+    'GET preserves manager editor preference' );
+is( $fresh_manager->entry_editor2, 'markdown0', 'GET preserves manager native editor preference' );
+is(
+    $fresh_manager->prop('entry_draft'),
+    '"manager draft body"',
+    'GET preserves manager draft body'
+);
+is_deeply(
+    thaw( $fresh_manager->prop('draft_properties') ),
+    { subject => 'manager draft subject', editor => 'markdown0' },
+    'GET preserves manager frozen draft properties'
+);
+my $fresh_poster = LJ::load_userid( $poster_id, 1 );
+is( $fresh_poster->prop('entry_editor'), 'always_plain', 'GET preserves poster editor preference' );
+is( $fresh_poster->entry_editor2, 'html_raw0', 'GET preserves poster native editor preference' );
+is( $fresh_poster->prop('entry_draft'), '"poster draft body"', 'GET preserves poster draft body' );
+is_deeply(
+    thaw( $fresh_poster->prop('draft_properties') ),
+    { subject => 'poster draft subject', editor => 'html_raw0' },
+    'GET preserves poster frozen draft properties'
+);
 
 done_testing;
