@@ -19,6 +19,7 @@ use DW::Request;
 use DW::Request::Plack;
 use DW::Template;
 use Plack::Middleware::DW::RequestWrapper;
+use LJ::Hooks;
 use LJ::Test qw(temp_user);
 
 sub entry_form {
@@ -144,9 +145,9 @@ my %cases = (
         legacy_editor => 'rich',
         rte_supported => 1,
         hook          => {
-            subject => 'rich hook subject',
-            event   => 'rich hook event',
-            tags    => 'rich hook tags',
+            subject => 'rich <hook> & "quotes"',
+            event   => 'rich <event> & "quotes"',
+            tags    => 'rich <tags> & "quotes"',
         },
         expected_editor => 'rte0',
     },
@@ -189,60 +190,79 @@ my %cases = (
 $cases{$_}{remote}->update_self( { status => 'A' } ) for keys %cases;
 $cases{preformat_or}{remote}->set_prop( 'disable_auto_formatting', 1 );
 
-my ( $hook_calls, $hook_ref, $get_ref );
-my $app = Plack::Middleware::DW::RequestWrapper->wrap(
+my ( $hook_calls, @hook_refs, @get_refs );
+my $action_url = '/entry/new?encoded=one%2Ftwo&repeated=first&repeated=second';
+my $app        = Plack::Middleware::DW::RequestWrapper->wrap(
     sub {
         my $r    = DW::Request->get;
         my $get  = $r->get_args;
         my $case = $get->{case} || 'rich';
         my $opts = $cases{$case} or die "unknown test case $case";
 
-        # The retained wrapper, not the production seam, owns update_fields.
-        ++$hook_calls;
-        $get_ref  = refaddr($get);
-        $hook_ref = refaddr($get);
+        # The retained wrapper owns update_fields. The production seam accepts
+        # its result so callers can retain the legacy hook ABI unchanged.
+        push @get_refs, refaddr($get);
+        my $hook = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
 
         DW::Controller::Entry::legacy_update_get_render(
             remote        => $opts->{remote},
             get           => $get,
-            update_fields => $opts->{hook},
+            update_fields => $hook,
             legacy_editor => $opts->{legacy_editor},
             rte_supported => $opts->{rte_supported},
             datetime      => '2026-09-23 04:05',
             usejournal    => $opts->{remote}->user,
-            action_url    => '/entry/new?encoded=one%2Ftwo&repeated=first&repeated=second',
+            action_url    => $action_url,
         );
         $r->status(200);
         return $r->res;
     }
 );
 
-test_psgi $app, sub {
-    my $request = shift;
-    for my $case (qw(rich unsupported casual preformat_or)) {
-        my $res = $request->(
-            GET "/__test_legacy_update_get?case=$case&subject=get&event=get&prop_taglist=get" );
-        diag( $res->content ) if $res->code != 200;
-        is( $res->code, 200, "$case test-only GET wrapper renders real template" );
-        my $form = entry_form( $res->content );
-        ok( $form, "$case real native entry form parses" ) or BAIL_OUT('native entry form missing');
+LJ::Hooks::are_hooks('update_fields');
+{
+    local $LJ::HOOKS{update_fields} = [
+        sub {
+            my ($get) = @_;
+            ++$hook_calls;
+            push @hook_refs, refaddr($get);
+            return $cases{ $get->{case} }{hook};
+        }
+    ];
 
-        my $opts = $cases{$case};
-        is( $form->value('subject'), $opts->{hook}{subject},   "$case form has hook subject" );
-        is( $form->value('event'),   $opts->{hook}{event},     "$case form has hook event" );
-        is( $form->value('taglist'), $opts->{hook}{tags},      "$case form has hook tags" );
-        is( $form->value('editor'),  $opts->{expected_editor}, "$case form selects mapped editor" );
-        is( $form->value('entrytime_date'), '2026-09-23', "$case form renders supplied date" );
-        is( $form->value('entrytime_time'), '04:05',      "$case form renders supplied time" );
-        is( $form->value('usejournal'), $opts->{remote}->user, "$case form retains usejournal" );
-        like( $form->action, qr{/entry/new\?},         "$case form uses native action" );
-        like( $res->content, qr/frozen draft subject/, "$case emits frozen draft restore data" )
-            if $case eq 'rich';
-    }
-};
+    test_psgi $app, sub {
+        my $request = shift;
+        for my $case (qw(rich unsupported casual preformat_or)) {
+            my $res = $request->(
+                GET "/__test_legacy_update_get?case=$case&subject=get&event=get&prop_taglist=get" );
+            diag( $res->content ) if $res->code != 200;
+            is( $res->code, 200, "$case test-only GET wrapper renders real template" );
+            my $form = entry_form( $res->content );
+            ok( $form, "$case real native entry form parses" )
+                or BAIL_OUT('native entry form missing');
 
-is( $hook_calls, 4,        'test wrapper invokes update_fields once for each GET' );
-is( $hook_ref,   $get_ref, 'test wrapper preserves original GET reference identity' );
+            my $opts = $cases{$case};
+            is( $form->value('subject'), $opts->{hook}{subject}, "$case form has hook subject" );
+            is( $form->value('event'),   $opts->{hook}{event},   "$case form has hook event" );
+            is( $form->value('taglist'), $opts->{hook}{tags},    "$case form has hook tags" );
+            is(
+                $form->value('editor'),
+                $opts->{expected_editor},
+                "$case form selects mapped editor"
+            );
+            is( $form->value('entrytime_date'), '2026-09-23', "$case form renders supplied date" );
+            is( $form->value('entrytime_time'), '04:05',      "$case form renders supplied time" );
+            is( $form->value('usejournal'), $opts->{remote}->user,
+                "$case form retains usejournal" );
+            is( $form->action, "http://localhost$action_url", "$case form preserves action query" );
+            like( $res->content, qr/frozen draft subject/, "$case emits frozen draft restore data" )
+                if $case eq 'rich';
+        }
+    };
+}
+
+is( $hook_calls, 4, 'test wrapper invokes update_fields once for each GET' );
+is_deeply( \@hook_refs, \@get_refs, 'update_fields receives each original GET reference' );
 
 my $fresh = LJ::load_userid( $u->id, 1 );
 is( $fresh->prop('entry_editor'), 'always_rich', 'real GET preserves legacy editor preference' );
