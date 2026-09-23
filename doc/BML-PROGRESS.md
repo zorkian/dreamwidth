@@ -2333,3 +2333,10 @@ was included in this package.
   corrections; immutable browser and failure/EOF cleanup acceptance still pending.
 - Retained sequence5a2 correction worker108 PASS queued Sol; public share candidate
   remains worker WIP with initial public78 PASS, no integration claim.
+
+- Retained sequencebc021+5a2 accepted Sol108 and integrated9df4acb83/e018e1fa0;
+  foreman adjacent203 PASS. Native continuation design preserved13f4ea792, callable
+  implementation assigned with public activation/default _do_post unchanged.
+- Anonymous browser64ce682e7 and public sharefa1767d51 are queued independent review;
+  worker acceptance passed, no root integration or public anonymous claim.
+- Next independent Themes package is retained altlogin GET test-only baseline.
