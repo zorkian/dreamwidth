@@ -2126,3 +2126,11 @@ throws in xpostAcctUpdated. Exact guard3a792 runtime replay removes that error
 without changing the actions or ordinary initialization. Permanent test73b560543
 and public same-poster activation acceptance remain under independent review.
 Terminal public2ed3af945 also queued; no accepted integration or deletion yet.
+
+### XPost missing-master guard accepted
+
+Sol3a7923d89/73b560543 CLEAR; integratedd6bd37f19/77930b27b. Foreman exact
+initializer regression and static build PASS. Permanent test fails preguard at
+the intended no-master assertion; independent real browser confirms both normal
+legacy initialization and manager action surfaces with no page errors. This
+resolves the pre-existing baseline bug; public community activation is separate.

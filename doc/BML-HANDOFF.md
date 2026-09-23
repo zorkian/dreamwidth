@@ -1,3 +1,13 @@
+## XPost guard integrated
+
+Sol source/runtime/permanent regression gate CLEAR for3a7923d89+73b560543.
+Integrated locally as d6bd37f19+77930b27b. Foreman exact node regression PASS;
+owned-container static build PASS (/tmp/bml-xpost-integrated-build.log).
+Independent same test fails preguard9177 at the missing-master assertion, and
+real retained ordinary/manager browser before/after proof is recorded. No
+suppression or action removal. Public community activation/browser remains
+separate pending complete actual-app matrix and named-failure cleanup evidence.
+
 ## Current immutable reviews and next packages
 
 Sol independently reproduced the retained manager XPost error at preactivation
