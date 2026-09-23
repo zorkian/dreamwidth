@@ -7,6 +7,36 @@ bml-opus-review) in the same worktrees, branches and containers; the mapping is
 in the checkpoint's resume record. All other held boundaries remain. Entries
 below this line predate the resume.
 
+## HOLD: legacy update/RTE port under scope review (2026-09-23)
+
+User directive after the resume: the old update page and RTE may be retired in
+favour of requiring the native (beta) entry page instead of porting the old
+editor. All legacy update, alternate-login and RTE migration and related
+activation work is HELD; the foreman is assessing native coverage, cutover and
+shared dependencies and will report before anything is implemented. Preserved
+immutable, unreviewed and unintegrated:
+- Themes decode-hook composition eda6394a6 + correction 5d282324c on
+  bml-sonnet-altlogin-hook-composition-20260923 (base 51fc74adb, patch-identical
+  to root 35329b053). Reviewer held eda6 only for run_hook vs run_hooks fan-out
+  and an uninspected caller_context; 5d28 claims both addressed, not re-reviewed.
+- Widgets retained altlogin POST characterization e1a991d88 + correction
+  a0cfe4f23 on bml-sonnet-altlogin-post-characterization-20260923 (base
+  e473de049). Reviewer held e1a9 only for one vacuous success regex; a0cf claims
+  it fixed, not re-reviewed.
+- Widgets draft-endpoint baseline assignment was stopped before commit; any WIP
+  is reported by the worker in its hold acknowledgement.
+Nothing under this hold may be integrated, activated or pushed. Unrelated
+migration work continues only on explicit foreman assignment.
+
+## Pure editor/date composition integrated (2026-09-23)
+
+bml-opus-review CLEAR of Themes 5ec8dec2a210c409c3a68b230f3bc3baaa25c2d6 +
+test-only correction d21b1c3a3d20f89ddfc9cbad900ef0afc0dce8db atop 145cd1e81
+(pure helper gate). Integrated on root as 334b531dc and 35329b053.
+compose_altlogin_hook_delta has no caller outside its module. Root six pure
+suites PASS, 27 top-level tests; full tidy1181 and compile1607 PASS. Logs in
+container 8d7783a043d8: /tmp/bml-editor-date-delta-integrated-{prove,tidy,compile}.log.
+
 ## Browser-only alternate-login rerender accepted (2026-09-23)
 
 bml-opus-review CLEAR of Widgets range 4a1d9d121c0b654b4952e2e6da50c2994b5367a3

@@ -2446,3 +2446,10 @@ Opus CLEAR of4a1d9d121+7c9499af5 integrated ase8068aa3c/2dba301fa. One review
 finding (UTC expected date) corrected and proved under a non-UTC zone. Root browser
 replay PASS with clean cleanup, build PASS, tidy1180, compile1607; captures preserved
 under update-altlogin-rerender. Test-only; no public activation or credential submit.
+
+## Composition integrated; legacy update port HELD for scope review (2026-09-23)
+
+Opus CLEAR of5ec8dec2a+d21b1c3a3 integrated as334b531dc/35329b053; root pure6files27
+PASS, tidy1181, compile1607. Unwired. The user then placed the legacy update/RTE
+port on hold pending an assessment of requiring the native entry page instead;
+candidates5d282324c anda0cfe4f23 are preserved unreviewed. See BML-HANDOFF.md.
