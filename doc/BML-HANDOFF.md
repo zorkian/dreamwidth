@@ -50,7 +50,19 @@ users persists). Nothing external was touched.
   (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
   Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
   s2_head_content_extra hook, so the swap is only safe in a decoupled form.
-- W8 decoupled journal request d886c0b7d HELD: LJ::S2::Page is also reached
+- W8 decoupled journal request range d886c0b7d + 0d645f809 bml-opus-review
+  CLEAR; integrated on root as ff87e378b, 007a69b5d. LJ::make_journal now
+  receives the DW::Request; LJ::S2.pm wraps a DW::BML::RequestAdapter for
+  s2_head_content_extra only when DW::Controller::Journal marks the opts, so
+  the held hook sees exactly what it saw before on both journal and preview
+  paths; the data_handler adapter is untouched. T4 translation shim audit
+  cb9c10831 + correction 920cf07f8 CLEAR; integrated as 7e360e41d, cfcf8096e
+  (doc/BML-TRANSLATION-SHIM.md). T5 cleanup d7b7d5612 + ff564360e CLEAR;
+  integrated as 63d64f887, 505d6a219 (imgupload.css deleted; 160
+  deadphrases.dat entries for the retired keys, which makes the production
+  BETA_FEATURES deploy gate stricter). Root allowlist 12 files 306 PASS;
+  tidy/compile/build logs /tmp/bml-w8t4t5-integrated-*.log.
+- (historical) W8 d886c0b7d was HELD: LJ::S2::Page is also reached
   from the native entry preview with a plain DW::Request, so always wrapping
   an adapter at the hook site changes what production hooks see on previews;
   fix in progress (wrap only when Journal.pm marks the opts) plus a

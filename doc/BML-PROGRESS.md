@@ -2479,3 +2479,5 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   disclosures.
 - F2 entry page deletion integrated as9f8428871..8d03595e9 (Opus CLEAR). No BML
   page remains except the engine _config files. Root allowlist23files911 PASS.
+- W8 journal request decoupling, T4 translation-shim audit and T5 cleanup
+  integrated asff87e378b..505d6a219 (all Opus CLEAR). Root12files306 PASS.
