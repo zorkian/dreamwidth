@@ -1,3 +1,18 @@
+## Active followups after alternate-login integration
+
+Root clean integration through e2d0f408a; no root tests running. Widgets public
+anonymous matrix through88d is independently146 PASS but held for exact normal
+failed-postevent trace/ref and fresh authenticated/forced-login persisted rows,
+plus remaining exclusions/isolation and simultaneous error precedence. Clarified
+that normal canonical backend failure still invokes one flat spam hook; canonical
+backend request is distinct from flat decoder/spam ref. Do not impose flat
+identity on that canonical path. Browserf029 remains clear.
+
+Themes next assigned unused pure native HMV mapper from root e2d0f408a, with
+explicit caller seed and separate legacy hook snapshot, no auth/hooks/save/routes.
+Design preserved in BML-ALTLOGIN-NATIVE-FORM-MAPPING.md; raw hook synchronization
+remains separate. Sol is clarifying exact88d trace before final corrected review.
+
 ## Callable alternate-login range integrated; public posting matrix remains held
 
 Source14db/67a/ec706/bd787/aa2 is independently clear and integrated as
