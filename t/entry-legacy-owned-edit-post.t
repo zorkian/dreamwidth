@@ -235,14 +235,18 @@ sub owned_entry_pair {
     no warnings 'redefine';
     local *DW::Entry::_save_editted_entry =
         sub { return { errors => 'Legacy retry error marker' } };
-    my $request = begin_request('/editjournal?encoded=one%2Ftwo&repeat=first&repeat=second');
-    my %result  = DW::Controller::Entry::legacy_owned_edit_post(
+    my $errors   = DW::FormErrors->new;
+    my $warnings = DW::FormErrors->new;
+    my $request  = begin_request('/editjournal?encoded=one%2Ftwo&repeat=first&repeat=second');
+    my %result   = DW::Controller::Entry::legacy_owned_edit_post(
         entry          => $entry,
         remote         => $owner,
         journal        => $owner,
         session_remote => $owner,
         post           => ordinary_post( subject => 'Retry subject', event => 'Retry body' ),
         get            => {},
+        errors         => $errors,
+        warnings       => $warnings,
     );
     is( $result{status}, 'rerender',
         'failed callable save rerenders through the native owned-edit template' );
@@ -261,14 +265,15 @@ sub owned_entry_pair {
     is( $form->value('subject'), 'Retry subject',
         'failed callable save retains submitted subject' );
     is( $form->value('event'), 'Retry body', 'failed callable save retains submitted body' );
-    my $retry_content = $request->response_content;
-    like(
-        $retry_content,
-        qr/Legacy retry error marker/,
-        'failed callable save visibly renders its error'
+
+    # Actual Foundation HTTP error visibility is covered by the retained-form
+    # integration test; this direct helper fixture checks error classification.
+    is_deeply(
+        [ map { $_->{message} } @{ $errors->get_all } ],
+        ['Legacy retry error marker'],
+        'failed callable save records the backend error exactly once'
     );
-    is( () = $retry_content =~ /Legacy retry error marker/g,
-        1, 'failed callable save renders the generic error exactly once' );
+    ok( !$warnings->exist, 'failed callable save does not duplicate its error as a warning' );
     is(
         fresh_entry( $owner, $entry->ditemid )->subject_raw,
         'Original subject',

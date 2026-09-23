@@ -6,6 +6,7 @@ use warnings;
 use Test::More;
 use HTTP::Request::Common;
 use HTML::Form;
+use URI;
 use Plack::Test;
 use lib "$ENV{LJHOME}/cgi-bin";
 use DW::Request;
@@ -54,7 +55,14 @@ sub adapter_handler {
         session_remote => $remote,
         post           => $post,
         get            => $r->get_args( preserve_case => 1 ),
-        legacy_seed    => { legacy_wrapper_marker => 'retained-form' },
+        legacy_seed    => {
+            mode       => 'editevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $remote->user,
+            usejournal => undef,
+            itemid     => $entry->jitemid,
+            xpost      => '0'
+        },
     );
     return $result{render} if exists $result{render};
     $r->status(400);
@@ -64,7 +72,9 @@ DW::Routing->register_string( '/editjournal', \&adapter_handler, app => 1, no_re
 
 sub visible_click {
     my ( $form, $name ) = @_;
-    my ($input) = grep { $_->can('click') && ( $_->name || '' ) eq $name && length( $_->value || '' ) } $form->inputs;
+    my ($input) =
+        grep { $_->can('click') && ( $_->name || '' ) eq $name && length( $_->value || '' ) }
+        $form->inputs;
     die "missing retained $name submit" unless $input;
     return $input->click($form);
 }
@@ -78,6 +88,14 @@ my $cookie =
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'legacyOwnedAdapter';
+
+my @hook_calls;
+my $run_hooks = \&LJ::Hooks::run_hooks;
+no warnings 'redefine';
+local *LJ::Hooks::run_hooks = sub {
+    push @hook_calls, $_[0] if $_[0] eq 'decode_entry_form' || $_[0] eq 'spam_check';
+    return $run_hooks->(@_);
+};
 
 test_psgi $app, sub {
     my $send = shift;
@@ -101,10 +119,15 @@ test_psgi $app, sub {
         ok( $form, "$path supplies its actual retained edit form" ) or next;
         ok( $form->find_input('lj_form_auth'), "$path form supplies its CSRF token" );
         $adapter_entry{ $entry->ditemid } = $entry;
-        $form->action( 'http://localhost/editjournal?itemid=' . $entry->ditemid );
+        $form->action( 'http://localhost' . $path );
         $form->value( subject => "Adapter $suffix changed" );
         $form->value( event   => "Adapter $suffix changed body" );
         my $post = visible_click( $form, 'action:save' );
+        is(
+            $post->uri->path,
+            '/editjournal' . $suffix,
+            'save POST uses the exact requested legacy alias'
+        );
         $post->header( Cookie         => $cookie );
         $post->header( Referer        => "http://localhost$path" );
         $post->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
@@ -124,8 +147,8 @@ test_psgi $app, sub {
             "Adapter $suffix changed body",
             "$path persists changed body"
         );
-        is( fresh( $owner, $entry->ditemid )->security, 'private',
-            "$path save preserves the retained private security selection" );
+        is( fresh( $owner, $entry->ditemid )->security,
+            'private', "$path save preserves the retained private security selection" );
         is(
             fresh( $owner, $other->ditemid )->subject_raw,
             "Adapter $suffix other",
@@ -137,8 +160,13 @@ test_psgi $app, sub {
         $res                              = $send->($again);
         $form                             = form_from( $res->content );
         $adapter_entry{ $entry->ditemid } = $entry;
-        $form->action( 'http://localhost/editjournal?itemid=' . $entry->ditemid );
-        my $delete = $form->click('action:delete');
+        $form->action( 'http://localhost' . $path );
+        my $delete = visible_click( $form, 'action:delete' );
+        is(
+            $delete->uri->path,
+            '/editjournal' . $suffix,
+            'delete POST uses the exact requested legacy alias'
+        );
         $delete->header( Cookie         => $cookie );
         $delete->header( Referer        => "http://localhost$path" );
         $delete->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
@@ -156,39 +184,140 @@ test_psgi $app, sub {
         my $other_path = "/editjournal$suffix?itemid=" . $other->ditemid;
         my $other_get  = GET $other_path;
         $other_get->header( Cookie => $cookie );
-        $res                              = $send->($other_get);
-        $form                             = form_from( $res->content );
         $adapter_entry{ $other->ditemid } = $other;
-        $form->action( 'http://localhost/editjournal?itemid=' . $other->ditemid );
-        my $unknown = visible_click( $form, 'action:save' );
-        $unknown->content(
-            $unknown->content =~ s/submit_value=[^&]*/submit_value=action%3Aunknown/r );
-        $unknown->header( Cookie         => $cookie );
-        $unknown->header( Referer        => "http://localhost$other_path" );
-        $unknown->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
         my $before_subject = fresh( $owner, $other->ditemid )->subject_raw;
-        my $unknown_res    = $send->($unknown);
-        ok( $unknown_res->code < 500,
-            "$other_path unsupported submit falls through without server failure" );
-        is( fresh( $owner, $other->ditemid )->subject_raw,
-            $before_subject, "$other_path unsupported submit leaves the fresh target unchanged" );
+        my $before_body    = fresh( $owner, $other->ditemid )->event_raw;
+        my $untouched      = $owner->t_post_fake_entry(
+            subject  => 'Unrelated sentinel',
+            body     => 'Unrelated sentinel body',
+            security => 'private'
+        );
 
-        $res                              = $send->($other_get);
-        $form                             = form_from( $res->content );
-        $adapter_entry{ $other->ditemid } = $other;
-        $form->action( 'http://localhost/editjournal?itemid=' . $other->ditemid );
-        my $missing = visible_click( $form, 'action:save' );
-        $missing->content( $missing->content =~ s/(?:^|&)lj_form_auth=[^&]*//r );
-        $missing->content( $missing->content =~ s/^&//r );
-        $missing->header( 'Content-Length' => length $missing->content );
-        $missing->header( Cookie           => $cookie );
-        $missing->header( Referer          => "http://localhost$other_path" );
-        $missing->header( 'Content-Type'   => 'application/x-www-form-urlencoded' );
-        my $missing_res = $send->($missing);
-        is( $missing_res->code, 403,
-            "$other_path missing token is rejected before adapter decode" );
+        for my $case (qw(no_action unknown_action unknown_submit missing_token invalid_token)) {
+            $res  = $send->($other_get);
+            $form = form_from( $res->content );
+            ok( $form, "$other_path $case has a real retained form" ) or next;
+            $form->action( 'http://localhost' . $other_path );
+            $form->value( subject => "Must not save $case" );
+            $form->value( event   => "Must not save body $case" );
+            my $request = visible_click( $form, 'action:save' );
+            my $encoded = URI->new('http://localhost/');
+            $encoded->query( $request->content );
+            my @pairs = $encoded->query_form;
+            my @kept;
+
+            while (@pairs) {
+                my ( $key, $value ) = splice @pairs, 0, 2;
+                next
+                    if $case =~ /^(?:no_action|unknown_action|unknown_submit)$/
+                    && ( $key =~ /^action:/ || $key eq 'submit_value' );
+                next if $case =~ /token$/ && $key eq 'lj_form_auth';
+                push @kept, $key, $value;
+            }
+            push @kept, 'action:unknown', 1 if $case eq 'unknown_action';
+            push @kept, submit_value => 'action:not-whitelisted' if $case eq 'unknown_submit';
+            push @kept, lj_form_auth => 'invalid' if $case eq 'invalid_token';
+            $encoded->query_form(@kept);
+            $request->content( $encoded->query );
+            $request->header( 'Content-Length' => length $request->content );
+            $request->header( Cookie => $cookie, Referer => 'http://localhost' . $other_path );
+            @hook_calls = ();
+            my $denied = $send->($request);
+            is(
+                $denied->code,
+                $case =~ /token$/ ? 403 : 200,
+                "$other_path $case has the expected rejection or fallback response"
+            );
+            is_deeply( \@hook_calls, [], "$other_path $case invokes no decode or spam hook" );
+            unlike(
+                $denied->content,
+                qr/Your edit was successful/,
+                "$other_path $case does not render native save success"
+            );
+            is( fresh( $owner, $other->ditemid )->subject_raw,
+                $before_subject,
+                "$other_path $case retains fresh subject despite distinct submitted value" );
+            is( fresh( $owner, $other->ditemid )->event_raw,
+                $before_body, "$other_path $case retains fresh body" );
+            is( fresh( $owner, $other->ditemid )->security,
+                'private', "$other_path $case retains private security" );
+            is(
+                fresh( $owner, $untouched->ditemid )->event_raw,
+                'Unrelated sentinel body',
+                "$other_path $case leaves unrelated entry unchanged"
+            );
+        }
+
+        $res  = $send->($other_get);
+        $form = form_from( $res->content );
+        ok( $form, "$other_path invalid date starts from actual retained form" ) or next;
+        my $retry_query = '&encoded=one%2Ftwo&repeat=first&repeat=second';
+        $form->action( 'http://localhost' . $other_path . $retry_query );
+        $form->value( subject       => 'Invalid date retained subject' );
+        $form->value( event         => 'Invalid date retained body' );
+        $form->value( date_ymd_yyyy => 'not-a-year' );
+        $form->value( date_ymd_mm   => '02' );
+        $form->value( date_ymd_dd   => '03' );
+        $form->value( hour          => '04' );
+        $form->value( min           => '05' );
+        $form->value( date_diff     => 1 );
+        my $invalid_date = visible_click( $form, 'action:save' );
+        $invalid_date->header( Cookie => $cookie, Referer => 'http://localhost' . $other_path );
+        @hook_calls = ();
+        my $retry_response = $send->($invalid_date);
+        is( $retry_response->code, 200, "$other_path invalid date renders a correction form" );
+        is_deeply(
+            \@hook_calls,
+            [qw(decode_entry_form spam_check)],
+            "$other_path invalid date preserves pre-attempt edit hook ordering"
+        );
+        my ($retry_form) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $retry_response->content, 'http://localhost' );
+        ok( $retry_form, "$other_path invalid date uses modern retry form" ) or next;
+        is( $retry_form->value('entrytime_date'),
+            'not-a-year-02-03', "$other_path retains raw invalid year" );
+        is(
+            $retry_form->value('subject'),
+            'Invalid date retained subject',
+            "$other_path retry retains subject"
+        );
+        is(
+            $retry_form->value('event'),
+            'Invalid date retained body',
+            "$other_path retry retains body"
+        );
+        is( $retry_form->value('security'),
+            'private', "$other_path retry retains private security" );
+        is(
+            $retry_form->action,
+            'http://localhost/entry/'
+                . $owner->user . '/'
+                . $other->ditemid
+                . '/edit?itemid='
+                . $other->ditemid
+                . $retry_query,
+            "$other_path retry uses modern action and exact query"
+        );
+        my @alerts =
+            $retry_response->content =~ m{<div[^>]*class="[^"]*alert-box[^"]*"[^>]*>(.*?)</div>}sg;
+        my @errors = grep { /(?:invalid|year|date|time|range)/i && !/beta/i } @alerts;
+        is( scalar @errors, 1, "$other_path invalid date has exactly one visible error alert" );
+        unlike(
+            $retry_response->content,
+            qr/missing string|DieObject|<\?errorbar/i,
+            "$other_path invalid date error has no legacy or missing-string artifacts"
+        );
         is( fresh( $owner, $other->ditemid )->subject_raw,
-            $before_subject, "$other_path missing token leaves the fresh target unchanged" );
+            $before_subject, "$other_path invalid date does not save subject" );
+        is( fresh( $owner, $other->ditemid )->event_raw,
+            $before_body, "$other_path invalid date does not save body" );
+        is( fresh( $owner, $other->ditemid )->security,
+            'private', "$other_path invalid date leaves persisted security" );
+        is(
+            fresh( $owner, $untouched->ditemid )->event_raw,
+            'Unrelated sentinel body',
+            "$other_path invalid date preserves unrelated entry"
+        );
 
     }
 };

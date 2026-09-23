@@ -1091,11 +1091,10 @@ sub legacy_owned_edit_post {
             entry_was_suspended => $entry->is_suspended ? 1 : 0,
         },
     );
-    return %result if $result{status} eq 'ok';
+    return %result if ( $result{status} || '' ) eq 'ok';
 
     if ( $result{errors} ) {
         $errors->add_string( undef, $result{errors} );
-        $warnings->add_string( undef, $result{errors} );
     }
     return (
         status => 'rerender',
