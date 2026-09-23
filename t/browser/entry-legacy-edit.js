@@ -211,10 +211,16 @@ function waitForPort() {
             `/entry/${data.user}/${data.id}/edit`, 'native retry posts to the modern edit action');
         await page.$eval('[name=entrytime_date]', element => { element.value = '2020-02-03'; });
         await page.$eval('[name=entrytime_time]', element => { element.value = '04:05'; });
+        await page.$eval('[name=subject]', element => { element.value = 'Native retry browser subject'; });
+        await page.$eval('[name=event]', element => { element.value = 'Native retry browser body'; });
         await submit('[name="action:post"]');
+        assert.ok(await page.$(`.successlinks a[href="/entry/${data.user}/${data.id}/edit"]`),
+            'native retry save renders the modern entry edit link');
         after = await state();
-        assert.equal(after.target_subject, 'Native adapter browser subject', 'native retry preserves subject');
-        assert.equal(after.target_body, 'Native adapter browser body', 'native retry preserves body');
+        assert.equal(after.target_subject, 'Native retry browser subject',
+            'native retry persists its distinct retained subject');
+        assert.equal(after.target_body, 'Native retry browser body',
+            'native retry persists its distinct retained body');
 
         await page.goto(url, {waitUntil: 'networkidle0'});
         allowDeleteDialog = true;
