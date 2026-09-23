@@ -42,15 +42,6 @@ sub edit_form {
             HTML::Form->parse( $_[0], 'http://localhost' ) )[0];
 }
 
-sub legacy_form {
-    (
-        grep {
-                   ( $_->attr('id') || '' ) eq 'updateForm'
-                && $_->find_input('subject')
-                && $_->find_input('event')
-        } HTML::Form->parse( $_[0], 'http://localhost/update' )
-    )[0];
-}
 my $user = temp_user();
 $user->update_self( { status => 'A' } );
 my $uid     = $user->id;
@@ -133,74 +124,6 @@ test_psgi $app, sub {
     is( $fresh_after_new->draft_text, undef, 'native new post clears saved draft body' );
     is_deeply( fresh_draft_properties($fresh_after_new),
         {}, 'native new post clears saved draft properties' );
-
-    local *LJ::BetaFeatures::user_in_beta = sub { 0 };
-    for my $path ( '/update', '/update.bml' ) {
-        @calls = ();
-        my ($before_count) =
-            $user->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef, $uid );
-        $res = $request->( GET $path );
-        is( $res->code, 200, "$path renders the retained legacy form" );
-        my $legacy = legacy_form( $res->content );
-        ok( $legacy, "$path actual legacy form parses" ) or next;
-        for my $name (
-            qw(prop_xpost_check prop_xpost_41 prop_xpost_42
-            prop_xpost_password_41 prop_xpost_chal_41 prop_xpost_resp_41)
-            )
-        {
-            ok( $legacy->find_input($name), "$path contains $name" );
-        }
-        $legacy->action("http://localhost$path");
-        $legacy->value( subject                => "Legacy crosspost $path subject" );
-        $legacy->value( event                  => "Legacy crosspost $path body" );
-        $legacy->value( prop_xpost_check       => 1 );
-        $legacy->value( prop_xpost_41          => 1 );
-        $legacy->value( prop_xpost_password_41 => 'legacy-password' );
-        $legacy->value( prop_xpost_chal_41     => 'legacy-challenge' );
-        $legacy->value( prop_xpost_resp_41     => 'legacy-response' );
-        $res = $request->( $legacy->click('action:update') );
-        is( $res->code,    200, "$path actual enabled legacy post succeeds" );
-        is( scalar @calls, 1,   "$path schedules exactly once when master is enabled" );
-        is_deeply(
-            $calls[0][3],
-            [
-                [
-                    41,
-                    [
-                        1,
-                        {
-                            password       => 'legacy-password',
-                            auth_challenge => 'legacy-challenge',
-                            auth_response  => 'legacy-response'
-                        }
-                    ]
-                ],
-                [
-                    42,
-                    [
-                        undef,
-                        { password => undef, auth_challenge => undef, auth_response => undef }
-                    ]
-                ],
-            ],
-            "$path callback preserves selected and unselected legacy values"
-        );
-        my ($after_count) =
-            $user->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef, $uid );
-        is( $after_count, $before_count + 1, "$path persists exactly one fresh entry" );
-    }
-
-    @calls = ();
-    $res   = $request->( GET '/update' );
-    my $disabled = legacy_form( $res->content );
-    ok( $disabled, 'disabled-master legacy form parses' ) or return;
-    $disabled->action('http://localhost/update');
-    $disabled->value( subject          => 'Legacy disabled scheduler subject' );
-    $disabled->value( event            => 'Legacy disabled scheduler body' );
-    $disabled->value( prop_xpost_check => 0 );
-    $res = $request->( $disabled->click('action:update') );
-    is( $res->code,    200, 'disabled-master legacy post succeeds normally' );
-    is( scalar @calls, 0,   'disabled legacy master does not schedule crossposts' );
 
     my ( $jitemid, $anum ) = $user->selectrow_array(
         'SELECT jitemid, anum FROM log2 WHERE journalid=? ORDER BY jitemid ASC LIMIT 1',

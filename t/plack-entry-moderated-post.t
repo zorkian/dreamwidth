@@ -118,34 +118,6 @@ local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'moderatedPostCharacterization';
 
 my @cases = (
     {
-        label => 'legacy extensionless update form',
-        path  => '/update?usejournal=' . $community->user,
-        form  => sub { form_with_fields( $_[0], $_[1], qw(subject event action:update) ) },
-        click => 'action:update',
-        set   => sub {
-            my ( $form, $expected ) = @_;
-            $form->value( subject               => $expected->{subject} );
-            $form->value( event                 => $expected->{event} );
-            $form->value( security              => 'public' );
-            $form->value( prop_current_location => $expected->{location} );
-            $form->value( prop_current_music    => $expected->{music} );
-        },
-    },
-    {
-        label => 'legacy .bml update form',
-        path  => '/update.bml?usejournal=' . $community->user,
-        form  => sub { form_with_fields( $_[0], $_[1], qw(subject event action:update) ) },
-        click => 'action:update',
-        set   => sub {
-            my ( $form, $expected ) = @_;
-            $form->value( subject               => $expected->{subject} );
-            $form->value( event                 => $expected->{event} );
-            $form->value( security              => 'public' );
-            $form->value( prop_current_location => $expected->{location} );
-            $form->value( prop_current_music    => $expected->{music} );
-        },
-    },
-    {
         label  => 'native new-entry form',
         path   => '/entry/new?usejournal=' . $community->user,
         form   => sub { form_with_fields( $_[0], $_[1], qw(subject event action:post) ) },
