@@ -145,7 +145,7 @@ my $auth_calls;
         for my $path (
               '/update?altlogin=1&case=snapshot&user=before-user&usejournal='
             . $owner_a->user
-            . '&subject=before-subject&event=before-event&prop_taglist=before-tag&repeated=one&repeated=two',
+            . '&subject=before-subject&event=before-event&prop_taglist=before-tag&password=encoded%3Cpassword-marker%3E&repeated=one&repeated=two',
             '/update.bml?altlogin=1&case=override&user=before-user&usejournal='
             . $owner_a->user
             . '&subject=before-subject&event=before-event&prop_taglist=before-tag&repeated=three&repeated=four'
@@ -169,6 +169,11 @@ my $auth_calls;
             is( $form->value('user'), 'hook <user> & "quote"',
                 "$path uses post-hook user prefill" );
             is( $form->value('password') // '', '', "$path keeps password blank" );
+            unlike(
+                $res->content,
+                qr/encoded(?:&lt;|<)password-marker(?:&gt;|>)/,
+                "$path never reflects password-like GET input"
+            );
             like(
                 $res->content,
                 qr/hook\s+&lt;user&gt;\s+&amp;\s+&quot;quote&quot;/,
@@ -229,6 +234,9 @@ my $auth_calls;
         is( $b_form->value('event'),   'B-event',   'B does not inherit A body' );
         like( $b->content, qr/useRichText\(\"draft\"/,
             'B retains its distinct rich editor preference in the retained onload' );
+        is( $b_form->value('event_format'),
+            'preformatted',
+            'B on auto-formatting remains selected independently of hook preformat' );
         is_deeply( fresh_state($owner_b), $before_b,
             'altlogin GET leaves B entries, drafts, and editor state unchanged' );
 
