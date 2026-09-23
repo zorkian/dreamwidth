@@ -1661,7 +1661,7 @@ sub _render_preview {
             return $can_create_poll
                 ? $poll->preview
                 : qq{<div class="highlight-box">}
-                . LJ::Lang::ml('/poll/create.bml.error.accttype2')
+                . LJ::Lang::ml('poll.error.accttype')
                 . qq{</div>};
         };
 

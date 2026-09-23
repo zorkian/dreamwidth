@@ -33,10 +33,10 @@ sub as_html {
             'class'    => "select",
             'selected' => $u->prop('opt_showbday')
         },
-        "N" => LJ::Lang::ml('/manage/profile/index.bml.show.birthday.nothing'),
-        "D" => LJ::Lang::ml('/manage/profile/index.bml.show.birthday.day'),
-        "Y" => LJ::Lang::ml('/manage/profile/index.bml.show.birthday.year'),
-        "F" => LJ::Lang::ml('/manage/profile/index.bml.show.birthday.full')
+        "N" => $class->ml('.setting.birthdaydisplay.option.nothing'),
+        "D" => $class->ml('.setting.birthdaydisplay.option.day'),
+        "Y" => $class->ml('.setting.birthdaydisplay.option.year'),
+        "F" => $class->ml('.setting.birthdaydisplay.option.full')
     );
     $ret .= $class->errdiv( $errs, "opt_showbday" );
 

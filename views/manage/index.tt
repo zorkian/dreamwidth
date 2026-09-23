@@ -66,7 +66,7 @@ the same terms as Perl itself.  For a copy of the license, please reference
   {
     href = dw.create_url( '/manage/profile/', keep_args => [ 'authas' ] )
     title = dw.ml( '.information.profile.about' )
-    text = dw.ml( '/manage/profile/index.bml.title' )
+    text = dw.ml( '.information.profile.title' )
   },
   {
     href = dw.create_url( '/manage/icons', keep_args => [ 'authas' ] )
@@ -81,7 +81,7 @@ the same terms as Perl itself.  For a copy of the license, please reference
   {
     href = dw.create_url( '/manage/settings/', keep_args => [ 'authas' ] )
     title = dw.ml( '.information.settings.about' )
-    text = dw.ml( '/manage/settings/index.bml.title.anon' )
+    text = dw.ml( '.information.settings.title' )
   } ];
 
 IF u.email_raw; infoitems.push(
@@ -200,7 +200,7 @@ IF use_tags && ! u.is_identity; entryitems.push(
   {
     href = dw.create_url( '/manage/tags', keep_args => [ 'authas' ] )
     title = dw.ml( '.entries.tags.about' )
-    text = dw.ml( '/manage/tags.bml.title2' )
+    text = dw.ml( '.entries.tags.title' )
   } ); END;
 
 IF u.is_personal; entryitems.push(
@@ -225,7 +225,7 @@ UNLESS u.is_community; circleitems.unshift(
   {
     href = dw.create_url( '/manage/circle/edit' )
     title = dw.ml( '.circle.edit.about' )
-    text = dw.ml( '/manage/circle/edit.bml.title2' )
+    text = dw.ml( '.circle.edit.title' )
   } ); END;
 
 UNLESS u.is_community; circleitems.push(

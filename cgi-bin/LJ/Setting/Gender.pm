@@ -35,10 +35,10 @@ sub as_html {
             'class'    => 'select',
             'selected' => $gender || 'U'
         },
-        'F' => $class->ml('/manage/profile/index.bml.gender.female'),
-        'M' => $class->ml('/manage/profile/index.bml.gender.male'),
-        'O' => $class->ml('/manage/profile/index.bml.gender.other'),
-        'U' => $class->ml('/manage/profile/index.bml.gender.unspecified')
+        'F' => $class->ml('.setting.gender.option.female'),
+        'M' => $class->ml('.setting.gender.option.male'),
+        'O' => $class->ml('.setting.gender.option.other'),
+        'U' => $class->ml('.setting.gender.option.unspecified')
         ) . $class->errdiv( $errs, "gender" );
 }
 

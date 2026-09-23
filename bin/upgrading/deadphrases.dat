@@ -4860,3 +4860,17 @@ general /entry/login.tt.password
 general /entry/login.tt.username
 
 general widget.userpicselector.link.view_thumbnails
+general /manage/profile/index.bml.gender.female
+general /manage/profile/index.bml.gender.male
+general /manage/profile/index.bml.gender.other
+general /manage/profile/index.bml.gender.unspecified
+general /manage/profile/index.bml.show.birthday.day
+general /manage/profile/index.bml.show.birthday.full
+general /manage/profile/index.bml.show.birthday.nothing
+general /manage/profile/index.bml.show.birthday.year
+general /manage/profile/index.bml.title
+general /manage/settings/index.bml.title.anon
+general /manage/tags.bml.title2
+general /manage/circle/edit.bml.title2
+general /manage/circle/edit.bml.title3
+general /poll/create.bml.error.accttype2
