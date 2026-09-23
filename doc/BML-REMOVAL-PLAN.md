@@ -14,7 +14,7 @@ by themselves permit deleting a file whose excluded requests still fall through.
 
 | Remaining area | Current native coverage and deletion gate |
 | --- | --- |
-| `update.bml` | Ordinary authenticated GET/POST, transforms, terminal and readonly GET slices are active. Authenticated share is callable-clear with public activation in review. Anonymous owner POST and GET renderers are callable-only; preserve failed-auth/protocol continuation before public composition. Alternate-login and remaining excluded form/action combinations still need explicit parity. |
+| `update.bml` | Ordinary authenticated GET/POST, transforms, terminal and readonly GET slices are active. Authenticated share GET is active after independent public review and combined validation. Anonymous owner POST and GET renderers are callable-only; preserve failed-auth/protocol continuation before public composition. Alternate-login and remaining excluded form/action combinations still need explicit parity. |
 | `editjournal.bml` | Native no-item picker, personal and same-poster community editor routes, and manager property-only POST are active. Other-poster manager GET retains delete/delete-as-spam controls; unsupported actions and excluded contexts still require BML. Do not infer manager deletion/reporting approval from property-only acceptance. |
 | `imgupload.bml`, `tools/endpoints/draft.bml` | Native editor replacements are accepted; retained entry JavaScript still uses these compatibility surfaces. Retire only after their last legacy editor caller is removed or migrated. |
 | Three `inbox/*.bml` files | Previously recorded platform-held message/inbox work remains held. Existing bounded fixes are not full retirement approval. |

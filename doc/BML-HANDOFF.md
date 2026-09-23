@@ -1,3 +1,24 @@
+## Public share integration complete; callable continuation under review
+
+Sol fa176+d973 CLEAR; integrated94a035428/7f5dc5da1. Foreman corrected six-suite
+315 PASS (/tmp/bml-share-public-corrected.log), session24026 complete. Public
+browser already PASS/cleanup/captures. Full tidy1168 and compile1607 PASS
+(/tmp/bml-share-public-{tidy,compile}.log), session12677 complete. No active root
+validation process. Authenticated share GET is now active; excluded contexts retain
+BML as proved. Root current tree remains local, unpublished.
+
+Widgets committed callable anonymous continuation3197da9d6ee32668b2705f6132b217ba550b9b55,
+base d46d952b7: worker237 combined/tidy/compile pass, queued Sol production review.
+Not integrated. Next worker deliverable is separate callable wrong-password browser
+on a preserved new branch, reusing accepted64ce browser lifecycle and native retry
+semantics. No public anonymous route. Keep _do_post defaults unchanged.
+
+Altlogin baseline1092 remains held: marker assertion must reject encoded reflection
+via unique substring, A formatting OFF needs actual event_format assertion.
+Themes corrections queued; callable-only presentation WIP preserved separately.
+Sol TT source audit also checks explicit action versus credential query nonreflection;
+public credential/target/action schema remains unresolved and unactivated.
+
 ## Public share browser replay passed; test-only fixes active
 
 Foreman public-share session94174 PASS (/tmp/bml-share-public-browser.log),

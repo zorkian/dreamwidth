@@ -2356,3 +2356,9 @@ was included in this package.
   correction remains required before combined integration is marked green.
 - Altlogin baseline919 is not yet accepted: Sol61 passes but requires password-marker
   exclusion and explicit remote formatting-default render assertions.
+
+- Public share correctiond973 accepted Sol and integrated7f5dc5da1. Foreman combined
+ 315 PASS, browser PASS with cleanup/captures, tidy1168/compile1607 PASS. This closes
+ the authenticated share public gate; excluded contexts remain retained.
+- Callable anonymous continuation3197 is immutable and queued Sol (worker237 PASS);
+ its separate wrong-password browser proof is assigned. No public anonymous route.
