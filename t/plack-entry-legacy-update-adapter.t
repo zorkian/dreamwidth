@@ -689,4 +689,101 @@ if ($moderated_form) {
     );
 }
 
+
+# Callable-only transform ABI: start from an actual retained form/token, then
+# invoke two distinct external transform names through the adapter wrapper.
+my $transform_uri = '/update?usejournal=' . $owner->user . '&encoded=a%2Fb%26c&repeated=one&repeated=two';
+my $transform_form;
+test_psgi $legacy_app, sub {
+    my $send = shift;
+    my $res = $send->( GET $transform_uri, Cookie => $cookie );
+    is( $res->code, 200, 'transform baseline renders retained form' );
+    $transform_form = update_form( $res->content );
+};
+ok( $transform_form, 'transform uses a real retained form token' ) or BAIL_OUT('missing transform form');
+my $transform_token = $transform_form->value('lj_form_auth');
+my $before_transform_entries = entry_count($owner);
+my $before_transform_draft = LJ::load_userid( $owner_id, 1 )->draft_text;
+for my $case ( [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
+               [ beta => 'beta subject', 'beta body', 'beta-tag' ] ) {
+    my ( $name, $subject, $body, $tag ) = @$case;
+    my $post = POST(
+        $transform_uri,
+        [
+            transform             => $name,
+            lj_form_auth          => $transform_token,
+            subject               => 'submitted ignored subject',
+            event                 => 'submitted ignored body',
+            prop_taglist          => 'submitted ignored tag',
+            security              => 'custom',
+            custom_bit_1          => 1,
+            prop_current_location => 'submitted location',
+            prop_current_music    => 'submitted music',
+            prop_opt_backdated    => 1,
+            date_ymd_mm           => '02', date_ymd_dd => '03', date_ymd_yyyy => '2020',
+            hour                  => '04', min => '05', date_diff => 1,
+            prop_xpost_check      => 1,
+            prop_xpost_99         => 1,
+            prop_xpost_password_99 => 'xpost-secret',
+            event_format          => 'preformatted', richtext_default => '0',
+        ]
+    );
+    $post->header( Referer => 'http://localhost/update' );
+    my ( $hook_get, $hook_post, $decode, $spam, $success, $crosspost, $calls ) = ( undef, undef, 0, 0, 0, 0, 0 );
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    my $run_hook = \&LJ::Hooks::run_hook;
+    {
+        no warnings 'redefine';
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $hook, @args ) = @_;
+            if ( $hook eq "transform_update_$name" ) {
+                ++$calls;
+                ( $hook_get, $hook_post ) = @args;
+                $hook_post->{subject} = $subject;
+                $hook_post->{event} = $body;
+                $hook_post->{prop_taglist} = $tag;
+                $hook_get->{unused_transform_get} = "get-$name";
+                return;
+            }
+            ++$decode if $hook eq 'decode_entry_form';
+            ++$spam if $hook eq 'spam_check';
+            return $run_hooks->($hook, @args);
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ($hook) = @_;
+            ++$success if $hook eq 'after_entry_post_extra_html';
+            return $run_hook->(@_);
+        };
+        local *LJ::Protocol::schedule_xposts = sub { ++$crosspost; return ([], []); };
+        my $res;
+        test_psgi $adapter_app, sub { $res = shift->($post); };
+        is( $res->code, 200, "$name transform returns native rerender" );
+        my $form = (
+            grep {
+                   ( $_->attr('id') || '' ) eq 'js-post-entry'
+                && $_->find_input('subject')
+                && $_->find_input('event')
+            } HTML::Form->parse( $res->content, 'http://localhost/entry/new' )
+        )[0];
+        ok( $form, "$name transform returns parsed native form" ) or next;
+        is( $form->value('subject'), $subject, "$name hook mutation retains subject" );
+        is( $form->value('event'), $body, "$name hook mutation retains body" );
+        is( $form->value('taglist'), $tag, "$name hook mutation retains tags" );
+        is( $form->value('current_location'), 'submitted location', "$name retains metadata" );
+        is( $form->value('editor'), 'html_raw0', "$name retains event formatting" );
+        like( $form->action, qr/encoded=a%2Fb%26c.*repeated=one.*repeated=two/,
+            "$name retains encoded/repeated query context" );
+    }
+    is( $calls, 1, "$name invokes its dynamic transform hook once" );
+    is( $hook_post->{transform}, $name, "$name hook receives mutable flat POST" );
+    is( $hook_get->{usejournal}, $owner->user, "$name hook receives mutable flat GET" );
+    is( $decode, 0, "$name does not invoke decode hook" );
+    is( $spam, 0, "$name does not invoke spam hook" );
+    is( $success, 0, "$name does not invoke success hook" );
+    is( $crosspost, 0, "$name does not schedule crossposts" );
+    is( entry_count($owner), $before_transform_entries, "$name does not persist entries" );
+    is( LJ::load_userid($owner_id, 1)->draft_text, $before_transform_draft,
+        "$name does not change drafts" );
+}
+
 done_testing;
