@@ -213,7 +213,8 @@ XPostAccount.loadAccounts = function () {
 // this requires md5.js
 XPostAccount.setUpXpostForm = function () {
   var updateForm = document.getElementById('updateForm');
-  if ( ! updateForm ) return;
+  var xpost_button = document.getElementById('prop_xpost_check');
+  if ( ! updateForm || ! xpost_button ) return;
 
   DOM.addEventListener(updateForm, "submit", XPostAccount.xpostFormSubmitted.bindEventListener(updateForm));
 
