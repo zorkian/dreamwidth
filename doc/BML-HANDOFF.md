@@ -50,6 +50,14 @@ users persists). Nothing external was touched.
   (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
   Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
   s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- W9 dead widget cleanup 581927a0d + 7cf7f1ab4 bml-opus-review CLEAR;
+  integrated on root as 78a0fc2e3, eab53381e (TagCloud and three Example
+  widgets deleted; compile now 1593). W9 doc commit 7e2fbd54d HELD for
+  corrections to its new findings (help_icon producer list, HELPURL
+  qualifier, ljuser tag sites); W10 (help_icon literal fix) is scoped from the
+  corrected list. T6 protocol/PageStats audit 0655e31a0 under review; T7
+  (ABI-preserving PageStats filename and explicit DISABLE_PROTOCOL adapter)
+  assigned.
 - W8 decoupled journal request range d886c0b7d + 0d645f809 bml-opus-review
   CLEAR; integrated on root as ff87e378b, 007a69b5d. LJ::make_journal now
   receives the DW::Request; LJ::S2.pm wraps a DW::BML::RequestAdapter for
