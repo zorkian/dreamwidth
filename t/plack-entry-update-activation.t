@@ -345,31 +345,50 @@ my $spell_before = entry_count($owner);
     }
 }
 
-# GET, alternate-login, and share requests are deliberately still BML
-# fallthroughs; registration must not turn them into the native correction form.
-for my $case ( [ '/update?altlogin=1', 'alternate-login GET' ],
-    [ '/update?share=not-a-url', 'share GET' ], )
+# Alternate login remains retained BML.  Share is now an authenticated native
+# GET composition, so keep its page factory inert and inspect the real template.
+my $altlogin;
+test_psgi $app, sub { $altlogin = shift->( GET '/update?altlogin=1', Cookie => $cookie ); };
+is( $altlogin->code, 200, 'alternate-login GET retains BML HTTP status' );
+like( $altlogin->content, qr/id=['"]updateForm['"]/,
+    'alternate-login GET retains BML update form' );
+unlike( $altlogin->content, qr/id="js-post-entry"/,
+    'alternate-login remains outside native rerender' );
+
+my $share;
 {
-    my ( $path, $label ) = @$case;
-    my $res;
-    test_psgi $app, sub { $res = shift->( GET $path, Cookie => $cookie ); };
-    is( $res->code, 200, "$label retains BML HTTP status" );
-    like( $res->content, qr/id=['"]updateForm['"]/, "$label retains BML update form" );
-    unlike( $res->content, qr/id="js-post-entry"/, "$label remains outside native rerender" );
+    no warnings 'redefine';
+    local *DW::External::Page::new = sub {
+        return bless {
+            url         => 'https://example.invalid/shared',
+            title       => 'Inert share title',
+            description => 'Inert share description',
+            },
+            'DW::External::Page';
+    };
+    test_psgi $app, sub { $share = shift->( GET '/update?share=not-a-url', Cookie => $cookie ); };
 }
+is( $share->code, 200, 'share GET renders native HTTP status with an inert local page factory' );
+my $share_form = native_form_from_content( $share->content, 'http://localhost/entry/new' );
+ok( $share_form, 'share GET renders the parsed native entry form' );
+is(
+    $share_form ? $share_form->value('subject') : undef,
+    'Inert share title',
+    'share GET uses the inert page title as native prefill'
+);
 
 my $invalid_get;
 test_psgi $app, sub {
     my $send = shift;
     $invalid_get = $send->( GET '/update.bml?usejournal=does-not-exist', Cookie => $cookie );
 };
-is( $invalid_get->code, 200, 'invalid GET usejournal retains BML status' );
+is( $invalid_get->code, 200, 'invalid GET usejournal renders native terminal status' );
 unlike( $invalid_get->content, qr/id="js-post-entry"/,
-    'invalid GET usejournal remains outside native handler' );
+    'invalid GET usejournal does not render the native entry form' );
 like(
     $invalid_get->content,
     qr/(?:invalid|does not exist|not found)/i,
-    'invalid GET usejournal retains a meaningful BML error'
+    'invalid GET usejournal renders a meaningful native terminal error'
 );
 
 is( $DW::Routing::string_choices{'app/update'},
