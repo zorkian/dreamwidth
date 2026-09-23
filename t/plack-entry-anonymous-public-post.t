@@ -91,8 +91,8 @@ sub form_post {
     ok( !$form->find_input('prop_picture_keyword'),
         "$path anonymous retained form has no userpic selector" );
     $form->action("http://localhost$path");
-    $form->value( user     => $user->user ) unless $values{missing_user};
-    $form->value( password => $password )   unless $values{missing_password};
+    $form->value( user => ( $values{username} // $user->user ) ) unless $values{missing_user};
+    $form->value( password => $password ) unless $values{missing_password};
     $form->find_input('password')->disabled(1) if $values{missing_password};
     $form->value( subject      => $values{subject} );
     $form->value( event        => $values{body} );
@@ -746,6 +746,56 @@ test_psgi $app, sub {
             'decline after success remains a retained BML response' );
         is_deeply( fresh_state( $replay_owner->id ),
             $after_success, 'decline after success creates no replayed entry or user mutation' );
+    }
+
+    for my $case (
+        [ 'missing user', sub { ( missing_user => 1 ) } ],
+        [
+            'unknown user',
+            sub { ( username => 'missing_anonymous_candidate_' . LJ::rand_chars(12) ) }
+        ],
+        [ 'GET target',      sub { ( path_suffix => '?usejournal=' . $community_target->user ) } ],
+        [ 'alternate login', sub { ( path_suffix => '?altlogin=1' ) } ],
+        [
+            'challenge',
+            sub {
+                ( extra_pairs =>
+                        [ [ chal => 'fixture-challenge' ], [ response => 'fixture-response' ] ] )
+            }
+        ],
+        )
+    {
+        my ( $label, $options ) = @$case;
+        for my $alias ( '/update', '/update.bml' ) {
+            my $candidate = temp_user();
+            $candidate->update_self( { status => 'A' } );
+            $candidate->set_password( 'candidate-correct-' . LJ::rand_chars(24) );
+            my $before  = fresh_state( $candidate->id );
+            my %options = $options->();
+            my $path    = $alias . ( $options{path_suffix} || '' );
+            $authenticated_calls = $anonymous_calls = 0;
+            my $post = form_post(
+                $send, $path, $candidate, 'candidate-wrong-' . LJ::rand_chars(24),
+                subject  => "$label $alias subject",
+                body     => "$label $alias body",
+                security => 'private',
+                %options
+            );
+            my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
+            is( $authenticated_calls, 1, "$label $alias reaches authenticated handler once" );
+            is( $anonymous_calls,     1, "$label $alias reaches anonymous classifier once" );
+            is( $attempts->{flat} || 0, 0, "$label $alias makes no native flat post attempt" );
+            is( $attempts->{save} || 0, 0, "$label $alias makes no native save attempt" );
+            unlike( $res->content, qr/id=['"]js-post-entry['"]/,
+                "$label $alias stays out of native retry" );
+            like(
+                $res->content,
+qr/(?:id=['"]updateForm['"]|Invalid username|Enter Password|Error updating journal)/,
+                "$label $alias retains a meaningful BML boundary response"
+            );
+            is_deeply( fresh_state( $candidate->id ),
+                $before, "$label $alias leaves fresh candidate state unchanged" );
+        }
     }
 
     for my $case (
