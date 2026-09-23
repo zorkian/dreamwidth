@@ -1475,3 +1475,19 @@ checks, after widgets Terra completes customization1/4.
 - Spellcheck baseline `3b367d0c` passes worker15 assertions and awaits independent
   review. Crossposting native-post baseline `785a5004` passes10; actual legacy
   aliases and native edit followup remain active. Delivery stays stubbed.
+
+### Draft timing range integrated: finite gate closed
+
+- Sol fully cleared production through `5b260732a` and permanent test through
+  `fc570e26e`. Exact fixed browser passes; exact known-broken6616 fails at the
+  saved-subject wait; disposable helper cleanup succeeds in both cases.
+- Integrated final range as `11fd6c97d`. Foreman static build and scoped helper
+  tidy pass, then sequential exact browser suites both exit0: delayed-image,
+  legacy accept/decline, property reverts, and final isolated subject/clear/blur.
+  Logs in foreman container `/tmp/bml-draft-final-{build,tidy,parity,preview}.log`.
+  Anchored helper check is empty after completion. This closes the finite draft
+  timing investigation; no additional draft coverage is required.
+- Preview method/deletion range remains held on one response-shape correction:
+  legacy requirepost GET returned bare localized text, while error_ml wraps a
+  full Error page. Terra is returning native localized text directly and adding
+  exact GET-body/HEAD assertions. Candidate source/deletion otherwise reviewed.

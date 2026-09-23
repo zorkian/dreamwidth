@@ -2,6 +2,19 @@
 
 ## Active continuation: 2026-09-22
 
+Latest accepted state: draft finite range through source `fc570e26e` is Sol-clear
+and integrated as `11fd6c97d`; final root browser suites both exit0; build/scoped
+helper tidy pass and helper cleanup is empty. Sol independently proved exact fixed PASS and broken6616 FAIL
+on isolated subject timing; delayed-image/untouched-decline also pass. No pending
+worker draft process or abandoned helper was retained.
+
+Preview candidate integrated `abc509db6`, root173/build/tidy1091/compile1605 and
+real popup browser pass; captures committed `be2839b6b`. GET/HEAD correction
+`a6277d378` plus file removal `4091af883` await Sol review, not integrated yet.
+Crossposting characterization final `9e6614a3` (50 assertions) and configured
+spellcheck baseline `3b367d0c` (15) await independent review. Preview and stash
+history are preserved. Journal external-hook question and held work unchanged.
+
 Latest 2026-09-23 timing status: `5b260732a` production correction is Sol-clear
 for subject/clear/blur and delayed-image/untouched-decline cases. Permanent test
 `49b75211e` is being tightened to await actual clear completion before blur;
