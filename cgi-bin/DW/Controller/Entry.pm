@@ -264,6 +264,13 @@ sub new_handler {
         }
     }
 
+    return _render_new_form( $vars, $post, $get, $remote, $errors, $warnings,
+        $spellcheck_requested );
+}
+
+sub _render_new_form {
+    my ( $vars, $post, $get, $remote, $errors, $warnings, $spellcheck_requested ) = @_;
+
 # this is an error in the user-submitted data, so regenerate the form with the error message and previous values
     $vars->{errors}   = $errors;
     $vars->{warnings} = $warnings;
