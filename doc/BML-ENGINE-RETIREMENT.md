@@ -175,3 +175,169 @@ Everything W5 explicitly excluded (`LJ::Protocol.pm:562,2339`,
 `DW::BML.pm`, `lj-bml-blocks.pl`, `BMLInit.pm`, journal request adapters,
 `LJ::Web::entry_form`) reappears in this audit's §1-§2 as still-live engine
 dependencies, none of them ordinary-caller conversions W5's pattern applies to.
+
+## 5. Post-F2 state (W9 re-audit)
+
+Re-audit base: root HEAD `072b7dba6` ("Record F2 entry page deletion
+integration"). F2 has landed: confirmed `entry_form`/`entry_form_decode`
+are gone from `LJ::Web.pm` (`grep -c BML::ml cgi-bin/LJ/Web.pm` → 0) and
+`find htdocs ext -iname '*.bml'` returns exactly the three config files —
+`htdocs/_config.bml`, `ext/dw-nonfree/htdocs/_config.bml`,
+`ext/dw-nonfree/htdocs/_config-local.bml` — matching §0's prediction.
+
+### 5.1 Full re-grep, cgi-bin/views/htdocs/app.psgi/bin/ext
+
+`BML::`/`$BML::` (per-file counts, `grep -rn 'BML::' ...`):
+
+| File | Count | Disposition |
+| --- | --- | --- |
+| `cgi-bin/DW/BML.pm` | 199 | Engine (Plack shim). Unchanged bucket from §1/§2. |
+| `cgi-bin/Apache/BML.pm` | 166 | Engine (core decoder). Unchanged bucket. |
+| `cgi-bin/lj-bml-blocks.pl` | 15 | Engine bootstrap. Unchanged bucket. |
+| `cgi-bin/LJ/Global/BMLInit.pm` | 12 | Engine bootstrap. Unchanged bucket. |
+| `cgi-bin/LJ/Web.pm` | 5 | `:391,:564` are W5's own native-first/BML-fallback lines (`did_post`/`check_referer`) — expected, by design, not a new finding. `:459,:471,:554` are comments. **New finding, not previously documented: `:269` (`help_icon`) and `:295` (`bad_input`) — see §5.2.** |
+| `cgi-bin/Plack/Middleware/DW/RequestWrapper.pm` | 2 | `:56` `set_language` call (comment `:53`) — unchanged from §1/T4's audit. |
+| `cgi-bin/LJ/Protocol.pm` | 2 | `:562` (held), `:2335` (held, `DISABLE_PROTOCOL` third arg) — unchanged. |
+| `cgi-bin/DW/Controller/Journal.pm` | 2 | `:285` (`data_handler:*`, held), `:317` (`LJ::make_journal`'s adapter). **W8 (queued for review, not yet on this root) converts `:317` to a plain `DW::Request` and adds a marked/conditional adapter at `LJ::S2.pm:2468` instead — not yet reflected in this root's line count.** |
+| `cgi-bin/ljlib.pl` | 1 | `:496`, W5's `defined &BML::reset_cookies` guard — unchanged, by design. |
+| `cgi-bin/bml/scheme/tt_runner.look` | 1 | Engine bridge — unchanged bucket. |
+| `cgi-bin/bml/scheme/global.look` | 1 | `BML::ml(...)` call at `:105` inside a nav-item loop — engine-internal, only reachable from a `.bml`/look-file render. |
+| `cgi-bin/LJ/UniqCookie.pm`, `cgi-bin/LJ/PageStats.pm` (`:145`), `cgi-bin/LJ/Lang.pm` | 1 each | Comment (UniqCookie, Lang) or held (`PageStats::get_request`) — unchanged. |
+
+`Apache::BML`/`DW::BML` as bareword package references (beyond the `BML::`
+table above, i.e. `use`/`->new`/`->render`/`->resolve_path` style):
+`app.psgi:26` (`use DW::BML`), `cgi-bin/DW/Controller/Journal.pm:25`
+(`use DW::BML`, for `:285`'s adapter), `cgi-bin/LJ/Global/BMLInit.pm:20`
+(`use Apache::BML`) — all unchanged from §1.
+
+`<?` BML-tag literals (excluding the engine files themselves and the two
+`.look` files, which legitimately use them):
+
+| Site | Literal | Disposition |
+| --- | --- | --- |
+| `cgi-bin/LJ/Web.pm:269` (`help_icon`) | `"$pre<?help ... help?>$post"` | **New finding.** `help_icon` (BML) has 8 live call sites feeding *native* TT templates or template variables directly — see §5.2. A native sibling, `help_icon_html` ("like help_icon, but no BML"), already exists one function below it and is unused by any of them. |
+| `cgi-bin/LJ/Web.pm:295` (`bad_input`) | `"<?badcontent?>\n<ul>\n"` | **New finding.** Zero callers anywhere (`grep -rn "LJ::bad_input\b"` matches only the definition and its own doc comment) — dead code, and the tag itself doesn't even match `global.look`'s real `BADINPUT` block (case/name mismatch), so it was already broken even for a hypothetical BML caller. |
+| `views/shop/confirm.tt:15-19` | `<?p $email_checkbox p?>` plus raw `if ( $email_checkbox ) { ... }` Perl inside the template | **New finding, and not really a BML-retirement issue** — this block is corrupted TT (literal Perl control flow and a stray BML tag inside a `.tt` file, plus a malformed `[%` on the line above it). Pre-existing breakage surfaced by this grep, unrelated to F2/W5/W8; flagged for whoever owns `views/shop/confirm.tt`, not actioned here. |
+| `views/beta.tt.text:43,49`, `ext/dw-nonfree/views/beta.tt.text.local:1`, `ext/dw-nonfree/views/index.tt.text.local:12`, `ext/dw-nonfree/bin/upgrading/en_DW.dat:432` | `<?ljuser NAME ljuser?>` / `<?ljcomm NAME ljcomm?>` inside translation *values* | **New finding.** `<?ljuser?>`/`<?ljcomm?>` are the two static blocks `lj-bml-blocks.pl:33-34` registers, resolved only by `bml_decode`/`bml_block` during an actual BML render. `LJ::Lang::ml()` (`LJ/Lang.pm:569-587`, confirmed by grep — no `bml_decode`/`BML::` call anywhere in `LJ::Lang.pm`) does not post-process its return value through BML at all, so any native `.tt` page rendering one of these ml keys via `dw.ml(...)` would show the literal tag text, not a linked username/community. Not verified end-to-end against a live render of every consuming page (out of this docs-only pass's scope) but the mechanism gap is confirmed by source. |
+
+`LJ::Widget` (framework + subclass inventory): the framework file itself
+(`cgi-bin/LJ/Widget.pm`) has zero `BML::` references (`grep -c` confirms) and
+is unrelated to BML engine retirement directly. W9 Part A deleted the four
+subclasses with zero remaining callers that a prior pass (informally,
+"W6" per the assignment) had flagged: `LJ::Widget::TagCloud`,
+`::ExamplePostWidget`, `::ExampleAjaxWidget`, `::ExampleRenderWidget`
+(re-verified independently by grep across `cgi-bin/`, `views/`, `htdocs/`,
+`ext/`, `bin/`, `t/` before deleting — see the Part A commit message for the
+full evidence). 28 `LJ::Widget`/`DW::Widget` subclasses remain; a full
+per-widget caller audit of all 28 was not performed in this pass (out of
+the stated Part A scope, which named specific widgets to re-verify, not an
+open-ended widget sweep) — flagged here as a possible future package if a
+broader dead-widget sweep is wanted.
+
+### 5.2 New findings this re-audit surfaced (not in the original W6 doc)
+
+1. **`LJ::help_icon` (`cgi-bin/LJ/Web.pm:264-270`) is a live, visible bug on
+   multiple native pages.** It returns a literal `<?help URL help?>` BML tag
+   that only resolves inside an actual BML render (`global.look:16`'s
+   `HELP` macro). It is called directly, or passed as a template variable
+   later called from a `.tt` file, from: `cgi-bin/LJ/Widget/S2PropGroup.pm`
+   (4 call sites), `cgi-bin/LJ/Widget/NavStripChooser.pm:60`,
+   `cgi-bin/LJ/Widget/JournalTitles.pm:35`,
+   `cgi-bin/DW/Controller/Manage/Profile.pm:188`,
+   `cgi-bin/DW/Controller/SettingsHub.pm:381` — consumed by
+   `views/manage/profile.tt:50`, `views/widget/journaltitles.tt:7`,
+   `views/widget/moodthemechooser.tt:4`, `views/edit/icons.tt:62,72,82,251`,
+   `views/widget/navstripchooser.tt:7`, all native TT pages. A native
+   sibling already exists and is already used correctly elsewhere
+   (`cgi-bin/LJ/Talk.pm:1585`, `cgi-bin/DW/Controller/EditIcons.pm:298`):
+   `LJ::help_icon_html` ("like help_icon, but no BML"). This looks like a
+   migration gap (callers updated to native TT, but not switched from
+   `help_icon` to `help_icon_html`) rather than anything F2/W5/W8 touched.
+   Not fixed here (Part B is docs-only); flagged as a small, well-scoped
+   future package (swap the call sites, confirm each rendered page shows a
+   real help link instead of literal tag text).
+2. **`LJ::bad_input` (`cgi-bin/LJ/Web.pm:292-299`) is dead code with a
+   broken tag** — see table above. Candidate for deletion in a future
+   small package, same shape as W9 Part A.
+3. **`views/shop/confirm.tt`'s error-display block is corrupted TT**,
+   unrelated to BML retirement — flagged for the owning team, not this
+   package.
+4. **Translation strings can embed `<?ljuser?>`/`<?ljcomm?>` tags that
+   native `LJ::Lang::ml()` never expands** — see table above. This is a
+   narrower, more general version of the `help_icon` problem (a BML-only
+   content convention silently surviving into native-rendered translation
+   values) and may affect other translation keys beyond the four sites
+   found by this pass's literal grep (a key could embed these tags without
+   the literal `<?` substring being adjacent to `ljuser`/`ljcomm` in a way
+   this grep's pattern would still catch — the pattern used was
+   `<?[a-zA-Z_]`, which is not scope-limited to only these two tag names,
+   so this is unlikely to have missed other tag names, but was not
+   independently re-verified with a second pattern).
+
+### 5.3 What W5/W7-A/F2/W8 removed vs. what is left
+
+Removed since the original audit (`28bafa21f`): the app.psgi `__rpc_*`
+fallback and `%LJ::AJAX_URI_MAP` default (W7-A); `LJ::User::Login.pm`,
+`DW::User::Rename.pm`, `DW::Hooks::Changelog.pm`, `LJ::Sysban.pm`,
+`ljlib.pl`'s `reset_cookies` guard, `LJ::Web.pm`'s
+`did_post`/`check_referer`/`check_form_auth`/`error_list`/`error_noremote`/
+`warning_list`, `LJ::Poll.pm`'s needlogin branch, `LJ::Console.pm`'s
+`<?_ml?>` literal (W5); the three entry `.bml` pages, `draft.bml`,
+`LJ::Web::entry_form`/`entry_form_decode` (F2); and (queued for review, not
+yet on this root) `DW::Controller::Journal.pm:317`'s adapter, replaced with
+a plain `DW::Request` plus a marked/conditional adapter at
+`LJ::S2.pm:2468` for the held `s2_head_content_extra` hook (W8).
+
+Left, matching §1/§2's classification exactly (nothing has moved buckets):
+the engine itself (`Apache::BML.pm`, `DW::BML.pm`, `lj-bml-blocks.pl`,
+`BMLInit.pm`, the two `.look` files); `RequestWrapper.pm:56`'s
+`set_language` shim (see T4 cross-check below for a refinement to when this
+is actually safe to drop); `LJ::Protocol.pm:562,2335` (held); `PageStats.pm`
+(held); `DW::Controller::Journal.pm:285`'s `data_handler:*` adapter (held,
+explicitly untouched by W8 too); `LJ::S2.pm:2468`'s hook adapter (held,
+now conditional per W8 rather than unconditional); the three `_config.bml`
+files; the two scheme `.look` files; `lj-bml-blocks.pl`; `t/plack-bml.t`.
+
+### 5.4 Cross-check against T4 (`doc/BML-TRANSLATION-SHIM.md`, themenav,
+`bml-sonnet-translation-shim-audit-20260923` at `cb9c10831`) and this
+document's own W6 baseline
+
+T4 is a rigorous, well-evidenced companion audit of the *translation* shim
+family (`RequestWrapper.pm`'s `BML::set_language`, `<?_ml?>`,
+`BML::ml`/`%BML::ML`) that this document treated only at a summary level
+in §1-§2. Its mechanism-level findings (§2-§4, §7 of T4) do not contradict
+anything here — they refine §2's `RequestWrapper.pm` row and step 2 of §3's
+removal sequence with exact line citations this document didn't have.
+
+**One factual contradiction found, with evidence:** T4 §3, §6, §8, and §9
+repeatedly rely on a claim that eight named `.bml` pages —
+`customize/index.bml`, `customize/options.bml`,
+`manage/circle/editfilters.bml`, `manage/settings/index.bml`,
+`imguploadrte.bml`, `imgpreview.bml`, `tools/fck_poll.bml`,
+`stc/fck/editor/dialog/imguploadrte.bml` — are "out of F2's scope and still
+render through this exact path" as of T4's own stated audit base,
+`4a3a24100`. This is not correct: `git ls-tree -r 4a3a2410062cc377bb812e22a483fe0c7dd46ff2 --name-only`
+lists no `.bml` files at all beyond `_config.bml`/`_config-local.bml`,
+`editjournal.bml`, `imgupload.bml`, `update.bml`, and
+`tools/endpoints/draft.bml` — the same five (plus two `_config` files) this
+document's own §0 already found at the earlier base `28bafa21f`. All eight
+of T4's named pages were migrated to native controllers and deleted by
+commits that are themselves ancestors of `4a3a24100` (confirmed via
+`git merge-base --is-ancestor`), well before T4's audit — e.g.
+`bcdced59f` "Migrate customization pages to native controllers" (deletes
+`customize/index.bml`), `035e27196`/`bcb019343` "Migrate the settings hub
+to native request handling and templates"/"Migrate settings hub from BML
+to TT" (deletes `manage/settings/index.bml`), `6dca2d923` "Consolidate FCK
+image dialogs on native routes" (the FCK/`imguploadrte.bml`/`imgpreview.bml`
+family). This means T4's §8/§9 caveat — that `RequestWrapper.pm:56`'s
+removal needs those eight specific pages individually re-audited for
+inline `BML::ml()`/`%BML::ML` calls before their own dispatch runs — rests
+on pages that do not exist in this tree at any commit T4 or this document
+audited; the caveat's *shape* (re-audit whichever `.bml` pages still exist
+for this specific risk) still stands, but its *named instances* do not,
+and today (post-F2) there are zero non-config `.bml` pages left to
+re-audit for it at all — T4's own risk, as stated, is now moot on this
+root, though T4's broader sequencing point (gate `RequestWrapper.pm:56`'s
+removal on "no `.bml` page can call `BML::ml()` before its own dispatch"
+rather than merely "F2 landed") remains valid in principle for any
+`.bml` page that might exist at removal time.
