@@ -2340,3 +2340,8 @@ was included in this package.
 - Anonymous browser64ce682e7 and public sharefa1767d51 are queued independent review;
   worker acceptance passed, no root integration or public anonymous claim.
 - Next independent Themes package is retained altlogin GET test-only baseline.
+
+- Anonymous callable browser64ce682e7 independently CLEAR normal/named/clean EOF,
+  cleanup and visual; integratedd5aa0905b. Foreman replay session29015 active at
+  this checkpoint. Native narrow retry usable; retained narrow overflow baseline.
+  Public anonymous activation remains separate from this accepted callable gate.

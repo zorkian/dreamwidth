@@ -1,3 +1,19 @@
+## Anonymous callable browser accepted and integrated
+
+Sol64ce682e7b9d78c7824303fafa8a3955cc542660 CLEAR: independent normal,
+named failure, clean EOF, owned process cleanup and visual review. Retained390
+horizontal overflow is baseline; native390 retry usable with one date error.
+Integrated rootd5aa0905b. Foreman exact browser replay running session29015,
+log /tmp/bml-anonymous-callable-browser.log; do not duplicate. Accepted callable
+HTTP/browser now complete, public anonymous activation still gated on continuation.
+
+Widgets active branch bml-terra-anonymous-native-failure-20260923 implements only
+callable error continuation from13f4ea792. It briefly stopped after incorrect
+standalone compile bootstrap; explicitly resumed through implementation/tests.
+_do_post defaults and public routes must remain unchanged. Themes active retained
+altlogin GET test-only baseline; fixture corrections routed (valid initial target,
+omitted hook keys for snapshot). Public sharefa176 remains Sol next review.
+
 ## Retained auth sequence accepted; next two reviews queued
 
 Sol bc021+5a2 CLEAR108/scoped tidy. Integrated9df4acb83/e018e1fa0; foreman
