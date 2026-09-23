@@ -178,6 +178,10 @@ async function assertUsableControl(page, selector, width) {
         fixtureDone = childDone(fixture, 'fixture');
         const next = lines(fixture, fixtureDone);
         const startup = JSON.parse(await nextOrExit(next, fixtureDone, 'startup'));
+        const fixtureState = async (command, label) => {
+            fixture.stdin.write(JSON.stringify(command) + '\n');
+            return JSON.parse(await nextOrExit(next, fixtureDone, label));
+        };
 
         server = spawn(
             'perl',
@@ -210,8 +214,7 @@ async function assertUsableControl(page, selector, width) {
             page.click('[type=submit]'),
         ]);
 
-        fixture.stdin.write(JSON.stringify({state: 1}) + '\n');
-        const before = JSON.parse(await nextOrExit(next, fixtureDone, 'initial state'));
+        const before = await fixtureState({state: 1}, 'initial state');
 
         for (const width of [1280, 390]) {
             await page.setViewport({width, height: 844});
@@ -240,9 +243,35 @@ async function assertUsableControl(page, selector, width) {
             await page.screenshot({path: `${output}/altlogin-${width}.png`, fullPage: true});
         }
 
-        fixture.stdin.write(JSON.stringify({state: 1}) + '\n');
-        const after = JSON.parse(await nextOrExit(next, fixtureDone, 'final state'));
+        const after = await fixtureState({state: 1}, 'final state');
         assert.deepEqual(after, before, 'alternate-login GET leaves draft/editor state unchanged');
+
+        const seeded = await fixtureState({seed_draft: 1}, 'seeded draft state');
+        assert.equal(seeded.draft, '"update GET draft"', 'fixture persisted a nonblank draft body');
+        assert.deepEqual(
+            seeded.props,
+            {
+                subject: 'update GET draft subject',
+                taglist: 'update-get-draft-tag',
+                editor: 'markdown0',
+            },
+            'fixture persisted complete frozen draft properties',
+        );
+        assert.equal(seeded.legacy_editor, 'always_rich', 'fixture preserves legacy editor property');
+        assert.equal(seeded.editor, 'markdown0', 'fixture preserves editor2 property');
+
+        const dialogPromise = new Promise(resolve => page.once('dialog', resolve));
+        const restoreNavigation = page.goto(
+            `http://127.0.0.1:${port}/__test_update_altlogin?altlogin=1&user=browser%3Cuser%3E`,
+            {waitUntil: 'domcontentloaded'},
+        );
+        const dialog = await dialogPromise;
+        assert.equal(dialog.type(), 'confirm', 'saved draft uses the retained confirmation dialog');
+        assert.match(dialog.message(), /Restore from saved draft/, 'saved draft confirmation is shown');
+        const whileDialog = await fixtureState({state: 1}, 'draft state while restore dialog is open');
+        assert.deepEqual(whileDialog, seeded, 'opening alternate-login GET does not mutate saved draft state');
+        await dialog.dismiss();
+        await restoreNavigation;
 
         if (process.env.UPDATE_ALTLOGIN_INTENTIONAL_FAIL) {
             throw Error('intentional alternate-login cleanup failure');

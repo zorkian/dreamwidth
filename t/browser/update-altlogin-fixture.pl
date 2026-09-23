@@ -30,8 +30,16 @@ while (<STDIN>) {
     my $q = decode_json($_);
     if ( $q->{seed_draft} ) {
         $u->set_prop( 'entry_draft', '"update GET draft"' );
-        $u->set_prop( 'draft_properties',
-            nfreeze( { subject => 'update GET draft subject', editor => 'markdown0' } ) );
+        $u->set_prop(
+            'draft_properties',
+            nfreeze(
+                {
+                    subject => 'update GET draft subject',
+                    taglist => 'update-get-draft-tag',
+                    editor  => 'markdown0',
+                }
+            )
+        );
     }
     print encode_json( state() ) . "\n" if $q->{state} || $q->{seed_draft};
 }
