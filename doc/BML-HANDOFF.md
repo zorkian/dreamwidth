@@ -1,3 +1,20 @@
+## Public community final matrix recheck pending
+
+Final candidate HTTP1be4ae912b2167573f5117edfa3b9d0f5c65eeef (99 worker tests)
+and production-POST browser9790446adebcf991c869befd6473c601f8eff035 are queued
+Sol. Foreman found narrow false-positive rows: precedence checked entry counters
+but not resolved target; readonly used invalid token; beta lacked exact redirect;
+missing token was empty rather than absent. Widgets corrects these test-only
+proofs before acceptance. Six-line production1d/core98 remains source/core clear.
+No public community POST integration yet. GET-only BML harvesting is deliberate;
+POST must use the captured real production route.
+
+Source-only manager property handoff is BML-MANAGER-PROPERTY-POST.md. Retained
+readonly/sysban/redirect/raw-value differences are explicit; no implementation,
+manager routing, deletion or reporting change. Themes test-only anonymous
+password-form baseline is active in its isolated container; no production/auth
+changes and automatic review is respected. Root has no active test processes.
+
 ## Corrected anonymous POST source contract preserved
 
 BML-ANONYMOUS-POST-SCHEMA.md is the corrected source-only audit. Retained
