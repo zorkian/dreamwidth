@@ -1,3 +1,13 @@
+## Ordinary manager-delete baseline integrated
+
+Sol6ade9d30be64d79680bc6632ccefcbcc96aabbea CLEAR; integrated6c70d09ef. Foreman
+actual retained-form test30 PASS (/tmp/bml-manager-delete-integrated.log), focused
+tidy PASS. Exact selected deletion/unrelated preservation, original flat request
+seed/ref and decode/log/spam/protocol order are characterized without reporting
+or crosspost calls. Test-only, no native manager action/routing implementation.
+Root session44491 complete. Sol now reviews readonly843 callable; public readonly
+activation remains worker WIP. Two-key Web heading conversion remains worker WIP.
+
 ## Latest readonly correction and review queue
 
 Readonly source84384adaa06de1cb81ca329a11ae3f01f578aed2 now actually passes the

@@ -2155,3 +2155,12 @@ readonly forms remain BML. Foreman five suites266 PASS, real browser PASS and
 helper cleanup empty, compile1607 PASS. Fulltidy1139 PASS after removing one extra
 blank line from community browser server ineb47aca13. Desktop/narrow terminal
 captures preserved; narrow cannot-post verified visually. No BML deletion/push.
+
+### Ordinary manager-delete baseline accepted
+
+Sol6ade9d30b CLEAR, integrated6c70d09ef. Actual retained manager form with valid
+session/token and visible delete control removes only the intended other-poster
+community entry. Fresh unrelated content/security/props survive; original flat
+seed/ref and decode -> delete log -> spam check -> protocol order are asserted,
+with deletion extras and zero report/crosspost calls. Foreman30 PASS and focused
+tidy PASS. This supplies test-only baseline evidence, not native manager rollout.
