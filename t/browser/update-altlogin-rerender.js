@@ -114,12 +114,18 @@ async function loadRerender(page, url, requestState, before, width) {
             assert.equal(await page.$eval('[name=security]', element => element.value), 'access');
             await page.waitForFunction(() => document.querySelector('[name=entrytime_date]'));
             assert.match(rawMarkup, /(?:name="entrytime_date"[^>]*value="not-a-year-02-03"|value="not-a-year-02-03"[^>]*name="entrytime_date")/);
-            const initializedDate = await page.$eval('[name=entrytime_date]', element => ({
-                value: element.value,
-                today: new Date().toISOString().slice(0, 10),
-                trusted: document.querySelector('#js-trust-datetime').value,
-            }));
-            // Native initialization replaces an untrusted legacy timestamp with local today.
+            const initializedDate = await page.$eval('[name=entrytime_date]', element => {
+                const zeropad = n => (n < 10 ? '0' + n : String(n));
+                const d = new Date();
+                return {
+                    value: element.value,
+                    today: [d.getFullYear(), zeropad(d.getMonth() + 1), zeropad(d.getDate())].join('-'),
+                    trusted: document.querySelector('#js-trust-datetime').value,
+                };
+            });
+            // Native initialization replaces an untrusted legacy timestamp with local today;
+            // compute the expected value from local date components, not UTC, to match
+            // htdocs/js/pages/entry/new.js's setTimeToNow().
             assert.equal(initializedDate.value, initializedDate.today);
             assert.equal(initializedDate.trusted, '1');
             assert.match(await page.$eval('body', element => element.innerText), /browser alternate-login retry marker/);
