@@ -106,18 +106,17 @@ subtest
     );
     };
 
-subtest 'BML::set_language(en) forwarding is a safe no-op with no active request' => sub {
+subtest 'forcing English with no active request is a safe no-op' => sub {
     DW::Request->reset;
     ok( !LJ::Lang::request_context(), 'no request context exists before the call' );
-    ok( eval { BML::set_language('en'); 1 },
-        'BML::set_language does not die with no active request' )
+    ok( eval { LJ::Lang::set_request_context( lang => 'en', getter => undef ); 1 },
+        'set_request_context does not die with no active request' )
         or diag("died: $@");
     ok( !LJ::Lang::request_context(),
-'no request context is created either -- LJ::Lang::set_request_context early-returns without a DW::Request'
-    );
-    is( LJ::Lang::get_effective_lang(), $LJ::DEFAULT_LANG,
-'LJ::Lang::ml falls back to the configured default language, not "en", with no request to force'
-    );
+        'no request context is created: set_request_context early-returns without a DW::Request' );
+    is( LJ::Lang::get_effective_lang(),
+        $LJ::DEFAULT_LANG,
+        'LJ::Lang::ml falls back to the configured default language with no request to force' );
 };
 
 done_testing;
