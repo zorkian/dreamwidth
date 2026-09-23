@@ -1519,3 +1519,17 @@ checks, after widgets Terra completes customization1/4.
   baseline2c6 passes28 but Sol identified incomplete original finite assertions:
   exact returned body/backdate/RTE, full draft properties, disabled edit control.
   Widgets owns that narrow correction;2c6 is not accepted/integrated yet.
+
+### Continued native spellcheck and next image insertion contract
+
+- Collected native spellcheck candidate d920ae962 (worker26 HTTP assertions);
+  Sol independently reviewing it. Themes owns required real RTE acceptance via
+  reversible isolated test-server configuration and in-process checker stub,
+  with no external checker or production configuration changes.
+- Widgets is correcting the sole remaining legacy baseline issue at044ad05b4:
+  hidden switched_rte_on is always0, so meaningful stored-RTE proof must observe
+  conditional useRichText initialization and a non-RTE response control.
+- Preserved Sol's completed ordinary image-popup audit in
+  BML-IMAGE-INSERT-ACCEPTANCE.md. Existing imgupload performs URL insertion,
+  not uploads; modern plain-editor parity is the bounded next package. Actual
+  media upload APIs and external deployment interfaces remain outside scope.
