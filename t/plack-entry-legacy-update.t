@@ -7,6 +7,7 @@ use warnings;
 
 use Test::More;
 use HTTP::Request::Common;
+use URI;
 use HTML::Form;
 use Plack::Test;
 
@@ -133,11 +134,37 @@ test_psgi $app, sub {
     {
         no warnings 'redefine';
         local *LJ::BetaFeatures::user_in_beta = sub { 1 };
+        my @query = (
+            subject      => 'Encoded subject & punctuation',
+            prop_taglist => 'first tag, second/tag',
+            repeated     => 'first value',
+            repeated     => 'second/value',
+        );
+        my $expected_query = {
+            subject      => ['Encoded subject & punctuation'],
+            prop_taglist => ['first tag, second/tag'],
+
+            # LJ::parse_args retains repeated legacy query values in one NUL-delimited scalar.
+            repeated => ["first value\0second/value"],
+        };
+
         for my $path ( '/update', '/update.bml' ) {
-            my $res = $request->( GET $path );
+            my $source = URI->new("http://localhost$path");
+            $source->query_form(@query);
+            my $res = $request->( GET $source->path_query );
             is( $res->code, 302, "$path beta GET redirects to the native editor" );
-            like( $res->header('Location') || '',
-                qr{/entry/new}, "$path beta GET retains the native editor destination" );
+
+            my $destination = URI->new_abs( $res->header('Location') || '', 'http://localhost' );
+            is( $destination->path, '/entry/new',
+                "$path beta GET retains the native editor destination" );
+            my %actual_query;
+            my @destination_query = $destination->query_form;
+            while (@destination_query) {
+                my ( $name, $value ) = splice @destination_query, 0, 2;
+                push @{ $actual_query{$name} }, $value;
+            }
+            is_deeply( \%actual_query, $expected_query,
+                "$path beta GET preserves encoded and repeated query arguments" );
         }
     }
 };

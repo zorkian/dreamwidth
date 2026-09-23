@@ -11,9 +11,11 @@ names from the native `DW::Controller::Entry` form at `/entry/new`.
   is its direct spelling.  The ordinary authenticated, non-beta fixture in
   `t/plack-entry-legacy-update.t` renders and posts through both spellings.
 - For an authenticated user in `updatepage`, `update.bml` redirects a GET that
-  is not a form post to `/entry/new`, retaining GET arguments.  The conditional
-  is deliberately `!LJ::did_post()`: a direct legacy POST remains handled by
-  the BML page while it is retained.
+  is not a form post to `/entry/new`, retaining encoded GET arguments and the
+  legacy NUL-delimited representation of repeated values through
+  `LJ::create_url`.  The conditional is deliberately
+  `!LJ::did_post()`: a direct legacy POST remains handled by the BML page while
+  it is retained.
 - `usejournal` is accepted from GET/POST by legacy BML.  It is the legacy
   target-journal selector and maps to modern `usejournal`; this baseline only
   posts to the authenticated owner’s private journal.
