@@ -192,6 +192,7 @@ function waitForPort() {
             await page.setViewport({width, height: 844, deviceScaleFactor: 1});
             await page.goto(managerURL, {waitUntil: 'networkidle0'});
             assert.ok(await page.$('[name="action:delete"]'), `${width}px manager stays on retained BML delete surface`);
+            assert.ok(await page.$('[name="action:deletespam"]'), `${width}px manager retains delete-spam action`);
             assert.ok(await page.$('[name="action:savemaintainer"]'), `${width}px manager retains maintainer action`);
             assert.ok(await visible('[name="action:delete"]'), `${width}px manager delete action is visible`);
             await page.screenshot({path: `${output}/community-manager-bml-${width}.png`, fullPage: true});
