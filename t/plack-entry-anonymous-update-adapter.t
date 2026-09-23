@@ -127,6 +127,16 @@ test_psgi $retained_app, sub {
 my $retained = retained_form($retained_html);
 ok( $retained, 'actual retained anonymous update form is available' )
     or BAIL_OUT('retained anonymous update form missing');
+like(
+    $retained_html,
+    qr/var restoredSubject\s*=\s*"";/,
+    'anonymous retained form initializes an absent draft subject as an empty JavaScript string'
+);
+unlike(
+    $retained_html,
+qr/var restored(?:Subject|Userpic|Taglist|MoodID|Mood|Location|Music|AdultReason|CommentSet|CommentScr|AdultCnt)\s*=\s*;/,
+    'anonymous retained form emits no malformed absent draft-property JavaScript assignments'
+);
 
 sub post_from_retained {
     my (%values) = @_;
