@@ -1,3 +1,18 @@
+## Current immutable reviews and next packages
+
+Sol independently reproduced the retained manager XPost error at preactivation
+9177ba357 and proved the narrow 3a7923d89 guard removes it after an exact static
+build. Ordinary retained forms still initialize; manager forms retain
+savemaintainer, delete, and deletespam. Permanent initializer regression
+73b560543 is queued for independent preguard-failure/fixed-pass review. Public
+same-poster community activation remains pending its actual-app acceptance.
+
+Terminal public activation 2ed3af945 is committed and queued for Sol review;
+worker reports 53 combined HTTP checks, normal/named-failure browser, tidy1137,
+and compile1607. It is not yet integrated. Themes is preparing the next separate
+callable readonly warning/form package, without public activation or anonymous
+schema changes. Existing deployment-hook and platform-held work stays held.
+
 ## Public community browser diagnosis
 
 Sol source diagnosis: XPostAccount null-master error belongs to pre-existing

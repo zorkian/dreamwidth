@@ -2117,3 +2117,12 @@ then updater dereferences a null master. Sol source-confirmed this pre-existing
 baseline defect; native same-poster form uses js-post-entry and skips the legacy
 initializer. Separate narrow setup guard/regression assigned; public activation
 still held, no error suppression or removed manager actions accepted.
+
+### Retained manager XPost baseline independently confirmed
+
+Sol exact preactivation9177 browser: ordinary legacy updateForm with master has
+no error; manager updateForm without master retains all three legacy actions but
+throws in xpostAcctUpdated. Exact guard3a792 runtime replay removes that error
+without changing the actions or ordinary initialization. Permanent test73b560543
+and public same-poster activation acceptance remain under independent review.
+Terminal public2ed3af945 also queued; no accepted integration or deletion yet.
