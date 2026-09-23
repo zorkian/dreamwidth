@@ -45,6 +45,19 @@ users persists). Nothing external was touched.
   short-circuit). Root validation (allowlist only, no moderation suites):
   14 files 432 PASS incl. t/plack-bml-runtime-callers.t; tidy/compile logs
   /tmp/bml-runtime-callers-integrated-*.log.
+- W7-B journal adapter characterization 74fb0ab92 + doc fix 810c4c3da
+  bml-opus-review CLEAR; integrated on root as 7db93986c, 372669ac9
+  (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
+  Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
+  s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- W8 decoupled journal request d886c0b7d HELD: LJ::S2::Page is also reached
+  from the native entry preview with a plain DW::Request, so always wrapping
+  an adapter at the hook site changes what production hooks see on previews;
+  fix in progress (wrap only when Journal.pm marks the opts) plus a
+  non-vacuous test that calls LJ::S2::Page directly for both shapes.
+- T4 translation shim audit cb9c10831 (docs) bml-opus-review CLEAR on
+  citations; awaiting one correction (it named eight remaining .bml pages
+  that no longer exist) before integration.
 - F2 entry legacy page deletion range 8e2f89fe7, 0bd8bfb89, 6a81f04b5,
   322205da0 (atop 508229ae9) bml-opus-review CLEAR; integrated on root as
   9f8428871, b46084e34, 2977bd054, 8d03595e9 (clean picks). update.bml,
