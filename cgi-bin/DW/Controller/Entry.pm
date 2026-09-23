@@ -813,8 +813,10 @@ sub legacy_update_get_handler {
         return $r->OK;
     }
 
-    # Preserve retained BML's own error pages for these contexts.
-    return undef if $remote->identity || !$remote->can_post;
+    # These terminal branches precede alternate-login/share just as retained
+    # update does; they do not initialize entry form state.
+    return legacy_update_terminal_response('identity') if $remote->identity;
+    return legacy_update_terminal_response('cantpost') unless $remote->can_post;
 
     # The first callable package deliberately excludes the retained alternate
     # login UI and remote share fetch path.

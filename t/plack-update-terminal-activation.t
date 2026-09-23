@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Test::More;
+use HTTP::Request::Common;
+use Plack::Test;
+BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use DW::Request;
+use LJ::Entry;
+use LJ::Session;
+use LJ::Test qw(temp_user);
+use Storable qw(nfreeze thaw);
+my $app = do "$ENV{LJHOME}/app.psgi";
+die $@ unless ref $app eq 'CODE';
+my $u = temp_user();
+$u->update_self( { status => 'A' } );
+my $owner_id = $u->id;
+$u->set_draft_text('terminal activation draft body');
+$u->set_prop( draft_properties =>
+        nfreeze( { subject => 'terminal draft subject', taglist => 'terminal-tag' } ) );
+my $session = LJ::Session->create( $u, nolog => 1 );
+my $cookie =
+      'ljmastersession='
+    . $session->master_cookie_string
+    . '; ljloggedin='
+    . $session->loggedin_cookie_string;
+my $orig_identity   = \&LJ::User::identity;
+my $orig_can_post   = \&LJ::User::can_post;
+my $orig_readonly   = \&LJ::User::readonly;
+my $orig_run_hook   = \&LJ::Hooks::run_hook;
+my $orig_accounts   = \&DW::External::Account::get_external_accounts;
+my $update_fields   = 0;
+my $account_lookups = 0;
+{
+    no warnings 'redefine';
+    local *LJ::User::identity =
+        sub { return 1 if DW::Request->get->get_args->{identity}; return $orig_identity->(@_) };
+    local *LJ::User::can_post =
+        sub { return 0 if DW::Request->get->get_args->{cantpost}; return $orig_can_post->(@_) };
+    local *LJ::User::readonly = sub {
+        return 1 if DW::Request->get && DW::Request->get->get_args->{readonly};
+        return $orig_readonly->(@_);
+    };
+    local *LJ::BetaFeatures::user_in_beta =
+        sub { return DW::Request->get && DW::Request->get->get_args->{beta}; };
+    local *LJ::Hooks::run_hook = sub {
+        ++$update_fields if $_[0] eq 'update_fields';
+        return $orig_run_hook->(@_);
+    };
+    local *DW::External::Account::get_external_accounts = sub {
+        ++$account_lookups;
+        return $orig_accounts->(@_);
+    };
+    local $LJ::MSG_NO_POST = q{Configured <a href="/no-post">cannot post</a>};
+    test_psgi $app, sub {
+        my $send    = shift;
+        my $request = sub {
+            my ($req) = @_;
+            $req->header( Cookie => $cookie );
+            return $send->($req);
+        };
+        my $entry_count = sub {
+            my $fresh = LJ::load_userid( $owner_id, 1 );
+            return $fresh->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
+                undef, $fresh->id );
+        };
+        my $before_count = $entry_count->();
+        my $before_draft = LJ::load_userid( $owner_id, 1 )->draft_text;
+        my $before_props = thaw( LJ::load_userid( $owner_id, 1 )->prop('draft_properties') );
+        for my $path (
+            '/update?identity=1', '/update.bml?identity=1',
+            '/update?cantpost=1', '/update.bml?cantpost=1'
+            )
+        {
+            my $res = $request->( GET $path);
+            is( $res->code, 200, "$path terminal status" );
+            unlike(
+                $res->content,
+                qr{id=['"](?:updateForm|js-post-entry)['"]},
+                "$path has no form"
+            );
+            is( $res->header('Location'), undef, "$path terminal response does not redirect" );
+            if ( $path =~ /identity/ ) {
+                like( $res->content, qr/<title>Sorry<\/title>/i, "$path identity title" );
+                like(
+                    $res->content,
+                    qr/Non-\Q$LJ::SITENAME\E users can't post entries/,
+                    "$path identity message substitutes the site name"
+                );
+            }
+            else {
+                like( $res->content, qr/<title>Can't Post<\/title>/i, "$path cannot-post title" );
+                like(
+                    $res->content,
+                    qr{Configured <a href="/no-post">cannot post</a>},
+                    "$path configured message"
+                );
+            }
+        }
+        for my $variant (qw(identity cantpost)) {
+            my $invalid = $request->( GET "/update?$variant=1&usejournal=does-not-exist" );
+            like(
+                $invalid->content,
+                qr/Invalid usejournal argument\./,
+                "invalid target precedes $variant terminal response"
+            );
+            unlike( $invalid->content, qr/id=['"]js-post-entry['"]/,
+                "invalid target does not initialize native form for $variant" );
+        }
+        {
+            local $LJ::MSG_NO_POST = '';
+            my $fallback = $request->( GET '/update?cantpost=1' );
+            like(
+                $fallback->content,
+                qr/<title>Can't Post<\/title>/i,
+                'empty configured message retains the legacy title'
+            );
+            like(
+                $fallback->content,
+                qr/Sorry: you can't post at this time\./,
+                'empty configured message uses the legacy translated fallback'
+            );
+        }
+        for my $variant (qw(identity cantpost)) {
+            my $beta = $request->( GET "/update?$variant=1&beta=1" );
+            is( $beta->code, 302, "beta redirect precedes $variant terminal response" );
+        }
+        is( $update_fields,   0, 'terminal requests do not invoke update_fields' );
+        is( $account_lookups, 0, 'terminal requests do not enumerate external accounts' );
+        is( $entry_count->(), $before_count, 'terminal requests create no entries' );
+        my $fresh = LJ::load_userid( $owner_id, 1 );
+        is( $fresh->draft_text, $before_draft, 'terminal requests leave draft body unchanged' );
+        is_deeply( thaw( $fresh->prop('draft_properties') ),
+            $before_props, 'terminal requests leave draft properties unchanged' );
+        my $ordinary = $request->( GET '/update?subject=ordinary' );
+        like( $ordinary->content, qr/id=["']js-post-entry["']/,
+            'ordinary eligible GET remains native after terminals' );
+        my $anonymous = $send->( GET '/update' );
+        like( $anonymous->content, qr/id=['"]updateForm['"]/,
+            'anonymous GET remains the retained credential form' );
+        like( $anonymous->content, qr/name=['"]user['"]/,
+            'anonymous retained form has user control' );
+        like( $anonymous->content, qr/name=['"]password['"]/,
+            'anonymous retained form has password control' );
+
+        my $readonly = $request->( GET '/update?readonly=1' );
+        like( $readonly->content, qr/id=['"]updateForm['"]/,
+            'readonly GET remains the retained form' );
+        like(
+            $readonly->content,
+            qr/read-only mode/i,
+            'readonly GET retains the legacy visible warning'
+        );
+
+        for my $path ( '/update?altlogin=1', '/update?share=not-a-url' ) {
+            my $res = $request->( GET $path );
+            like( $res->content, qr/id=["']updateForm["']/, "$path remains retained BML form" );
+        }
+    };
+}
+done_testing;
