@@ -71,9 +71,9 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    button absence, retained submitted metadata/date/editor controls and the old
    edit stored-RTE nuance, plus unchanged draft state. Test-only separate branch;
    see BML-EDITOR-SPELLCHECK-ACCEPTANCE.md. No external checker process.
-3. Sol: review exact crossposting characterization9e6614a3 (parents785a5004,
-   6ec3844f), worker50 PASS. Ordinary own-journal real forms and stubbed scheduler;
-   no delivery. Then review preview correction and remaining spellcheck proofs.
+3. Sol: crossposting characterization9e6614a3 is bounded-clear and integrated
+   d6aa5dbb7; foreman crosspost/spellcheck combined65 PASS. Review preview
+   correction and remaining spellcheck proofs next. No external delivery.
    Native spellcheck implementation is subsequent bounded work on integrated
    preview base; /tmp/spellcheck-native-plan.md is in Themenav's checkout host.
 

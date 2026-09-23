@@ -1491,3 +1491,17 @@ checks, after widgets Terra completes customization1/4.
   legacy requirepost GET returned bare localized text, while error_ml wraps a
   full Error page. Terra is returning native localized text directly and adding
   exact GET-body/HEAD assertions. Candidate source/deletion otherwise reviewed.
+
+### Recovery reconciled; characterization ranges integrated
+
+- Confirmed clean root and committed final draft ledger2b164e4ee after recovery.
+  Existing worker sessions survived; stale 4c/6616 findings were not reopened.
+  Handoff rewritten around current accepted state in b28269995; old chronology
+  remains here and in Git history rather than contradictory active queues.
+- Sol bounded-clear spellcheck baseline3b367d0c integrated f6a8261d7, foreman15
+  PASS. Sol bounded-clear crosspost range through9e6614a3 integrated d6aa5dbb7;
+  combined two-file65 PASS, /tmp/bml-crosspost-spellcheck-integrated.log.
+- Widgets now extends only finite legacy spellcheck retention/disabled/draft
+  proofs; Themenav finishes preview bare-response correction; Sol reviews exact
+  fixes and native spellcheck plan. No deployment-hook approval or held-work
+  authorization was inferred from recovery.
