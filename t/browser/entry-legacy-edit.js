@@ -1,4 +1,4 @@
-// Exercise the native owned-edit adapter through its isolated retained route.
+// Exercise the registered native owned-edit dispatch through retained controls.
 // Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,7 +35,7 @@ function waitForPort() {
             socket.once('error', () => {
                 socket.destroy();
                 Date.now() >= deadline
-                    ? reject(new Error('native owned-edit server did not listen'))
+                    ? reject(new Error('public owned-edit server did not listen'))
                     : setTimeout(tryPort, 100);
             });
         };
@@ -114,7 +114,7 @@ function waitForPort() {
             serverDone.then(result => ({result})),
         ]);
         if (!ready.ready) {
-            throw new Error(`native owned-edit server exited before startup: ${JSON.stringify(ready.result)}`);
+            throw new Error(`public owned-edit server exited before startup: ${JSON.stringify(ready.result)}`);
         }
 
         browser = await puppeteer.launch({
@@ -177,10 +177,10 @@ function waitForPort() {
         await page.$eval('[name=event]', element => { element.value = 'Native adapter browser body'; });
         await submit('input[name="action:save"][value="Save Changes"], input[name="action:save"][value="Save"]');
         assert.ok(await page.$(`.successlinks a[href="/entry/${data.user}/${data.id}/edit"]`),
-            'native adapter success renders the modern entry edit link');
+            'registered dispatch success renders the modern entry edit link');
         let after = await state();
-        assert.equal(after.target_subject, 'Native adapter browser subject', 'native adapter persists subject');
-        assert.equal(after.target_body, 'Native adapter browser body', 'native adapter persists body');
+        assert.equal(after.target_subject, 'Native adapter browser subject', 'registered dispatch persists subject');
+        assert.equal(after.target_body, 'Native adapter browser body', 'registered dispatch persists body');
         if (process.env.ENTRY_LEGACY_EDIT_FAIL_AFTER_SAVE) {
             throw new Error('intentional native owned-edit cleanup probe');
         }
@@ -227,12 +227,12 @@ function waitForPort() {
         await submit('input[name="action:delete"]');
         allowDeleteDialog = false;
         after = await state();
-        assert.equal(after.target_valid, false, 'native adapter delete removes only the target entry');
-        assert.equal(after.other_valid, true, 'native adapter delete preserves the unrelated entry');
+        assert.equal(after.target_valid, false, 'registered dispatch delete removes only the target entry');
+        assert.equal(after.other_valid, true, 'registered dispatch delete preserves the unrelated entry');
         assert.deepEqual(unexpectedDialogs, [], 'retained edit actions raise no unexpected browser dialogs');
-        assert.deepEqual(errors, [], 'native owned-edit browser flow has no JavaScript errors');
-        assert.deepEqual(failures, [], 'native owned-edit browser flow has no network failures');
-        console.log('PASS: retained owned edit uses the isolated native adapter and modern retry');
+        assert.deepEqual(errors, [], 'registered owned-edit browser flow has no JavaScript errors');
+        assert.deepEqual(failures, [], 'registered owned-edit browser flow has no network failures');
+        console.log('PASS: retained owned edit uses the registered production dispatch and modern retry');
     } finally {
         try {
             if (browser) await browser.close();
