@@ -11,6 +11,8 @@ use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
+local $LJ::DISABLED{tags} = 0;
+
 use DW::Controller::Entry;
 use DW::Request;
 use DW::Request::Plack;
@@ -39,7 +41,11 @@ $poster->set_prop( 'draft_properties',
 my $manager_id = $manager->id;
 my $poster_id  = $poster->id;
 my $comm       = temp_comm();
-LJ::set_rel( $comm, $manager, 'A' );
+$manager->join_community( $comm, 1, 1 );
+LJ::set_rel( $comm->userid, $manager->userid, 'A' );
+DW::Cache->request->remove( 'rel', $comm->userid . '-' . $manager->userid . '-A' );
+$comm->set_comm_settings( $manager, { membership => 'open', postlevel => 'members' } );
+$comm->set_prop( opt_tagpermissions => 'private,private' );
 
 my $own = $manager->t_post_fake_comm_entry(
     $comm,
@@ -49,6 +55,12 @@ my $own = $manager->t_post_fake_comm_entry(
 $own->set_prop( current_location => 'community native location' );
 $own->set_prop( current_music    => 'community native music' );
 $own->set_prop( editor           => 'html_raw0' );
+ok(
+    LJ::Tags::update_logtags(
+        $comm, $own->jitemid, { set_string => 'community tag, second tag', remote => $manager }
+    ),
+    'disposable community tags are seeded'
+);
 my $pic = LJ::Userpic->create( $manager,
     data => file_contents("$ENV{LJHOME}/t/data/userpics/good.jpg"), );
 ok( $pic, 'disposable manager userpic is created' ) or BAIL_OUT('missing userpic');
@@ -211,12 +223,17 @@ sub native_request {
         }
         is( $same_poster_form->value('prop_picture_keyword'),
             'community-native-pic', 'ordinary form retains userpic' );
+        is(
+            $same_poster_form->value('taglist'),
+            'community tag, second tag',
+            'ordinary form retains seeded tags'
+        );
         my @direct_custom_bits = map { $_->value }
             grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $direct_form->inputs;
         my @legacy_custom_bits = map { $_->value }
             grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $same_poster_form->inputs;
         is_deeply( \@legacy_custom_bits, \@direct_custom_bits,
-            'community custom-bit controls match direct native form' );
+            'community form has no personal custom bits, matching direct native form' );
         ok(
             !$same_poster_form->find_input('action:savemaintainer'),
             'ordinary edit lacks the maintainer action'
