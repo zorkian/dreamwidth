@@ -349,6 +349,60 @@ sub legacy_owned_edit_get_handler {
     );
 }
 
+# Callable-only community item-bearing retained edit GET composition. Public
+# editjournal routing remains BML-owned until this seam's route parity is reviewed.
+sub legacy_community_edit_get_handler {
+    my (%opts) = @_;
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+    my $get     = $r->get_args;
+    my @itemids = $get->get_all('itemid');
+    return undef unless @itemids == 1 && $itemids[0] =~ /\A[1-9][0-9]*\z/;
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($remote);
+    my $authas = $get->{authas} || $remote->user;
+    my $actor  = LJ::get_authas_user($authas);
+    return undef unless LJ::isu($actor) && $actor->is_individual && !$actor->readonly;
+    my $name = $get->{usejournal} || $get->{journal};
+    return undef unless $name;
+    my $journal = LJ::load_user($name);
+    return undef unless LJ::isu($journal) && $journal->is_comm && !$journal->readonly;
+    my $ditemid = $itemids[0];
+    my $entry   = LJ::Entry->new( $journal, ditemid => $ditemid );
+    return undef unless $entry && $entry->valid && $entry->ditemid == $ditemid;
+    return undef unless $entry->visible_to($actor) && $entry->editable_by($actor);
+    my $path   = '/entry/' . $journal->user . '/' . $ditemid . '/edit';
+    my $action = LJ::create_url( $path, keep_query_string => 1 );
+
+    if ( $entry->poster->equals($actor) ) {
+        if ( LJ::BetaFeatures->user_in_beta( $actor => 'updatepage' ) ) {
+            $r->status(302);
+            $r->header_out( Location => $path );
+            return $r->OK;
+        }
+        my %crosspost;
+        if ( my $xpost = $entry->prop('xpostdetail') ) {
+            my $detail = DW::External::Account->xpost_string_to_hash($xpost);
+            %crosspost = map { $_ => 1 } keys %{ $detail || {} };
+        }
+        my $vars = _init(
+            {
+                usejournal           => $journal->username,
+                remote               => $actor,
+                datetime             => $entry->eventtime_mysql,
+                trust_datetime_value => 1,
+                crosspost            => \%crosspost,
+                sticky_entry         => $journal->sticky_entries_lookup->{$ditemid}
+            },
+            undef
+        );
+        return _render_edit_form( $r, $vars, DW::FormErrors->new, DW::FormErrors->new, undef,
+            $entry, $actor, $journal, 0, action => { edit => 1, url => $action } );
+    }
+    return undef unless $actor->can_manage($journal);
+    return _render_maintainer_form( $entry, $journal, $actor, action => $action );
+}
+
 # Dispatch the narrow ordinary-owned retained edit subset after the route
 # composition has preserved picker and BML fallthroughs.  The retained resolver
 # decides the item from GET first and then the hidden POST field; only a
