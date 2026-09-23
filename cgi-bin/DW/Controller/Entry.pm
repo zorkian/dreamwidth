@@ -269,9 +269,8 @@ sub new_handler {
         $spellcheck_requested );
 }
 
-# Callable compatibility seam for ordinary retained /update POSTs. Route
-# registration, transforms, alternate login, and community posting remain
-# deliberately outside this first adapter slice.
+# Callable compatibility seam for retained /update POSTs. Route registration,
+# transforms, and alternate login remain deliberately outside this adapter.
 sub legacy_update_handler {
     my (%opts) = @_;
 
@@ -284,8 +283,8 @@ sub legacy_update_handler {
     my $legacy_get  = DW::Entry::Legacy::legacy_post_hash($get);
     my $remote      = $opts{remote} || LJ::get_remote();
 
-    # This initial slice only covers the authenticated owner's ordinary post.
-    # Everything else must continue to the retained BML implementation.
+    # This adapter only covers an authenticated retained post. Everything else
+    # must continue to the retained BML implementation.
     return undef unless LJ::isu($remote);
     return undef
         if $legacy_get->{altlogin}
@@ -298,21 +297,23 @@ sub legacy_update_handler {
         if $legacy_post->{user}
         && LJ::canonical_username( $legacy_post->{user} ) ne $remote->user;
 
-    my $target =
-        exists $legacy_post->{usejournal}
-        ? $legacy_post->{usejournal}
-        : $legacy_get->{usejournal};
-    return undef
-        if defined $target
-        && length $target
-        && LJ::canonical_username($target) ne $remote->user;
-
     # The retained route rejects token/referer and readonly failures before
     # decode_entry_form.  The decoder is hook-bearing, so this guard must remain
     # ahead of preparation rather than using it merely to build a retry form.
     return undef
         unless LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer();
     return undef if $remote->readonly;
+
+    # Retained update reads the target solely from its submitted form. In
+    # particular, an explicit empty usejournal means the owner even when the
+    # URL still names a community. A bad named target must not become an owner
+    # post merely because the callable seam cannot handle it.
+    my $journal = $remote;
+    if ( defined $legacy_post->{usejournal} && length $legacy_post->{usejournal} ) {
+        $journal = LJ::load_user( $legacy_post->{usejournal} );
+        return undef unless LJ::isu($journal);
+        return undef if $journal->readonly || !$remote->can_post_to($journal);
+    }
 
     my $prepared = DW::Entry::Legacy::prepare_entry_form(
         {
@@ -337,7 +338,7 @@ sub legacy_update_handler {
     my %post_res = _do_post(
         $prepared->{canonical},
         { noauth => 1,       u       => $remote },
-        { poster => $remote, journal => $remote },
+        { poster => $remote, journal => $journal },
         warnings       => $warnings,
         legacy_success => {
             request          => $prepared->{request},

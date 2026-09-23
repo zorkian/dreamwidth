@@ -11,6 +11,7 @@ use HTML::Form;
 use Plack::Test;
 use URI;
 use Scalar::Util qw(refaddr);
+use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
@@ -19,7 +20,7 @@ use DW::Request;
 use DW::Request::Plack;
 use LJ::Entry;
 use LJ::Session;
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_comm temp_user);
 use LJ::Userpic;
 use Plack::Middleware::DW::RequestWrapper;
 
@@ -373,5 +374,284 @@ is_deeply(
 );
 ok( grep( { defined $_ && $_ eq '1' } @adapter_altlogin ),
     'test-only routing passes the alternate-login query to the callable adapter' );
+
+# Community and moderation remain callable-only coverage: the test wrapper is
+# deliberately the only route that invokes the adapter.
+sub entry_count {
+    my ($user) = @_;
+    my $fresh = LJ::load_userid( $user->id, 1 );
+    return $fresh->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef,
+        $fresh->id );
+}
+
+sub moderation_count {
+    my ($community) = @_;
+    my $dbcm = LJ::get_cluster_master($community);
+    return $dbcm->selectrow_array( 'SELECT COUNT(*) FROM modlog WHERE journalid=?',
+        undef, $community->id );
+}
+
+sub latest_moderation {
+    my ($community) = @_;
+    my $dbcm = LJ::get_cluster_master($community);
+    my ( $posterid, $frozen ) = $dbcm->selectrow_array(
+        'SELECT l.posterid, b.request_stor FROM modlog l JOIN modblob b '
+            . 'ON b.journalid=l.journalid AND b.modid=l.modid '
+            . 'WHERE l.journalid=? ORDER BY l.modid DESC LIMIT 1',
+        undef, $community->id
+    );
+    return unless defined $posterid;
+    return { posterid => $posterid, request => thaw($frozen) };
+}
+
+sub retained_form {
+    my ( $path, $label ) = @_;
+    my $form;
+    test_psgi $legacy_app, sub {
+        my $send = shift;
+        my $res  = $send->( GET $path, Cookie => $cookie );
+        is( $res->code, 200, "$label retained form GET succeeds" );
+        $form = update_form( $res->content );
+    };
+    ok( $form, "$label retains an actual old update form" ) or return;
+    return $form;
+}
+
+sub adapter_post {
+    my ( $form, $path, $label ) = @_;
+    my $post = $form->click('action:update');
+    $post->uri( 'http://localhost' . $path );
+    $post->header( Referer => 'http://localhost' . $path );
+    my $res;
+    test_psgi $adapter_app, sub { $res = shift->($post); };
+    is( $res->code, 200, "$label callable adapter handles the retained POST" );
+    unlike( $res->content, qr/retained BML fallback marker/, "$label does not fall back to BML" );
+    return $res;
+}
+
+my $community = temp_comm();
+LJ::set_rel( $community, $owner, 'P' );
+ok( $owner->can_post_to($community), 'owner can post to disposable community' );
+my $community_before       = entry_count($community);
+my $owner_before_community = entry_count($owner);
+my $community_path         = '/update?usejournal=' . $community->user;
+my $community_form         = retained_form( $community_path, 'authorized community' );
+my $community_response;
+
+if ($community_form) {
+    is( $community_form->value('usejournal'),
+        $community->user, 'retained community form carries its submitted target' );
+    $community_form->value( subject               => 'Adapter community subject' );
+    $community_form->value( event                 => '<p>Adapter community body</p>' );
+    $community_form->value( security              => 'public' );
+    $community_form->value( prop_current_location => 'Adapter community location' );
+    $community_form->value( switched_rte_on       => 1 );
+    my ( $decoded, $spam, $success );
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    my $run_hook  = \&LJ::Hooks::run_hook;
+    {
+        no warnings 'redefine';
+        local *LJ::Protocol::schedule_xposts = sub {
+            die 'community adapter must not schedule owner crossposts';
+        };
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $name, @args ) = @_;
+            $decoded = $args[1] if $name eq 'decode_entry_form';
+            $spam    = $args[1] if $name eq 'spam_check';
+            return $run_hooks->(@_);
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ( $name, @args ) = @_;
+            $success = {@args} if $name eq 'after_entry_post_extra_html';
+            return $run_hook->(@_);
+        };
+        my $res = adapter_post( $community_form, $community_path, 'authorized community' );
+        $community_response = $res->content;
+        like(
+            $res->content,
+            qr/\Q$community->{user}\E|my entries/i,
+            'community response retains community success context'
+        );
+    }
+    is(
+        entry_count($community),
+        $community_before + 1,
+        'community post creates one community entry'
+    );
+    is( entry_count($owner), $owner_before_community, 'community post creates no owner entry' );
+    my $fresh_community = LJ::load_userid( $community->id, 1 );
+    my ($community_jitemid) = $fresh_community->selectrow_array(
+        'SELECT jitemid FROM log2 WHERE journalid=? ORDER BY jitemid DESC LIMIT 1',
+        undef, $community->id );
+    my $community_entry =
+        $community_jitemid
+        ? fresh_entry( $fresh_community, $community_jitemid )
+        : undef;
+    ok( $community_entry, 'community post creates a loadable community entry' )
+        or diag( 'community response: '
+            . ( $community_response // '' )
+            . '; moderation count: '
+            . moderation_count($community) );
+    if ($community_entry) {
+        is( $community_entry->posterid,
+            $owner->id, 'community entry preserves the authenticated poster' );
+        is(
+            $community_entry->subject_raw,
+            'Adapter community subject',
+            'community entry persists subject'
+        );
+        is(
+            $community_entry->event_raw,
+            '<p>Adapter community body</p>',
+            'community entry persists RTE body'
+        );
+        is(
+            $community_entry->prop('current_location'),
+            'Adapter community location',
+            'community entry persists metadata'
+        );
+        is( $community_entry->prop('used_rte'), 1, 'community entry preserves RTE marker' );
+    }
+    is( refaddr($decoded), refaddr($spam), 'community spam hook receives decoded flat request' );
+    is(
+        refaddr($decoded),
+        refaddr( $success->{request} ),
+        'community success hook receives decoded flat request'
+    );
+    is( $success->{request}{usejournal},
+        $community->user, 'community hooks receive submitted target seed' );
+    for my $request ( $decoded, $spam, $success->{request} ) {
+        is( $request->{mode}, 'postevent', 'community hook request retains legacy mode seed' );
+        is( $request->{ver}, $LJ::PROTOCOL_VER,
+            'community hook request retains legacy protocol version' );
+        is( $request->{user}, $owner->user, 'community hook request retains legacy owner seed' );
+        is(
+            $request->{password},
+            $community_form->value('password'),
+            'community hook request retains submitted password seed'
+        );
+        is( $request->{xpost}, '0', 'community hook request retains disabled xpost seed' );
+    }
+}
+
+# POST owns target selection: an explicit empty field and an absent field both
+# select the owner, regardless of a community-valued query string.
+for my $case ( [ explicit_empty => '' ], [ absent => undef ], ) {
+    my ( $label, $target ) = @$case;
+    my $form = retained_form( $community_path, "$label owner precedence" ) or next;
+    $form->value( subject => "Adapter $label owner subject" );
+    $form->value( event   => "Adapter $label owner body" );
+    if ( defined $target ) {
+        $form->value( usejournal => $target );
+    }
+    else {
+        $form->find_input('usejournal')->value(undef);
+    }
+    my $before_owner     = entry_count($owner);
+    my $before_community = entry_count($community);
+    adapter_post( $form, $community_path, "$label owner precedence" );
+    is( entry_count($owner), $before_owner + 1, "$label POST selects owner" );
+    is( entry_count($community), $before_community,
+        "$label POST does not use GET community target" );
+}
+
+for my $target ( 'does-not-exist', $community->user ) {
+    my $form = retained_form( '/update', "target $target fallback" ) or next;
+    $form->value( subject    => "Adapter rejected $target subject" );
+    $form->value( event      => "Adapter rejected $target body" );
+    $form->value( usejournal => $target );
+    if ( $target eq $community->user ) {
+        LJ::clear_rel( $community, $owner, 'P' );
+        ok( !$owner->can_post_to($community), 'community target is denied before callable POST' );
+    }
+    my ( $before_owner, $before_community ) = ( entry_count($owner), entry_count($community) );
+    my $post = $form->click('action:update');
+    $post->uri('http://localhost/update');
+    $post->header( Referer => 'http://localhost/update' );
+    my $res;
+    test_psgi $adapter_app, sub { $res = shift->($post); };
+    is( $res->code, 418, "target $target remains BML fallback" );
+    is( entry_count($owner), $before_owner,
+        "target $target cannot fall back to owner persistence" );
+    is( entry_count($community), $before_community,
+        "target $target cannot persist community data" );
+}
+
+my $moderated = temp_comm();
+$moderated->set_prop( moderated => 1 );
+LJ::set_rel( $moderated, $owner, 'P' );
+ok( $owner->can_post_to($moderated), 'owner can submit to disposable moderated community' );
+$owner->set_draft_text('Adapter moderation draft body');
+$owner->set_prop(
+    draft_properties => nfreeze( { subject => 'Adapter moderation draft subject' } ) );
+my $moderated_path = '/update?usejournal=' . $moderated->user;
+my $moderated_form = retained_form( $moderated_path, 'moderated community' );
+
+if ($moderated_form) {
+    $moderated_form->value( subject               => 'Adapter moderated subject' );
+    $moderated_form->value( event                 => '<p>Adapter moderated body</p>' );
+    $moderated_form->value( prop_current_location => 'Adapter moderated location' );
+    my $before = moderation_count($moderated);
+    my ( $decoded, $spam, @success );
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    my $run_hook  = \&LJ::Hooks::run_hook;
+    {
+        no warnings 'redefine';
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $name, @args ) = @_;
+            $decoded = $args[1] if $name eq 'decode_entry_form';
+            $spam    = $args[1] if $name eq 'spam_check';
+            return $run_hooks->(@_);
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ( $name, @args ) = @_;
+            push @success, {@args} if $name eq 'after_entry_post_extra_html';
+            return $run_hook->(@_);
+        };
+        my $res = adapter_post( $moderated_form, $moderated_path, 'moderated community' );
+        like(
+            $res->content,
+            qr/(?:moderation|moderated|approval|queue)/i,
+            'moderated community receives a meaningful moderation response'
+        );
+    }
+    is(
+        moderation_count($moderated),
+        $before + 1,
+        'moderated community creates one moderation request'
+    );
+    my $stored = latest_moderation($moderated);
+    is( $stored->{posterid},            $owner->id,       'moderation retains poster' );
+    is( $stored->{request}{usejournal}, $moderated->user, 'moderation retains submitted target' );
+    is( $stored->{request}{event}, '<p>Adapter moderated body</p>', 'moderation retains body' );
+    is( refaddr($decoded), refaddr($spam), 'moderation spam hook receives decoded flat request' );
+    is( scalar @success, 1, 'moderation calls only legacy HTML success hook' );
+    is( $success[0]{user}, undef, 'moderation success hook has no published journal link context' );
+    is( refaddr( $success[0]{request} ),
+        refaddr($decoded), 'moderation success hook retains decoded request identity' );
+
+    for my $request ( $decoded, $spam, $success[0]{request} ) {
+        is( $request->{mode}, 'postevent', 'moderation hook request retains legacy mode seed' );
+        is( $request->{ver}, $LJ::PROTOCOL_VER,
+            'moderation hook request retains legacy protocol version' );
+        is( $request->{user}, $owner->user, 'moderation hook request retains legacy owner seed' );
+        is(
+            $request->{password},
+            $moderated_form->value('password'),
+            'moderation hook request retains submitted password seed'
+        );
+        is( $request->{usejournal},
+            $moderated->user, 'moderation hook request retains submitted community seed' );
+        is( $request->{xpost}, '0', 'moderation hook request retains disabled xpost seed' );
+    }
+    is( entry_count($moderated), 0, 'moderated submission creates no published community entry' );
+    my $fresh_owner = LJ::load_userid( $owner->id, 1 );
+    is( $fresh_owner->draft_text, '', 'moderated submission clears draft body' );
+    is_deeply(
+        thaw( $fresh_owner->prop('draft_properties') ),
+        { subject => 'Adapter moderation draft subject' },
+        'moderated submission retains draft properties'
+    );
+}
 
 done_testing;
