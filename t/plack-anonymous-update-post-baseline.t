@@ -231,15 +231,31 @@ test_psgi $app, sub {
         my $form                 = update_form( $res->content, $path );
         ok( $form, "$case->{label} starts from the retained anonymous form" ) or next;
         $form->action( 'http://localhost' . $path );
-        $form->value( user             => $owner->user );
-        $form->value( password         => $case->{password} );
-        $form->value( subject          => $case->{subject} );
-        $form->value( event            => $case->{body} );
-        $form->value( event_format     => undef ) if $form->find_input('event_format');
-        $form->value( richtext_default => undef ) if $form->find_input('richtext_default');
+        $form->value( user     => $owner->user );
+        $form->value( password => $case->{password} );
+        $form->value( subject  => $case->{subject} );
+        $form->value( event    => $case->{body} );
+
+        # An unchecked legacy checkbox is absent from the request.  Disable it
+        # here rather than assigning it a value, then make the two RTE state
+        # fields explicitly false where the retained form emits them.
+        $form->find_input('event_format')->disabled(1) if $form->find_input('event_format');
+        for my $field (qw(richtext_default switched_rte_on)) {
+            $form->value( $field => 0 ) if $form->find_input($field);
+        }
 
         my $before = entry_count($owner_id);
         my $post   = $form->click('action:update');
+        unlike(
+            $post->content,
+            qr/(?:^|&)event_format(?:=|&|$)/,
+            "$case->{label} plain-format request omits the unchecked event_format control"
+        );
+        unlike(
+            $post->content,
+            qr/(?:^|&)(?:richtext_default|switched_rte_on)=(?:1|on|true|yes)(?:&|$)/i,
+            "$case->{label} plain-format request has no truthy RTE state"
+        );
         $post->uri("http://localhost$path");
         $post->header( Referer => "http://localhost$path" );
         $res = $request->($post);
