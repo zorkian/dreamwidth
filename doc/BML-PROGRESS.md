@@ -2430,3 +2430,12 @@ Combined5files1131 exposed stale retained-auth and share expectations only;
 test-only correction is active before combined validation is complete. No
 production rollback or changed authentication policy is indicated. Native-owned
 attempts stay native after first authentication; structural declines retain BML.
+
+## Explicit resume and raw-hook builder integration (2026-09-23)
+
+User lifted the pause at331f1f042 and replaced the Codex team with Claude agents
+in the same worktrees/containers (mapping in BML-PAUSED-2026-09-23.md). Opus
+reviewer re-proved both c717 residuals; Themes corrected them in770db2b2d with
+regression tests proved to fail at base. Range d19ba22d5..770db2b2d integrated as
+96c253a44..e473de049. Root pure5files21 PASS, tidy1178 and compile1607 PASS. Still
+an unused pure helper: no hook, auth, save, route or public change.

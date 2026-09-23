@@ -7,6 +7,23 @@ bml-opus-review) in the same worktrees, branches and containers; the mapping is
 in the checkpoint's resume record. All other held boundaries remain. Entries
 below this line predate the resume.
 
+## Unused raw-hook builder integrated (resume, 2026-09-23)
+
+bml-opus-review CLEAR of Themes correction
+770db2b2d2d2647b846354cca9d530f235b795dd atop c7170b572 (pure-helper gate only).
+Full range d19ba22d5, c7170b572, 770db2b2d integrated on root as 96c253a44,
+ff2163b19, e473de049. Literal `xpost` is removed with the crosspost namespace and
+repeated `entrytime_date`/`entrytime_time` decline before any mutation; native
+parser policy is unchanged. Reviewer non-blocking notes: valid-then-invalid
+ordering cases also passed at base, and the widened pattern drops `xpost_*`
+keys, for which no legitimate non-`prop_xpost_*` field was found.
+Root five pure suites PASS, 21 top-level tests; full tidy1178 and compile1607
+PASS. Logs in container 8d7783a043d8:
+/tmp/bml-raw-builder-integrated-{prove,tidy,compile}.log.
+No hook invocation, auth, save, route or public caller is added. Widgets browser
+candidate 4a1d9d121 (atop ce4a7d63c) is under independent review; Themes pure
+composition WIP is preserved as 815d9fa23 and being finished.
+
 ## Pure raw-hook builder candidate pending review
 
 Themes d19ba22d5fcd06622c9a3a9fefb593c577663d8f is committed but NOT
