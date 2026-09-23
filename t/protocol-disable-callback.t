@@ -1,10 +1,9 @@
 #!/usr/bin/perl
 # Regression coverage for $LJ::DISABLE_PROTOCOL{getevents}'s third callback
-# argument: LJ::Protocol.pm:2333-2338 constructs a DW::BML::RequestAdapter
-# explicitly instead of going through BML::get_request(), preserving the
-# exact object shape that call always returned (DW::BML.pm:231-236 --
-# $Apache::BML::r is never set under Plack). See
-# doc/BML-PROTOCOL-PAGESTATS.md for the characterization this implements.
+# argument: LJ::Protocol.pm's getevents constructs a DW::BML::RequestAdapter
+# directly from the current DW::Request, or passes undef outside a request --
+# the held external callback ABI this file locks in. See
+# doc/BML-PROTOCOL-PAGESTATS.md for the original characterization.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;

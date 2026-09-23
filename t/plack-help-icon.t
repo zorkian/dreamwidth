@@ -1,8 +1,8 @@
 #!/usr/bin/perl
-# Characterizes LJ::Web::help_icon's dead "<?help ... help?>" BML tag, which
-# only ever resolved inside an actively-rendering BML page (global.look's
-# HELP macro), reaching native TT pages via LJ::Widget::JournalTitles (a
-# widget), DW::Controller::Manage::Profile (a controller), and
+# Characterizes LJ::Web::help_icon's dead "<?help ... help?>" tag, which
+# never resolved from a native TT page (only the BML rendering engine's own
+# macro understood it), reaching native TT pages via LJ::Widget::JournalTitles
+# (a widget), DW::Controller::Manage::Profile (a controller), and
 # LJ::Web::subscribe_interface (feeding the /manage/tracking and
 # /manage/settings notifications pages), and proves the fix: help_icon now
 # renders the same real help link help_icon_html already produces elsewhere

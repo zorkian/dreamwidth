@@ -134,11 +134,9 @@ subtest 'debug preserves full global keys without a getter' => sub {
 };
 
 # LJ::Web::entry_form (deleted by F2, formerly the caller exercised here) is
-# gone; DW::Widget::LatestInbox is the current production caller of
-# LJ::error_list (LJ::Web.pm has no other real caller left besides the BML
-# engine's own global.look:81, which is out of scope for native language
-# coverage). Force its "could not retrieve inbox" branch to exercise the
-# same LJ::error_list -> error.procrequest heading lookup this file
+# gone; DW::Widget::LatestInbox is the only remaining caller of
+# LJ::error_list. Force its "could not retrieve inbox" branch to exercise
+# the same LJ::error_list -> error.procrequest heading lookup this file
 # characterizes, preserving the same isolation property the old subtest
 # proved (the heading key reaches the request getter exactly once).
 subtest 'actual DW::Widget::LatestInbox error path reaches the native error heading once' => sub {
