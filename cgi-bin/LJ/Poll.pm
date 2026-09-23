@@ -937,7 +937,7 @@ sub render {
     }
 
     # Users cannot vote unless they are logged in
-    return "<?needlogin?>"
+    return LJ::error_noremote()
         if $mode eq 'enter' && !$remote;
 
     my $do_form = $mode eq 'enter' && $can_vote;

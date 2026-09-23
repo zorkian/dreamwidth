@@ -171,4 +171,97 @@ subtest 'LJ::start_request resets BML cookie cache without a blanket eval' => su
     is_deeply( \%BML::COOKIE_M, {}, 'start_request clears the BML cookie cache' );
     is( $BML::COOKIES_PARSED, 0, 'start_request resets the BML cookies-parsed flag' );
 };
+
+subtest 'LJ::did_post prefers DW::Request over BML::get_method' => sub {
+    DW::Request->reset;
+    my $get_r = DW::Request::Standard->new( GET 'http://localhost/foo' );
+    $get_r->header_in( Host => 'localhost' );
+    is( LJ::did_post(), '', 'GET request is not a post' );
+
+    DW::Request->reset;
+    my $post_r = DW::Request::Standard->new( POST 'http://localhost/foo', [] );
+    $post_r->header_in( Host => 'localhost' );
+    ok( LJ::did_post(), 'POST request is a post' );
+
+    DW::Request->reset;
+    ok( !LJ::did_post(), 'no active request falls back to BML::get_method, which is false' );
+};
+
+subtest 'LJ::check_referer prefers DW::Request over BML::get_client_header' => sub {
+    DW::Request->reset;
+    my $r =
+        DW::Request::Standard->new( GET 'http://localhost/foo', Referer => 'http://localhost/bar' );
+    $r->header_in( Host => 'localhost' );
+    ok( LJ::check_referer('/bar'), 'referer picked up from the active native request matches' );
+    ok( !LJ::check_referer('/other'),
+        'referer picked up from the active request does not match /other' );
+    DW::Request->reset;
+};
+
+subtest 'LJ::check_form_auth reads post_args from DW::Request, not $BMLCodeBlock::POST' => sub {
+    local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'bmlRuntimeCallersFormAuth';
+    my $chal = LJ::form_auth(1);
+
+    DW::Request->reset;
+    my $r = DW::Request::Standard->new( POST 'http://localhost/foo', [ lj_form_auth => $chal ] );
+    $r->header_in( Host           => 'localhost' );
+    $r->header_in( 'Content-Type' => 'application/x-www-form-urlencoded' );
+    ok( LJ::check_form_auth(),
+        'valid form auth token in native post_args validates with no explicit arg' );
+    DW::Request->reset;
+};
+
+subtest 'LJ::error_list and LJ::warning_list emit real divs, not the broken <?...?> tags' => sub {
+    my $errors = LJ::error_list();
+    unlike( $errors, qr/<\?errorbar/, 'error_list no longer emits the broken <?errorbar?> tag' );
+    like( $errors, qr/<div class="errorbar">/, 'error_list emits a real errorbar div' );
+
+    my $warnings = LJ::warning_list('a warning');
+    unlike( $warnings, qr/<\?warningbar/,
+        'warning_list no longer emits the broken <?warningbar?> tag' );
+    like( $warnings, qr/<div class="warningbar">/, 'warning_list emits a real warningbar div' );
+    like( $warnings, qr/<li>a warning<\/li>/, 'warning_list still lists the given warning text' );
+};
+
+subtest 'LJ::error_noremote emits a real login link, not the broken <?needlogin?> tag' => sub {
+    DW::Request->reset;
+    my $no_req_msg = LJ::error_noremote();
+    unlike( $no_req_msg, qr/<\?needlogin\?>/, 'no longer emits the literal <?needlogin?> tag' );
+    like( $no_req_msg, qr/log in/i, 'still tells the user to log in' );
+
+    my $r = DW::Request::Standard->new( GET 'http://localhost/poll/?id=5' );
+    $r->header_in( Host => 'localhost' );
+    my $msg = LJ::error_noremote();
+    like(
+        $msg,
+        qr{href='\Q$LJ::SITEROOT\E/login\?returnto=},
+        'includes a login link with a returnto target, built from the active request'
+    );
+    DW::Request->reset;
+};
+
+subtest 'LJ::Poll::render needlogin branch emits a real login link' => sub {
+    my $poll_journal = temp_user();
+    $poll_journal->update_self( { status => 'A' } );
+    my $entry = $poll_journal->t_post_fake_entry();
+    my $poll  = LJ::Poll->create(
+        entry     => $entry,
+        questions => [ { type => 'text', qtext => 'a question' } ],
+        name      => 'w5 needlogin test poll',
+        isanon    => 'no',
+        whovote   => 'all',
+        whoview   => 'all',
+    );
+
+    LJ::set_remote(undef);
+    DW::Request->reset;
+    my $r = DW::Request::Standard->new( GET 'http://localhost/entry/view' );
+    $r->header_in( Host => 'localhost' );
+
+    my $html = $poll->render( mode => 'enter' );
+    unlike( $html, qr/<\?needlogin\?>/,
+        'poll voting prompt no longer leaks the literal <?needlogin?> tag' );
+    like( $html, qr/log in/i, 'poll voting prompt tells the anonymous viewer to log in' );
+    DW::Request->reset;
+};
 done_testing;

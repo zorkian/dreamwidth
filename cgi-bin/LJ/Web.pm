@@ -313,7 +313,7 @@ sub error_list {
     # FIXME: retrofit like bad_input above?  merge?  make aliases for each other?
     my @errors = @_;
     my $ret;
-    $ret .= "<?errorbar ";
+    $ret .= qq{<div class="errorbar">};
     $ret .= "<strong>";
     $ret .= LJ::Lang::ml('error.procrequest');
     $ret .= "</strong><ul>";
@@ -322,7 +322,7 @@ sub error_list {
         my $err = LJ::errobj($ei) or next;
         $ret .= $err->as_bullets;
     }
-    $ret .= " </ul> errorbar?>";
+    $ret .= "</ul></div>";
     return $ret;
 }
 
@@ -332,7 +332,16 @@ sub error_list {
 # returns: Translation string "error.notloggedin"
 # </LJFUNC>
 sub error_noremote {
-    return "<?needlogin?>";
+    my $r        = DW::Request->get;
+    my $returnto = '';
+    if ($r) {
+        my $uri = $r->uri;
+        if ( my $qs = $r->query_string ) {
+            $uri .= '?' . $qs;
+        }
+        $returnto = '?returnto=' . LJ::eurl($uri);
+    }
+    return LJ::Lang::ml( 'error.notloggedin', { aopts => "href='$LJ::SITEROOT/login$returnto'" } );
 }
 
 # <LJFUNC>
@@ -346,7 +355,7 @@ sub warning_list {
     my @warnings = @_;
     my $ret;
 
-    $ret .= "<?warningbar ";
+    $ret .= qq{<div class="warningbar">};
     $ret .= "<strong>";
     $ret .= LJ::Lang::ml('label.warning');
     $ret .= "</strong><ul>";
@@ -354,7 +363,7 @@ sub warning_list {
     foreach (@warnings) {
         $ret .= "<li>$_</li>";
     }
-    $ret .= " </ul> warningbar?>";
+    $ret .= "</ul></div>";
     return $ret;
 }
 
@@ -375,6 +384,10 @@ sub warning_list {
 # returns: true if REQUEST_METHOD == "POST"
 # </LJFUNC>
 sub did_post {
+    my $r = DW::Request->get;
+    return $r->did_post if $r;
+
+    # no active request (e.g. a background job); preserve the old fallback
     return ( BML::get_method() eq "POST" );
 }
 
@@ -544,8 +557,11 @@ sub make_cookie {
 # returns: 1 if they're coming from that URI, else undef
 # </LJFUNC>
 sub check_referer {
-    my $uri     = shift(@_) || '';
-    my $referer = shift(@_) || BML::get_client_header('Referer');
+    my $uri = shift(@_) || '';
+    my $referer =
+           shift(@_)
+        || ( DW::Request->get && DW::Request->get->header_in('Referer') )
+        || BML::get_client_header('Referer');
 
     # get referer and check
     return 1 unless $referer;
@@ -628,7 +644,11 @@ sub form_auth {
 #          or the user has changed session (logged out and in again, or something).
 # </LJFUNC>
 sub check_form_auth {
-    my $formauth = @_ ? shift : $BMLCodeBlock::POST{'lj_form_auth'};
+    my $formauth =
+        @_
+        ? shift
+        : ( DW::Request->get && DW::Request->get->post_args->{'lj_form_auth'} )
+        || $BMLCodeBlock::POST{'lj_form_auth'};
     return 0 unless $formauth;
 
     my $remote = LJ::get_remote();
