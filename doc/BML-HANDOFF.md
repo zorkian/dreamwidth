@@ -1,3 +1,20 @@
+## Delta candidate held; public classifier correction active
+
+Unused delta8b144572fe2b97c6953c0ac695396cc6040d1662 is NOT integrated.
+Foreman identified after-reference aliasing into returned output and unordered
+top-level props versus prop_* normalization collision; Sol independently probing
+exact8b, Themes correcting separate immutable followup. Scalar tests alone do
+not establish arbitrary reference isolation. Same-reference before/after cannot
+represent a prior in-place mutation and must not be claimed as a snapshot proof.
+
+Widgets shared native-scope guard instrumentation537 PASS; final additional
+method/action/input run655 initially failed anonymous preview expectations.
+Anonymous no-session transforms decline to retained BML after both classifiers;
+authenticated native transforms are separate. Worker correcting tests only.
+No public anonymous route integrated, no root tests running. Rootthroughb4dd58f78
+has cleared mapper and test-only retained mutation baseline; earlier accepted
+production/browser gates are not reopened.
+
 ## Hook mutation characterization integrated
 
 Sol37e6fb87cc08e057b03acc782263964d635cb095 CLEAR; rootd5f8a157e.
