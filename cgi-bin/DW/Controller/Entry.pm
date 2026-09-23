@@ -832,7 +832,7 @@ sub legacy_update_readonly_get_handler {
         legacy_editor => $remote->new_entry_editor,
         rte_supported => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
         datetime      => $opts{datetime} || $now->strftime('%F %R'),
-        usejournal    => $opts{usejournal},
+        usejournal    => $usejournal,
         crosspost     => \%crosspost,
         warnings      => $warnings,
         action_url    => $opts{action_url} || '/entry/new',

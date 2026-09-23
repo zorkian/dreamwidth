@@ -19,7 +19,7 @@ use DW::Request;
 use DW::Request::Plack;
 use Plack::Middleware::DW::RequestWrapper;
 use LJ::Hooks;
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_comm temp_user);
 
 sub form {
     return (
@@ -38,7 +38,9 @@ $u->entry_editor2('markdown0');
 $u->set_draft_text('readonly draft body');
 $u->set_prop(
     draft_properties => nfreeze( { subject => 'readonly draft subject', editor => 'markdown0' } ) );
-my $uid = $u->id;
+my $uid  = $u->id;
+my $comm = temp_comm();
+$u->join_community( $comm, 1, 1 );
 
 my ( $hook_calls, @hook_refs, @request_refs );
 my $app = Plack::Middleware::DW::RequestWrapper->wrap(
@@ -69,7 +71,7 @@ LJ::Hooks::are_hooks('update_fields');
             ++$hook_calls;
             push @hook_refs, refaddr($get);
             if ( $get->{case} && $get->{case} eq 'target' ) {
-                $get->{usejournal} = $u->user;
+                $get->{usejournal} = $comm->user;
                 $get->{subject}    = 'hook must not replace the pre-hook snapshot';
                 return {};
             }
@@ -92,7 +94,7 @@ LJ::Hooks::are_hooks('update_fields');
         is( $f->value('event'),   'get', 'pre-hook event snapshot remains retained' );
         is( $f->value('taglist'), 'get', 'pre-hook tag snapshot remains retained' );
         is( $f->value('usejournal'),
-            $u->user, 'post-hook target mutation selects the retained journal' );
+            $comm->user, 'post-hook target mutation selects the distinct community journal' );
         is( $f->value('editor'), 'rte0', 'readonly form retains legacy rich editor mapping' );
         is( $f->value('entrytime_date'), '2026-09-23', 'readonly form retains supplied date' );
         is( $f->value('entrytime_time'), '04:05',      'readonly form retains supplied time' );
