@@ -18,6 +18,7 @@ use strict;
 use warnings;
 
 use DW::Mood;
+use Hash::MultiValue;
 use LJ::HTMLControls;
 use LJ::Hooks;
 use LJ::Lang;
@@ -212,6 +213,79 @@ sub normalize_entry_form {
     }
 
     return $decoded;
+}
+
+# Build native form fields for a legacy error rerender. This intentionally does
+# not decode again: raw subject/body controls and the already-normalized legacy
+# request each carry information required for a safe native-schema retry.
+sub formdata_from_legacy {
+    my ( $canonical, $post ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my $props       = $canonical->{props} || {};
+    my @form;
+    my $add = sub { push @form, @_ };
+
+    $add->( subject    => $canonical->{subject}, event => $legacy_post->{event} );
+    $add->( usejournal => $legacy_post->{usejournal} ) if exists $legacy_post->{usejournal};
+
+    my $editor =
+          $props->{used_rte}         ? 'rte0'
+        : $props->{opt_preformatted} ? 'html_raw0'
+        :                              'html_casual1';
+    $add->( editor => $editor );
+
+    my $security = $canonical->{security} || 'public';
+    if ( $security eq 'usemask' ) {
+        $security = $canonical->{allowmask} == 1 ? 'access' : 'custom';
+    }
+    $add->( security => $security );
+    foreach my $bit ( 1 .. 60 ) {
+        $add->( custom_bit => $bit ) if $legacy_post->{"custom_bit_$bit"};
+    }
+
+    if ( defined $canonical->{year} && defined $canonical->{mon} && defined $canonical->{day} ) {
+        $add->( entrytime_date => join( '-', @{$canonical}{qw(year mon day)} ) );
+    }
+    if ( defined $canonical->{hour} && defined $canonical->{min} ) {
+        $add->( entrytime_time => join( ':', @{$canonical}{qw(hour min)} ) );
+    }
+    $add->( trust_datetime       => 1 ) if !exists $canonical->{tz};
+    $add->( nojs                 => 1 ) if $legacy_post->{date_diff_nojs};
+    $add->( entrytime_outoforder => 1 ) if $props->{opt_backdated};
+
+    $add->( taglist              => $props->{taglist} );
+    $add->( prop_picture_keyword => $props->{picture_keyword} );
+    $add->( current_mood         => $props->{current_moodid} );
+    $add->( current_mood_other   => $props->{current_mood} );
+    $add->( current_music        => $props->{current_music} );
+    $add->( current_location     => $props->{current_location} );
+    $add->( opt_screening        => $props->{opt_screening} );
+
+    my $comment_settings =
+          $props->{opt_noemail}    ? 'noemail'
+        : $props->{opt_nocomments} ? 'nocomments'
+        :                            $legacy_post->{comment_settings};
+    $add->( comment_settings => $comment_settings );
+
+    my %adult = ( none => 'none', concepts => 'discretion', explicit => 'restricted' );
+    $add->( age_restriction        => $adult{ $props->{adult_content} || '' } || '' );
+    $add->( age_restriction_reason => $props->{adult_content_reason} );
+
+    $add->( flags_adminpost => $legacy_post->{flags_adminpost} )
+        if exists $legacy_post->{flags_adminpost};
+
+    $add->( crosspost_entry => $canonical->{crosspost_entry} ? 1 : 0 );
+    foreach my $acctid ( sort { $a <=> $b } keys %{ $canonical->{crosspost} || {} } ) {
+        my $crosspost = $canonical->{crosspost}{$acctid};
+        $add->( crosspost => $acctid ) if $crosspost->{id};
+        foreach my $field (qw(password chal resp)) {
+            next unless defined $crosspost->{$field};
+            $add->( "crosspost_${field}_$acctid" => $crosspost->{$field} );
+        }
+    }
+
+    return Hash::MultiValue->new(@form);
 }
 
 1;
