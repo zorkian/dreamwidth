@@ -1,3 +1,14 @@
+## Latest retained-update prerequisite integration
+
+Sol359579574 +9ceede79d CLEAR; integrated8c9813584/11c75c53e. Foreman real
+four-file prove632 PASS in /tmp/bml-update-fixture-integrated.log; session39400
+complete. Helper scopes BML GET capture only and restores exact route; real POST
+continues through production. Backdating uses actual old prop_opt_backdated and
+native entrytime_outoforder, both required. Public update GET activation still
+worker WIP with passing HTTP; real browser run pending. Foreman corrected an
+early shell exit that otherwise skipped the browser after syntax check.
+Community nondefault security/tags correction still active; no overall gate.
+
 ## Latest narrow correction queue
 
 Sol86be24e57 CLEAR resolves entry-versus-user draft assertions. Community final

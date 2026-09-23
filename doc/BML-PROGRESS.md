@@ -2059,3 +2059,13 @@ recorded in BML-UPDATE-GET-REMAINING.md: terminal identity/cannot-post display i
 a small future package; readonly warning-form is separate; anonymous credentials
 must remain BML until their schema/action/authentication transition is reviewed.
 No authorization or deployment interface change is implied by the audit.
+
+### Retained update-form prerequisite accepted
+
+Sol359579574/9ceede79d CLEAR; integrated8c9813584/11c75c53e. Scoped test helper
+retains physical BML GET forms and forwards POST/non-GET to captured production;
+route restoration asserted. Browser old-form -> production save/native retry
+and named failure cleanup independently passed. Stale spellcheck assertions now
+parse current native response, require real old backdating control and verify
+native entrytime_outoforder=1. Foreman four suites632 PASS in
+/tmp/bml-update-fixture-integrated.log. Public eligible GET activation separate.
