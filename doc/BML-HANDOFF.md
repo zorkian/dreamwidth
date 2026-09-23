@@ -17,7 +17,10 @@ forced-login increments and is finishing finite exclusions/isolation and error
 precedence. Do not integrate its public route from partial evidence.
 
 Retained alternate-login POST test-only9718f68c76bfdd8e9acf821deba4484371e38b71
-is queued to Sol. Themes is preparing a source-only native TT schema mapping
+is Sol-clear and integrated as45e7bf723. Root adjacent GET/POST baseline run
+passed156 assertions (/tmp/bml-altlogin-baselines-integrated.log); scoped tidy
+passed. Session A identity is explicitly observed: B owns entry/formatting, A
+draft property clears, frozen properties and editor preferences remain. Themes is preparing a source-only native TT schema mapping
 handoff; no new auth execution or route change in that audit. Existing deployment,
 message/inbox and valid reporting holds remain unchanged. All root validation
 processes above completed; no root test remains running.

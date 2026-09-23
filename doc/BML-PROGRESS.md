@@ -2391,3 +2391,12 @@ named failure and early EOF reviews are clear, including nonblank draft state
 checked while the restore dialog is open. Public anonymous POST remains a
 separate held HTTP matrix; retained alternate-login POST characterization9718
 is under independent review.
+
+## Retained alternate-login POST characterization (2026-09-23)
+
+Independent9718 baseline85 PASS integrated as45e7bf723; root retained GET/POST
+baselines156 PASS and scoped tidy PASS. Actual session A and credential actor B
+are separately observed through hooks and force-fresh state. B owns the private
+entry and formatting change; A draft property clears while frozen properties
+and editor preferences remain. Wrong/empty password rows prove exact retained
+errors and unchanged seeded state. No production or authentication policy change.
