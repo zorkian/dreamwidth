@@ -1695,3 +1695,25 @@ checks, after widgets Terra completes customization1/4.
 - Sol is checking prepared canonical data against an actual disposable native
   save while independent rerender/hook fixes proceed. No new authorization or
   deployment-interface decision is inferred.
+
+
+### Legacy new-post prerequisites complete; explicit adapters active
+
+- Hook483f..7d11 independently clear with actual ordinary and moderated template
+  response/status proof; integrated0c3bb1722. Foreman4files193 PASS in
+  /tmp/bml-legacy-success-hooks-integrated.log.
+- Rerender00b independently clear, integratedb96357e07. Actual parsed native form
+  retains mapped controls and exact encoded/repeated query on /entry/new action;
+  no save. Foreman4files107 PASS in /tmp/bml-legacy-rerender-integrated.log.
+- Post-attempt callbackd372 independently clear, integratedda092e789: explicit
+  legacy context only, original flat request, old failure/ordinary/moderated
+  ordering retained. Native pre-save path unchanged. Foreman callbacks3files91
+  PASS; full tidy1112 and compile1607 PASS in /tmp/bml-legacy-adapters-*.log.
+- Sol actual prepared legacy-to-native save probe atd8b910151 passed30 assertions
+  using a rendered old form, disposable owner and force-fresh persisted entry:
+  subject/body/RTE/security/date/backdate/tags/location/music retained. Probe at
+  /tmp/bml-sol-canonical-save-probe.pl in reviewer host/container; no route/auth,
+  hook or external crosspost claim.
+- Themes now implements callable ordinary owner-old-POST adapter with test-only
+  routing; Widgets prepares owned-edit rerender. Both exclude public route
+  registration and page deletion until their bounded implementation gates pass.

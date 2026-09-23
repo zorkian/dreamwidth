@@ -61,25 +61,26 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: mapper final e3deb independently clear, integrated374e45d80;
-   selector451 independently clear, integratedde05d97bb. Combined helper/old
-   HTTP191 PASS. Preparation27026 independently clear, integrated182cad0d7;
-   combined5 helper suites23 top-level PASS. Active next: legacy error/transform
-   rerender helper using shared native renderer, explicit modern retry action
-   and retained controls/query. No public route registration or saves yet.
-2. Widgets: image integrated59ebe781c, fully clear. Housekeeping original final
-   427e4109b (0e88/3e876/0aaf/427) is independently clear and integratedd8b910151;
-   foreman housekeeping/crosspost/native-new/moderated216 PASS. Separate hook
-   implementation483f is HELD: it appended HTML to render_template return status
-   after response emission. Worker is fixing actual template variables and adding
-   a real response test; fake string-renderer assertion was insufficient.
-3. Sol: bounded actual canonical-save compatibility audit atd8b910151 while
-   awaiting corrected success-hook/rerender implementations.
-   Root actual hook baseline8a55 independently clear149 PASS. Root mechanical
-   rendererbe407 independently clear85 HTTP PASS. Root test-only hook timing
-   b762072f0 independently clear75 PASS: old callback observes already-persisted entry
-   and retains original flat request reference. Held inbox work and external
-   Journal deployment interfaces remain excluded.
+1. Themenav: new-entry rerender00b independently clear, integratedb96357e07;
+   foreman rerender/native-new/spellcheck/image107 PASS. Active owner-new POST
+   adapter on bml-terra-legacy-update-adapter-20260923: callable handler/test-only
+   routing first, no public registration yet; unsupported cases fall through
+   before state changes. Clear pipeline dependencies supplied explicitly.
+2. Widgets: hook correction7d11 independently clear, integrated0c3bb1722;
+   foreman hook/housekeeping/new/moderated193 PASS. Post-attempt callbackd372
+   independently clear, integratedda092e789. Active owned-edit render-tail
+   extraction and callable legacy rerender on separate branch, no saves/routes.
+   Mechanical extraction sourceed03dfc2d is committed; adapter tests underway.
+3. Sol: bounded owned-edit save/delete housekeeping and crosspost source audit
+   while next adapter commits mature. Canonical new save audit atd8b910151 passed
+   30 actual-form/fresh-entry assertions, no mismatch. Ordinary/moderated hook
+   real responses and root timing characterization are clear. Held inbox work
+   and pending external Journal deployment interfaces remain excluded.
+
+Final current combined-tree callbacks91 PASS, tidy1112 PASS, compile1607 PASS.
+Logs /tmp/bml-legacy-callbacks-integrated.log and
+/tmp/bml-legacy-adapters-{tidy,compile}.log in foreman container. No foreman test
+process remains running at this ledger update. All integrations are local only.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
