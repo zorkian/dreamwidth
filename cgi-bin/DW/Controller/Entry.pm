@@ -65,6 +65,11 @@ DW::Routing->register_string(
     app     => 1,
     methods => { POST => 1 }
 );
+DW::Routing->register_string(
+    '/preview/entry', \&legacy_preview_handler,
+    app     => 1,
+    methods => { POST => 1 }
+);
 
 DW::Routing->register_string( '/__rpc_draft', \&draft_rpc_handler, app => 1, format => 'json' );
 
@@ -1248,8 +1253,17 @@ sub preview_handler {
     my $form_req = {};
     DW::Entry::_form_to_backend( 0, $form_req, $post );
 
+    return _render_preview( $r, $u, $up, $form_req );
+}
+
+sub _render_preview {
+    my ( $r, $u, $up, $form_req, %opts ) = @_;
+    my $styleid;
+    my $siteskinned   = 1;
+    my $preview_scope = $opts{legacy} ? '/preview/entry.bml' : '/entry/preview.tt';
+
     # check for spam domains
-    LJ::Hooks::run_hooks( 'spam_check', $up, $form_req, 'entry' );
+    LJ::Hooks::run_hooks( 'spam_check', $up, $form_req, 'entry' ) unless $opts{legacy};
 
     my ( $event, $subject ) = ( $form_req->{event}, $form_req->{subject} );
     LJ::CleanHTML::clean_subject( \$subject );
@@ -1310,20 +1324,28 @@ sub preview_handler {
         $r->note( "_journal"  => $u->{user} );
         $r->note( "journalid" => $u->{userid} );
 
-        # load necessary props
-        $u->preload_props(qw( s2_style journaltitle journalsubtitle ));
+        # Legacy style selection also reads stylesys and force_s1 inputs.
+        $u->preload_props(qw( stylesys s2_style journaltitle journalsubtitle ));
 
-        # determine style system to preview with
+        # Legacy previews retain the old stylesys/force_s1 decision; native
+        # previews retain their existing journal-entry-style decision.
         $ctx = LJ::S2::s2_context( $u->{s2_style} );
-        my $view_entry_disabled = !LJ::S2::use_journalstyle_entry_page( $u, $ctx );
-
-        if ($view_entry_disabled) {
-
-            # force site-skinned
-            ( $siteskinned, $styleid ) = ( 1, 0 );
+        if ( $opts{legacy} ) {
+            if ( $u->{stylesys} == 2 ) {
+                my $force_s1 = 0;
+                LJ::Hooks::run_hooks( 'force_s1', $u, \$force_s1 );
+                my $view_entry_disabled = !LJ::S2::use_journalstyle_entry_page($u);
+                ( $siteskinned, $styleid ) =
+                    $force_s1 || $view_entry_disabled ? ( 1, 0 ) : ( 0, $u->{s2_style} );
+            }
+            else {
+                ( $siteskinned, $styleid ) = ( 1, 0 );
+            }
         }
         else {
-            ( $siteskinned, $styleid ) = ( 0, $u->{s2_style} );
+            my $view_entry_disabled = !LJ::S2::use_journalstyle_entry_page( $u, $ctx );
+            ( $siteskinned, $styleid ) =
+                $view_entry_disabled ? ( 1, 0 ) : ( 0, $u->{s2_style} );
         }
     }
     else {
@@ -1378,7 +1400,10 @@ sub preview_handler {
         }
         $vars->{security} = $security;
 
-        return DW::Template->render_template( 'entry/preview.tt', $vars );
+        # The legacy page and native route share markup, but relative
+        # translation keys must retain their physical page scope.
+        return DW::Template->render_template( 'entry/preview.tt', $vars,
+            $opts{legacy} ? { ml_scope => $preview_scope } : undef );
     }
     else {
         my $ret  = "";
@@ -1474,7 +1499,7 @@ sub preview_handler {
 
         $p->{entry}             = $s2entry;
         $p->{comments}          = [];
-        $p->{preview_warn_text} = LJ::Lang::ml('/entry/preview.tt.entry.preview_warn_text');
+        $p->{preview_warn_text} = LJ::Lang::ml("$preview_scope.entry.preview_warn_text");
 
         $p->{viewing_thread} = 0;
         $p->{multiform_on}   = 0;
@@ -1517,6 +1542,54 @@ sub preview_handler {
         $r->print($ret);
         return $r->OK;
     }
+
+}
+
+# This legacy-schema wrapper derives from htdocs/preview/entry.bml, which was
+# forked from LiveJournal and remains covered by its GNU General Public License
+# notice in LICENSE-LiveJournal.txt. Keep that attribution with this wrapper
+# while the shared renderer above remains Dreamwidth-native code.
+sub legacy_preview_handler {
+    my $r      = DW::Request->get;
+    my $remote = LJ::get_remote();
+    LJ::set_active_resource_group('foundation');
+
+    my $post       = $r->post_args;
+    my $username   = $post->{user} || $post->{username};
+    my $altlogin   = $r->get_args->{altlogin} || $post->{post_as_other};
+    my $usejournal = $altlogin ? $post->{postas_usejournal} : $post->{usejournal};
+    my ( $u, $up );
+    if ($usejournal) {
+        $u  = LJ::load_user($usejournal);
+        $up = $username ? LJ::load_user($username) : $remote;
+    }
+    elsif ( $username && $altlogin ) {
+        $u = LJ::load_user($username);
+    }
+    else {
+        $u = $remote;
+    }
+    $up ||= $u;
+
+    my %legacy = ( usejournal => $post->{usejournal} );
+    LJ::entry_form_decode( \%legacy, $post );
+    my $form_req = {
+        ( map { $_ => $legacy{$_} } qw(subject event security allowmask year mon day hour min) ),
+        props => {
+            taglist          => $legacy{prop_taglist},
+            picture_keyword  => $legacy{prop_picture_keyword},
+            current_moodid   => $legacy{prop_current_moodid},
+            current_mood     => $legacy{prop_current_mood},
+            current_music    => $legacy{prop_current_music},
+            current_location => $legacy{prop_current_location},
+            current_coords   => $legacy{prop_current_coords},
+            adult_content    => $legacy{prop_adult_content},
+            opt_preformatted => $legacy{prop_opt_preformatted},
+            opt_nocomments   => $legacy{prop_opt_nocomments},
+            opt_noemail      => $legacy{prop_opt_noemail},
+        },
+    };
+    return _render_preview( $r, $u, $up, $form_req, legacy => 1 );
 }
 
 =head2 C<< DW::Controller::Entry::options_handler( ) >>
