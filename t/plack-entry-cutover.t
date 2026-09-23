@@ -7,6 +7,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use File::Find;
 use HTTP::Request::Common;
 use HTML::Form;
 use Plack::Test;
@@ -522,6 +523,40 @@ subtest 'the updatepage beta no longer gates anything reachable' => sub {
     };
 };
 
+subtest 'F2: .bml suffixes still resolve natively after the retired pages are deleted' => sub {
+    ok( !-e "$ENV{LJHOME}/htdocs/update.bml", 'htdocs/update.bml no longer exists on disk' );
+    ok(
+        !-e "$ENV{LJHOME}/htdocs/editjournal.bml",
+        'htdocs/editjournal.bml no longer exists on disk'
+    );
+    my $entry = $owner->t_post_fake_entry(
+        subject => 'F2 routing-precedence subject',
+        body    => 'F2 routing-precedence body',
+    );
+    test_psgi $app, sub {
+        my $send = shift;
+        for my $path ( '/update.bml', '/editjournal.bml?itemid=' . $entry->ditemid ) {
+            my $req = GET $path;
+            $req->header( Cookie => $owner_cookie );
+            my $res = $send->($req);
+            is( $res->code, 302,
+                "$path still resolves through DW::Routing, not the deleted BML file" );
+        }
+    };
+};
+
+subtest 'F2: pages with no native route are gone' => sub {
+    test_psgi $app, sub {
+        my $send = shift;
+        for my $path (
+            qw(/imgupload /imgupload.bml /tools/endpoints/draft /tools/endpoints/draft.bml))
+        {
+            my $res = $send->( GET $path );
+            is( $res->code, 404, "$path is gone (no native route, retired BML file deleted)" );
+        }
+    };
+};
+
 subtest 'native success links point at the native edit URL' => sub {
     my $entry = $owner->t_post_fake_entry(
         subject => 'Success link subject',
@@ -536,6 +571,36 @@ subtest 'native success links point at the native edit URL' => sub {
         unlike( $res->content, qr{/editjournal\?itemid=},
             'the native edit form carries no old-style editjournal itemid link' );
     };
+};
+
+subtest 'F2: no surviving file references the deleted legacy pages or their JS' => sub {
+    my @offenders;
+    my @deleted_files = (
+        qr{\bjs/entry\.js\b},            qr{\bjs/xpost\.js\b},
+        qr{\bhtdocs/imgupload\.bml\b},   qr{\bhtdocs/update\.bml\b},
+        qr{\bhtdocs/editjournal\.bml\b}, qr{\btools/endpoints/draft\.bml\b},
+        qr{\bUserpicSelector\b},
+    );
+    File::Find::find(
+        {
+            wanted => sub {
+                return unless -f $_ && /\.(?:tt|pm|js|bml)$/;
+                return if $File::Find::name =~ m{/t/plack-entry-cutover\.t$};
+                open my $fh, '<', $_ or return;
+                local $/;
+                my $content = <$fh>;
+                for my $pattern (@deleted_files) {
+                    push @offenders, "$File::Find::name: $pattern" if $content =~ $pattern;
+                }
+            },
+            no_chdir => 1,
+        },
+        "$ENV{LJHOME}/cgi-bin",
+        "$ENV{LJHOME}/views",
+        "$ENV{LJHOME}/htdocs",
+    );
+    is_deeply( \@offenders, [],
+        'no surviving file references a deleted F2 page, script, or widget' );
 };
 
 done_testing;

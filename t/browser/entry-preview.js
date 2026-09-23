@@ -1,4 +1,4 @@
-// Exercise real legacy and native entry-preview controls without publishing.
+// Exercise the real native entry-preview control without publishing.
 // Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -132,35 +132,6 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
             await preview.close();
         }
 
-        await page.goto(base + '/update', {waitUntil: 'networkidle0'});
-        await page.waitForSelector('#updateForm input[type=button]');
-        await openPreview({
-            form: '#updateForm',
-            button: '#updateForm input[type=button]',
-            path: '/preview/entry',
-            title: 'Legacy preview title marker',
-            body: 'Legacy preview body marker',
-            targetAfterPreview: '_self',
-            prepare: async () => {
-                await page.click('#jplain a');
-                await page.waitForSelector('#draft:not([style*="display: none"])');
-            },
-            label: 'legacy-preview',
-        });
-        await openPreview({
-            form: '#updateForm',
-            button: '#updateForm input[type=button]',
-            path: '/preview/entry',
-            title: 'Legacy empty-body preview marker',
-            body: '',
-            targetAfterPreview: '_self',
-            prepare: async () => {
-                await page.click('#jplain a');
-                await page.waitForSelector('#draft:not([style*="display: none"])');
-            },
-            label: 'legacy-empty-preview',
-        });
-
         await page.goto(base + '/entry/new', {waitUntil: 'networkidle0'});
         await page.waitForSelector('#js-preview-button');
         const passwordsBefore = await page.$$eval('form input[type=password]', inputs =>
@@ -182,11 +153,11 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
         );
 
         const entriesAfter = (await readFixture('entry_count')).entry_count;
-        assert.equal(entriesAfter, entriesBefore, 'all legacy and native previews leave fresh entry count unchanged');
+        assert.equal(entriesAfter, entriesBefore, 'native preview leaves fresh entry count unchanged');
         if (process.env.ENTRY_PREVIEW_FAIL_AFTER_OPEN) throw new Error('intentional preview cleanup failure');
         assert.deepEqual(errors, [], 'preview controls and popup pages have no JavaScript errors');
         assert.deepEqual(networkFailures, [], 'preview controls and popup pages have no HTTP failures');
-        console.log('PASS: real legacy and native preview popups render without publishing');
+        console.log('PASS: real native preview popup renders without publishing');
     } finally {
         try { if (browser) await browser.close(); }
         finally {

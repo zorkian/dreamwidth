@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Disposable account for legacy and native entry preview browser characterization.
+# Disposable account for native entry preview browser characterization.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
