@@ -857,8 +857,10 @@ sub legacy_update_get_handler {
     my $get = DW::Entry::Legacy::legacy_post_hash( $r->get_args );
 
     # This is the retained page's first GET guard, before remote lookup or the
-    # update_fields hook. Let BML continue to render its existing error.
-    return undef if $get->{usejournal} && !LJ::load_user( $get->{usejournal} );
+    # update_fields hook. Its terminal representation preserves the legacy
+    # update title rather than the generic error title.
+    return legacy_update_terminal_response('invalidusejournal')
+        if $get->{usejournal} && !LJ::load_user( $get->{usejournal} );
 
     my $remote = $opts{remote} || LJ::get_remote();
     return undef unless LJ::isu($remote);

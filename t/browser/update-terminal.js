@@ -38,10 +38,15 @@ async function stop(child, done, name) { if (!child) return; if (child.exitCode 
     await page.goto(`http://127.0.0.1:${port}/mobile/login`,{waitUntil:'domcontentloaded',timeout:15000});
     await page.type('[name=user]',startup.user); await page.type('[name=password]',startup.password);
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.click('[type=submit]')]);
-    for (const [variant,title,message] of [['identity','Sorry',/Non-.*users can't post entries/],['cantpost',"Can't Post", /Configured cannot post/]]) {
+    const terminals = [
+      ['identity', 'identity=1', 'Sorry', /Non-.*users can't post entries/],
+      ['cantpost', 'cantpost=1', "Can't Post", /Configured cannot post/],
+      ['invalidusejournal', 'usejournal=missing-invalid-user&encoded=one%2Ftwo&repeat=first&repeat=second', 'Post an Entry', /Invalid usejournal argument\./],
+    ];
+    for (const [variant, query, title, message] of terminals) {
       for (const width of [1280,390]) {
         await page.setViewport({width,height:844});
-        await page.goto(`http://127.0.0.1:${port}/update?${variant}=1`,{waitUntil:'networkidle0',timeout:15000});
+        await page.goto(`http://127.0.0.1:${port}/update?${query}`,{waitUntil:'networkidle0',timeout:15000});
         assert.equal(await page.title(),title); assert.equal(await page.$('#js-post-entry'),null); assert.equal(await page.$('#updateForm'),null);
         const text=await page.$eval('#content',e=>e.innerText); assert.match(text,message);
         const usable=await page.$eval('#content',e=>{const r=e.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth;}); assert.ok(usable,`${variant} content usable at ${width}`);

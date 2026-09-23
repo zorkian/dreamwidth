@@ -244,7 +244,17 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         my $share = $request->( GET '/__test_update_get?share=https%3A%2F%2Fexample.invalid%2F' );
         is( $share->code, 299, 'share falls through to retained BML' );
         my $invalid = $request->( GET '/__test_update_get?usejournal=not-a-real-user' );
-        is( $invalid->code, 299, 'invalid usejournal falls through before hook' );
+        is( $invalid->code, 200, 'invalid usejournal returns the native terminal before hook' );
+        like(
+            $invalid->content,
+            qr/Invalid usejournal argument\./,
+            'invalid usejournal keeps the exact retained message'
+        );
+        unlike(
+            $invalid->content,
+            qr/id=['"](?:updateForm|js-post-entry)['"]/,
+            'invalid usejournal terminal has no form'
+        );
         my $beta = $request->( GET '/__test_update_get?beta=1&encoded=one%2Ftwo' );
         is( $beta->code, 302, 'beta GET keeps retained redirect status' );
         $beta_location = $beta->header('Location');

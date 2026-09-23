@@ -156,13 +156,21 @@ my $share_fetches     = 0;
             'share BML fallback performs its retained share prefill exactly once' );
 
         my $invalid = $request->( GET '/update?usejournal=does-not-exist' );
-        is( $invalid->code, 200, 'invalid target GET keeps retained BML status' );
-        unlike( $invalid->content, qr/id=['"]js-post-entry['"]/,
-            'invalid target GET does not render native form' );
+        is( $invalid->code, 200, 'invalid target GET preserves the retained HTTP status' );
+        like(
+            $invalid->content,
+            qr/<title>Post an Entry<\/title>/i,
+            'invalid target GET keeps the exact retained update title'
+        );
         like(
             $invalid->content,
             qr/Invalid usejournal argument\./,
-            'invalid target GET keeps the exact retained BML error message'
+            'invalid target GET keeps the exact retained error message'
+        );
+        unlike(
+            $invalid->content,
+            qr/id=['"](?:updateForm|js-post-entry)['"]/,
+            'invalid target GET renders the native terminal without a form'
         );
 
         my $anonymous = $send->( GET '/update' );
