@@ -1,3 +1,14 @@
+## Pure raw-hook builder candidate pending review
+
+Themes d19ba22d5fcd06622c9a3a9fefb593c577663d8f is committed but NOT
+integrated. Worker mapper/builder2files7top-level PASS, tidy and compile1607 PASS.
+Sol review queued after source-only editor/date reconciliation audit. Foreman
+flagged mixed bit-zero mask representability and invalid date/time observation
+for that review; no native parser policy change or public caller is proposed.
+Widgets browser-only altlogin rerender fixture remains uncommitted WIP, fixing
+restore-dialog navigation handling after the timeout; do not treat it as green.
+Root remains clean through 8e699eb09 with no running root validation processes.
+
 ## Render-only alternate-login retry integrated
 
 Sol ce4a7d63c57546e8c19e40a7430034e86f3d78f5 CLEAR; root cee270600.
