@@ -64,7 +64,7 @@ DW::Routing->register_string( '/editjournal', \&adapter_handler, app => 1, no_re
 
 sub visible_click {
     my ( $form, $name ) = @_;
-    my ($input) = grep { ( $_->name || '' ) eq $name && $_->can('click') } $form->inputs;
+    my ($input) = grep { $_->can('click') && ( $_->name || '' ) eq $name && length( $_->value || '' ) } $form->inputs;
     die "missing retained $name submit" unless $input;
     return $input->click($form);
 }
@@ -105,7 +105,6 @@ test_psgi $app, sub {
         $form->value( subject => "Adapter $suffix changed" );
         $form->value( event   => "Adapter $suffix changed body" );
         my $post = visible_click( $form, 'action:save' );
-        $post->content( $post->content =~ s/submit_value=[^&]*/submit_value=action%3Asave/r );
         $post->header( Cookie         => $cookie );
         $post->header( Referer        => "http://localhost$path" );
         $post->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
@@ -125,6 +124,8 @@ test_psgi $app, sub {
             "Adapter $suffix changed body",
             "$path persists changed body"
         );
+        is( fresh( $owner, $entry->ditemid )->security, 'private',
+            "$path save preserves the retained private security selection" );
         is(
             fresh( $owner, $other->ditemid )->subject_raw,
             "Adapter $suffix other",
@@ -138,7 +139,6 @@ test_psgi $app, sub {
         $adapter_entry{ $entry->ditemid } = $entry;
         $form->action( 'http://localhost/editjournal?itemid=' . $entry->ditemid );
         my $delete = $form->click('action:delete');
-        $delete->content( $delete->content =~ s/submit_value=[^&]*/submit_value=action%3Adelete/r );
         $delete->header( Cookie         => $cookie );
         $delete->header( Referer        => "http://localhost$path" );
         $delete->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
@@ -152,6 +152,43 @@ test_psgi $app, sub {
             "$path delete removes only the selected entry"
         );
         ok( fresh( $owner, $other->ditemid )->valid, "$path delete preserves unrelated entry" );
+
+        my $other_path = "/editjournal$suffix?itemid=" . $other->ditemid;
+        my $other_get  = GET $other_path;
+        $other_get->header( Cookie => $cookie );
+        $res                              = $send->($other_get);
+        $form                             = form_from( $res->content );
+        $adapter_entry{ $other->ditemid } = $other;
+        $form->action( 'http://localhost/editjournal?itemid=' . $other->ditemid );
+        my $unknown = visible_click( $form, 'action:save' );
+        $unknown->content(
+            $unknown->content =~ s/submit_value=[^&]*/submit_value=action%3Aunknown/r );
+        $unknown->header( Cookie         => $cookie );
+        $unknown->header( Referer        => "http://localhost$other_path" );
+        $unknown->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
+        my $before_subject = fresh( $owner, $other->ditemid )->subject_raw;
+        my $unknown_res    = $send->($unknown);
+        ok( $unknown_res->code < 500,
+            "$other_path unsupported submit falls through without server failure" );
+        is( fresh( $owner, $other->ditemid )->subject_raw,
+            $before_subject, "$other_path unsupported submit leaves the fresh target unchanged" );
+
+        $res                              = $send->($other_get);
+        $form                             = form_from( $res->content );
+        $adapter_entry{ $other->ditemid } = $other;
+        $form->action( 'http://localhost/editjournal?itemid=' . $other->ditemid );
+        my $missing = visible_click( $form, 'action:save' );
+        $missing->content( $missing->content =~ s/(?:^|&)lj_form_auth=[^&]*//r );
+        $missing->content( $missing->content =~ s/^&//r );
+        $missing->header( 'Content-Length' => length $missing->content );
+        $missing->header( Cookie           => $cookie );
+        $missing->header( Referer          => "http://localhost$other_path" );
+        $missing->header( 'Content-Type'   => 'application/x-www-form-urlencoded' );
+        my $missing_res = $send->($missing);
+        is( $missing_res->code, 403,
+            "$other_path missing token is rejected before adapter decode" );
+        is( fresh( $owner, $other->ditemid )->subject_raw,
+            $before_subject, "$other_path missing token leaves the fresh target unchanged" );
 
     }
 };
