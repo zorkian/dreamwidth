@@ -28,14 +28,15 @@ authenticate a user, validate CSRF, save an entry, or change the
   dates continue to delete `tz` and set `year`, `mon`, `day`, `hour`, and
   `min`.
 
-The implementation accepts the existing hash-like post inputs used by legacy
-BML and `DW::Request->post_args`; repeated values retain the existing
-`Hash::MultiValue` scalar lookup semantics. Canonical property-to-backend
-mapping and route cutover are deliberately later work.
+The implementation accepts legacy-shaped plain hashes unchanged. For a
+`Hash::MultiValue` boundary, `legacy_post_hash` creates a separate plain hash
+with `each` values joined by NUL exactly as `DW::BML` does; it never mutates the
+multivalue input. Canonical property-to-backend mapping and route cutover are
+deliberately later work.
 
 ## Finite tests
 
-1. The preserved decoder is called once, receives the original seed/post
+1. The preserved decoder is called once, receives the original seed/plain-post
    references, and hook-added ordinary fields survive normalization.
 2. Decoder-produced and hook-produced `prop_*` fields become `props`, while
    `subject`, `event`, security, mask, and unrelated hook values stay top-level.
@@ -44,6 +45,9 @@ mapping and route cutover are deliberately later work.
 4. Master-enabled selected and unselected accounts retain each account's
    selected state and password/challenge/response values; a disabled master
    stays disabled without discarding the rendered account records.
-5. Existing direct decoder tests continue to cover masks through bit 60,
+5. A `Hash::MultiValue` boundary conversion preserves empty-first repeated
+   values with NUL joining, does not mutate input, and gives the hook its
+   converted legacy scalar.
+6. Existing direct decoder tests continue to cover masks through bit 60,
    metadata/adult/comment precedence, RTE conversion, mood normalization, and
    hook ordering.

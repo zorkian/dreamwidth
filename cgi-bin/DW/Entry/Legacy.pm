@@ -21,6 +21,7 @@ use DW::Mood;
 use LJ::HTMLControls;
 use LJ::Hooks;
 use LJ::Lang;
+use Scalar::Util qw(blessed);
 
 sub decode_entry_form {
     my ( $req, $POST ) = @_;
@@ -160,6 +161,57 @@ sub decode_entry_form {
     LJ::Hooks::run_hooks( 'decode_entry_form', $POST, $req );
 
     return $req;
+}
+
+# Decode a retained update/editjournal form and move its legacy property
+# fields into the canonical property hash. Action selection, authorization,
+# and save behavior remain the responsibility of the eventual route adapter.
+sub legacy_post_hash {
+    my ($post) = @_;
+    return $post unless blessed($post) && $post->isa('Hash::MultiValue');
+
+    my %legacy;
+    $post->each(
+        sub {
+            my ( $name, $value ) = @_;
+            $legacy{$name} .= "\0" if exists $legacy{$name};
+            $legacy{$name} .= $value;
+        }
+    );
+    return \%legacy;
+}
+
+sub normalize_entry_form {
+    my ( $req, $post ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my $decoded     = decode_entry_form( $req, $legacy_post );
+    $decoded->{props} ||= {};
+
+    foreach my $name ( keys %$decoded ) {
+        next unless $name =~ /^prop_(.+)$/;
+        next if $name =~ /^prop_xpost_/;
+        $decoded->{props}{$1} = delete $decoded->{$name};
+    }
+
+    my %crosspost_ids;
+    foreach my $name ( keys %$legacy_post ) {
+        next unless $name =~ /^prop_xpost_(?:(?:password|chal|resp)_)?(\d+)$/;
+        $crosspost_ids{$1} = 1;
+    }
+
+    $decoded->{crosspost_entry} = $legacy_post->{prop_xpost_check} ? 1 : 0;
+    $decoded->{crosspost}       = {};
+    foreach my $acctid ( keys %crosspost_ids ) {
+        $decoded->{crosspost}{$acctid} = {
+            id       => $legacy_post->{"prop_xpost_$acctid"} ? $acctid : undef,
+            password => $legacy_post->{"prop_xpost_password_$acctid"},
+            chal     => $legacy_post->{"prop_xpost_chal_$acctid"},
+            resp     => $legacy_post->{"prop_xpost_resp_$acctid"},
+        };
+    }
+
+    return $decoded;
 }
 
 1;
