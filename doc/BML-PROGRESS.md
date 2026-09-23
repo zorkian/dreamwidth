@@ -2491,3 +2491,7 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   (standalone request adapter) integrated through7b8bd2170 (all Opus CLEAR).
   ljlib-only processes no longer load the BML engine. E3 engine deletion in
   progress.
+- W13 precheck tests and W14 orphaned-key relocation integrated through3c679e9ea
+  (Opus CLEAR). E3 engine deletion verified except its static-file fix, which is
+  being corrected for journal-host robots.txt; W15 and T9 pending review.
+  Checkpoint with exact SHAs at the top of BML-HANDOFF.md.

@@ -18,6 +18,59 @@ below this line predate the resume.
 
 ## Graduation progress (2026-09-23)
 
+### CHECKPOINT 2026-09-23 late evening (session limits near)
+
+Root `bml-astra-foreman-20260922` HEAD `3c679e9ea`, clean. Foreman container
+8d7783a043d8 dev Starman is running a scratch (engine-less) tree from the E3
+dry-run; restart it on root before any browser evidence. Scratch branch
+`foreman-e3-dryrun` (root + W13 + E3 minus aeb94fb1b) may be deleted.
+
+Integrated on root since the previous record (all independently CLEAR):
+W13 range 52ac113bd + c6d55e4b4 + 3f3d93312 (71006eef8, e6e1c2d38,
+39f54715d); W14 65ac9a47d + e9d79a38f (33a8d3bce, 30e24933e; the
+deadphrases.dat conflict resolved as the union and deduplicated in
+3c679e9ea). Root validation after W14: 11 files 138 PASS
+(lang-bml-file-branch, plack-entry-strings, ml, settings, plack-settings-return,
+settings-confirm-message, profile-userlink-lookups, lang-names-native,
+plack-no-bml-fallback, site-scheme-native, lang-native-request-context);
+full tidy/compile not yet rerun after W14.
+
+Pending review / integration, exact SHAs:
+- E3 engine deletion on `bml-sonnet-bml-engine-removal-20260923` at
+  fa75b9d82: E3-specific commits b7194027e, 468c24e90, 8c0f7ece5, 2b485b47c,
+  977f6de16, 894ea9b10, 464bcbe92, 35970d102, 5b01dc0d9, 7360940f5,
+  fe0de20a1, 4e0ba0c20, 319a03ca4 are reviewer-verified; SKIP at integration
+  f8281d435 (=dcfb2bffb), 341d21c59 (=E1), 6fe4118a5 (=7b8bd2170),
+  633581ffb (=W13 tests), aeb94fb1b (superseded by the W13 fix); keep root's
+  t/bml-shims-loaded.t over 977f6de16's version. Static fix fa75b9d82 HELD:
+  its path-only Static rule serves the site robots.txt on journal hosts and
+  bypasses DW::Controller::Journal's per-journal robots (opt_blockrobots
+  journals lose 'Disallow: /'); themenav is fixing with a rule that declines
+  when dw.journal_user is set, plus tests; favicon stays static.
+- W15 LJ::Lang .bml branches 32cf431b4 (parent e9d79a38f) under review.
+- T9 post-E3 test hygiene on `bml-sonnet-post-e3-test-hygiene-20260923` at
+  e8d1c180b (three commits, built on E3 tip 319a03ca4), not yet reviewed.
+- Reviewer follow-ups noted, not assigned: /manage/ has two pre-existing
+  missing .tt keys ('/manage/index.tt.communities.invites.about ' with a
+  trailing space, '/manage/index.tt.friends.groups.about'); LJ::Setting::Gender
+  and LJ::Setting::BirthdayDisplay are dead modules (delete with their eight
+  setting.*.option strings).
+
+Integration order when resuming: E3 (verified set, in branch order) + its
+corrected static fix, then W15 (rebased or cherry-picked; its lineage lacks
+E2 so t/lang-names-native.t only fails there), then T9 (rebase onto E3),
+then full tidy/compile/build, live probes incl. journal-host robots.txt and
+favicon, browser entry-preview.js and entry-draft-parity.js, root integrity
+recheck by the reviewer, then E4 docs (final graduation record, deploy-gate
+checklist: production BETA_FEATURES updatepage/inbox, ext/local hooks and
+LJ::Local::BMLInit, AJAX_URI_MAP, HELPURL, CDN/static origin for the six root
+files, deployed _config-local.bml no longer read, prod .bml URLs now 404).
+
+Standing rules unchanged: allowlists per review, inert recorders for any
+moderation/report/ban/log path, no push/deploy, DW-only header for new
+files, comments describe present constraints only, obsolete worker branches
+preserved.
+
 **Test-execution boundary (user rule, restated 2026-09-23 after two reviewer
 disclosures):** moderation, report, ban, suspension and other admin-mutation
 paths stay inert in every test or probe we write or run: stub them as
