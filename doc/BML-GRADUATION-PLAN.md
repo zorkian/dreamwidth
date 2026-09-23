@@ -42,3 +42,68 @@ and config unknowns stay explicit gates.
 No push, remote merge, deployment, real moderation or report side effects
 (tests use disposable entries and stub any external reporting), no new
 authentication policy, no changes to held external contracts.
+
+## Cutover package specifications
+
+### W2 inbox cutover (after W1 clears)
+
+- Register native `index_handler`, `compose_handler`, `markspam_handler` at
+  `/inbox/` (with `no_redirects => 1`, as `/poll/` does in `DW/Controller/Poll.pm:29`),
+  `/inbox/compose` and `/inbox/markspam`. Routing runs before the BML file
+  fallback (`app.psgi:166-172`), so the `.bml` pages become unreachable and are
+  deleted in F2. Keep `/inbox/new`, `/inbox/new/compose`, `/inbox/new/markspam`
+  as 302s to the canonical URLs, preserving query args.
+- Native redirects (`Inbox.pm:447,451,608,622,695-703,728`) and
+  `views/inbox/msg_list.tt:16,18` already target `/inbox`; keep them canonical.
+- Remove the `inbox` beta: `index.bml:37-38` (page goes in F2),
+  `LJ/Event/UserMessageRecvd.pm:53-56,145-148`, `LJ/User/Message.pm:405-416`
+  (`message_url`), the banner `views/inbox/index.tt:21` and `dw_beta` load
+  (`Inbox.pm:152-153`). Retarget `views/widget/latestinbox.tt:6`,
+  `UserMessageRecvd.pm:158`, `LJ/Event/JournalNewComment.pm:348` to canonical
+  native URLs (they already are `/inbox/...`; verify each resolves natively,
+  including `?view=singleentry&itemid=`).
+- Tests: routes resolve natively for a logged-in ESN user (both index and
+  compose/markspam, GET and POST with form auth), `/inbox/new*` 302s, anonymous
+  gets the login page, legacy `.bml` URLs (`/inbox/index.bml`) reach native via
+  suffix stripping (`DW/Routing.pm:113-114`); no `user_in_beta('inbox')` remains.
+
+### T2 entry cutover (after T1 clears)
+
+- Replace the `/update` route block (`Entry.pm:92-112`):
+  - GET: 302 to `/entry/new` (or `/entry/<usejournal>/new` when `usejournal`
+    names a journal) carrying `subject`, `event`, `prop_taglist` as `tags`,
+    `share`, and any other native-recognised query args; drop `altlogin`. Let
+    `/entry/new` produce its own identity/cannot-post/login responses.
+  - POST (old-schema form from a stale tab): never save and never discard.
+    Decode once with `DW::Entry::Legacy::prepare_entry_form({ tz => 'guess' },
+    $post)` and render the native form prefilled through
+    `legacy_new_rerender` with a single explicit notice string ("the previous
+    posting page has been retired; your content is carried over, review and
+    post"), `action_url` `/entry/new`, default submit name, no crosspost
+    suppression, no `legacy_altlogin`. Anonymous old POSTs render the same form
+    with the native login modal; the submitted password is discarded and never
+    echoed. Transforms, spellcheck and preview buttons from the old form get the
+    same carry-over rendering.
+- `/editjournal?itemid=` (`EntryPicker.pm:35-52`): GET 302 to
+  `/entry/<journal>/<ditemid>/edit` (journal from `usejournal`/`journal` or the
+  remote); old-schema POST renders the native edit form prefilled through the
+  existing rerender helper with the same notice and no save. No-itemid picker
+  unchanged.
+- Remove the `updatepage` beta: `Poll.pm:686-690` chooses `/entry/new`
+  unconditionally; delete the banner `form.tt:126` and `betacommunity`
+  (`Entry.pm:1662-1663`); `.beta.on`/`.beta.off` strings become unused.
+- Retarget navigation to native: `/update` links in `DW/Logic/MenuNav.pm:82`,
+  `schemes/common.tt:140,221`, `schemes/lynx.tt:62`, `LJ/Web.pm:2627,2685`,
+  `views/login.tt:36`, `views/site/index.tt:42`, `views/index-free.tt:40`,
+  `views/create/next.tt:28`, `views/manage/circle/editfilters.tt:21`,
+  `DW/Controller/Create.pm:255`, `DW/Controller/Circle.pm:243`,
+  `DW/Controller/Journal.pm:261`, ESN mails `LJ/Event/Birthday.pm:147`,
+  `RemovedFromCircle.pm:98,114`; edit links `LJ/S2.pm:4328`, `LJ/Talk.pm:202`,
+  `LJ/Protocol.pm:1666,2188`, `LJ/Web.pm:2634`, `views/edittags.tt:8`,
+  `views/manage/index.tt:194`, `views/site/index.tt:43`,
+  `views/index-free.tt:61`, native success links `Entry.pm:2038,2311,2447,2489`.
+- Tests: GET redirects with argument mapping; old-schema POST carry-over
+  renders every submitted field, saves nothing (force-fresh entry count and
+  draft unchanged), never echoes a password; anonymous carry-over; edit GET
+  redirect and edit POST carry-over; no `updatepage` check remains; native
+  success links point at native edit.
