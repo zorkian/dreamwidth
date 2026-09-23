@@ -288,4 +288,30 @@ sub formdata_from_legacy {
     return Hash::MultiValue->new(@form);
 }
 
+# Classify a retained editjournal action without dispatching it. This mirrors
+# the old source ordering while refusing arbitrary submit_value field names.
+sub legacy_edit_action {
+    my ( $post, %opts ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my %known   = map { ( "action:$_", $_ ) } qw(save delete deletespam savemaintainer spellcheck);
+    my %actions = map { $known{$_} => 1 } grep { $legacy_post->{$_} } keys %known;
+
+    my $submitted = $legacy_post->{submit_value};
+    $actions{ $known{$submitted} } = 1 if defined $submitted && exists $known{$submitted};
+
+    return 'savemaintainer' if $opts{maintainer_enabled} && $actions{savemaintainer};
+
+    my $spellcheck_enabled =
+        exists $opts{spellcheck_enabled}
+        ? $opts{spellcheck_enabled}
+        : $LJ::SPELLER;
+    return 'spellcheck' if $spellcheck_enabled && $actions{spellcheck};
+
+    return 'deletespam' if $actions{deletespam};
+    return 'delete'     if $actions{delete};
+    return 'save'       if $actions{save};
+    return undef;
+}
+
 1;
