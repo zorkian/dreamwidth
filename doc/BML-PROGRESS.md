@@ -2177,3 +2177,20 @@ Sol Web headingsc861 CLEAR; integrated5b8aa3ccd. error_list/warning_list heading
 use native language; bad_input, legacy wrappers and supplied markup remain
 unchanged. Foreman three helper suites12 top-level tests PASS. Full combined
 tidy1143 and compile1607 PASS. No held interface, deployment or publishing change.
+
+### Public readonly integration complete
+
+Sol4493 and test correctionc9 CLEAR; integrateda564e9e50/ed5210e22. Foreman
+plain-app actual-readonly browser PASS/nohelpers, saved desktop/narrow captures,
+and merged5files206 PASS after correcting five stale BML-fallback expectations.
+Full tidy1146 and compile1607 PASS. Hooks use the same flat request and native
+warning/editor/draft behavior stays intact; anonymous/altlogin/share remain BML.
+
+### Same-poster community edit helper accepted
+
+Sol55c9 CLEAR, integrated184a32c7a. Explicit callable opt-in preserves personal
+default rejection, original session deletion-log actor, effective spam/protocol
+actor, and native retry after attempted failure. Foreman3files202 PASS; no public
+resolver/route or manager/reporting scope. Callable invalid-target renderera662
+also independently clear, integrated51a7ec6c1 with root17 PASS; public dispatch
+remains separate.

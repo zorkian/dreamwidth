@@ -1,3 +1,19 @@
+## Readonly integration fully green
+
+Solc9fb04a1 stale-suite correction CLEAR, integrateded5210e22. Root exact merged
+five-suite run206 PASS (/tmp/bml-readonly-public-integrated-fixed.log). Full tidy
+1146 and compile1607 PASS (/tmp/bml-readonly-community-final-{tidy,compile}.log).
+Public readonly4493 integrateda564 now has complete broader regression evidence,
+plain-app browser PASS/nohelpers, and saved captures. Earlier five stale failures
+are resolved. Root sessions39451/24219 complete; no active root test process.
+
+Community helper55 integrated184a: root3files202PASS (session67807 complete).
+Callable invalid-targeta662 integrated51a7: root17PASS (session73750 complete).
+Widgets implements separate callable community resolver; Themes finishes public
+invalid-target terminal with adjacent stale rows updated before review. Sol has
+source-only anonymous GET rendering audit, explicitly excluding authentication
+implementation/probes and leaving schema/auth parity as separate future gate.
+
 ## Community POST helper accepted; readonly test correction pending
 
 Sol55c9 helper CLEAR, integrated184a32c7a. Root three-suite replay session67807
