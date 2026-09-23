@@ -19,9 +19,16 @@ async function stop(child, done, name) { if (!child) return; if (child.exitCode 
   try {
     await unusedPort();
     fixture=spawn('perl',[process.env.LJHOME+'/t/browser/update-get-fixture.pl'],{stdio:['pipe','pipe','inherit']});
-    fixtureDone=new Promise((resolve,reject)=>{fixture.once('exit',(code,signal)=>code===0?resolve({code,signal}):reject(Error(`fixture exit ${code}/${signal}`)));fixture.once('error',reject);}); fixtureDone.catch(()=>{});
+    fixtureDone=new Promise((resolve,reject)=>{
+      fixture.once('exit',(code,signal)=>code===0?resolve({code,signal}):reject(Error(`fixture exit ${code}/${signal}`)));
+      fixture.once('error',reject);
+    });
+    fixtureDone.catch(()=>{});
     fixture.stdout.on('data',chunk=>{buffer+=chunk;let i;while((i=buffer.indexOf('\n'))>=0){lines.push(buffer.slice(0,i));buffer=buffer.slice(i+1);}drain();});
-    const startup=JSON.parse(await nextLine());
+    const startup=JSON.parse(await Promise.race([
+      nextLine(),
+      fixtureDone.then(()=>Promise.reject(Error('fixture exited before startup JSON')))
+    ]));
     server=spawn('perl',[process.env.LJHOME+'/t/browser/update-terminal-server.pl',String(port)],{stdio:['ignore','ignore','inherit']});
     serverDone=new Promise((resolve,reject)=>{server.once('exit',(code,signal)=>resolve({code,signal}));server.once('error',reject);});
     await Promise.race([waitPort(),serverDone.then(r=>Promise.reject(Error(`server exited early: ${JSON.stringify(r)}`)))]);
@@ -43,5 +50,8 @@ async function stop(child, done, name) { if (!child) return; if (child.exitCode 
     }
     if (process.env.UPDATE_TERMINAL_INTENTIONAL_FAIL) throw Error('intentional update terminal cleanup failure');
     assert.deepEqual(errors,[]); assert.deepEqual(failures,[]); console.log('PASS update terminal browser');
-  } finally { try { if(browser) await browser.close(); } finally { try { await stop(server,serverDone,'server'); } finally { if(fixture){fixture.stdin.end();await fixtureDone;} } } }
+  } finally { try { if(browser) await browser.close(); } finally { try { await stop(server,serverDone,'server'); } finally { if(fixture){
+      if(fixture.exitCode === null && !fixture.stdin.destroyed) fixture.stdin.end();
+      await fixtureDone;
+    } } } }
 })().catch(error=>{console.error(error);process.exit(1)});

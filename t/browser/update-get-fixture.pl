@@ -7,6 +7,8 @@ use JSON qw(encode_json decode_json);
 use Storable qw(nfreeze thaw);
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Test qw(temp_user);
+die "intentional update terminal fixture startup failure\n"
+    if $ENV{UPDATE_TERMINAL_FIXTURE_EARLY_FAIL};
 my $u = temp_user();
 $u->update_self( { status => 'A' } );
 $u->set_password( my $p = 'update-get-' . LJ::rand_chars(12) );
