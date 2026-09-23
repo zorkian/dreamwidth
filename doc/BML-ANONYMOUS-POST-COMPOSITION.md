@@ -82,3 +82,15 @@ without registering a route.
 
 Public `/update` dispatch, anonymous community posting, alternate-login/challenge authentication,
 and any authentication-policy change remain separate gates.
+
+## Callable browser and native retry boundary
+
+The callable attempt and error rendering must preserve the nonempty draft and
+editor sentinels described above. A subsequent corrected submission to the rendered
+`/entry/new` action is a separate, ordinary native post: existing `_do_post` clears
+`entry_draft` and `draft_properties`, and `_persist_props` stores displaydate behavior.
+The browser must assert these stages separately with fresh reads. Do not require
+unchanged drafts after native retry, seed empty drafts to make that assertion pass,
+or change native housekeeping as part of this package. Username/password controls
+and the modal submission should retain their existing native contract; submitted
+passwords must not appear in logged evidence or error-page markup.
