@@ -1260,6 +1260,11 @@ sub _do_post {
 sub _do_edit {
     my ( $ditemid, $form_req, $auth, %opts ) = @_;
 
+    # Retained editjournal supplies its raw crosspost fields and response-only
+    # state explicitly. The native edit path keeps its normalized request and
+    # native links untouched.
+    my $legacy_edit = $opts{legacy_edit};
+
     my $res = DW::Entry::_save_editted_entry( $ditemid, $form_req, $auth );
     return %$res if $res->{errors};
 
@@ -1369,14 +1374,27 @@ sub _do_edit {
 
     }
 
+    my $crosspost_form = $form_req;
+    if ($legacy_edit) {
+        $crosspost_form = { %$form_req, crosspost_entry => $legacy_edit->{crosspost_master}, };
+    }
+
     my @crossposts = _queue_crosspost(
-        $form_req,
-        remote  => $remote,
-        journal => $journal,
-        deleted => $deleted,
-        ditemid => $ditemid,
-        editurl => $edit_url,
+        $crosspost_form,
+        remote             => $legacy_edit ? $legacy_edit->{remote} : $remote,
+        journal            => $journal,
+        deleted            => $deleted,
+        ditemid            => $ditemid,
+        editurl            => $legacy_edit ? $legacy_edit->{editurl} : $edit_url,
+        crosspost_callback => $legacy_edit ? $legacy_edit->{crosspost_callback} : undef,
     );
+
+    if ( $legacy_edit && $deleted ) {
+        $opts{legacy_edit_deleted_extras} = LJ::Hooks::run_hook('entry_deleted_page_extras');
+    }
+    elsif ( $legacy_edit && $legacy_edit->{entry_was_suspended} ) {
+        $warnings->add( undef, '/editjournal.bml.success.editedstillsuspended' );
+    }
 
     my $poststatus = {
         status    => $deleted ? 'deleted' : 'edited',
@@ -1393,7 +1411,8 @@ sub _do_edit {
             links        => \@links,
             links_header => '.links',
             entry_url    => $entry_url,
-            extradata => _get_extradata( $form_req, $journal ),
+            extradata                  => _get_extradata( $form_req, $journal ),
+            legacy_edit_deleted_extras => $opts{legacy_edit_deleted_extras},
         }
     );
 

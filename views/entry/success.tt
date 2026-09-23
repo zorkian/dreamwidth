@@ -61,6 +61,8 @@ the same terms as Perl itself.  For a copy of the license, please reference
 </ul>
 [%- END -%]
 
+[%- legacy_edit_deleted_extras %]
+
 [%- IF links.size -%]
 <p>[%- links_header | ml -%]</p>
 <ul class="successlinks">
