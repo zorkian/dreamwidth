@@ -61,21 +61,19 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: new-entry rerender00b independently clear, integratedb96357e07;
-   foreman rerender/native-new/spellcheck/image107 PASS. Active owner-new POST
-   adapter on bml-terra-legacy-update-adapter-20260923: callable handler/test-only
-   routing first, no public registration yet; unsupported cases fall through
-   before state changes. Clear pipeline dependencies supplied explicitly.
-2. Widgets: hook correction7d11 independently clear, integrated0c3bb1722;
-   foreman hook/housekeeping/new/moderated193 PASS. Post-attempt callbackd372
-   independently clear, integratedda092e789. Active owned-edit render-tail
-   extraction and callable legacy rerender on separate branch, no saves/routes.
-   Mechanical extraction sourceed03dfc2d is committed; adapter tests underway.
-3. Sol: bounded owned-edit save/delete housekeeping and crosspost source audit
-   while next adapter commits mature. Canonical new save audit atd8b910151 passed
-   30 actual-form/fresh-entry assertions, no mismatch. Ordinary/moderated hook
-   real responses and root timing characterization are clear. Held inbox work
-   and pending external Journal deployment interfaces remain excluded.
+1. Themenav: owner-only callable update adapter 752163c08 is held by Sol for
+   decoder-hook-before-validation ordering, incomplete flat hook request seed,
+   and missing post-attempt hook on empty-body failure. Narrow correction is
+   prioritized; browser harness WIP is preserved. No public route registration.
+2. Widgets: mechanical edit renderer ed03 independently clear and integrated
+   5bead7879, foreman52 PASS. Rerender bdc invalid-date fix7550febd5 and separate
+   edit-success seams015f36746 are queued for Sol. Worker continues a separate
+   callable ordinary-owned save/delete adapter with test-only routing; unsupported
+   maintainer/spam-delete/community actions remain outside this slice.
+3. Sol: completed held findings for752; now rechecks bdc..755 raw invalid date/time
+   retention, then015 edit-success compatibility against the preserved audit.
+   All reviews use immutable commits. Held inbox and external Journal deployment
+   interfaces remain excluded.
 
 Final current combined-tree callbacks91 PASS, tidy1112 PASS, compile1607 PASS.
 Logs /tmp/bml-legacy-callbacks-integrated.log and
@@ -106,11 +104,3 @@ paths and old container IDs in older logs are not current resources. Shell
 sandbox bwrap loopback errors have required reviewed escalations; do not bypass
 approval review. Use Herdr skill with HERDR_ENV=1, preserve focus, and keep
 unresolved external decisions separate from independent implementation work.
-
-
-Latest continuation: root 5bead7879 includes independently clear mechanical
-edit renderer; foreman 52 assertions pass. Sol now reviews owner-only callable
-update adapter 752163c08 while Themes builds its test-only-route browser proof.
-Widgets preserves edit-success WIP and will separately fix bdc3f3a6a invalid
-raw date/time retention; that rerender gate remains held. No public old-route
-cutover or BML deletion is accepted by these helper packages.

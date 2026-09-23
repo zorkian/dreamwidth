@@ -1738,3 +1738,16 @@ checks, after widgets Terra completes customization1/4.
   tidy 1113 and compile 1607 passing. No public routes are registered. Themes
   continues disposable real-browser acceptance through test-only routing.
 - Held inbox work and pending external Journal hook interfaces remain unchanged.
+
+
+### Update adapter review findings and edit corrections
+
+- Sol holds owner adapter752: decoder hook runs before token/referer decisions;
+  flat request lacks old mode/ver/user/password/usejournal/xpost seed fields;
+  valid empty body skips old protocol-attempt then spam-hook ordering. Separate
+  reproduced probes confirm hook counts. Themes is correcting these before
+  integration, preserving browser harness WIP.
+- Widgets committed edit success seams015f36746 and raw date/time display fix
+  7550febd5 atop bdc. Both are queued for independent review. Canonical backend
+  values remain separate from raw retry controls. Worker continues ordinary
+  owned save/delete callable adapter without public registration.
