@@ -1,3 +1,22 @@
+## Public readonly integration follow-up required
+
+Sol4493 CLEAR, integrateda564e9e50. Root plain-app actual-readonly browser PASS
+(/tmp/bml-readonly-public-browser.log), fixture check empty, captures copied to
+/tmp/bml-readonly-public-browser. Broader five-file root run failed five STALE
+assertions in two older files: plack-update-get-activation22-23 still expects
+readonly BML; legacy-update-get-handler28 expects299 and33-34 expect3 hooks rather
+than4. Themes assigned separate test-only precise native warning/form and once/ref
+correction, preserving invalid-target WIP. Do not report full combined suite clear
+until this fix is independently reviewed and rerun. Root sessions9852/15505 done.
+
+Sol callable invalid-targeta662 CLEAR, integrated51a7ec6c1; no public invalid-target
+route. Focused root replay session73750 pending (log /tmp/bml-invalid-target-callable-integrated.log).
+
+Widgets helper55c9e8a7ad468e0579c734a13cbd5dad2beb8be6 queued Sol: explicit community
+opt-in, personal default unchanged, session log actor vs effective spam/protocol,
+native retry/no BML after attempt. Worker37/339 tests and tidy/compile PASS. Resolver
+contract preparation only; no public route. Held interfaces unchanged.
+
 ## Pending public readonly and next independent slices
 
 Public readonly4493a7212e2186bb6662b61f4b5e800b9b820a99 is committed and in
