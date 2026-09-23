@@ -79,13 +79,27 @@ today.
 };
 ```
 
-`grep -rn '\$Apache::BML::r\b' cgi-bin` finds **zero** assignments anywhere
-in the tree — only this one read. `doc/PLACK.md:7` confirms the historical
-Apache/mod_perl path "was retired once all web services moved to Starman,"
-so this is not a dev-environment artifact; the `$Apache::BML::r` branch is
-permanently dead in this codebase's current architecture. That leaves
-exactly two live outcomes, both already characterized by
-`doc/BML-JOURNAL-ADAPTER.md`'s method table (same adapter class):
+**Correction (this commit):** an earlier version of this section claimed
+`grep -rn '\$Apache::BML::r\b' cgi-bin` finds zero assignments; that is
+false. `cgi-bin/DW/BML.pm:633` does `local $Apache::BML::r = $adapter`
+inside `DW::BML::render` (reset at `:692`/`:711`), and `cgi-bin/Apache/
+BML.pm:102` sets it too (reset at `:198`/`:239`/`:370`/`:386`/`:411`/`:450`).
+The corrected reasoning: `DW::BML->render` is reached from `app.psgi:163`'s
+BML fallback for any URI `DW::Routing`/`DW::Controller::Journal` didn't
+claim, and is therefore still live in principle. But post-F2 the only
+`.bml` files left are the three `_config*.bml` files, and `DW::BML::render`
+explicitly forbids serving any `_config` file (`DW/BML.pm:623-628`) with an
+early `return 0` **before** reaching the `:633` assignment — so every
+reachable call to `render()` 403s before `$Apache::BML::r` is ever set.
+`Apache::BML.pm`'s own handler (where `:102`'s assignment lives) is the
+retired mod_perl request-dispatch entry point, unused under Plack
+(`doc/PLACK.md:7`: the historical Apache/mod_perl path "was retired once
+all web services moved to Starman"). So `$Apache::BML::r` is never set
+during any live Plack request today — not because nothing in the tree ever
+assigns it, but because every code path that does assign it is unreachable
+from a real request post-F2. That leaves exactly two live outcomes, both
+already characterized by `doc/BML-JOURNAL-ADAPTER.md`'s method table (same
+adapter class):
 
 - **Inside an active web request** (§1.2's only current case):
   `DW::BML::RequestAdapter->new(DW::Request->get)` — the same adapter class
@@ -231,9 +245,10 @@ sub filename {
 }
 ```
 
-So, inside an active web request (the only live case per §1.3's same
-analysis — `$Apache::BML::r` is permanently unset): `$r->filename` on the
-adapter **already returns `undef` today**, before any change proposed here.
+So, inside an active web request (the only live case per §1.3's corrected
+analysis — `$Apache::BML::r` is never set during any live Plack request):
+`$r->filename` on the adapter **already returns `undef` today**, before any
+change proposed here.
 `$filename =~ s!...!!` on that `undef` value warns ("Use of uninitialized
 value") and leaves it effectively empty/`undef`; `filename()` returns
 nothing meaningful in production **right now**.
@@ -334,7 +349,7 @@ and `BML-TRANSLATION-SHIM.md`'s findings (§8-§9 there, correction commit
 | 2 | Re-grep `BML::ml`/`%ML`/`%BML::ML`, drop `RequestWrapper.pm:56` | Ready per `BML-TRANSLATION-SHIM.md`'s correction (`920cf07f8`): no `.bml` page exists post-F2 at all except the three never-rendered `_config*.bml` files, so the residual risk that document originally raised is moot. The one remaining consideration is `LJ::Protocol.pm:562` (held, translation family, **not** this document's scope) | User decision on `LJ::Protocol.pm:562` (§4 there) |
 | 3 | `LJ::make_journal`'s adapter → plain `DW::Request` (`Journal.pm:317`) | **Done, but HELD** — W8 (`d886c0b7d`) implements exactly this, decoupling `s2_head_content_extra` (`LJ::S2.pm:2468`) into its own adapter construction. Per `BML-HANDOFF.md`'s W8 entry, HELD because `LJ::S2::Page` is also reached from native entry preview with a plain `DW::Request` — always wrapping an adapter at the hook site would change what a production hook sees on previews; fix in progress | Not this document's scope; tracked by W8 |
 | 4 | User decision: `$LJ::DISABLE_PROTOCOL{*}` ABI, `data_handler:*`/`s2_head_content_extra` ABI | **This document (§1) covers `$LJ::DISABLE_PROTOCOL{getevents}`** with the same three-way decision (keep adapter / pass `DW::Request` / drop argument) `BML-ENGINE-RETIREMENT.md` posed generically. `data_handler:*`/`s2_head_content_extra` remain `BML-JOURNAL-ADAPTER.md`'s scope, unchanged by this document | **User decision required**, no default recommended beyond "keep adapter" as the zero-risk option (§1.5) |
-| 5 | User decision: `LJ::PageStats::filename` contract | **This document (§2) resolves this** to a concrete, evidence-based proposal (return `undef`, §2.5) rather than leaving it fully deferred — the "characterize before deciding" instruction `BML-REMAINING-NATIVE-CONSUMERS.md:47-49` asked for is now done | **User decision required** to approve §2.5's change itself (low risk: zero in-tree callers, already-`undef`/crashing today) |
+| 5 | User decision: `LJ::PageStats::filename` contract | **This document (§2) proposes** a concrete, evidence-based answer (return `undef`, §2.5) rather than leaving it fully deferred — the "characterize before deciding" instruction `BML-REMAINING-NATIVE-CONSUMERS.md:47-49` asked for is now done | **User decision required** to approve §2.5's change itself (low risk: zero in-tree callers, already-`undef`/crashing today) |
 | 6 | Delete `Apache::BML.pm`, `DW::BML.pm`, `lj-bml-blocks.pl`, `BMLInit.pm`, `.look` files, `_config*.bml`, retire `t/plack-bml.t` | Not reachable until steps 2-5 are individually resolved and actioned | Composite of every gate above |
 
 **This document's net addition to the sequence**: steps 4 and 5 no longer
