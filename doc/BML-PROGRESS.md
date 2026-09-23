@@ -2009,3 +2009,11 @@ Foreman normal replay PASS and anchored process check empty; captures preserved
 under legacy-owned-edit-get, log /tmp/bml-owned-get-browser-integrated.log.
 Public GET activation waits for the passing retained-schema fixture prerequisite.
 Update callable wrappera349/7aa remains under final review; browser work active.
+
+### Update wrapper remains held at7aa
+
+Sol exact markup probe shows both default41 and query-selected nondefault42
+checked. Production still ORs raw GET with defaults; the test only inspects
+HTML::Form->value, which returns first selected input and misses42. Routed
+narrow direct-default map plus every-checkbox assertion. Redirect302 correction
+is clear. Browser WIP preserved; no a349/7aa integration or public GET activation.

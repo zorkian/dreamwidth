@@ -9,7 +9,10 @@ complete. Production GET routing remains unchanged.
 Pending review: callable update GET wrappera3491e46 + correction7aa50a729
 (44 worker assertions, full tidy/compile pass). Foreman and Sol held the first
 candidate for303 vs retained302 and query-selected vs default-only crosspost;
-7aa is under final recheck. Widgets continues browser-only update GET acceptance
+7aa did not actually remove the GET override: Sol exact rendered markup checks
+both accounts41/42 while HTML::Form->value reports only first41. Gate remains
+held; Widgets must map defaults directly and enumerate every checkbox. Native
+302 correction is clear. Browser WIP is preserved while this fix takes priority. Widgets continues browser-only update GET acceptance
 on bml-terra-update-get-browser-20260923; its first run failed and diagnosis is
 active. Themes is implementing the test-only retained-form GET/production POST
 fixture prerequisite per BML-OWNED-GET-ACTIVATION-TESTS.md, then narrow public
