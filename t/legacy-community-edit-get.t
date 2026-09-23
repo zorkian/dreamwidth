@@ -236,12 +236,11 @@ sub native_request {
             [ sort grep { length } split /,\s*/, $direct_form->value('taglist') ],
             'same-poster form matches direct native tag set'
         );
-        my @direct_custom_bits = map { $_->value }
-            grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $direct_form->inputs;
-        my @legacy_custom_bits = map { $_->value }
-            grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $same_poster_form->inputs;
-        is_deeply( \@legacy_custom_bits, \@direct_custom_bits,
-            'community form has no personal custom bits, matching direct native form' );
+        ok( !$direct_form->find_input('custom_bit'),
+            'direct native community form has no personal custom-bit control' );
+        ok( !$same_poster_form->find_input('custom_bit'),
+            'callable community form has no personal custom-bit control' );
+
         ok(
             !$same_poster_form->find_input('action:savemaintainer'),
             'ordinary edit lacks the maintainer action'
