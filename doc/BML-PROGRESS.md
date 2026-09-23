@@ -1717,3 +1717,24 @@ checks, after widgets Terra completes customization1/4.
 - Themes now implements callable ordinary owner-old-POST adapter with test-only
   routing; Widgets prepares owned-edit rerender. Both exclude public route
   registration and page deletion until their bounded implementation gates pass.
+
+
+### Owned-edit rendering and first owner update adapter
+
+- Mechanical edit renderer extraction ed03dfc2d independently clear and
+  integrated as 5bead7879. Foreman edit/rendering parity passed 52 assertions in
+  /tmp/bml-edit-render-extraction-integrated.log. Existing missing Russian
+  fixture diagnostics remain; no changed behavior was found.
+- Owned-edit integration audit is preserved in
+  BML-OWNED-EDIT-INTEGRATION.md (99d2d0dfd). Edit delete/log/pre-save-hook order
+  differs from new-post ordering; no new-post draft/preference housekeeping
+  belongs in the edit adapter.
+- Callable owned-edit rerender bdc3f3a6a is held: independent invalid-year probe
+  rendered 0000-02-03 instead of submitted not-a-year-02-03. Persisted entries
+  remained unchanged. Widgets is correcting displayed raw date/time retention
+  separately from canonical backend values and its edit-success work.
+- Callable owner-only update adapter 752163c08 is in independent Sol review.
+  Worker reports old-form plus adapter 180 assertions, focused pipeline 218,
+  tidy 1113 and compile 1607 passing. No public routes are registered. Themes
+  continues disposable real-browser acceptance through test-only routing.
+- Held inbox work and pending external Journal hook interfaces remain unchanged.

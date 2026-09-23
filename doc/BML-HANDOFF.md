@@ -106,3 +106,11 @@ paths and old container IDs in older logs are not current resources. Shell
 sandbox bwrap loopback errors have required reviewed escalations; do not bypass
 approval review. Use Herdr skill with HERDR_ENV=1, preserve focus, and keep
 unresolved external decisions separate from independent implementation work.
+
+
+Latest continuation: root 5bead7879 includes independently clear mechanical
+edit renderer; foreman 52 assertions pass. Sol now reviews owner-only callable
+update adapter 752163c08 while Themes builds its test-only-route browser proof.
+Widgets preserves edit-success WIP and will separately fix bdc3f3a6a invalid
+raw date/time retention; that rerender gate remains held. No public old-route
+cutover or BML deletion is accepted by these helper packages.
