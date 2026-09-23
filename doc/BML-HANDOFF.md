@@ -50,6 +50,17 @@ users persists). Nothing external was touched.
   (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
   Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
   s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- CI green check on root 3342a072f (reviewer, allowlist discipline): the 90
+  files CI runs were screened for side effects; 86 ran and passed, tidyall
+  clean; four (entry-maintainer, entry-picker, entry-moderated-post,
+  entry-spellcheck) skipped only for fixture writes (community statusvis
+  toggle, posting-access set_rel 'P'), which the foreman rules as fixture
+  shaping, not moderation; all four passed on the F2 allowlist. No stale
+  code reference to deleted symbols remains in t/ apart from the two known
+  red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- T8 adapter module extraction 1420764ba HELD: dropping 'use DW::BML' from
+  LJ::S2 unloaded the BML::* shims from ljlib-only processes (PageStats,
+  Protocol sendmessage, LJ::Web fallbacks); fix in progress.
 - T6 protocol/PageStats audit 0655e31a0 + correction c8d7b8dcd, T7 range
   b6a244508 + 127d54c3c (PageStats filename undef-safe; explicit
   DISABLE_PROTOCOL adapter, ABI unchanged), W9 doc 7e2fbd54d + fix 71b7782bc,
