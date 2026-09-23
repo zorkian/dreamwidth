@@ -35,6 +35,7 @@ use LJ::JSON;
 use LJ::SpellCheck;
 
 use DW::External::Account;
+use DW::External::Page;
 use DW::External::Site;
 
 my @modules = qw(
@@ -1019,6 +1020,63 @@ sub legacy_update_get_render {
             action_url     => $opts{action_url} || '/entry/new',
             title_override => $opts{title_override},
         }
+    );
+}
+
+# Callable-only authenticated retained /update share GET seam. It deliberately
+# has no route registration: callers retain legacy guard ordering and any later
+# public action/schema decision. The factory is only called after the excluded
+# contexts decline, and update_fields receives the original flat GET reference.
+sub legacy_update_share_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($remote);
+
+    my $get = $opts{get} || DW::Entry::Legacy::legacy_post_hash( $r->get_args );
+    return undef unless $get->{share};
+    return undef if $get->{altlogin};
+    return undef if $get->{usejournal} && !LJ::load_user( $get->{usejournal} );
+    return undef if LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' );
+    return undef if $remote->identity || !$remote->can_post || $remote->readonly;
+
+    # Retained update creates the page before update_fields. Subject/event/tag
+    # are ordinary GET defaults until a returned page replaces the first two.
+    my %prefill = map { $_ => $get->{$_} } qw(subject event prop_taglist);
+    if ( my $page = DW::External::Page->new( url => $get->{share} ) ) {
+        $prefill{subject} = LJ::ehtml( $page->title );
+        $prefill{event} =
+              '<a href="'
+            . $page->url . '">'
+            . ( LJ::ehtml( $page->description ) || $prefill{subject} || $page->url )
+            . "</a>\n\n";
+    }
+
+    my $hook       = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
+    my $usejournal = LJ::canonical_username( $get->{usejournal} || '' );
+    my %crosspost  = map { $_->acctid => $_->xpostbydefault }
+        DW::External::Account->get_external_accounts($remote);
+
+    my $now = DateTime->now;
+    if ( my $timezone = $remote->prop('timezone') ) {
+        my $tz = eval { DateTime::TimeZone->new( name => $timezone ) };
+        $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
+    }
+
+    return legacy_update_get_render(
+        remote         => $remote,
+        get            => \%prefill,
+        update_fields  => $hook,
+        legacy_editor  => $remote->new_entry_editor,
+        rte_supported  => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime       => $now->strftime('%F %R'),
+        usejournal     => $usejournal,
+        crosspost      => \%crosspost,
+        action_url     => LJ::create_url( '/entry/new', keep_query_string => 1 ),
+        title_override => LJ::Lang::ml('/update.bml.title2'),
     );
 }
 
