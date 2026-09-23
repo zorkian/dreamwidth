@@ -1,3 +1,21 @@
+## Pending invalid-target and community resolver review
+
+Canonical invalid-target public tip is 24fddcb8244b1b790278f6ad1e12b222d37a3d79,
+replayed directly atop ff4774366 with accepted readonly fixes already present.
+Worker combined seven suites: 246 PASS. Sol reviews this exact tip, replacing
+stale 94 ancestry. No invalid-target public activation has been integrated yet.
+
+Callable community resolver 124473f0d58d461faee4645a9cd194a3dd0fbd4d is also
+queued for independent review. Widgets continues separate test-only browser
+acceptance; no production registration. Themes audits remaining ordinary BML
+language/request consumers outside held interfaces and current Entry work.
+
+Source-only anonymous rendering handoff is preserved in
+BML-ANONYMOUS-UPDATE-GET-RENDER.md. Its proposed callable shares the native
+renderer, but public activation remains separate from credential/target schema
+and authentication parity. No anonymous implementation or policy change yet.
+All external deployment and platform restrictions remain held.
+
 ## Readonly integration fully green
 
 Solc9fb04a1 stale-suite correction CLEAR, integrateded5210e22. Root exact merged
