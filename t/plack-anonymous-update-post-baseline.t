@@ -49,13 +49,16 @@ sub fresh_entry {
     return LJ::Entry->new( $user, jitemid => $jitemid );
 }
 
-sub fresh_draft {
+sub fresh_user_state {
     my ($userid) = @_;
     my $fresh  = LJ::load_userid( $userid, 1 );
     my $frozen = $fresh->prop('draft_properties') || '';
     return {
-        body  => $fresh->draft_text,
-        props => length $frozen ? thaw($frozen) : {},
+        draft_body              => $fresh->draft_text,
+        draft_props             => length $frozen ? thaw($frozen) : {},
+        entry_editor            => $fresh->prop('entry_editor') || '',
+        entry_editor2           => $fresh->prop('entry_editor2') || '',
+        disable_auto_formatting => $fresh->prop('disable_auto_formatting') || 0,
     };
 }
 
@@ -67,6 +70,9 @@ my $owner_id = $owner->id;
 # URL, or response comparison.
 my $password = join '-', 'anonymous-update-fixture', LJ::rand_chars(24);
 $owner->set_password($password);
+$owner->set_prop( entry_editor            => 'plain' );
+$owner->set_prop( entry_editor2           => 'markdown0' );
+$owner->set_prop( disable_auto_formatting => 0 );
 
 ok( $owner->set_draft_text('Anonymous retained draft body sentinel'),
     'seeded anonymous owner draft body sentinel' );
@@ -79,7 +85,7 @@ $owner->set_prop(
         }
     )
 );
-my $draft_before = fresh_draft($owner_id);
+my $state_before = fresh_user_state($owner_id);
 
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'anonymousUpdatePostBaseline';
 my $scheduled = 0;
@@ -96,16 +102,18 @@ test_psgi $app, sub {
 
     for my $case (
         {
-            path     => '/update',
-            subject  => 'Anonymous retained slash subject',
-            body     => 'Anonymous retained slash body',
-            security => 'private',
+            path         => '/update',
+            subject      => 'Anonymous retained slash subject',
+            body         => 'Anonymous retained slash body',
+            security     => 'private',
+            event_format => 1,
         },
         {
-            path     => '/update.bml',
-            subject  => 'Anonymous retained bml subject',
-            body     => 'Anonymous retained bml body',
-            security => 'friends',
+            path         => '/update.bml',
+            subject      => 'Anonymous retained bml subject',
+            body         => 'Anonymous retained bml body',
+            security     => 'friends',
+            event_format => 0,
         },
         )
     {
@@ -128,6 +136,8 @@ test_psgi $app, sub {
         $form->value( event            => $case->{body} );
         $form->value( security         => $case->{security} );
         $form->value( prop_xpost_check => 0 ) if $form->find_input('prop_xpost_check');
+        $form->value( event_format     => 'preformatted' )
+            if $case->{event_format} && $form->find_input('event_format');
 
         my $before = entry_count($owner_id);
         my $post   = $form->click('action:update');
@@ -163,8 +173,25 @@ test_psgi $app, sub {
         else {
             is( $entry->security, 'private', "$case->{path} preserves private security" );
         }
-        is_deeply( fresh_draft($owner_id), $draft_before,
-            "$case->{path} anonymous password POST leaves draft/editor sentinels unchanged" );
+        my $after_state = fresh_user_state($owner_id);
+        is_deeply(
+            {
+                draft_body    => $after_state->{draft_body},
+                draft_props   => $after_state->{draft_props},
+                entry_editor  => $after_state->{entry_editor},
+                entry_editor2 => $after_state->{entry_editor2},
+            },
+            {
+                draft_body    => $state_before->{draft_body},
+                draft_props   => $state_before->{draft_props},
+                entry_editor  => $state_before->{entry_editor},
+                entry_editor2 => $state_before->{entry_editor2},
+            },
+            "$case->{path} anonymous password POST leaves remote-only draft/editor state unchanged"
+        );
+        is( $after_state->{disable_auto_formatting},
+            $case->{event_format},
+            "$case->{path} success updates disable_auto_formatting from event_format" );
     }
 
     for my $case (
@@ -173,21 +200,21 @@ test_psgi $app, sub {
             password   => join( '-', 'wrong', LJ::rand_chars(24) ),
             subject    => 'Anonymous wrong-password subject',
             body       => 'Anonymous wrong-password body',
-            want_error => qr/(?:login|password|error)/i,
+            want_error => qr/Error logging on.*Invalid password/s,
         },
         {
             label      => 'empty password',
             password   => '',
             subject    => 'Anonymous empty-password subject',
             body       => 'Anonymous empty-password body',
-            want_error => qr/(?:password|error)/i,
+            want_error => qr/Enter Password/,
         },
         {
             label      => 'empty body',
             password   => $password,
             subject    => 'Anonymous empty-body subject',
             body       => '',
-            want_error => qr/(?:entry|body|error)/i,
+            want_error => qr/Must provide entry text/,
         },
         )
     {
@@ -211,11 +238,17 @@ test_psgi $app, sub {
         like( $res->content, $case->{want_error},
             "$case->{label} has a meaningful error response" );
         is( entry_count($owner_id), $before, "$case->{label} creates no entry" );
-        is_deeply( fresh_draft($owner_id), $draft_before,
-            "$case->{label} leaves draft/editor sentinels unchanged" );
+        is_deeply( fresh_user_state($owner_id),
+            $state_before, "$case->{label} leaves draft/editor and formatting state unchanged" );
 
         my $retry = update_form( $res->content, $path );
         ok( $retry, "$case->{label} rerenders the retained anonymous form" );
+        is( $retry ? ( $retry->value('user') // '' ) : '',
+            $owner->user, "$case->{label} retry retains the submitted username" );
+        is( $retry ? ( $retry->value('subject') // '' ) : '',
+            $case->{subject}, "$case->{label} retry retains the submitted subject" );
+        is( $retry ? ( $retry->value('event') // '' ) : '',
+            $case->{body}, "$case->{label} retry retains the submitted body" );
         is( $retry ? ( $retry->value('password') // '' ) : '',
             '', "$case->{label} retry password control remains blank" );
     }
