@@ -1055,14 +1055,15 @@ sub legacy_owned_edit_post {
     my $action = DW::Entry::Legacy::legacy_edit_action($post);
     return unless $action && ( $action eq 'save' || $action eq 'delete' );
 
-    my $prepared    = DW::Entry::Legacy::prepare_entry_form( $opts{legacy_seed} || {}, $post );
-    my $canonical   = $prepared->{canonical};
-    my $legacy_post = $prepared->{post};
-    my $deleted     = $action eq 'delete';
+    my $prepared       = DW::Entry::Legacy::prepare_entry_form( $opts{legacy_seed} || {}, $post );
+    my $canonical      = $prepared->{canonical};
+    my $legacy_request = $prepared->{request};
+    my $legacy_post    = $prepared->{post};
+    my $deleted        = $action eq 'delete';
 
     if ($deleted) {
-        $legacy_post->{event} = '';
-        $canonical->{event}   = '';
+        $legacy_request->{event} = '';
+        $canonical->{event}      = '';
         $journal->log_event(
             'delete_entry',
             {
@@ -1073,7 +1074,7 @@ sub legacy_owned_edit_post {
         );
     }
 
-    LJ::Hooks::run_hooks( 'spam_check', $remote, $legacy_post, 'entry' );
+    LJ::Hooks::run_hooks( 'spam_check', $remote, $legacy_request, 'entry' );
 
     my $errors   = $opts{errors}   || DW::FormErrors->new;
     my $warnings = $opts{warnings} || DW::FormErrors->new;

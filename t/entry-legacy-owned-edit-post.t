@@ -6,6 +6,7 @@ use warnings;
 use Test::More;
 use HTTP::Request;
 use HTML::Form;
+use Scalar::Util qw(refaddr);
 use lib "$ENV{LJHOME}/cgi-bin";
 use DW::Request::Standard;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
@@ -38,16 +39,17 @@ sub begin_request {
 sub ordinary_post {
     my (%opts) = @_;
     return {
-        'action:save' => 1,
-        subject       => $opts{subject} || 'Legacy adapter subject',
-        event         => $opts{event} || 'Legacy adapter body',
-        security      => 'private',
-        date_ymd_yyyy => '2020',
-        date_ymd_mm   => '02',
-        date_ymd_dd   => '03',
-        hour          => '04',
-        min           => '05',
-        date_diff     => 1,
+        'action:save'      => 1,
+        subject            => $opts{subject} || 'Legacy adapter subject',
+        prop_current_music => 'raw post music',
+        event              => $opts{event} || 'Legacy adapter body',
+        security           => 'private',
+        date_ymd_yyyy      => '2020',
+        date_ymd_mm        => '02',
+        date_ymd_dd        => '03',
+        hour               => '04',
+        min                => '05',
+        date_diff          => 1,
     };
 }
 
@@ -62,10 +64,18 @@ sub owned_entry_pair {
 {
     my ( $owner, $entry, $other ) = owned_entry_pair();
     my @spam;
+    my $decoded_request;
     my @saved;
     my @scheduled;
     my $account = bless { acctid => 23, name => 'Adapter account' }, 'LegacyEditFixture::Account';
     no warnings 'redefine';
+    my $decode_entry_form = \&DW::Entry::Legacy::decode_entry_form;
+    local *DW::Entry::Legacy::decode_entry_form = sub {
+        my $decoded = $decode_entry_form->(@_);
+        $decoded_request = $decoded;
+        $decoded_request->{prop_current_music} = 'decoded hook music';
+        return $decoded;
+    };
     local *LJ::Hooks::run_hooks = sub {
         push @spam, [@_] if $_[0] eq 'spam_check';
         return;
@@ -114,7 +124,22 @@ sub owned_entry_pair {
     );
     is( scalar @spam, 1,      'callable legacy save invokes spam_check exactly once' );
     is( $spam[0][1],  $owner, 'callable legacy save supplies the owner as spam actor' );
-    is( $spam[0][2]{event}, 'Legacy adapter body', 'spam hook receives the original flat body' );
+    is( $spam[0][2]{event}, 'Legacy adapter body', 'spam hook receives the decoded legacy body' );
+    is(
+        refaddr( $spam[0][2] ),
+        refaddr($decoded_request),
+        'spam hook receives the exact decoded request reference'
+    );
+    isnt(
+        refaddr( $spam[0][2] ),
+        refaddr( ordinary_post() ),
+        'spam hook does not receive an unrelated raw post hash'
+    );
+    is(
+        $spam[0][2]{prop_current_music},
+        'decoded hook music',
+        'spam hook sees metadata transformed by the decode hook'
+    );
     like(
         $request->response_content,
         qr/Your edit was successful\./,
