@@ -596,10 +596,6 @@ sub _render_new_form {
     return DW::Template->render_template( 'entry/form.tt', $vars );
 }
 
-# Render a retained legacy new-entry error or transform response through the
-# shared native form. This is deliberately not a route or save adapter: callers
-# retain authorization and action decisions, and provide the already-prepared
-# legacy decoder result.
 # Render-only compatibility seam for an already-authorized retained /update GET.
 # The caller retains routing, beta, external fetches, and update_fields ABI.
 sub legacy_update_get_render {
@@ -608,11 +604,9 @@ sub legacy_update_get_render {
     my $get           = $opts{get}           || {};
     my $hook          = $opts{update_fields} || {};
     my $legacy_editor = $opts{legacy_editor} || '';
-    my $rich = $opts{rte_supported} && $legacy_editor eq 'rich';
-    my $preformatted =
-        exists $hook->{prop_opt_preformatted}
-        ? $hook->{prop_opt_preformatted}
-        : $remote && $remote->prop('disable_auto_formatting');
+    my $rich         = $opts{rte_supported} && $legacy_editor eq 'rich';
+    my $preformatted = ( $remote && $remote->prop('disable_auto_formatting') )
+        || $hook->{prop_opt_preformatted};
     my $formdata = {
         subject => exists $hook->{subject} ? $hook->{subject} : $get->{subject},
         event   => exists $hook->{event}   ? $hook->{event}   : $get->{event},
@@ -636,6 +630,10 @@ sub legacy_update_get_render {
     );
 }
 
+# Render a retained legacy new-entry error or transform response through the
+# shared native form. This is deliberately not a route or save adapter: callers
+# retain authorization and action decisions, and provide the already-prepared
+# legacy decoder result.
 sub legacy_new_rerender {
     my ( $prepared, %opts ) = @_;
 
