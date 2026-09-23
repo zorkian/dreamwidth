@@ -1598,3 +1598,22 @@ checks, after widgets Terra completes customization1/4.
 - Native image remains unintegrated. Enter parent-form submission was reproduced
   by Sol; the correction is being covered with actual keyboard assertions. URL
   constraint/FAQ-hook fixes and final viewport/RTE/lifecycle matrix remain active.
+
+
+### Canonical normalizer accepted; native image harness correction queued
+
+- Sol independently cleared264a0e19..c12a30c5a. Integrated design26040bb19 and
+  implementation7d3a8eb70; foreman decoder/normalizer/crosspost59 PASS in
+  /tmp/bml-legacy-normalizer-integrated.log. Repeated POST fields retain exact
+  old each-order NUL joining, including empty-first values. No routes changed.
+- Retry mapper90fec3cdf is awaiting independent review. Foreman found the raw
+  legacy subject placeholder would reappear on native retry; the correction uses
+  canonical normalized subject and tests a real native decode of that retry.
+- Image production through42d0f6f5 independently resolves local URL constraints,
+  Enter accidentally submitting the parent form, Cancel behavior and FAQ hook.
+  Sol found its intentional browser run could instead fail when FCK fetched the
+  deliberately invalid escaping-test URL. Browser-onlyba1991d4a uses a successful
+  local image while retaining escaping and strict resource-error assertions.
+  Worker normal and named intentional failure/cleanup pass; Sol recheck queued.
+- Legacy success housekeeping is separate preserved WIP, not accepted code.
+  The next pure edit action selector also changes no routes or persistence.

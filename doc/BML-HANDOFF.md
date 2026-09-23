@@ -61,21 +61,22 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: Protocol notes178af2896 independently clear, integratedc2cc22f9c;
-   foreman notes/request/roundtrip51 PASS. Existing protocol.t skips; worker full
-   compile1605 PASS. Exact decoder extraction independently clear, integrated31a4c2fd3; root157
-   legacy +22preview and compile1607 PASS. Now building explicit canonical
-   normalizer with repeated-POST NUL-join boundary, property and crosspost mapping.
-   Existing hook/API remain unchanged; no route cutover yet.
-2. Widgets: native plain-editor URL/alt insertion image-only branch frombcd40791e.
-   Initial production10e2c0c41 is not accepted: required actual browser fixture and
-   new/edit/mode/narrow/cancel/escaping/persistence evidence are in progress, along
-   with localization/help/license refinements. The worker must continue beyond
-   partial setup and existing unrelated parity tests. No actual uploads involved.
-3. Sol: native spellcheck throughf8bbe2413 is final-clear and integrated19a32d950.
-   Ordinary legacy POST audit is preserved in BML-EDITOR-POST-COMPATIBILITY.md.
-   Review image production while its finite browser proofs are completed, then
-   review immutable decoder extraction when ready. Held inbox work and external deployment interfaces remain excluded.
+1. Themenav: decoder extraction and canonical normalizer are independently clear,
+   integrated through7d3a8eb70. Foreman decoder/normalizer/crosspost59 PASS in
+   /tmp/bml-legacy-normalizer-integrated.log. Pure native retry mapper through
+   90fec3cdf is queued for Sol; it retains the decoder-normalized subject so the
+   old localized placeholder cannot become saved retry text. Next independent
+   increment is a pure whitelisted legacy edit action selector; no route changes.
+2. Widgets: native image production through42d0f6f5 is independently clear.
+   Browser correctionba1991d4a replaces an intentionally invalid image URL with
+   a successful local resource before RTE rendering. Worker normal PASS and
+   named intentional failure/cleanup PASS; independent recheck remains pending.
+   The image range is not integrated yet. Preserved Entry.pm housekeeping WIP
+   is restored on its separate branch and active: opt-in legacy success behavior,
+   native defaults unchanged, then raw crosspost callback and moderation tests.
+3. Sol: recheck imageba199, then pure retry mapperc12a30c5a..90fec3cdf.
+   Decoder, normalizer, Protocol notes and native spellcheck are already clear.
+   Held inbox work and external deployment interfaces remain excluded.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
