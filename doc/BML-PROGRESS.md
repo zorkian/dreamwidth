@@ -1582,3 +1582,19 @@ checks, after widgets Terra completes customization1/4.
   BML-EDITOR-POST-COMPATIBILITY.md. First decoder extraction characterizes exact
   old behavior then moves it without route changes, retaining decode_entry_form
   hook and current LJ API. No external interface retirement is implied.
+
+### Legacy decoder extracted without route changes
+
+- Sol clear characterizatione6657c8c and extractioncf7fd694e integrated as
+  46a1a5398 and31a4c2fd3. Old/new decoder bodies are byte-identical after name
+  normalization; GPL notice retained. LJ forwarding preserves original arguments
+  and return, and deployment hook identity/order remains intact.
+- Foreman legacy decoder/update/edit157 PASS; dependent legacy preview22 PASS;
+  full compile1607 PASS. Logs /tmp/bml-legacy-decoder-{integrated,preview,compile}.log.
+- Next normalizer keeps old flat-property semantics and crosspost values while
+  preparing canonical native input. Foreman identified legacy repeated POST NUL
+  joining at DW/BML.pm948-949: a native Hash::MultiValue boundary must preserve
+  that scalar contract explicitly, not silently take one repeated value.
+- Native image remains unintegrated. Enter parent-form submission was reproduced
+  by Sol; the correction is being covered with actual keyboard assertions. URL
+  constraint/FAQ-hook fixes and final viewport/RTE/lifecycle matrix remain active.

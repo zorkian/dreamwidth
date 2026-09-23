@@ -63,9 +63,10 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 1. Themenav: Protocol notes178af2896 independently clear, integratedc2cc22f9c;
    foreman notes/request/roundtrip51 PASS. Existing protocol.t skips; worker full
-   compile1605 PASS. Now characterizing/extracting exact entry_form_decode into
-   DW::Entry::Legacy with existing LJ forwarding API and decode_entry_form hook
-   unchanged. No route changes in this first bounded package.
+   compile1605 PASS. Exact decoder extraction independently clear, integrated31a4c2fd3; root157
+   legacy +22preview and compile1607 PASS. Now building explicit canonical
+   normalizer with repeated-POST NUL-join boundary, property and crosspost mapping.
+   Existing hook/API remain unchanged; no route cutover yet.
 2. Widgets: native plain-editor URL/alt insertion image-only branch frombcd40791e.
    Initial production10e2c0c41 is not accepted: required actual browser fixture and
    new/edit/mode/narrow/cancel/escaping/persistence evidence are in progress, along
