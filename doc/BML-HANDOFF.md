@@ -1,3 +1,21 @@
+## Callable property and anonymous retry reviews queued
+
+Manager property adapter82f59cca2f92277afad47073828c2c9c2d2cdb6f is queued Sol;
+worker focused254/tidy1154/compile1607 passed. No route registration, only three
+properties for savemaintainer. Themes builds test-only disposable browser set/clear
+proof; no delete/report action. Foreman flagged submit controls omitted by
+make_request and missing contradictory target rows for finite review.
+
+Anonymous retry prerequisite dc7db44d222c928cffe7d418a3447560a9f60fac (base7ed)
+is queued after manager: explicit anonymous_username, native username field, blank
+password, real TT18 tests and tidy passed. Hidden and visible username controls
+must be distinguished; do not rename native username to legacy user. Widgets now
+implements the ordinary successful-password callable slice atopdc7. Failed auth
+remains BML-owned, no public activation or authentication-policy change.
+
+Rootc5b4a8985 is clean; all integration tests and browser sessions are complete.
+Public community POST and retained anonymous baseline are accepted, not reopened.
+
 ## Retained anonymous password baseline accepted
 
 Sol207..2cb742c854a9442d9562aef8ed4b8b99b22c3789 CLEAR; integratede14dda093
