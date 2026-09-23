@@ -7,13 +7,15 @@ use warnings;
 
 use Test::More;
 use Scalar::Util qw(refaddr);
+use lib "$ENV{LJHOME}/cgi-bin";
+use DW::Entry::Legacy;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 sub decode {
     my ( $post, $request ) = @_;
     $request ||= {};
-    return LJ::entry_form_decode( $request, $post );
+    return DW::Entry::Legacy::decode_entry_form( $request, $post );
 }
 
 sub date_post {
@@ -29,6 +31,15 @@ sub date_post {
         @_,
     };
 }
+
+subtest 'LJ forwarding API delegates to the native legacy decoder' => sub {
+    my $post = date_post( security => 'friends', prop_taglist => 'forwarded' );
+    my %from_lj;
+    my %from_native;
+    LJ::entry_form_decode( \%from_lj, $post );
+    DW::Entry::Legacy::decode_entry_form( \%from_native, $post );
+    is_deeply( \%from_lj, \%from_native, 'forwarding API retains the decoder result' );
+};
 
 subtest 'security preserves friends and all custom-bit positions through bit 60' => sub {
     my $friends = decode( date_post( security => 'friends' ) );

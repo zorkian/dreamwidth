@@ -1,0 +1,165 @@
+#!/usr/bin/perl
+#
+# This code was extracted from LJ::Web, which was forked from the LiveJournal
+# project owned and operated by Live Journal, Inc. The code has been modified
+# and expanded by Dreamwidth Studios, LLC. These files were originally licensed
+# under the terms of the license supplied by Live Journal, Inc, which can
+# currently be found at:
+#
+# http://code.livejournal.org/trac/livejournal/browser/trunk/LICENSE-LiveJournal.txt
+#
+# In accordance with the original license, this code and all its modifications
+# are provided under the GNU General Public License. A copy of that license can
+# be found in the LICENSE file included as part of this distribution.
+
+package DW::Entry::Legacy;
+
+use strict;
+use warnings;
+
+use DW::Mood;
+use LJ::HTMLControls;
+use LJ::Hooks;
+use LJ::Lang;
+
+sub decode_entry_form {
+    my ( $req, $POST ) = @_;
+
+    # find security
+    my $sec   = "public";
+    my $amask = 0;
+    if ( $POST->{'security'} eq "private" ) {
+        $sec = "private";
+    }
+    elsif ( $POST->{'security'} eq "friends" ) {
+        $sec   = "usemask";
+        $amask = 1;
+    }
+    elsif ( $POST->{'security'} eq "custom" ) {
+        $sec = "usemask";
+        foreach my $bit ( 1 .. 60 ) {
+            next unless $POST->{"custom_bit_$bit"};
+            $amask |= ( 1 << $bit );
+        }
+    }
+    $req->{'security'}  = $sec;
+    $req->{'allowmask'} = $amask;
+
+    # date/time
+    my $date = LJ::html_datetime_decode( { 'name' => "date_ymd", }, $POST );
+    my ( $year, $mon, $day ) = split( /\D/, $date );
+    my ( $hour, $min ) = ( $POST->{'hour'}, $POST->{'min'} );
+
+    # TEMP: ease golive by using older way of determining differences
+    my $date_old = LJ::html_datetime_decode( { 'name' => "date_ymd_old", }, $POST );
+    my ( $year_old, $mon_old, $day_old ) = split( /\D/, $date_old );
+    my ( $hour_old, $min_old ) = ( $POST->{'hour_old'}, $POST->{'min_old'} );
+
+    my $different = $POST->{'min_old'}
+        && ( ( $year ne $year_old )
+        || ( $mon ne $mon_old )
+        || ( $day ne $day_old )
+        || ( $hour ne $hour_old )
+        || ( $min ne $min_old ) );
+
+    # this value is set when the JS runs, which means that the user-provided
+    # time is sync'd with their computer clock. otherwise, the JS didn't run,
+    # so let's guess at their timezone.
+    if ( $POST->{'date_diff'} || $POST->{'date_diff_nojs'} || $different ) {
+        delete $req->{'tz'};
+        $req->{'year'} = $year;
+        $req->{'mon'}  = $mon;
+        $req->{'day'}  = $day;
+        $req->{'hour'} = $hour;
+        $req->{'min'}  = $min;
+    }
+
+    # copy some things from %POST
+    foreach (
+        qw(subject
+        prop_picture_keyword prop_current_moodid
+        prop_current_mood prop_current_music
+        prop_opt_screening prop_opt_noemail
+        prop_opt_preformatted prop_opt_nocomments
+        prop_current_location prop_current_coords
+        prop_taglist )
+        )
+    {
+        $req->{$_} = $POST->{$_};
+    }
+
+    if ( $POST->{"subject"} && ( $POST->{"subject"} eq LJ::Lang::ml('entryform.subject.hint2') ) ) {
+        $req->{"subject"} = "";
+    }
+
+    $req->{"prop_opt_preformatted"} ||=
+          $POST->{'switched_rte_on'} ? 1
+        : $POST->{event_format} && $POST->{event_format} eq "preformatted" ? 1
+        :                                                                    0;
+    $req->{"prop_opt_nocomments"} ||=
+        $POST->{comment_settings} && $POST->{comment_settings} eq "nocomments" ? 1 : 0;
+    $req->{"prop_opt_noemail"} ||=
+        $POST->{comment_settings} && $POST->{comment_settings} eq "noemail" ? 1 : 0;
+    $req->{'prop_opt_backdated'} = $POST->{'prop_opt_backdated'} ? 1 : 0;
+
+    if ( LJ::is_enabled('adult_content') ) {
+        $req->{prop_adult_content} = $POST->{prop_adult_content} || '';
+        $req->{prop_adult_content} = ""
+            unless $req->{prop_adult_content} eq "none"
+            || $req->{prop_adult_content} eq "concepts"
+            || $req->{prop_adult_content} eq "explicit";
+
+        $req->{prop_adult_content_reason} = $POST->{prop_adult_content_reason} || "";
+    }
+
+    # nuke taglists that are just blank
+    $req->{'prop_taglist'} = "" unless $req->{'prop_taglist'} && $req->{'prop_taglist'} =~ /\S/;
+
+    # Convert the rich text editor output back to parsable lj tags.
+    my $event = $POST->{'event'};
+    if ( $POST->{'switched_rte_on'} ) {
+        $req->{"prop_used_rte"} = 1;
+
+        # We want to see if we can hit the fast path for cleaning
+        # if they did nothing but add line breaks.
+        my $attempt = $event;
+        $attempt =~ s!<br />!\n!g;
+
+        if ( $attempt !~ /<\w/ ) {
+            $event = $attempt;
+
+            # Make sure they actually typed something, and not just hit
+            # enter a lot
+            $attempt =~ s!(?:<p>(?:&nbsp;|\s)+</p>|&nbsp;)\s*?!!gm;
+            $event = '' unless $attempt =~ /\S/;
+
+            $req->{'prop_opt_preformatted'} = 0;
+        }
+        else {
+            # Old methods, left in for compatibility during code push
+            $event =~ s!<lj-cut class="ljcut">!<lj-cut>!gi;
+
+            $event =~ s!<lj-raw class="ljraw">!<lj-raw>!gi;
+        }
+    }
+    else {
+        $req->{"prop_used_rte"} = 0;
+    }
+
+    $req->{'event'} = $event;
+
+    ## see if an "other" mood they typed in has an equivalent moodid
+    if ( $POST->{'prop_current_mood'} ) {
+        if ( my $id = DW::Mood->mood_id( $POST->{'prop_current_mood'} ) ) {
+            $req->{'prop_current_moodid'} = $id;
+            delete $req->{'prop_current_mood'};
+        }
+    }
+
+    # process site-specific options
+    LJ::Hooks::run_hooks( 'decode_entry_form', $POST, $req );
+
+    return $req;
+}
+
+1;
