@@ -280,6 +280,8 @@ test_psgi $app, sub {
         @dispatch_order = ();
         $res            = $send->($csrf_post);
         unlike( $res->content, qr{id="js-post-entry"}, "$case->[0] remains retained BML denial" );
+        like( $res->content, qr/Invalid form/i, "$case->[0] shows useful retained denial" );
+        unlike( $res->header('Location') || '', qr/.+/, "$case->[0] denial does not redirect" );
         is_deeply( \@dispatch_order, [qw(personal community)],
             "$case->[0] reaches both dispatch candidates before fallback" );
         is(
@@ -364,6 +366,12 @@ test_psgi $app, sub {
         if ( $gate eq 'beta' ) {
             local *LJ::BetaFeatures::user_in_beta = sub { 1 };
             $guard->();
+            is( $res->code, 302, 'beta uses the retained redirect status' );
+            like(
+                $res->header('Location') || '',
+                qr{^/entry/\Q@{[$comm->user]}\E/\d+/edit$},
+                'beta retains legacy redirect location'
+            );
         }
         else {
             my $is_readonly = \&LJ::User::is_readonly;
