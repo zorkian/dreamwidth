@@ -65,6 +65,8 @@ sub form_post {
     is( $get->code, 200, "$path GET renders the retained anonymous form" );
     my $form = retained_form( $get->content, $path );
     ok( $form, "$path GET has a real retained anonymous form" ) or return;
+    ok( !$form->find_input('prop_picture_keyword'),
+        "$path anonymous retained form has no userpic selector" );
     $form->action("http://localhost$path");
     $form->value( user     => $user->user ) unless $values{missing_user};
     $form->value( password => $password )   unless $values{missing_password};
@@ -145,8 +147,12 @@ test_psgi $app, sub {
             "$path claimed anonymous POST does not fall through to BML" );
         my $after = fresh_state($owner_id);
         is( $after->{count}, $before->{count} + 1, "$path creates exactly one fresh entry" );
+        my $fresh_owner = LJ::load_userid( $owner_id, 1 );
+        my ($jitemid) = $fresh_owner->selectrow_array(
+            'SELECT jitemid FROM log2 WHERE journalid=? ORDER BY jitemid DESC LIMIT 1',
+            undef, $fresh_owner->id );
         LJ::Entry::reset_singletons();
-        my $entry = LJ::Entry->new( LJ::load_userid( $owner_id, 1 ), jitemid => $after->{count} );
+        my $entry = LJ::Entry->new( $fresh_owner, jitemid => $jitemid );
         is( $entry->subject_raw, $subject, "$path persists the exact subject" );
         is( $entry->event_raw,   $body,    "$path persists the exact body" );
 
