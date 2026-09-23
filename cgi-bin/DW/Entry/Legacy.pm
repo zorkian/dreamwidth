@@ -23,7 +23,8 @@ use Hash::MultiValue;
 use LJ::HTMLControls;
 use LJ::Hooks;
 use LJ::Lang;
-use Scalar::Util qw(blessed refaddr);
+use Scalar::Util qw(blessed);
+use Storable qw(dclone nfreeze);
 
 sub decode_entry_form {
     my ( $req, $POST, %opts ) = @_;
@@ -332,42 +333,78 @@ sub apply_legacy_request_delta {
     die 'canonical and legacy request snapshots must be hash references'
         unless ref $canonical eq 'HASH' && ref $before eq 'HASH' && ref $after eq 'HASH';
 
-    my %updated = %$canonical;
-    $updated{props} = { %{ $canonical->{props} || {} } };
+    # Hook callers must retain deeply independent before/after snapshots. A
+    # nested reference mutated in place before this helper observes either
+    # snapshot cannot be reconstructed as a delta.
 
-    my %names = map { $_ => 1 } ( keys %$before, keys %$after );
-    for my $name ( keys %names ) {
-        next unless _legacy_request_value_changed( $before, $after, $name );
+    # Existing decoded_to_canonical treats props as a copied hash. Deep cloning
+    # here additionally keeps a returned delta result from aliasing any source
+    # or after-snapshot nested extension value.
+    my $updated = dclone($canonical);
+    $updated->{props} ||= {};
 
-        if ( $name =~ /^prop_(.+)$/ && $name !~ /^prop_xpost_/ ) {
-            my $prop = $1;
-            if ( exists $after->{$name} ) {
-                $updated{props}{$prop} = $after->{$name};
-            }
-            else {
-                delete $updated{props}{$prop};
-            }
-            delete $updated{$name};
-            next;
-        }
+    my %names   = map { $_ => 1 } ( keys %$before, keys %$after );
+    my @changed = grep { _legacy_request_value_changed( $before, $after, $_ ) } keys %names;
 
-        # decoded_to_canonical leaves prop_xpost_* top-level. Retain that
-        # namespace exception while applying additions, changes, and deletes.
+    # decoded_to_canonical establishes the props hash before it flattens
+    # top-level prop_* keys. Preserve that deterministic order when a hook
+    # replaces props and changes a prop_* key in the same call.
+    my $props_changed = grep { $_ eq 'props' } @changed;
+    if ($props_changed) {
+        $updated->{props} = _legacy_request_delta_props_value( $after->{props} );
+    }
+
+    for my $name ( sort grep { $_ ne 'props' && ( $_ !~ /^prop_(.+)$/ || $_ =~ /^prop_xpost_/ ) }
+        @changed )
+    {
         if ( exists $after->{$name} ) {
-            $updated{$name} = $after->{$name};
+            $updated->{$name} = _legacy_request_delta_clone_value( $after->{$name} );
         }
         else {
-            delete $updated{$name};
+            delete $updated->{$name};
         }
     }
 
-    return \%updated;
+    # When props itself changed, decoded_to_canonical would initialize it from
+    # the after snapshot and then flatten every retained prop_* key, including
+    # keys whose scalar value did not change. Otherwise only changed prop_*
+    # keys need applying to the existing canonical props.
+    my @prop_names =
+        $props_changed
+        ? grep { /^prop_(.+)$/ && !/^prop_xpost_/ } keys %$after
+        : grep { /^prop_(.+)$/ && !/^prop_xpost_/ } @changed;
+    for my $name ( sort @prop_names ) {
+        $name =~ /^prop_(.+)$/;
+        my $prop = $1;
+        if ( exists $after->{$name} ) {
+            $updated->{props}{$prop} = _legacy_request_delta_clone_value( $after->{$name} );
+        }
+        else {
+            delete $updated->{props}{$prop};
+        }
+        delete $updated->{$name};
+    }
+
+    return $updated;
+}
+
+sub _legacy_request_delta_clone_value {
+    my ($value) = @_;
+    return ref $value ? dclone($value) : $value;
+}
+
+sub _legacy_request_delta_props_value {
+    my ($props) = @_;
+    return {} unless ref $props eq 'HASH';
+    return dclone($props);
 }
 
 sub _legacy_request_value_changed {
     my ( $before, $after, $name ) = @_;
-    return 1 if exists $before->{$name} != exists $after->{$name};
-    return 0 unless exists $before->{$name};
+    my $has_before = exists $before->{$name};
+    my $has_after  = exists $after->{$name};
+    return 1 if $has_before != $has_after;
+    return 0 unless $has_before;
 
     my $left  = $before->{$name};
     my $right = $after->{$name};
@@ -376,7 +413,8 @@ sub _legacy_request_value_changed {
 
     return $left ne $right unless ref $left || ref $right;
     return 1 unless ref $left && ref $right;
-    return refaddr($left) != refaddr($right);
+    local $Storable::canonical = 1;
+    return nfreeze($left) ne nfreeze($right);
 }
 
 # Decode once while retaining the original flat request for legacy success

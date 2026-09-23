@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 use Scalar::Util qw(refaddr);
+use Storable qw(dclone);
 use Test::More;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
@@ -101,23 +102,116 @@ subtest 'flat request additions changes and deletions update an independent cano
     is_deeply( $after->{prop_added}, 'hook property', 'after snapshot remains unchanged' );
 };
 
-subtest 'reference replacements and repeated calls remain isolated' => sub {
+subtest 'props replacement is applied before every retained prop namespace value' => sub {
     my $source = canonical();
-    my $before =
-        { extension => { value => 'before' }, prop_extension => { value => 'before prop' } };
-    my $after = { extension => { value => 'after' }, prop_extension => { value => 'after prop' } };
+    my $before = {
+        props            => { replacement => 'before', unchanged => 'before props' },
+        prop_replacement => 'before prop',
+        prop_unchanged   => 'before prop value',
+    };
+    my $after = {
+        props            => { replacement => 'after', unchanged => 'after props' },
+        prop_replacement => 'after prop',
+        prop_unchanged   => 'before prop value',
+    };
+
+    my $updated = DW::Entry::Legacy::apply_legacy_request_delta( $source, $before, $after );
+    is_deeply(
+        $updated->{props},
+        { replacement => 'after prop', unchanged => 'before prop value' },
+'decoded_to_canonical ordering reapplies unchanged top-level prop values after props replacement'
+    );
+    isnt(
+        refaddr( $updated->{props} ),
+        refaddr( $after->{props} ),
+        'props replacement is copied rather than aliased to after snapshot'
+    );
+
+    my $undef_props = DW::Entry::Legacy::apply_legacy_request_delta(
+        canonical(),
+        { props => { discarded => 'before' }, prop_only => 'before value' },
+        { props => undef,                     prop_only => 'after value' },
+    );
+    is_deeply(
+        $undef_props->{props},
+        { only => 'after value' },
+        'non-hash props follows decoded_to_canonical empty-hash behavior before prop flattening'
+    );
+};
+
+subtest 'deeply independent nested snapshots produce an isolated result' => sub {
+    my $source = dclone(
+        {
+            extension => { value  => 'source' },
+            props     => { editor => 'markdown0', extension => { value => 'source prop' } },
+        }
+    );
+    my $before = dclone(
+        {
+            extension      => { value => 'before' },
+            prop_extension => { value => 'before prop' },
+        }
+    );
+    my $after = dclone(
+        {
+            extension      => { value => 'after' },
+            prop_extension => { value => 'after prop' },
+        }
+    );
+    my $source_before = dclone($source);
+    my $before_before = dclone($before);
+    my $after_before  = dclone($after);
+
+    my $updated = DW::Entry::Legacy::apply_legacy_request_delta( $source, $before, $after );
+    is_deeply( $updated->{extension}, { value => 'after' }, 'nested extension delta propagates' );
+    is_deeply(
+        $updated->{props}{extension},
+        { value => 'after prop' },
+        'nested prop delta canonicalizes'
+    );
+    $updated->{extension}{value} = 'changed result';
+    $updated->{props}{extension}{value} = 'changed result prop';
+    is_deeply( $source, $source_before, 'result nested mutation cannot alter canonical source' );
+    is_deeply( $before, $before_before, 'result nested mutation cannot alter before snapshot' );
+    is_deeply( $after,  $after_before,  'result nested mutation cannot alter after snapshot' );
+};
+
+subtest 'deep independent snapshots detect an in-place nested hook mutation' => sub {
+    my $request = { extension => { value => 'before' } };
+    my $before  = dclone($request);
+    $request->{extension}{value} = 'after';
+    my $after = dclone($request);
+
+    my $updated = DW::Entry::Legacy::apply_legacy_request_delta(
+        { extension => { value => 'source' }, props => {} },
+        $before, $after );
+    is_deeply(
+        $updated->{extension},
+        { value => 'after' },
+        'a deep pre-hook snapshot makes an in-place nested mutation observable'
+    );
+};
+
+subtest 'scalar arbitrary extension names and repeated calls remain isolated' => sub {
+    my $source = canonical();
+    my $before = { extension => 'before', prop_extension => 'before prop' };
+    my $after  = { extension => 'after', prop_extension => 'after prop' };
 
     my $first = DW::Entry::Legacy::apply_legacy_request_delta( $source, $before, $after );
-    is_deeply(
-        $first->{extension},
-        { value => 'after' },
-        'arbitrary extension reference replacement propagates'
+    is( $first->{extension},        'after',      'arbitrary scalar extension change propagates' );
+    is( $first->{props}{extension}, 'after prop', 'arbitrary scalar prop extension canonicalizes' );
+
+    my $same_content = DW::Entry::Legacy::apply_legacy_request_delta(
+        { extension => 'native unchanged', props => {} },
+        { extension => { alpha => 1, beta  => 2 } },
+        { extension => { beta  => 2, alpha => 1 } },
     );
-    is_deeply(
-        $first->{props}{extension},
-        { value => 'after prop' },
-        'arbitrary prop extension replacement canonicalizes'
+    is(
+        $same_content->{extension},
+        'native unchanged',
+        'canonical snapshot serialization does not report reordered equal hashes as a delta'
     );
+
     $first->{props}{editor} = 'html_raw0';
     my $second = DW::Entry::Legacy::apply_legacy_request_delta( $source, $before, $after );
     is( $second->{props}{editor}, 'markdown0', 'repeated call does not share copied props state' );
