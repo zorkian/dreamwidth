@@ -1,3 +1,18 @@
+## Active work after public GET integration
+
+Root cd4e87b2e is clean; public community and terminal integrations/checks/captures
+are complete. No root test process remains. Readonly callable e30/b7 is HELD:
+foreman exact-source review found computed usejournal unused (renderer still
+receives opts value); owner-target assertion equals native default. Themes must
+wire computed target and prove a distinct authorized community selected after
+hook mutation. Browser evidence alone does not close this target finding.
+
+Manager ordinary-delete characterization6ade9d30b (test-only30 assertions) is
+queued Sol review. Widgets now implements only Web error_list/warning_list native
+language headings on a separate root-based branch; wrappers and all caller,
+authentication, reporting, inbox, and routing behavior stay unchanged. Sol source
+audit of those helpers precedes review. No external or held interfaces unblocked.
+
 ## Public terminal update GET accepted
 
 Sol final2ed/a93/3f315 CLEAR; integrated2f36ed6fc/653c12cba/f47aab510. Identity
