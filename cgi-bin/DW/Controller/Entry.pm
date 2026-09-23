@@ -473,6 +473,74 @@ sub legacy_owned_edit_handler {
     return undef;
 }
 
+# Callable-only retained editjournal POST resolver for a same-poster community
+# entry. It has no route registration: the picker may call it only after the
+# personal resolver declines. Every unsupported context returns undef before the
+# decoder, while an accepted save/delete always returns the helper's native
+# success or retry render.
+sub legacy_same_poster_community_edit_handler {
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->did_post;
+
+    my $get          = $r->get_args;
+    my $post         = $r->post_args;
+    my @get_itemids  = $get->get_all('itemid');
+    my @post_itemids = $post->get_all('itemid');
+    my @itemids      = @get_itemids ? @get_itemids : @post_itemids;
+    return undef unless @itemids == 1 && $itemids[0] =~ /\A[1-9][0-9]*\z/;
+    my $ditemid = $itemids[0];
+
+    my $session_remote = LJ::get_remote();
+    return undef unless LJ::isu($session_remote);
+    my $authas = $get->{authas} || $session_remote->user;
+    my $actor  = LJ::get_authas_user($authas);
+    return undef unless LJ::isu($actor) && $actor->is_individual;
+
+    # Retained BML uses truthy GET, POST, then journal context and collapses a
+    # same-user target before the personal resolver handles it.
+    my $usejournal = $get->{usejournal} || $post->{usejournal} || $get->{journal};
+    return undef unless $usejournal;
+    return undef if $usejournal eq $actor->user;
+    my $journal = LJ::load_user($usejournal);
+    return undef unless LJ::isu($journal) && $journal->is_comm;
+
+    my $entry = LJ::Entry->new( $journal, ditemid => $ditemid );
+    return undef unless $entry && $entry->valid && $entry->ditemid == $ditemid;
+    return undef unless $entry->visible_to($actor) && $entry->poster->equals($actor);
+
+    # Match retained editjournal: readonly and beta remain BML-owned before
+    # action classification or the hook-bearing decoder.
+    return undef if $actor->is_readonly || $journal->is_readonly;
+    return undef if LJ::BetaFeatures->user_in_beta( $session_remote => 'updatepage' );
+
+    my $action = DW::Entry::Legacy::legacy_edit_action($post);
+    return undef unless $action && ( $action eq 'save' || $action eq 'delete' );
+    return undef unless LJ::check_form_auth( $post->{lj_form_auth} ) && LJ::check_referer();
+
+    my %result = legacy_owned_edit_post(
+        entry                 => $entry,
+        remote                => $actor,
+        session_remote        => $session_remote,
+        journal               => $journal,
+        same_poster_community => 1,
+        post                  => $post,
+        get                   => $r->get_args( preserve_case => 1 ),
+        legacy_seed           => {
+            mode       => 'editevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $actor->user,
+            usejournal => $journal->user,
+            itemid     => $entry->jitemid,
+            xpost      => '0',
+        },
+    );
+    return $result{render} if exists $result{render};
+
+    # Reaching here after an accepted mutation would otherwise make the picker
+    # fall through to BML and risk a second attempt.
+    return error_ml('error.invalidform');
+}
+
 # Callable compatibility seam for retained /update POSTs. Alternate login and
 # every action outside the classified retained subset remain in BML.
 sub legacy_update_handler {
