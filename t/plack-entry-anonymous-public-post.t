@@ -71,12 +71,20 @@ sub form_post {
     $form->value( user     => $user->user ) unless $values{missing_user};
     $form->value( password => $password )   unless $values{missing_password};
     $form->find_input('password')->disabled(1) if $values{missing_password};
-    $form->value( subject          => $values{subject} );
-    $form->value( event            => $values{body} );
-    $form->value( security         => $values{security} || 'private' );
-    $form->value( prop_taglist     => $values{tags} ) if defined $values{tags};
+    $form->value( subject      => $values{subject} );
+    $form->value( event        => $values{body} );
+    $form->value( security     => $values{security} || 'private' );
+    $form->value( prop_taglist => $values{tags} ) if defined $values{tags};
+    my $has_usejournal = $form->find_input('usejournal') ? 1 : 0;
+    $form->value( usejournal => $values{usejournal} )
+        if defined $values{usejournal} && $has_usejournal;
     $form->value( prop_xpost_check => 0 ) if $form->find_input('prop_xpost_check');
     my $post = visible_click( $form, 'action:update' );
+
+    if ( defined $values{usejournal} && !$has_usejournal ) {
+        $post->content( $post->content . '&usejournal=' . $values{usejournal} );
+        $post->header( 'Content-Length' => length $post->content );
+    }
     $post->uri("http://localhost$path");
     $post->header( Referer => "http://localhost$path" );
     return $post;
@@ -234,7 +242,7 @@ test_psgi $app, sub {
     for my $case (
         [ 'empty password',   { password         => '' } ],
         [ 'missing password', { missing_password => 1 } ],
-        [ 'community target', { usejournal       => 'missing-anonymous-target' } ],
+        [ 'community target', { usejournal       => $community_target->user } ],
         )
     {
         my ( $label, $changes ) = @$case;
@@ -245,11 +253,16 @@ test_psgi $app, sub {
             subject          => "$label subject",
             body             => "$label body",
             security         => 'private',
-            missing_password => $changes->{missing_password}
+            missing_password => $changes->{missing_password},
+            usejournal       => $changes->{usejournal},
         );
         if ( $changes->{usejournal} ) {
-            $post->content( $post->content . '&usejournal=' . $changes->{usejournal} );
-            $post->header( 'Content-Length' => length $post->content );
+            my @targets = $post->content =~ /(?:^|&)usejournal=([^&]*)/g;
+            is_deeply(
+                \@targets,
+                [ $changes->{usejournal} ],
+                'community target request contains exactly one intended usejournal value'
+            );
         }
         my $res = $send->($post);
         is( $authenticated_calls, 1,
@@ -257,11 +270,22 @@ test_psgi $app, sub {
         is( $anonymous_calls, 1, "$label reaches anonymous classifier before retained fallback" );
         unlike( $res->content, qr/id=['"]js-post-entry['"]/,
             "$label does not enter the native retry renderer" );
-        like(
-            $res->content,
-            qr/(?:id=['"]updateForm['"]|Invalid users passed to)/,
-            "$label retains a meaningful BML fallback response"
-        );
+        if ( $label eq 'community target' ) {
+            like(
+                $res->content,
+qr/Error updating journal:<\/strong>\s*Client error: Don&#39;t have access to requested journal/,
+                'community target retains the real BML authorization denial'
+            );
+            unlike(
+                $res->content,
+                qr/Invalid users passed to/,
+                'community target is not an invalid composite usejournal error'
+            );
+        }
+        else {
+            like( $res->content, qr/id=['"]updateForm['"]/,
+                "$label retains the ordinary BML fallback form" );
+        }
         is_deeply( fresh_state($owner_id), $before, "$label leaves fresh owner state unchanged" );
     }
 };
