@@ -36,18 +36,26 @@ DW::Routing->register_string( '/inbox/index', \&index_handler, app => 1, no_redi
 DW::Routing->register_string( '/inbox/compose',  \&compose_handler,  app => 1 );
 DW::Routing->register_string( '/inbox/markspam', \&markspam_handler, app => 1 );
 
-# Retained old links redirect to the canonical URLs above, preserving args.
-DW::Routing->register_redirect( '/inbox/new',         '/inbox',         app => 1, keep_args => 1 );
-DW::Routing->register_redirect( '/inbox/new/compose', '/inbox/compose', app => 1, keep_args => 1 );
-DW::Routing->register_redirect(
-    '/inbox/new/markspam', '/inbox/markspam',
-    app       => 1,
-    keep_args => 1
-);
+# Retained old links are routed to the same handlers (not register_redirect):
+# a GET there still redirects to the canonical URL (see _redirect_old_get
+# below), but a POST must never hit a redirect, since a 303/302 turns a
+# browser's POST into a bodyless GET and silently discards the submission.
+DW::Routing->register_string( '/inbox/new',          \&index_handler,    app => 1 );
+DW::Routing->register_string( '/inbox/new/compose',  \&compose_handler,  app => 1 );
+DW::Routing->register_string( '/inbox/new/markspam', \&markspam_handler, app => 1 );
 
 DW::Routing->register_rpc( 'inbox_actions', \&action_handler, format => 'json' );
 
 my $PAGE_LIMIT = 15;
+
+# A GET to a retained /inbox/new* link still redirects to its canonical URL;
+# a POST there must fall through and be handled natively by the caller
+# instead, since a redirect response would silently drop the submitted body.
+sub _redirect_old_get {
+    my ( $r, $old_uri, $canonical ) = @_;
+    return undef unless $r->method eq 'GET' && $r->uri eq $old_uri;
+    return $r->redirect( LJ::create_url( $canonical, keep_args => 1 ) );
+}
 
 # Take a supplied filter but default it to 'all' unless it is a real,
 # callable NotificationInbox view method. This is the only validation that
@@ -65,7 +73,10 @@ sub index_handler {
     my ( $ok, $rv ) = controller( form_auth => 1 );
     return $rv unless $ok;
 
-    my $r      = $rv->{r};
+    my $r = $rv->{r};
+    if ( my $redirect = _redirect_old_get( $r, '/inbox/new', '/inbox' ) ) {
+        return $redirect;
+    }
     my $POST   = $r->post_args;
     my $GET    = $r->get_args;
     my $remote = $rv->{remote};
@@ -120,12 +131,29 @@ sub index_handler {
     # not covered by controller's automatic form_auth check above and needs
     # its own token, validated against msg_list.tt's rendered links.
     my $bookmark_link_auth = LJ::check_form_auth( $GET->{lj_form_auth} );
+    my $bookmark_toggled;
     if ( $GET->{bookmark_off} && $GET->{bookmark_off} =~ /^\d+$/ && $bookmark_link_auth ) {
-        $errors->add( undef, "$scope.error.max_bookmarks" )
-            unless $inbox->add_bookmark( $GET->{bookmark_off} );
+        if ( $inbox->add_bookmark( $GET->{bookmark_off} ) ) {
+            $bookmark_toggled = 1;
+        }
+        else {
+            $errors->add( undef, "$scope.error.max_bookmarks" );
+        }
     }
     if ( $GET->{bookmark_on} && $GET->{bookmark_on} =~ /^\d+$/ && $bookmark_link_auth ) {
         $inbox->remove_bookmark( $GET->{bookmark_on} );
+        $bookmark_toggled = 1;
+    }
+
+    # Once the one-time token has done its job, drop it (and the toggle
+    # params) from the address bar/history rather than leave a live CSRF
+    # token sitting in a bookmarked or shared URL.
+    if ($bookmark_toggled) {
+        my %clean_args;
+        $clean_args{page}   = $page   if $GET->{page};
+        $clean_args{view}   = $view   if $view && $view ne 'all';
+        $clean_args{itemid} = $itemid if $itemid;
+        return $r->redirect( LJ::create_url( '/inbox', args => \%clean_args ) );
     }
 
     # Pagination
@@ -364,7 +392,7 @@ sub action_handler {
         $page = $last_page if $page > $last_page;
 
         my $items_html = render_items( $page, $view, $remote, $display_items, $expand );
-        my $path       = "/inbox/new";
+        my $path       = "/inbox";
         my $pages_html = DW::Template->template_string( 'components/pagination.tt',
             { current => $page, total_pages => $last_page, path => $path, cur_args => $getextra } );
 
@@ -462,7 +490,10 @@ sub compose_handler {
     return $rv unless $ok;
 
     # gets the request and args
-    my $r      = $rv->{r};
+    my $r = $rv->{r};
+    if ( my $redirect = _redirect_old_get( $r, '/inbox/new/compose', '/inbox/compose' ) ) {
+        return $redirect;
+    }
     my $POST   = $r->post_args;
     my $GET    = $r->get_args;
     my $remote = $rv->{remote};
@@ -724,7 +755,10 @@ sub markspam_handler {
     return $rv unless $ok;
 
     # gets the request and args
-    my $r      = $rv->{r};
+    my $r = $rv->{r};
+    if ( my $redirect = _redirect_old_get( $r, '/inbox/new/markspam', '/inbox/markspam' ) ) {
+        return $redirect;
+    }
     my $POST   = $r->post_args;
     my $GET    = $r->get_args;
     my $remote = $rv->{remote};

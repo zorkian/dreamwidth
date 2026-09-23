@@ -7,6 +7,7 @@ use strict;
 use warnings;
 
 use File::Find;
+use HTML::Form;
 use HTTP::Request::Common;
 use Plack::Test;
 use Test::More;
@@ -151,9 +152,83 @@ test_psgi $app, sub {
 
     my $good_toggle =
         $cb->( GET "/inbox/?bookmark_off=$qid&lj_form_auth=" . LJ::eurl($index_token) );
-    is( $good_toggle->code, 200, 'bookmark toggle with a valid token renders' );
+    ok( $good_toggle->is_redirect,
+        'a successful token-bearing bookmark toggle redirects rather than re-rendering' );
+    my $clean_location = $good_toggle->header('Location') || '';
+    unlike( $clean_location, qr/bookmark_(?:on|off)=/,
+        'the redirect after a bookmark toggle drops the toggle param' );
+    unlike( $clean_location, qr/lj_form_auth=/,
+        'the redirect after a bookmark toggle drops the CSRF token from the address bar' );
     is( $fresh_is_bookmark->(), 1,
         'bookmark toggle with a valid token actually changes bookmark state' );
+
+    # notification_inbox/NotificationItem singletons cache on the user
+    # object, so a fresh reload is required to see a server-side mutation.
+    my $fresh_item_read =
+        sub { LJ::NotificationItem->new( LJ::load_userid( $u->id, 1 ), $_[0] )->read };
+
+    # --- REQUIRED: templates/code no longer point at /inbox/new, which is a
+    # redirect. Submit the *rendered* form via its own action attribute --
+    # this is exactly what a browser does, and is what silently dropped a
+    # POST body when the action still said /inbox/new. ---
+    my $another_evt  = LJ::Event::AddedToCircle->new( $u2, $u, 2 );
+    my $another_item = $u->notification_inbox->enqueue( event => $another_evt );
+    my $another_qid  = $another_item->qid;
+
+    my $rendered = $cb->( GET '/inbox' );
+    my ($actions_form) =
+        grep { $_->find_input('mark_read') }
+        HTML::Form->parse( $rendered->content, 'http://localhost/inbox' );
+    ok( $actions_form, 'the rendered no-JS actions form parses' );
+    like( $actions_form->action, qr{^https?://[^/]+/inbox$},
+        'the rendered actions form posts to the canonical URL, not /inbox/new' );
+    ok(
+        $actions_form->find_input("check_$another_qid"),
+        'the rendered form has a checkbox for the seeded item'
+    );
+    $actions_form->value( "check_$another_qid" => $another_qid );
+    my $submitted = $cb->( $actions_form->click('mark_read') );
+    is( $submitted->code, 200, 'submitting the rendered actions form is handled natively' );
+    ok( $fresh_item_read->($another_qid),
+        'submitting the rendered actions form actually marks the item read' );
+
+    # --- REQUIRED: a POST straight to a retained /inbox/new* link (a tab
+    # left open from before cutover) must not be silently dropped by a
+    # redirect; it must be handled the same as the canonical URL. ---
+    my $stale_item =
+        $u->notification_inbox->enqueue( event => LJ::Event::AddedToCircle->new( $u2, $u, 2 ) );
+    my $stale_qid  = $stale_item->qid;
+    my $stale_post = $cb->(
+        POST '/inbox/new',
+        Content => [
+            mark_read          => 1,
+            "check_$stale_qid" => $stale_qid,
+            lj_form_auth       => $index_token,
+        ],
+    );
+    is( $stale_post->code, 200, 'POST straight to /inbox/new is handled natively, not redirected' );
+    ok( !$stale_post->header('Location'), 'POST straight to /inbox/new is not a redirect' );
+    ok( $fresh_item_read->($stale_qid),
+        'POST straight to /inbox/new actually performs the mutation, not silently dropped' );
+
+    my $stale_compose_get   = $cb->( GET '/inbox/compose' );
+    my $stale_compose_token = form_token( $stale_compose_get->content );
+    my $stale_compose_post  = $cb->(
+        POST '/inbox/new/compose',
+        Content => [
+            mode         => 'send',
+            msg_to       => $u2->user,
+            msg_subject  => 'stale tab subject',
+            msg_body     => 'stale tab body',
+            lj_form_auth => $stale_compose_token,
+        ],
+    );
+    ok( $stale_compose_post->is_redirect,
+'POST straight to /inbox/new/compose is handled natively through to its own success redirect'
+    );
+    like( $stale_compose_post->header('Location') || '',
+        qr{/inbox$},
+        'POST straight to /inbox/new/compose actually sends, landing on the success redirect' );
 };
 
 # --- No user_in_beta('inbox') check remains outside the retained .bml page ---
@@ -178,6 +253,37 @@ test_psgi $app, sub {
     );
     is_deeply( \@offenders, [],
         'no user_in_beta("inbox") check remains outside the retained .bml page' );
+}
+
+# --- No stray "/inbox/new" reference remains outside the deliberate old-link
+# plumbing (route registration and the in-handler redirect-or-fall-through
+# check); every user-visible link/form must point at a canonical URL. ---
+{
+    my @offenders;
+    find(
+        {
+            wanted => sub {
+                return unless -f $_ && /\.tt$/;
+                open my $fh, '<', $_ or return;
+                local $/;
+                my $content = <$fh>;
+                push @offenders, "$File::Find::name (template)"
+                    if $content =~ m{/inbox/new\b};
+            },
+            no_chdir => 1,
+        },
+        "$ENV{LJHOME}/views/inbox",
+    );
+    open my $fh, '<', "$ENV{LJHOME}/cgi-bin/DW/Controller/Inbox.pm" or die $!;
+    while ( my $line = <$fh> ) {
+        next unless $line =~ m{/inbox/new\b};
+        next if $line =~ /^\s*#/;    # comments explaining the plumbing are fine
+        next if $line =~ /register_string|register_redirect|_redirect_old_get\(/;
+        push @offenders, "cgi-bin/DW/Controller/Inbox.pm:$.: $line";
+    }
+    is_deeply( \@offenders, [],
+'no stray /inbox/new reference remains outside route registration and the redirect-or-native check'
+    );
 }
 
 done_testing;
