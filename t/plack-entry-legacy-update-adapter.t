@@ -690,49 +690,59 @@ if ($moderated_form) {
     );
 }
 
-
 # Callable-only transform ABI: start from an actual retained form/token, then
 # invoke two distinct external transform names through the adapter wrapper.
-my $transform_uri = '/update?usejournal=' . $owner->user . '&encoded=a%2Fb%26c&repeated=one&repeated=two';
+my $transform_uri =
+    '/update?usejournal=' . $owner->user . '&encoded=a%2Fb%26c&repeated=one&repeated=two';
 my $transform_form;
 test_psgi $legacy_app, sub {
     my $send = shift;
-    my $res = $send->( GET $transform_uri, Cookie => $cookie );
+    my $res  = $send->( GET $transform_uri, Cookie => $cookie );
     is( $res->code, 200, 'transform baseline renders retained form' );
     $transform_form = update_form( $res->content );
 };
-ok( $transform_form, 'transform uses a real retained form token' ) or BAIL_OUT('missing transform form');
-my $transform_token = $transform_form->value('lj_form_auth');
+ok( $transform_form, 'transform uses a real retained form token' )
+    or BAIL_OUT('missing transform form');
+my $transform_token          = $transform_form->value('lj_form_auth');
 my $before_transform_entries = entry_count($owner);
-my $before_transform_draft = LJ::load_userid( $owner_id, 1 )->draft_text;
-for my $case ( [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
-               [ beta => 'beta subject', 'beta body', 'beta-tag' ] ) {
+my $before_transform_draft   = LJ::load_userid( $owner_id, 1 )->draft_text;
+for my $case (
+    [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
+    [ beta  => 'beta subject',  'beta body',  'beta-tag' ]
+    )
+{
     my ( $name, $subject, $body, $tag ) = @$case;
     my $post = POST(
         $transform_uri,
         [
-            transform             => $name,
-            lj_form_auth          => $transform_token,
-            subject               => 'submitted ignored subject',
-            event                 => 'submitted ignored body',
-            prop_taglist          => 'submitted ignored tag',
-            security              => 'custom',
-            custom_bit_1          => 1,
-            prop_current_location => 'submitted location',
-            prop_current_music    => 'submitted music',
-            prop_opt_backdated    => 1,
-            date_ymd_mm           => '02', date_ymd_dd => '03', date_ymd_yyyy => '2020',
-            hour                  => '04', min => '05', date_diff => 1,
-            prop_xpost_check      => 1,
-            prop_xpost_99         => 1,
+            transform              => $name,
+            lj_form_auth           => $transform_token,
+            subject                => 'submitted ignored subject',
+            event                  => 'submitted ignored body',
+            prop_taglist           => 'submitted ignored tag',
+            security               => 'custom',
+            custom_bit_1           => 1,
+            prop_current_location  => 'submitted location',
+            prop_current_music     => 'submitted music',
+            prop_opt_backdated     => 1,
+            date_ymd_mm            => '02',
+            date_ymd_dd            => '03',
+            date_ymd_yyyy          => '2020',
+            hour                   => '04',
+            min                    => '05',
+            date_diff              => 1,
+            prop_xpost_check       => 1,
+            prop_xpost_99          => 1,
             prop_xpost_password_99 => 'xpost-secret',
-            event_format          => 'preformatted', richtext_default => '0',
+            event_format           => 'preformatted',
+            richtext_default       => '0',
         ]
     );
     $post->header( Referer => 'http://localhost/update' );
-    my ( $hook_get, $hook_post, $decode, $spam, $success, $crosspost, $calls ) = ( undef, undef, 0, 0, 0, 0, 0 );
+    my ( $hook_get, $hook_post, $decode, $spam, $success, $crosspost, $calls ) =
+        ( undef, undef, 0, 0, 0, 0, 0 );
     my $run_hooks = \&LJ::Hooks::run_hooks;
-    my $run_hook = \&LJ::Hooks::run_hook;
+    my $run_hook  = \&LJ::Hooks::run_hook;
     {
         no warnings 'redefine';
         local *LJ::Hooks::run_hooks = sub {
@@ -740,180 +750,311 @@ for my $case ( [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
             if ( $hook eq "transform_update_$name" ) {
                 ++$calls;
                 ( $hook_get, $hook_post ) = @args;
-                $hook_post->{subject} = $subject;
-                $hook_post->{event} = $body;
-                $hook_post->{prop_taglist} = $tag;
+                $hook_post->{subject}             = $subject;
+                $hook_post->{event}               = $body;
+                $hook_post->{prop_taglist}        = $tag;
                 $hook_get->{unused_transform_get} = "get-$name";
                 return;
             }
             ++$decode if $hook eq 'decode_entry_form';
-            ++$spam if $hook eq 'spam_check';
-            return $run_hooks->($hook, @args);
+            ++$spam   if $hook eq 'spam_check';
+            return $run_hooks->( $hook, @args );
         };
         local *LJ::Hooks::run_hook = sub {
             my ($hook) = @_;
             ++$success if $hook eq 'after_entry_post_extra_html';
             return $run_hook->(@_);
         };
-        local *LJ::Protocol::schedule_xposts = sub { ++$crosspost; return ([], []); };
+        local *LJ::Protocol::schedule_xposts = sub { ++$crosspost; return ( [], [] ); };
         my $res;
         test_psgi $adapter_app, sub { $res = shift->($post); };
         is( $res->code, 200, "$name transform returns native rerender" );
         my $form = (
             grep {
-                   ( $_->attr('id') || '' ) eq 'js-post-entry'
-                && $_->find_input('subject')
-                && $_->find_input('event')
+                       ( $_->attr('id') || '' ) eq 'js-post-entry'
+                    && $_->find_input('subject')
+                    && $_->find_input('event')
             } HTML::Form->parse( $res->content, 'http://localhost/entry/new' )
         )[0];
         ok( $form, "$name transform returns parsed native form" ) or next;
         is( $form->value('subject'), $subject, "$name hook mutation retains subject" );
-        is( $form->value('event'), $body, "$name hook mutation retains body" );
-        is( $form->value('taglist'), $tag, "$name hook mutation retains tags" );
-        is( $form->value('current_location'), '', "$name ignores transform metadata outside retained fallback fields" );
+        is( $form->value('event'),   $body,    "$name hook mutation retains body" );
+        is( $form->value('taglist'), $tag,     "$name hook mutation retains tags" );
+        is( $form->value('current_location'),
+            '', "$name ignores transform metadata outside retained fallback fields" );
         is( $form->value('editor'), 'html_raw0', "$name retains event formatting" );
-        like( $form->action, qr/encoded=a%2Fb%26c.*repeated=one.*repeated=two/,
-            "$name retains encoded/repeated query context" );
+        like(
+            $form->action,
+            qr/encoded=a%2Fb%26c.*repeated=one.*repeated=two/,
+            "$name retains encoded/repeated query context"
+        );
     }
-    is( $calls, 1, "$name invokes its dynamic transform hook once" );
-    is( $hook_post->{transform}, $name, "$name hook receives mutable flat POST" );
+    is( $calls,                  1,            "$name invokes its dynamic transform hook once" );
+    is( $hook_post->{transform}, $name,        "$name hook receives mutable flat POST" );
     is( $hook_get->{usejournal}, $owner->user, "$name hook receives mutable flat GET" );
-    is( $decode, 0, "$name does not invoke decode hook" );
-    is( $spam, 0, "$name does not invoke spam hook" );
-    is( $success, 0, "$name does not invoke success hook" );
-    is( $crosspost, 0, "$name does not schedule crossposts" );
+    is( $decode,                 0,            "$name does not invoke decode hook" );
+    is( $spam,                   0,            "$name does not invoke spam hook" );
+    is( $success,                0,            "$name does not invoke success hook" );
+    is( $crosspost,              0,            "$name does not schedule crossposts" );
     is( entry_count($owner), $before_transform_entries, "$name does not persist entries" );
-    is( LJ::load_userid($owner_id, 1)->draft_text, $before_transform_draft,
-        "$name does not change drafts" );
+    is( LJ::load_userid( $owner_id, 1 )->draft_text,
+        $before_transform_draft, "$name does not change drafts" );
 }
-
-
 
 # Spellcheck is also callable-only here: a configured checker and a checker
 # that disappears after form render both rerender without save-side hooks.
 my $spell_form = retained_form( '/update', 'callable spellcheck' );
 if ($spell_form) {
     $spell_form->value( subject => 'callable spellcheck subject' );
-    $spell_form->value( event => 'callable misspell body' );
-    my $spell_post = POST('/update', [
-        'action:spellcheck' => 'Spell Check', lj_form_auth => $spell_form->value('lj_form_auth'),
-        subject => 'callable spellcheck subject', event => 'callable misspell body', security => 'public',
-    ]);
+    $spell_form->value( event   => 'callable misspell body' );
+    my $spell_post = POST(
+        '/update',
+        [
+            'action:spellcheck' => 'Spell Check',
+            lj_form_auth        => $spell_form->value('lj_form_auth'),
+            subject             => 'callable spellcheck subject',
+            event               => 'callable misspell body',
+            security            => 'public',
+        ]
+    );
     $spell_post->header( Referer => 'http://localhost/update' );
-    my ($checked, $decode, $spam, $options, $html) = (0, 0, 0, 0, 0);
+    my ( $checked, $decode, $spam, $options, $html ) = ( 0, 0, 0, 0, 0 );
     my $run_hooks = \&LJ::Hooks::run_hooks;
-    my $run_hook = \&LJ::Hooks::run_hook;
-    my $before = entry_count($owner);
+    my $run_hook  = \&LJ::Hooks::run_hook;
+    my $before    = entry_count($owner);
     {
         local $LJ::SPELLER = 'callable-stub';
         no warnings 'redefine';
-        local *LJ::SpellCheck::check_html = sub { ++$checked; return '<em class="spell-suggestion">callable suggestion</em>'; };
-        local *LJ::Hooks::run_hooks = sub { my ($name, @args) = @_; ++$decode if $name eq 'decode_entry_form'; ++$spam if $name eq 'spam_check'; ++$options if $name eq 'after_entry_post_extra_options'; return $run_hooks->($name, @args); };
-        local *LJ::Hooks::run_hook = sub { my ($name, @args) = @_; ++$html if $name eq 'after_entry_post_extra_html'; return $run_hook->($name, @args); };
-        my $res; test_psgi $adapter_app, sub { $res = shift->($spell_post); };
-        like($res->content, qr/callable suggestion/, 'configured callable spellcheck renders checker output');
+        local *LJ::SpellCheck::check_html =
+            sub { ++$checked; return '<em class="spell-suggestion">callable suggestion</em>'; };
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $name, @args ) = @_;
+            ++$decode  if $name eq 'decode_entry_form';
+            ++$spam    if $name eq 'spam_check';
+            ++$options if $name eq 'after_entry_post_extra_options';
+            return $run_hooks->( $name, @args );
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ( $name, @args ) = @_;
+            ++$html if $name eq 'after_entry_post_extra_html';
+            return $run_hook->( $name, @args );
+        };
+        my $res;
+        test_psgi $adapter_app, sub { $res = shift->($spell_post); };
+        like(
+            $res->content,
+            qr/callable suggestion/,
+            'configured callable spellcheck renders checker output'
+        );
     }
-    is($checked, 1, 'configured callable spellcheck invokes checker once');
-    is_deeply([$decode,$spam,$options,$html], [0,0,0,0], 'callable spellcheck invokes no save hook family');
-    is(entry_count($owner), $before, 'configured callable spellcheck creates no entry');
-    my $unavailable; { local $LJ::SPELLER; test_psgi $adapter_app, sub { $unavailable = shift->($spell_post); }; }
-    like($unavailable->content, qr/Spell check is currently unavailable/, 'unavailable callable spellcheck remains nonpersisting');
-    is(entry_count($owner), $before, 'unavailable callable spellcheck creates no entry');
+    is( $checked, 1, 'configured callable spellcheck invokes checker once' );
+    is_deeply(
+        [ $decode, $spam, $options, $html ],
+        [ 0,       0,     0,        0 ],
+        'callable spellcheck invokes no save hook family'
+    );
+    is( entry_count($owner), $before, 'configured callable spellcheck creates no entry' );
+    my $unavailable;
+    {
+        local $LJ::SPELLER;
+        test_psgi $adapter_app, sub { $unavailable = shift->($spell_post); };
+    }
+    like(
+        $unavailable->content,
+        qr/Spell check is currently unavailable/,
+        'unavailable callable spellcheck remains nonpersisting'
+    );
+    is( entry_count($owner), $before, 'unavailable callable spellcheck creates no entry' );
 }
-
-
 
 # Ordinary rerenders copy explicit empty submitted controls instead of using the
 # GET fallback that is specific to transforms.
 $owner->set_draft_text('ordinary rerender draft body');
-$owner->set_prop(draft_properties => nfreeze({ subject => 'ordinary rerender draft subject', taglist => 'draft-tag' }));
-my $ordinary_before_props = thaw(LJ::load_userid($owner_id,1)->prop('draft_properties'));
+$owner->set_prop( draft_properties =>
+        nfreeze( { subject => 'ordinary rerender draft subject', taglist => 'draft-tag' } ) );
+my $ordinary_before_props = thaw( LJ::load_userid( $owner_id, 1 )->prop('draft_properties') );
 for my $action ( [ showform => 1 ], [ moreoptsbtn => 1 ], [ 'action:preview' => 'Preview' ] ) {
-    my ($field, $value) = @$action;
+    my ( $field, $value ) = @$action;
     my $path = '/update?usejournal=' . $owner->user . '&subject=GET+subject&event=GET+body';
-    my $form = retained_form($path, "ordinary $field") or next;
-    my $post = POST($path, [
-        $field => $value, lj_form_auth => $form->value('lj_form_auth'),
-        subject => '', event => '', usejournal => '', security => 'custom', custom_bit_1 => 1,
-        prop_taglist => '', prop_current_location => '', prop_current_music => '',
-        prop_picture_keyword => 'legacy-update-pic', prop_opt_backdated => 1,
-        date_ymd_mm => '02', date_ymd_dd => '03', date_ymd_yyyy => '2020', hour => '04', min => '05', date_diff => 1,
-        comment_settings => 'noemail', prop_xpost_check => 1, prop_xpost_9 => 1,
-    ]);
-    $post->header(Referer => 'http://localhost/update');
-    my ($decode,$spam,$options,$html,$xpost)=(0,0,0,0,0);
-    my $rh=\&LJ::Hooks::run_hooks; my $rhook=\&LJ::Hooks::run_hook;
+    my $form = retained_form( $path, "ordinary $field" ) or next;
+    my $post = POST(
+        $path,
+        [
+            $field                => $value,
+            lj_form_auth          => $form->value('lj_form_auth'),
+            subject               => '',
+            event                 => '',
+            usejournal            => '',
+            security              => 'custom',
+            custom_bit_1          => 1,
+            prop_taglist          => '',
+            prop_current_location => '',
+            prop_current_music    => '',
+            prop_picture_keyword  => 'legacy-update-pic',
+            prop_opt_backdated    => 1,
+            date_ymd_mm           => '02',
+            date_ymd_dd           => '03',
+            date_ymd_yyyy         => '2020',
+            hour                  => '04',
+            min                   => '05',
+            date_diff             => 1,
+            comment_settings      => 'noemail',
+            prop_xpost_check      => 1,
+            prop_xpost_9          => 1,
+        ]
+    );
+    $post->header( Referer => 'http://localhost/update' );
+    my ( $decode, $spam, $options, $html, $xpost ) = ( 0, 0, 0, 0, 0 );
+    my $rh    = \&LJ::Hooks::run_hooks;
+    my $rhook = \&LJ::Hooks::run_hook;
     my $res;
-    { no warnings 'redefine';
-      local *LJ::Hooks::run_hooks=sub { my($n,@a)=@_; ++$decode if $n eq 'decode_entry_form'; ++$spam if $n eq 'spam_check'; ++$options if $n eq 'after_entry_post_extra_options'; return $rh->($n,@a); };
-      local *LJ::Hooks::run_hook=sub { my($n,@a)=@_; ++$html if $n eq 'after_entry_post_extra_html'; return $rhook->($n,@a); };
-      local *LJ::Protocol::schedule_xposts=sub { ++$xpost; return([],[]); };
-      test_psgi $adapter_app, sub { $res=shift->($post); };
+    {
+        no warnings 'redefine';
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $n, @a ) = @_;
+            ++$decode  if $n eq 'decode_entry_form';
+            ++$spam    if $n eq 'spam_check';
+            ++$options if $n eq 'after_entry_post_extra_options';
+            return $rh->( $n, @a );
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ( $n, @a ) = @_;
+            ++$html if $n eq 'after_entry_post_extra_html';
+            return $rhook->( $n, @a );
+        };
+        local *LJ::Protocol::schedule_xposts = sub { ++$xpost; return ( [], [] ); };
+        test_psgi $adapter_app, sub { $res = shift->($post); };
     }
-    my $native=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($res->content,'http://localhost/entry/new'))[0];
-    ok($native,"$field returns native ordinary rerender");
-    is($native->value('subject'),'',"$field retains empty submitted subject over GET");
-    is($native->value('event'),'',"$field retains empty submitted body over GET");
-    is($native->value('security'),'custom',"$field retains custom security");
-    is($native->value('entrytime_date'),'2020-02-03',"$field retains submitted date");
-    is($native->value('entrytime_outoforder'),1,"$field retains backdating");
-    is($native->value('prop_picture_keyword'),'legacy-update-pic',"$field retains userpic");
-    is_deeply([$decode,$spam,$options,$html,$xpost],[0,0,0,0,0],"$field has no save-side hooks");
-    is(entry_count($owner),$before_transform_entries,"$field creates no entry");
-    is_deeply(thaw(LJ::load_userid($owner_id,1)->prop('draft_properties')),$ordinary_before_props,"$field retains full draft properties");
+    my $native = ( grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/entry/new' ) )[0];
+    ok( $native, "$field returns native ordinary rerender" );
+    is( $native->value('subject'),  '',       "$field retains empty submitted subject over GET" );
+    is( $native->value('event'),    '',       "$field retains empty submitted body over GET" );
+    is( $native->value('security'), 'custom', "$field retains custom security" );
+    is( $native->value('entrytime_date'),       '2020-02-03', "$field retains submitted date" );
+    is( $native->value('entrytime_outoforder'), 1,            "$field retains backdating" );
+    is( $native->value('prop_picture_keyword'), 'legacy-update-pic', "$field retains userpic" );
+    is_deeply(
+        [ $decode, $spam, $options, $html, $xpost ],
+        [ 0,       0,     0,        0,     0 ],
+        "$field has no save-side hooks"
+    );
+    is( entry_count($owner), $before_transform_entries, "$field creates no entry" );
+    is_deeply( thaw( LJ::load_userid( $owner_id, 1 )->prop('draft_properties') ),
+        $ordinary_before_props, "$field retains full draft properties" );
 }
-
-
 
 # Explicit token regressions: spellcheck must never invoke a checker before
 # the reviewed token/referer guard accepts the retained form submission.
 for my $token_case ( [ missing => undef ], [ invalid => 'not-a-token' ] ) {
-    my ($label,$token)=@$token_case; my $checked=0;
-    my @fields=('action:spellcheck'=>'Spell Check',subject=>'token subject',event=>'token body',security=>'public');
-    push @fields,(lj_form_auth=>$token) if defined $token;
-    my $req=POST('/update',\@fields); $req->header(Referer=>'http://localhost/update');
-    my $res; { local $LJ::SPELLER='stub'; no warnings 'redefine'; local *LJ::SpellCheck::check_html=sub {++$checked; return 'bad';}; test_psgi $adapter_app,sub{$res=shift->($req);}; }
-    is($checked,0,"$label spellcheck token never invokes checker");
-    like($res->content,qr/(?:Invalid form submission|invalid form)/i,"$label spellcheck token visibly errors");
+    my ( $label, $token ) = @$token_case;
+    my $checked = 0;
+    my @fields  = (
+        'action:spellcheck' => 'Spell Check',
+        subject             => 'token subject',
+        event               => 'token body',
+        security            => 'public'
+    );
+    push @fields, ( lj_form_auth => $token ) if defined $token;
+    my $req = POST( '/update', \@fields );
+    $req->header( Referer => 'http://localhost/update' );
+    my $res;
+    {
+        local $LJ::SPELLER = 'stub';
+        no warnings 'redefine';
+        local *LJ::SpellCheck::check_html = sub { ++$checked; return 'bad'; };
+        test_psgi $adapter_app, sub { $res = shift->($req); };
+    }
+    is( $checked, 0, "$label spellcheck token never invokes checker" );
+    like(
+        $res->content,
+        qr/(?:Invalid form submission|invalid form)/i,
+        "$label spellcheck token visibly errors"
+    );
 }
-
-
 
 # Ordinary absent controls inherit only retained GET defaults; explicit empties
 # deliberately override them. Use showform so this remains nonpersisting.
 for my $case ( [ absent => 0 ], [ empty => 1 ] ) {
-    my ($label,$empty)=@$case;
-    my $path='/update?subject=GET-subject&event=GET-body&prop_taglist=GET-tag&prop_current_location=GET-location';
-    my @f=(showform=>1,lj_form_auth=>$valid_form_auth,security=>'public');
-    push @f,(subject=>'',event=>'',prop_taglist=>'') if $empty;
-    my $req=POST($path,\@f); $req->header(Referer=>'http://localhost/update');
-    my $res; test_psgi $adapter_app,sub{$res=shift->($req);};
-    my $form=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($res->content,'http://localhost/entry/new'))[0];
-    ok($form,"$label ordinary rerender parses");
-    is($form->value('subject'),$empty?'':'GET-subject',"$label subject retention");
-    is($form->value('event'),$empty?'':'GET-body',"$label body retention");
-    is($form->value('taglist'),$empty?'':'GET-tag',"$label tag retention");
-    is($form->value('current_location'),'',"$label ignores arbitrary GET metadata");
+    my ( $label, $empty ) = @$case;
+    my $path =
+'/update?subject=GET-subject&event=GET-body&prop_taglist=GET-tag&prop_current_location=GET-location';
+    my @f = ( showform => 1, lj_form_auth => $valid_form_auth, security => 'public' );
+    push @f, ( subject => '', event => '', prop_taglist => '' ) if $empty;
+    my $req = POST( $path, \@f );
+    $req->header( Referer => 'http://localhost/update' );
+    my $res;
+    test_psgi $adapter_app, sub { $res = shift->($req); };
+    my $form = ( grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/entry/new' ) )[0];
+    ok( $form, "$label ordinary rerender parses" );
+    is( $form->value('subject'), $empty ? '' : 'GET-subject', "$label subject retention" );
+    is( $form->value('event'),   $empty ? '' : 'GET-body',    "$label body retention" );
+    is( $form->value('taglist'), $empty ? '' : 'GET-tag',     "$label tag retention" );
+    is( $form->value('current_location'), '', "$label ignores arbitrary GET metadata" );
 }
 
+{
 
-
-{ package LegacyTransformFixture::Account; sub new { my $class = shift; bless {@_}, $class } sub acctid { $_[0]{id} } sub displayname { $_[0]{name} } sub password { $_[0]{password} } sub xpostbydefault { $_[0]{default} } }
+    package LegacyTransformFixture::Account;
+    sub new { my $class = shift; bless {@_}, $class }
+    sub acctid         { $_[0]{id} }
+    sub displayname    { $_[0]{name} }
+    sub password       { $_[0]{password} }
+    sub xpostbydefault { $_[0]{default} }
+}
 
 # Transform xpost controls retain truthy GET fallback when the submitted
 # legacy selection/credential is explicitly empty.
-my @xpost_accounts=(LegacyTransformFixture::Account->new(id=>41,name=>'Rendered account',password=>'',default=>0));
-my $xpost_path='/update?subject=GET&event=GET&prop_xpost_check=1&prop_xpost_41=1&prop_xpost_password_41=GET-secret';
-my $xpost_req=POST($xpost_path,[transform=>'xpostfallback',lj_form_auth=>$valid_form_auth,subject=>'POST',event=>'POST',prop_xpost_check=>'',prop_xpost_41=>'',prop_xpost_password_41=>'']);
-$xpost_req->header(Referer=>'http://localhost/update');
+my @xpost_accounts = (
+    LegacyTransformFixture::Account->new(
+        id       => 41,
+        name     => 'Rendered account',
+        password => '',
+        default  => 0
+    )
+);
+my $xpost_path =
+'/update?subject=GET&event=GET&prop_xpost_check=1&prop_xpost_41=1&prop_xpost_password_41=GET-secret';
+my $xpost_req = POST(
+    $xpost_path,
+    [
+        transform              => 'xpostfallback',
+        lj_form_auth           => $valid_form_auth,
+        subject                => 'POST',
+        event                  => 'POST',
+        prop_xpost_check       => '',
+        prop_xpost_41          => '',
+        prop_xpost_password_41 => ''
+    ]
+);
+$xpost_req->header( Referer => 'http://localhost/update' );
 my $xpost_res;
 my $prepared_xpost;
-{ no warnings 'redefine'; local *DW::External::Account::get_external_accounts=sub { @xpost_accounts }; my $orig_prepare=\&DW::Entry::Legacy::prepare_rerender_entry_form; local *DW::Entry::Legacy::prepare_rerender_entry_form=sub { my $prepared=$orig_prepare->(@_); $prepared_xpost=$prepared; return $prepared; }; my $rh=\&LJ::Hooks::run_hooks; local *LJ::Hooks::run_hooks=sub { my($n,@a)=@_; return if $n eq 'transform_update_xpostfallback'; return $rh->($n,@a); }; test_psgi $adapter_app,sub{$xpost_res=shift->($xpost_req);}; }
-my $xpost_form=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($xpost_res->content,'http://localhost/entry/new'))[0];
-ok($xpost_form,'transform empty-xpost fallback rerender parses');
-is($xpost_form->value('crosspost_entry'),1,'empty transform xpost master inherits GET selection');
-my @xpost_passwords=map { $_->value } grep {($_->name||'') eq 'crosspost_password_41'} $xpost_form->inputs;
-is($prepared_xpost->{canonical}{crosspost}{41}{password},'GET-secret','empty transform xpost credential inherits GET value before native rendering');
-is($xpost_passwords[0],'','native crosspost password control deliberately does not reflect a secret');
+{
+    no warnings 'redefine';
+    local *DW::External::Account::get_external_accounts = sub { @xpost_accounts };
+    my $orig_prepare = \&DW::Entry::Legacy::prepare_rerender_entry_form;
+    local *DW::Entry::Legacy::prepare_rerender_entry_form =
+        sub { my $prepared = $orig_prepare->(@_); $prepared_xpost = $prepared; return $prepared; };
+    my $rh = \&LJ::Hooks::run_hooks;
+    local *LJ::Hooks::run_hooks = sub {
+        my ( $n, @a ) = @_;
+        return if $n eq 'transform_update_xpostfallback';
+        return $rh->( $n, @a );
+    };
+    test_psgi $adapter_app, sub { $xpost_res = shift->($xpost_req); };
+}
+my $xpost_form = ( grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+        HTML::Form->parse( $xpost_res->content, 'http://localhost/entry/new' ) )[0];
+ok( $xpost_form, 'transform empty-xpost fallback rerender parses' );
+is( $xpost_form->value('crosspost_entry'),
+    1, 'empty transform xpost master inherits GET selection' );
+my @xpost_passwords =
+    map { $_->value } grep { ( $_->name || '' ) eq 'crosspost_password_41' } $xpost_form->inputs;
+is( $prepared_xpost->{canonical}{crosspost}{41}{password},
+    'GET-secret', 'empty transform xpost credential inherits GET value before native rendering' );
+is( $xpost_passwords[0], '',
+    'native crosspost password control deliberately does not reflect a secret' );
 
 done_testing;

@@ -322,7 +322,8 @@ sub legacy_update_handler {
         LJ::Hooks::run_hooks( "transform_update_$transform", $legacy_get, $legacy_post )
             if $transform;
         if ( $legacy_post->{'action:spellcheck'}
-            && !( LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer() ) ) {
+            && !( LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer() ) )
+        {
             my $errors = DW::FormErrors->new;
             $errors->add( undef, 'error.invalidform' );
             return _legacy_update_rerender( $legacy_post, $legacy_get, $remote, errors => $errors );
@@ -422,8 +423,8 @@ sub _legacy_update_rerender {
     else {
         # Retained ordinary rerenders default only these values from GET, then
         # overlay every present POST control (including explicit empties).
-        $render{$_} = $get->{$_} for qw(subject event prop_taglist usejournal);
-        $render{$_} = $get->{$_} for grep { /^prop_xpost_/ } keys %$get;
+        $render{$_} = $get->{$_}  for qw(subject event prop_taglist usejournal);
+        $render{$_} = $get->{$_}  for grep { /^prop_xpost_/ } keys %$get;
         $render{$_} = $post->{$_} for keys %$post;
     }
 
