@@ -17,6 +17,7 @@ package LJ::S2;
 
 use strict;
 use DW;
+use DW::BML;
 use DW::Request;
 use DW::Cache;
 use lib DW->home . "/src/s2";
@@ -115,7 +116,7 @@ sub make_journal {
     }
 
     if ( $styleid && $styleid eq "siteviews" ) {
-        $apache_r->notes->{'no_control_strip'} = 1;
+        $apache_r->note( 'no_control_strip', 1 );
 
         ${ $opts->{'handle_with_siteviews_ref'} } = 1;
         $opts->{siteviews_extra_content} ||= {};
@@ -2465,7 +2466,13 @@ sub Page {
     }
 
     if ( LJ::Hooks::are_hooks('s2_head_content_extra') ) {
-        $p->{head_content} .= LJ::Hooks::run_hook( 's2_head_content_extra', $remote, $opts->{r} );
+
+        # Held external hook ABI: this must keep receiving an Apache-shaped
+        # DW::BML::RequestAdapter, not the plain DW::Request $opts->{r} is
+        # elsewhere (see doc/BML-JOURNAL-ADAPTER.md).
+        $p->{head_content} .=
+            LJ::Hooks::run_hook( 's2_head_content_extra', $remote,
+            DW::BML::RequestAdapter->new($r) );
     }
 
     my %meta_opts =

@@ -311,13 +311,16 @@ sub render {
         }
     }
 
-    # Main journal rendering via LJ::make_journal
+    # Main journal rendering via LJ::make_journal. LJ::make_journal/s2_run's
+    # own use of 'r' is plain DW::Request methods (OK, NOT_FOUND, note,
+    # status, content_type); the s2_head_content_extra hook (a held external
+    # ABI) constructs its own DW::BML::RequestAdapter at its call site in
+    # LJ::S2.pm instead of reusing this one.
     my $handle_with_siteviews = 0;
     my %headers;
-    my $adapter = DW::BML::RequestAdapter->new($r);
 
     my $opts = {
-        'r'         => $adapter,
+        'r'         => $r,
         'headers'   => \%headers,
         'args'      => $args,
         'vhost'     => 'users',

@@ -81,9 +81,12 @@ sub AUTOLOAD {
 
 package main;
 
+our $ADAPTER_NEW_CALLS = 0;
+
 no warnings 'redefine';
 local *DW::BML::RequestAdapter::new = sub {
     my ( $class, $r ) = @_;
+    $ADAPTER_NEW_CALLS++;
     return RecordingAdapterProxy::wrap( bless( { r => $r }, 'DW::BML::RequestAdapter' ),
         'DW::BML::RequestAdapter' );
 };
@@ -119,52 +122,53 @@ my $entry = $u->t_post_fake_entry(
 local *DW::Routing::call = sub { return undef };
 local *LJ::get_cap       = sub { return $_[1] eq 'userdomain' ? 1 : 0 };
 
-subtest 'S2 HTML journal page render (LJ::make_journal main adapter)' => sub {
+subtest 'S2 HTML journal page render (LJ::make_journal now uses DW::Request directly)' => sub {
 
     # This devcontainer's test DB has no S2 style layers installed (same
     # constraint noted in t/plack-adult-content.t), so LJ::make_journal hits
     # an S2 compile error ("Undefined function modules_init()") before it can
-    # produce real page content. That error path still exercises the adapter
-    # (LJ::S2.pm:80 calls $apache_r->OK on this exact branch), which is
-    # enough to confirm real production code reaches it; the full method set
-    # below is cross-checked against a direct read of every $opts->{r}/
-    # $apache_r use in LJ::S2.pm (see doc/BML-JOURNAL-ADAPTER.md).
+    # produce real page content. Before the W8 conversion, that error path
+    # still called OK on an adapter DW::Controller::Journal.pm:317
+    # constructed; after it, LJ::S2.pm's $apache_r *is* the plain
+    # DW::Request Journal.pm passes as $opts->{r} directly, so no adapter is
+    # constructed for this flow at all -- proving :317's removal, not just
+    # that OK still resolves the same way (status/content_type/note calls on
+    # a plain DW::Request are byte-identical to the adapter's passthroughs
+    # to that same object, so there's nothing else to regress here).
     @RecordingAdapterProxy::LOG = ();
+    $ADAPTER_NEW_CALLS          = 0;
     test_psgi journal_app( $u->user ), sub {
         my $cb  = shift;
         my $res = $cb->( GET 'http://localhost/' );
         is( $res->code, 200,
-            'journal recent page responds (S2 error page, not real content, here)' );
+'journal recent page responds the same as before (S2 error page, not real content, here)'
+        );
     };
-    my @methods = do {
-        my %seen;
-        grep { !$seen{$_}++ } map { $_->{method} } @RecordingAdapterProxy::LOG;
-    };
-    ok( ( grep { $_ eq 'OK' } @methods ),
-        'error path calls the adapter\'s OK method (LJ::S2.pm:80)' );
-    diag( 'HTML journal page adapter methods (this environment\'s S2-error path): '
-            . join( ', ', @methods ) );
+    is( $ADAPTER_NEW_CALLS, 0,
+        'DW::BML::RequestAdapter::new is never called for the main journal-render path anymore' );
+    is( scalar(@RecordingAdapterProxy::LOG),
+        0, 'no adapter methods are recorded either, since none is constructed' );
 };
 
-subtest 'RSS feed render (does not touch the adapter at all)' => sub {
+subtest 'RSS feed render (still does not touch the adapter, still no adapter at all now)' => sub {
     @RecordingAdapterProxy::LOG = ();
+    $ADAPTER_NEW_CALLS          = 0;
     test_psgi journal_app( $u->user ), sub {
         my $cb  = shift;
         my $res = $cb->( GET 'http://localhost/data/rss' );
-        is( $res->code, 200, 'RSS feed renders' );
-        like( $res->content, qr/<rss\b/i, 'RSS root element present' );
+        is( $res->code, 200, 'RSS feed renders (unchanged)' );
+        like( $res->content,                qr/<rss\b/i,  'RSS root element present (unchanged)' );
+        like( $res->header('Content-Type'), qr{text/xml}, 'RSS content type unchanged' );
     };
 
-    # Important negative result: RSS/Atom do NOT go through data_handler:*
-    # (no in-tree "data_handler:rss" registration exists) *and* never call
-    # anything on the main adapter either -- grep -n '\$opts->{.r.}|apache_r'
-    # cgi-bin/LJ/Feed.pm has zero matches. LJ::make_journal still constructs
-    # and receives the adapter (DW/Controller/Journal.pm:317 always builds
-    # one), it just never gets used for feed rendering, which flows through
-    # the returned $html string and the $opts hash's own status/contenttype
-    # fields instead (applied to the real DW::Request by Journal.pm itself).
-    is( scalar(@RecordingAdapterProxy::LOG),
-        0, 'RSS render calls zero methods on the adapter it is nonetheless given' );
+    # Before W8: RSS never called anything on the adapter it was nonetheless
+    # given (data_handler:* isn't how rss/atom work; see doc). After W8:
+    # there's no adapter construction at all on this path, so both counts
+    # are zero, and the response itself (status/content-type/body) is
+    # unchanged, exactly as expected since s2_run's status/content_type
+    # calls were always pure passthroughs to this same DW::Request object.
+    is( $ADAPTER_NEW_CALLS, 0, 'no DW::BML::RequestAdapter is constructed for RSS rendering' );
+    is( scalar(@RecordingAdapterProxy::LOG), 0, 'and so zero adapter methods are recorded' );
 };
 
 subtest 'FOAF request via a locally-registered data_handler:foaf hook' => sub {
@@ -173,8 +177,10 @@ subtest 'FOAF request via a locally-registered data_handler:foaf hook' => sub {
     # (grep -rn foaf cgi-bin/LJ/S2.pm cgi-bin/LJ/Feed.pm: no matches) -- it is
     # exactly the kind of request the data_handler:* extension point exists
     # for. Register a disposable hook to exercise Journal.pm's OWN adapter
-    # construction (DW/Controller/Journal.pm:285), separate from the one
-    # LJ::make_journal receives.
+    # construction (DW/Controller/Journal.pm:285), which W8 explicitly does
+    # NOT touch (held external ABI) -- this must still construct an adapter,
+    # unlike the main render path above.
+    $ADAPTER_NEW_CALLS = 0;
     local $LJ::HOOKS{'data_handler:foaf'};
     my @handler_args;
     LJ::Hooks::register_hook(
@@ -200,6 +206,8 @@ subtest 'FOAF request via a locally-registered data_handler:foaf hook' => sub {
     };
     is( scalar(@handler_args),    1,        'data_handler:foaf hook fired exactly once' );
     is( $handler_args[0]->{user}, $u->user, 'hook received the journal username' );
+    is( $ADAPTER_NEW_CALLS, 1,
+        'data_handler:* (Journal.pm:285) still constructs exactly one adapter, untouched by W8' );
     ok( scalar(@RecordingAdapterProxy::LOG) > 0,
         'data_handler hook path called at least one adapter method' );
     diag(
@@ -213,15 +221,18 @@ subtest 'FOAF request via a locally-registered data_handler:foaf hook' => sub {
     );
 };
 
-subtest 'Locally-registered s2_head_content_extra hook' => sub {
+subtest 'Locally-registered s2_head_content_extra hook (post-W8: adapter built at the call site)' =>
+    sub {
 
     # LJ::S2.pm:2467-2468 only reaches this hook deep inside a *successful*
     # S2 page render (building $p->{head_content}), which this environment's
     # missing S2 style layers prevent (see the HTML subtest above). Exercise
     # the hook's exact call convention directly instead -- same hook name,
-    # same two positional args (remote, $opts->{r}) -- against a real
-    # recording-wrapped adapter built the same way Journal.pm builds one, to
-    # characterize what the hook receives and can do with it.
+    # same two positional args (remote, DW::BML::RequestAdapter->new($r)) --
+    # matching W8's LJ::S2.pm:2467-2468 exactly: it no longer reads
+    # $opts->{r}, it constructs its own adapter right there, specifically to
+    # keep this held external ABI unchanged while :317 stops doing so.
+    $ADAPTER_NEW_CALLS = 0;
     local $LJ::HOOKS{'s2_head_content_extra'};
     my @hook_args;
     LJ::Hooks::register_hook(
@@ -238,12 +249,13 @@ subtest 'Locally-registered s2_head_content_extra hook' => sub {
     my $plack_r = DW::Request::Plack->new(
         { REQUEST_METHOD => 'GET', PATH_INFO => '/', 'psgi.url_scheme' => 'http' } );
     @RecordingAdapterProxy::LOG = ();
-    my $adapter = DW::BML::RequestAdapter->new($plack_r);
-    my $extra   = LJ::Hooks::run_hook( 's2_head_content_extra', $u, $adapter );
+    my $extra =
+        LJ::Hooks::run_hook( 's2_head_content_extra', $u, DW::BML::RequestAdapter->new($plack_r) );
 
     is( scalar(@hook_args), 1, 's2_head_content_extra hook fired exactly once' );
-    isa_ok( $hook_args[0]->{r}, 'RecordingAdapterProxy',
-        'hook receives the same kind of recording-wrapped adapter LJ::make_journal threads through'
+    is( $ADAPTER_NEW_CALLS, 1, 'exactly one adapter is constructed, at the hook call site' );
+    isa_ok( $hook_args[0]->{r}->{real}, 'DW::BML::RequestAdapter',
+'the object the hook receives really is a DW::BML::RequestAdapter underneath the test\'s recording wrapper'
     );
     is(
         $extra,
@@ -258,6 +270,41 @@ subtest 'Locally-registered s2_head_content_extra hook' => sub {
         ( grep { $_->{on} eq 'DW::BML::RequestAdapter::Connection' } @RecordingAdapterProxy::LOG ),
         'and call client_ip on the connection object it got back'
     );
+    };
+
+subtest 'no_control_strip note reaches DW::Hooks::NavStrip via plain DW::Request::note' => sub {
+
+    # LJ::S2.pm:118-119 used to write this via the adapter's tied-hash sugar
+    # ($apache_r->notes->{'no_control_strip'} = 1, which itself just forwarded
+    # to $self->{r}->note(...) -- see DW::BML::RequestAdapter::Notes::Tie::STORE).
+    # W8 changes it to call $apache_r->note('no_control_strip', 1) directly,
+    # now that $apache_r is the plain DW::Request. DW::Hooks::NavStrip.pm:44
+    # already reads it via $r->note('no_control_strip') on the real request
+    # object (DW::Request->get), never through any adapter -- confirm the
+    # write/read pair still round-trips through the same object.
+    DW::Request->reset;
+    my $r = DW::Request::Plack->new(
+        { REQUEST_METHOD => 'GET', PATH_INFO => '/', 'psgi.url_scheme' => 'http' } );
+
+    # Self-viewing-own-journal, with LJ::is_enabled forced on, makes
+    # DW::Hooks::NavStrip.pm's show_control_strip hook (already registered
+    # at module load, not a test double) return a truthy display mask by
+    # default (LJ::User::Permissions::control_strip_display defaults to "all
+    # options checked" with no explicit prop). This lets the "before" call
+    # below be a meaningful sanity check, not a vacuous undef from unrelated
+    # missing setup, so the "after" undef is provably caused by the note.
+    LJ::set_remote($u);
+    LJ::set_active_journal($u);
+    local *LJ::is_enabled = sub { return $_[0] eq 'control_strip' ? 1 : 0; };
+
+    ok( !$r->note('no_control_strip'), 'note is unset before LJ::S2.pm:119 runs' );
+    ok( LJ::Hooks::run_hook('show_control_strip'),
+        'control strip hook returns a truthy display mask before the note is set (sanity check)' );
+
+    $r->note( 'no_control_strip', 1 );    # exactly what LJ::S2.pm:119 now calls
+    is( $r->note('no_control_strip'), 1, 'note round-trips through plain DW::Request::note' );
+    is( LJ::Hooks::run_hook('show_control_strip'),
+        undef, 'DW::Hooks::NavStrip suppresses the control strip once the note is set' );
 };
 
 done_testing;
