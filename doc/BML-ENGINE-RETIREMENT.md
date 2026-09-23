@@ -375,3 +375,58 @@ root, though T4's broader sequencing point (gate `RequestWrapper.pm:56`'s
 removal on "no `.bml` page can call `BML::ml()` before its own dispatch"
 rather than merely "F2 landed") remains valid in principle for any
 `.bml` page that might exist at removal time.
+
+## 6. E3: engine deletion (complete, 2026-09-23)
+
+§3's held gates are all resolved by earlier packages, letting this
+document's final step run: E1 converted `LJ::Protocol.pm:562`'s
+`BML::set_language('en')` to a direct native call and dropped its
+`use DW::BML`; W8/the journal-adapter work resolved gate 3
+(`DW::BML::RequestAdapter` split into its own standalone file, kept for
+the held `s2_head_content_extra`/`data_handler:*`/`DISABLE_PROTOCOL{getevents}`
+ABIs per gate 4 — those ABIs are explicitly untouched, not converted);
+`LJ::PageStats::filename` (gate 5) was resolved earlier (T7) to always
+return `undef`, matching its already-observed behavior.
+
+§3 step 6, the actual deletion, is package E3: `RequestWrapper.pm:56`'s
+`set_language` call, `ljlib.pl:496`'s `reset_cookies` guard,
+`LJ::Global::BMLInit.pm`, then `Apache::BML.pm`, `DW::BML.pm`,
+`lj-bml-blocks.pl`, `cgi-bin/bml/scheme/*.look`, `htdocs/_config.bml`,
+`ext/dw-nonfree/htdocs/_config*.bml`, `app.psgi`'s dispatch fallback, and
+`DW::SiteScheme`'s `tt_runner`/`supports_bml` are all deleted.
+`t/plack-bml.t` is rewritten (not deleted) to assert the router-only
+behavior this document's own §3 step 2 anticipated as the fallback
+regression guard's eventual replacement; `t/bml-shims-loaded.t` is
+inverted to assert the engine is never loaded by `ljlib.pl` alone.
+`DW::BML::RequestAdapter` is untouched and still constructed directly at
+all three held call sites — this document's gate 4 stands as the reason
+why, unchanged.
+
+One correction to §3's own risk note: "step 2 risks are limited to
+language selection on still-existing `.bml` pages" assumed `.bml` pages
+might still exist at that step's removal time. By E3, none did (F2, then
+inbox W1-W3, completed first) — the risk that materialized instead was in
+this document's own test suite: `t/protocol-sendmessage-language.t` (added
+by E1, requiring `ae2d00875`) was missing from this branch's history at
+E3's start because it depended on E1's own commit, not just its later
+follow-up (`dcfb2bffb`); running it caught `LJ::Protocol.pm` still calling
+the by-then-deleted `BML::set_language('en')` directly. Two more E3-only
+test regressions surfaced the same way (a `%BML::COOKIE_M`/`$BML::COOKIES_PARSED`
+assertion in `t/plack-bml-runtime-callers.t`, and two `$Apache::BML::base_recent_mod`
+assertions in `t/admin-faq-modtime.t`/`t/native-faq-language.t`) — all three
+were caught only by running each affected test file directly, not by any
+grep; §3's own risk note undersold this category for a project this size.
+
+**Left, deliberately, past this document's own scope:**
+`DW::BML::RequestAdapter` and the three held external hook ABIs (gate 4,
+unresolved by design); `LJ::Lang.pm`'s `.bml`-itcode-string-parsing
+branches (`relative_langdat_file_of_lang_itcode`, `itcode_for_langdat_file`),
+kept because `bin/upgrading/texttool.pl`'s `dumptext`/`deadphrases` still
+call them and 14 call sites across 6 files still request `.bml`-scoped
+keys (W14 relocates these; the branches come out after, not before);
+`LJ::Web.pm`'s `check_referer` still strips a `.bml` suffix from URIs it
+matches against (harmless compatibility, not engine-dependent); the
+`BMLschemepref` cookie name (a compatibility contract independent of the
+engine, per §2); production `LJ::Local::BMLInit` and any deployed
+`_config-local.bml` overlay, both pre-existing deploy-time gates this
+document never asserted unused since neither is in this repo.

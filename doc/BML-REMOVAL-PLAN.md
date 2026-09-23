@@ -24,14 +24,28 @@ deleted (inbox's three, W1-W3; `update.bml`/`editjournal.bml`/`imgupload.bml`/
 `tools/endpoints/draft.bml`/`preview/entry.bml`, F2). Only the three
 configuration files remain tracked under `htdocs/`.
 
+**Status (2026-09-23, after E3): package 9 complete, project done.** The
+three configuration files, the engine (`cgi-bin/DW/BML.pm`,
+`cgi-bin/Apache/BML.pm`), its blocks/hooks (`cgi-bin/lj-bml-blocks.pl`,
+`cgi-bin/LJ/Global/BMLInit.pm`), look files (`cgi-bin/bml/scheme/*.look`),
+`app.psgi`'s dispatch fallback, and `DW::SiteScheme`'s `tt_runner`/`supports_bml`
+are all deleted; see `doc/BML-ENGINE-RETIREMENT.md` for the item-by-item
+record. Remaining deploy-time gates, restated from the "Definition of done"
+checklist below: production `LJ::Local::BMLInit` (if deployed) and any
+deployed `_config-local.bml` overlay stop being read by anything (both
+already documented as gates, not asserted unused, since neither is in this
+repo); any production URL that used to resolve to a `.bml` file now hits a
+plain 404 instead of the old engine's page/redirect -- confirm this is the
+intended behavior for any such URL still receiving traffic before deploy.
+
 | Remaining area | Current native coverage and deletion gate |
 | --- | --- |
 | `update.bml`, `editjournal.bml` | **Graduated and deleted** (package F2, 2026-09-23). T2 (`bml-sonnet-entry-cutover`) put `/update` and `/editjournal?itemid=` on native, always-redirecting-or-carrying-over routes; T3 forward-deleted the now-dead `legacy_*` render/dispatch subs those pages used. F2 deleted the two `.bml` files themselves, `LJ::entry_form` (their last remaining server-side renderer, `cgi-bin/LJ/Web.pm`), and their `.bml.text` companions after grep confirmed no code reads their keys. `LJ::entry_form_decode` and the transitional `legacy_new_rerender`/`legacy_owned_edit_rerender`/`legacy_carryover_unrecoverable` carry-over renderers are kept; none of them reference the deleted `.bml.text` scopes (relocated to `views/entry/form.tt.text` by W4/T2). **Deploy gate:** production `%LJ::BETA_FEATURES` must drop `updatepage`; `ext/local` may implement `update_fields`, `transform_update_*`, `after_entry_post_extra_*`, `entry_deleted_page_extras`, `entryforminfo`, or `LJ::Local::BMLInit` — these are no longer invoked by the native pages (not asserted unused, since `ext/local` is not in this repo). |
 | `imgupload.bml`, `tools/endpoints/draft.bml` | **Graduated and deleted** (package F2, 2026-09-23). Their only callers, `htdocs/js/entry.js` and `htdocs/js/xpost.js`, are deleted with them (grep-confirmed: no other loader, no `LJ::need_res` call, no view). Neither page had a native replacement route; `GET /imgupload` and `GET /tools/endpoints/draft` now 404. `imgupload.bml.text` is deleted after grep confirmed no code reads its keys (`imgupload.bml.insertimage.*` had already been relocated to `/imguploadrte`'s own scope). `LJ::Widget::UserpicSelector` is deleted: `LJ::entry_form` was its last caller anywhere in the codebase (grep-confirmed zero remaining instantiations). |
 | `preview/entry.bml` | **Graduated and deleted** (package F2, 2026-09-23). `/preview/entry`'s only caller, `js/entry.js`, is deleted with it. `_render_preview` (`cgi-bin/DW/Controller/Entry.pm`) dropped its `legacy`-branch (`legacy_preview_handler`, the requirepost GET/HEAD text response, and the stylesys/force_s1 site-vs-S2 selection); the native `/entry/preview` path is unchanged. `preview/entry.bml.text` is deleted after grep confirmed no code reads its keys (`/entry/preview.tt.title`/`.entry.preview_warn_text` were already the relocated native keys). `t/plack-legacy-preview.t` keeps its legacy-schema decoder subtest (still exercises kept `entry_form_decode`) and its native-preview subtests; every subtest that POSTed to the retired route or asserted the retired requirepost behavior is removed. |
 | Three `inbox/*.bml` files | **Graduated and deleted** (packages W1-W3, 2026-09-23): `index.bml`, `compose.bml`, `markspam.bml`, their `.bml.text` companions, `LJ::Widget::InboxFolder`/`InboxFolderNav`, `js/esn_inbox.js`, and `stc/inbox.css` are removed. Native `DW::Controller::Inbox` owns the canonical `/inbox`, `/inbox/compose`, `/inbox/markspam` routes; `/inbox/new*` redirect (GET) or dispatch natively (POST). Production `%LJ::BETA_FEATURES{inbox}` removal at deploy time remains an explicit gate (see BML-GRADUATION-PLAN.md). |
-| Three `_config*.bml` files and parser/runtime | Remove after remaining pages and request adapters are retired. Preserve inherited/nonfree licensing boundaries. |
-| Journal request adapters and external hooks | `DW::Controller::Journal` still constructs BML request adapters. Deployment contracts for `s2_head_content_extra`, `data_handler:*`, and other recorded external interfaces remain pending; do not silently change their ABI. |
+| Three `_config*.bml` files and parser/runtime | **Graduated and deleted** (package E3, 2026-09-23). `htdocs/_config.bml`, `ext/dw-nonfree/htdocs/_config.bml` and `_config-local.bml`, `cgi-bin/DW/BML.pm`, `cgi-bin/Apache/BML.pm`, `cgi-bin/lj-bml-blocks.pl`, `cgi-bin/LJ/Global/BMLInit.pm`, and `cgi-bin/bml/scheme/*.look` are all deleted; `app.psgi` no longer has a BML dispatch fallback. |
+| Journal request adapters and external hooks | **Unchanged, by design.** `DW::Controller::Journal`, `LJ::S2`, and `LJ::Protocol` still construct `DW::BML::RequestAdapter` (its own standalone file since T8) for the held `s2_head_content_extra`, `data_handler:*`, and `DISABLE_PROTOCOL{getevents}` external hook ABIs. E3 did not touch this adapter or those ABIs; they remain an explicit, separate decision from engine removal. |
 
 The live immutable review queue, local integration evidence, and explicit held
 boundaries are maintained at the top of `BML-HANDOFF.md` and in `BML-PROGRESS.md`.
@@ -291,6 +305,31 @@ test and retain that behavior where useful without retaining the engine.
 - Runtime/static scans and browser network traces reveal no unexplained legacy
   dependency. Any remaining “BML” text is documented history or an intentional
   compatibility identifier, not executable infrastructure.
+
+**Confirmed against E3 (2026-09-23):**
+
+- Every inventory row above is graduated/deleted; no row is silently unresolved.
+- Grepped: zero `use DW::BML`/`use Apache::BML`, zero bare `BML::*`/`BMLCodeBlock::*`
+  calls anywhere in the tree. One narrow, explicit exception: `LJ::Lang.pm`'s
+  `.bml`-itcode-*string*-parsing branches (`relative_langdat_file_of_lang_itcode`,
+  `itcode_for_langdat_file`) are untouched, on purpose -- they parse itcode
+  *strings* that happen to contain `.bml`, not any `BML::*` symbol, and
+  `bin/upgrading/texttool.pl`'s `dumptext`/`deadphrases` still call them
+  (§ current retirement gates above; deferred to W14).
+- `t/bml-shims-loaded.t` (inverted, E3(5)) and `t/00-compile.t` both pass with
+  `DW/BML.pm`/`Apache/BML.pm` physically absent from the tree.
+- Request language/input state isolation: covered by the existing native
+  request-context test suite (`t/native-*-language.t`,
+  `t/lang-native-request-context.t`); no new leak introduced by E3's deletions.
+- Public-URL compatibility: the one still-relevant surface, a bookmarked
+  `.bml`-suffixed link to a page that has a native replacement, is preserved
+  by `DW::Routing`'s existing suffix-stripping (`t/plack-bml.t`,
+  `t/plack-no-bml-fallback.t`). A `.bml` URL with **no** native replacement
+  (there are none left in this repo, but see the deploy-gate note above for
+  production) now 404s instead of rendering or 403ing.
+- Not run as part of E3: a live browser network trace across the site. The
+  static/runtime greps above are the evidence for this package; a browser
+  sanity pass is the foreman's separate closing step.
 
 Continue with remaining independently testable packages after their listed
 prerequisites pass. The progress log records completed packages and known gates.
