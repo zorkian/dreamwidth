@@ -883,18 +883,19 @@ sub _auth {
 sub _queue_crosspost {
     my ( $form_req, %opts ) = @_;
 
-    my $u       = delete $opts{remote};
-    my $ju      = delete $opts{journal};
-    my $deleted = delete $opts{deleted};
-    my $editurl = delete $opts{editurl};
-    my $ditemid = delete $opts{ditemid};
+    my $u                  = delete $opts{remote};
+    my $ju                 = delete $opts{journal};
+    my $deleted            = delete $opts{deleted};
+    my $editurl            = delete $opts{editurl};
+    my $ditemid            = delete $opts{ditemid};
+    my $crosspost_callback = delete $opts{crosspost_callback};
 
     my @crossposts;
-    if ( $u->equals($ju) && $form_req->{crosspost_entry} ) {
+    if ( $u && $ju && $u->equals($ju) && $form_req->{crosspost_entry} ) {
         my $user_crosspost = $form_req->{crosspost};
         my ( $xpost_successes, $xpost_errors ) = LJ::Protocol::schedule_xposts(
             $u, $ditemid, $deleted,
-            sub {
+            $crosspost_callback || sub {
                 my $submitted = $user_crosspost->{ $_[0]->acctid } || {};
 
                 # first argument is true if user checked the box
@@ -995,12 +996,15 @@ sub _do_post {
     return %$res if $res->{errors};
 
     # post succeeded, time to do some housecleaning
-    _persist_props( $auth->{poster}, $form_req, 0 );
-
-    # Clear out a draft
-    if ( $auth->{poster} ) {
-        $auth->{poster}->set_prop( 'entry_draft',      '' );
-        $auth->{poster}->set_prop( 'draft_properties', '' );
+    if ( my $legacy = $opts{legacy_success} ) {
+        _legacy_success_housekeeping( $legacy, $form_req );
+    }
+    else {
+        _persist_props( $auth->{poster}, $form_req, 0 );
+        if ( $auth->{poster} ) {
+            $auth->{poster}->set_prop( 'entry_draft',      '' );
+            $auth->{poster}->set_prop( 'draft_properties', '' );
+        }
     }
 
     my $render_ret;
@@ -1077,14 +1081,23 @@ sub _do_post {
             }
             );
 
+        # Legacy update keeps its master checkbox outside normalized form data.
+        # Its POST-first, GET-fallback value is passed explicitly by its adapter.
+        my $crosspost_form = $form_req;
+        if ( $opts{legacy_success} && exists $opts{legacy_success}{crosspost_master} ) {
+            $crosspost_form =
+                { %$form_req, crosspost_entry => $opts{legacy_success}{crosspost_master} };
+        }
+
         # crosspost!
         my @crossposts = _queue_crosspost(
-            $form_req,
-            remote  => $u,
-            journal => $journal,
-            deleted => 0,
-            editurl => $edititemlink,
-            ditemid => $ditemid,
+            $crosspost_form,
+            remote             => $opts{legacy_success} ? $opts{legacy_success}{remote} : $u,
+            journal            => $journal,
+            deleted            => 0,
+            editurl            => $edititemlink,
+            ditemid            => $ditemid,
+            crosspost_callback => $opts{legacy_crosspost_callback},
         );
 
         # set sticky
@@ -1255,6 +1268,49 @@ sub _do_edit {
 }
 
 # remember value of properties, to use the next time the user makes a post
+
+# The legacy update form keeps its raw crosspost fields outside the normalized
+# form request.  Preserve its POST-first, GET-fallback contract at the scheduler
+# boundary without changing native form normalization.
+sub _legacy_crosspost_master {
+    my ( $post, $get ) = @_;
+    return $post->{prop_xpost_check} || $get->{prop_xpost_check};
+}
+
+sub _legacy_crosspost_callback {
+    my ( $post, $get ) = @_;
+
+    return sub {
+        my $acctid = $_[0]->acctid;
+        my $prefix = "prop_xpost_$acctid";
+
+        return (
+            $post->{$prefix} || $get->{$prefix},
+            {
+                password => $post->{"prop_xpost_password_$acctid"}
+                    || $get->{"prop_xpost_password_$acctid"},
+                auth_challenge => $post->{"prop_xpost_chal_$acctid"}
+                    || $get->{"prop_xpost_chal_$acctid"},
+                auth_response => $post->{"prop_xpost_resp_$acctid"}
+                    || $get->{"prop_xpost_resp_$acctid"},
+            }
+        );
+    };
+}
+
+sub _legacy_success_housekeeping {
+    my ( $legacy, $form ) = @_;
+    my $poster = $legacy->{poster};
+    my $remote = $legacy->{remote};
+    $poster->set_prop( 'disable_auto_formatting', $legacy->{event_format} ? 1 : 0 ) if $poster;
+    if ($remote) {
+        $remote->set_prop( 'entry_draft', '' );
+        my $editor = $remote->prop('entry_editor') || '';
+        $remote->set_prop( 'entry_editor', $legacy->{switched_rte_on} ? 'rich' : 'plain' )
+            unless $editor =~ /^always_/;
+    }
+}
+
 sub _persist_props {
     my ( $u, $form, $is_edit ) = @_;
 
