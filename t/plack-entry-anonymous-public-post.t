@@ -647,6 +647,107 @@ test_psgi $app, sub {
             'private', 'authenticated session request preserves private security' );
     }
 
+    {
+        my $first = temp_user();
+        $first->update_self( { status => 'A' } );
+        $first->set_password( 'sequence-correct-' . LJ::rand_chars(24) );
+        my $first_before = fresh_state( $first->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $wrong = form_post(
+            $send, '/update', $first, 'sequence-wrong-' . LJ::rand_chars(24),
+            subject  => 'sequence first subject',
+            body     => 'sequence first body',
+            security => 'private'
+        );
+        my $wrong_res = $send->($wrong);
+        like(
+            $wrong_res->content,
+            qr/Error logging on:\s+Invalid password/,
+            'first sequential request renders its own wrong-password retry'
+        );
+        is_deeply( fresh_state( $first->id ),
+            $first_before,
+            'first sequential wrong-password request leaves its fresh state unchanged' );
+
+        my $second = temp_user();
+        $second->update_self( { status => 'A' } );
+        my $second_password = 'sequence-correct-' . LJ::rand_chars(24);
+        $second->set_password($second_password);
+        my $second_before = fresh_state( $second->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $valid = form_post(
+            $send, '/update.bml', $second, $second_password,
+            subject  => 'sequence second subject',
+            body     => 'sequence second body',
+            security => 'private'
+        );
+        my $valid_res = $send->($valid);
+        is( $authenticated_calls, 1,
+            'second sequential request reaches authenticated handler once' );
+        is( $anonymous_calls, 1, 'second sequential request reaches anonymous handler once' );
+        like(
+            $valid_res->content,
+            qr/class=['"]successlinks['"]/,
+            'second sequential request is not contaminated by prior retry state'
+        );
+        unlike(
+            $valid_res->content,
+            qr/Invalid password/,
+            'second sequential request contains no prior password error'
+        );
+        is(
+            fresh_state( $second->id )->{count},
+            $second_before->{count} + 1,
+            'second sequential request creates exactly one entry for its own user'
+        );
+        is_deeply( fresh_state( $first->id ),
+            $first_before, 'second sequential request does not mutate the prior user' );
+    }
+
+    {
+        my $replay_owner = temp_user();
+        $replay_owner->update_self( { status => 'A' } );
+        my $replay_password = 'replay-correct-' . LJ::rand_chars(24);
+        $replay_owner->set_password($replay_password);
+        my $before = fresh_state( $replay_owner->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $success = form_post(
+            $send, '/update', $replay_owner, $replay_password,
+            subject  => 'replay success subject',
+            body     => 'replay success body',
+            security => 'private'
+        );
+        my $success_res = $send->($success);
+        like(
+            $success_res->content,
+            qr/class=['"]successlinks['"]/,
+            'success-before-decline request is claimed once'
+        );
+        my $after_success = fresh_state( $replay_owner->id );
+        is(
+            $after_success->{count},
+            $before->{count} + 1,
+            'success-before-decline creates exactly one entry'
+        );
+
+        my $decline = form_post(
+            $send, '/update.bml', $replay_owner, 'replay-wrong-' . LJ::rand_chars(24),
+            subject     => 'replay declined subject',
+            body        => 'replay declined body',
+            security    => 'private',
+            extra_pairs => [ [ transform => 1 ] ]
+        );
+        my ( $decline_res, $attempts ) = post_with_native_attempt_counts( $send, $decline );
+        is( $attempts->{flat} || 0, 0,
+            'decline after success does not replay native flat attempt' );
+        is( $attempts->{save} || 0, 0,
+            'decline after success does not replay native save attempt' );
+        like( $decline_res->content, qr/id=['"]updateForm['"]/,
+            'decline after success remains a retained BML response' );
+        is_deeply( fresh_state( $replay_owner->id ),
+            $after_success, 'decline after success creates no replayed entry or user mutation' );
+    }
+
     for my $case (
         [ 'transform',    [ transform   => 1 ] ],
         [ 'show form',    [ showform    => 1 ] ],
