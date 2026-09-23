@@ -241,4 +241,151 @@ subtest 'preparation keeps multivalue inputs unchanged while sharing one decoded
     );
 };
 
+subtest 'decode hook mutations have distinct raw and decoded-request propagation' => sub {
+    for my $case (
+        [
+            plain => sub {
+                return post(
+                    prop_current_location => 'decoded before hook',
+                    prop_taglist          => 'decoded tags',
+                    date_diff             => 1,
+                );
+            },
+        ],
+        [
+            multivalue => sub {
+                return Hash::MultiValue->new(
+                    security              => 'public',
+                    subject               => 'Legacy subject',
+                    event                 => 'Legacy body',
+                    date_ymd_mm           => '02',
+                    date_ymd_dd           => '03',
+                    date_ymd_yyyy         => '2020',
+                    hour                  => '04',
+                    min                   => '05',
+                    date_diff             => 1,
+                    prop_current_location => 'decoded before hook',
+                    prop_taglist          => 'decoded tags',
+                );
+            },
+        ],
+        )
+    {
+        my ( $label, $make_input ) = @$case;
+        my $input = $make_input->();
+        my $seed  = {
+            tz          => 'UTC',
+            top_changed => 'seed value',
+            top_deleted => 'remove me',
+            props       => { seeded => 'yes' },
+        };
+        my @seen;
+        local $LJ::HOOKS{decode_entry_form} = [
+            sub {
+                my ( $raw, $request ) = @_;
+                @seen = ( $raw, $request );
+
+                # The decoder has already copied this property before the hook.
+                # Raw changes are visible to later raw consumers only unless the
+                # hook also changes the decoded request itself.
+                $raw->{prop_current_location} = 'raw mutation after decode';
+                $raw->{prop_raw_added}        = 'raw-only property';
+                delete $raw->{prop_taglist};
+
+                $request->{prop_current_location} = 'decoded request mutation';
+                $request->{prop_hook_added}       = 'hook-added property';
+                delete $request->{prop_taglist};
+                $request->{top_changed} = 'hook top-level replacement';
+                $request->{top_added}   = 'hook top-level addition';
+                delete $request->{top_deleted};
+            }
+        ];
+
+        my $prepared = DW::Entry::Legacy::prepare_entry_form( $seed, $input );
+        my ( $raw, $request ) = @seen;
+
+        is( refaddr($request), refaddr($seed), "$label hook receives the original flat request" );
+        is( refaddr( $prepared->{request} ),
+            refaddr($seed), "$label prepared success request remains the original flat reference" );
+        is(
+            $raw->{prop_current_location},
+            'raw mutation after decode',
+            "$label raw first argument retains its late mutation"
+        );
+        is(
+            $raw->{prop_raw_added},
+            'raw-only property',
+            "$label raw first argument retains arbitrary added properties"
+        );
+        ok( !exists $raw->{prop_taglist}, "$label raw first argument retains its deletion" );
+
+        is(
+            $request->{prop_current_location},
+            'decoded request mutation',
+            "$label decoded request has its independent property mutation"
+        );
+        is(
+            $request->{prop_hook_added},
+            'hook-added property',
+            "$label decoded request retains arbitrary added property"
+        );
+        ok( !exists $request->{prop_taglist},
+            "$label decoded request retains its property deletion" );
+        is(
+            $request->{top_changed},
+            'hook top-level replacement',
+            "$label decoded request retains top-level replacement"
+        );
+        is(
+            $request->{top_added},
+            'hook top-level addition',
+            "$label decoded request retains top-level addition"
+        );
+        ok( !exists $request->{top_deleted}, "$label decoded request retains top-level deletion" );
+        ok( !exists $request->{tz}, "$label hook sees observed changed-date timezone deletion" );
+
+        my $canonical = $prepared->{canonical};
+        isnt( refaddr($canonical), refaddr($request), "$label canonical data is independent" );
+        is(
+            $canonical->{props}{current_location},
+            'decoded request mutation',
+            "$label canonicalization uses the decoded request, not raw mutation"
+        );
+        is(
+            $canonical->{props}{hook_added},
+            'hook-added property',
+            "$label arbitrary decoded prop addition becomes canonical"
+        );
+        ok( !exists $canonical->{props}{taglist},
+            "$label decoded prop deletion remains deleted canonically" );
+        ok( !exists $canonical->{props}{raw_added},
+            "$label raw-only property is not synchronized" );
+        is(
+            $canonical->{top_changed},
+            'hook top-level replacement',
+            "$label top-level replacement survives canonicalization"
+        );
+        is(
+            $canonical->{top_added},
+            'hook top-level addition',
+            "$label top-level addition survives canonicalization"
+        );
+        ok( !exists $canonical->{top_deleted},
+            "$label top-level deletion survives canonicalization" );
+        ok( !exists $canonical->{tz},
+            "$label canonical data preserves observed date timezone deletion" );
+
+        if ( $label eq 'multivalue' ) {
+            isnt( refaddr($raw), refaddr($input),
+                'multivalue hook raw argument is legacy plain conversion' );
+            is_deeply( [ $input->get_all('prop_current_location') ],
+                ['decoded before hook'],
+                'multivalue input remains unchanged by raw hook mutation' );
+        }
+        else {
+            is( refaddr($raw), refaddr($input), 'plain input remains the raw hook argument' );
+        }
+    }
+};
+
 done_testing;
