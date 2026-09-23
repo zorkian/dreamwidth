@@ -1037,6 +1037,78 @@ sub legacy_owned_edit_rerender {
     );
 }
 
+# Dispatch the ordinary owned-entry subset of a retained editjournal POST. It
+# deliberately receives the already-authorized entry from a future route
+# wrapper: maintainer, community, and spam-delete requests fall through before
+# decoding or mutating anything.
+sub legacy_owned_edit_post {
+    my (%opts) = @_;
+
+    my $entry   = $opts{entry};
+    my $remote  = $opts{remote};
+    my $journal = $opts{journal};
+    my $post    = $opts{post};
+    my $get     = $opts{get} || {};
+    return unless $entry && $remote && $journal && $post;
+    return unless $journal->equals($remote) && $entry->poster->equals($remote);
+
+    my $action = DW::Entry::Legacy::legacy_edit_action($post);
+    return unless $action && ( $action eq 'save' || $action eq 'delete' );
+
+    my $prepared    = DW::Entry::Legacy::prepare_entry_form( $opts{legacy_seed} || {}, $post );
+    my $canonical   = $prepared->{canonical};
+    my $legacy_post = $prepared->{post};
+    my $deleted     = $action eq 'delete';
+
+    if ($deleted) {
+        $legacy_post->{event} = '';
+        $canonical->{event}   = '';
+        $journal->log_event(
+            'delete_entry',
+            {
+                remote       => $remote,
+                actiontarget => $entry->ditemid,
+                method       => 'web',
+            }
+        );
+    }
+
+    LJ::Hooks::run_hooks( 'spam_check', $remote, $legacy_post, 'entry' );
+
+    my $errors   = $opts{errors}   || DW::FormErrors->new;
+    my $warnings = $opts{warnings} || DW::FormErrors->new;
+    my %result   = _do_edit(
+        $entry->ditemid,
+        $canonical,
+        { poster => $remote, journal => $journal },
+        warnings    => $warnings,
+        legacy_edit => {
+            remote              => $opts{session_remote},
+            crosspost_master    => _legacy_crosspost_master( $legacy_post, $get ),
+            crosspost_callback  => _legacy_crosspost_callback( $legacy_post, $get ),
+            editurl             => '/editjournal?itemid=' . $entry->ditemid,
+            entry_was_suspended => $entry->is_suspended ? 1 : 0,
+        },
+    );
+    return %result if $result{status} eq 'ok';
+
+    if ( $result{errors} ) {
+        $errors->add_string( undef, $result{errors} );
+        $warnings->add_string( undef, $result{errors} );
+    }
+    return (
+        status => 'rerender',
+        render => legacy_owned_edit_rerender(
+            entry    => $entry,
+            remote   => $remote,
+            journal  => $journal,
+            prepared => $prepared,
+            errors   => $errors,
+            warnings => $warnings,
+        ),
+    );
+}
+
 # returns:
 # poster: user object that contains the poster of the entry. may be the current remote user,
 #           or may be someone logging in via the login form on the entry
