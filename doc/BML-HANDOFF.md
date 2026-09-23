@@ -26,7 +26,14 @@ below this line predate the resume.
   /tmp/bml-inbox-fixes-integrated-{prove,tidy,compile}.log in 8d7783a043d8.
   Reviewer non-blocking items (undef view warning, no-JS icon preview,
   messaging-disabled test, GET bookmark toggle CSRF) are folded into W2.
-- T1 native manager moderation 6648e8681 + correction e2b961a02 under review;
+- T1 native manager moderation range 6648e8681 + e2b961a02 + d99d4bbf8
+  bml-opus-review FINAL CLEAR (inert recorder, call-count assertions,
+  mutation-proved); integrated on root as abc4e531d, 2ad063c37, 0aa11d135.
+  Root six suites 389 tests PASS after test-only fix 02bce1487: t/post.t (in
+  CI) still expected the relative .error.noentry key although DW/Entry.pm has
+  emitted the absolute /entry/form.tt key since shared commit 0aad3e37f.
+  Full tidy/compile PASS: /tmp/bml-manager-moderation-integrated-*.log.
+- (historical) T1 6648e8681 + correction e2b961a02 were under review;
   a further test-only commit is required so the deletespam test stubs
   LJ::mark_entry_as_spam (a local spamreports write is a moderation side
   effect; tests stay inert per user boundary). Reviewer mutation test showed

@@ -2460,3 +2460,5 @@ User authorized graduating native entry and inbox (BML-DIRECTION.md). W1 inbox
 fixes integrated as627ba13fd after Opus CLEAR (view eval removed, RPC form auth,
 compose validation). T1 manager moderation under review with inert-test boundary;
 T2/W2 cutovers in progress. Root inbox5files198 PASS.
+- T1 manager moderation integrated asabc4e531d..0aa11d135 (Opus FINAL CLEAR,
+  inert tests). Pre-existing t/post.t key expectation fixed in02bce1487.
