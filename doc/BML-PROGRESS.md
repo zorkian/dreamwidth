@@ -1425,3 +1425,21 @@ checks, after widgets Terra completes customization1/4.
 - Preview formatting WIP briefly used literal backslash-n inputs; foreman caught
   the false proof and required real newline/markup assertions before acceptance.
   The native-only hook-invocation correction is also pending independent review.
+
+### Delayed-image diagnosis completed; final regression ordering pending
+
+- Scheduled run inspection found no surviving draft browser/helper in either
+  Terra container or Sol container. Live ownership is Widgets for draft,
+  Themenav for preview; no duplicate run was launched in a worker container.
+- Source correction `5b260732a` independently passes Sol's preserved subject
+  typed-before-clear/blur-after-clear probe and the existing delayed-image,
+  untouched-decline parity suite. Worker normal parity/preview also pass;
+  intentional cleanup exits1 with helper absent and focused checks pass.
+- Permanent test `49b75211e` requires one narrow ordering correction: continuing
+  an intercepted request does not prove response/callback completion before
+  Tab. Widgets is making that ordering explicit before final integration.
+  No additional draft coverage is requested.
+- Preview followup `d61cf7537` now passes worker20 top-level assertions with real
+  raw/casual newlines, two poll controls in both pipelines, and preserved
+  native-only hook invocation. Independent finite review and full validation
+  status are pending. Preview WIP/history and crossposting stash are preserved.

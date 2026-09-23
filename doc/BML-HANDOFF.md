@@ -2,6 +2,14 @@
 
 ## Active continuation: 2026-09-22
 
+Latest 2026-09-23 timing status: `5b260732a` production correction is Sol-clear
+for subject/clear/blur and delayed-image/untouched-decline cases. Permanent test
+`49b75211e` is being tightened to await actual clear completion before blur;
+whole draft range remains unintegrated until that narrow recheck. Preview
+followup `d61cf7537` is committed and awaiting finite review/full gate status.
+Widgets owns draft; Themenav owns preview; crossposting WIP is in named stash.
+No duplicate draft processes were found. External-hook question remains open.
+
 Latest queue, 2026-09-23 (supersedes historical queues below): accepted root
 `a426524be` includes moderated-post characterization `3862f9eba` and native
 language names `b29e99f50`, both independently clear. Foreman combined143,
