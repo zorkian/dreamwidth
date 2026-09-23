@@ -1,3 +1,17 @@
+## Latest readonly correction and review queue
+
+Readonly source84384adaa06de1cb81ca329a11ae3f01f578aed2 now actually passes the
+computed post-hook usejournal into the renderer; its test selects a distinct
+authorized community, removing b7's default-owner false positive. Worker24/81
+HTTP, browser, tidy1139/compile1607 PASS. Sol review queued for e30+b7+843;
+not integrated. Themes prepares separate public activation while callable gate
+remains pending; no foreman route activation before both independent reviews.
+
+Sol queue: finish two-heading Web language source audit; review test-only manager
+delete6ade9d30b; review readonly843 range. Widgets implements two-heading native
+Web language conversion separately from rootcd4e87b2e. Root clean through this
+record, no active test sessions; public terminal/community are fully integrated.
+
 ## Active work after public GET integration
 
 Root cd4e87b2e is clean; public community and terminal integrations/checks/captures
