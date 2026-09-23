@@ -15,7 +15,7 @@ use Plack::Test;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
-use DW::BML;
+use DW::BML::RequestAdapter;
 use DW::Request;
 use DW::Request::Plack;
 use LJ::Protocol;

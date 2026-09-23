@@ -1,17 +1,16 @@
 #!/usr/bin/perl
-# Characterize legacy language state before native request-language migration.
-# Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+# Native LJ::Lang request-context coverage: scope save/restore across nested
+# TT renders, the configured getter/substitutions path, the debug-language
+# short circuit, nonweb callers, and DB/cache/fallback/source-autoload
+# resolution. Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as
+# Perl itself.
 use strict;
 use warnings;
 use lib "$ENV{LJHOME}/cgi-bin";
 use Test::More;
-use HTTP::Request::Common;
-use Plack::Middleware::DW::RequestWrapper;
-use Plack::Test;
 use File::Temp qw(tempdir);
 
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
-use DW::BML;
 use DW::Request;
 use DW::Request::Plack;
 use LJ::Lang;
@@ -40,7 +39,7 @@ sub request {
     return $r;
 }
 
-subtest 'nested TT scopes restore BML and undef scopes after exceptions' => sub {
+subtest 'nested TT scope save/restore across normal and exception paths' => sub {
     my $dir = tempdir( 'lang-scope-XXXXXX', DIR => "$ENV{LJHOME}/views", CLEANUP => 1 );
     my ($name) = $dir =~ m{/([^/]+)$};
     my %files = (
@@ -60,10 +59,10 @@ qq{outer:[% '.outer' | ml %]|[% dw.scoped_include( '$name/child.tt' ) %]|[% '.ou
 
     local $LJ::IS_DEV_SERVER = 1;
 
-    # This is a real modern template render nested inside an active BML scope.
+    # A native TT render nested inside an active outer request scope.
     request();
-    BML::set_language_scope('/legacy.bml');
-    BML::set_language( 'en', \&LJ::Lang::get_text );
+    LJ::Lang::set_request_scope('/legacy.bml');
+    LJ::Lang::set_request_context( lang => 'en', getter => \&LJ::Lang::get_text );
     is(
         DW::Template->template_string( "$name/outer.tt", {}, {} ),
         'outer:Outer|child:Child|Outer',
@@ -72,23 +71,23 @@ qq{outer:[% '.outer' | ml %]|[% dw.scoped_include( '$name/child.tt' ) %]|[% '.ou
     is(
         LJ::Lang::ml('.key'),
         '[missing string /legacy.bml.key]',
-        'outer BML scope is restored after nested modern template render'
+        'outer scope is restored after nested modern template render'
     );
     my $ok = eval { DW::Template->template_string( "$name/bad.tt", {}, {} ); 1 };
     ok( !$ok, 'nested TT exception propagates' );
     is(
         LJ::Lang::ml('.key'),
         '[missing string /legacy.bml.key]',
-        'BML scope is restored before nested exception propagates'
+        'outer scope is restored before nested exception propagates'
     );
     DW::Request->reset;
 
     request();
-    BML::set_language( 'en', \&LJ::Lang::get_text );
+    LJ::Lang::set_request_context( lang => 'en', getter => \&LJ::Lang::get_text );
     is(
         DW::Template->template_string( "$name/outer.tt", {}, {} ),
         'outer:Outer|child:Child|Outer',
-        'actual modern render also works without a prior scope'
+        'modern render also works without a prior scope'
     );
     ok(
         !defined DW::Request->get->note('ml_scope'),
@@ -103,32 +102,13 @@ qq{outer:[% '.outer' | ml %]|[% dw.scoped_include( '$name/child.tt' ) %]|[% '.ou
     DW::Request->reset;
 };
 
-subtest 'BML scope survives language changes without a matching request note' => sub {
-    request();
-    BML::set_language_scope('/customize/index.bml');
-    BML::set_language( 'en', sub { return $_[1]; } );
-    is(
-        LJ::Lang::ml('.setstyle.user'),
-        '/customize/index.bml.setstyle.user',
-        'BML scope survives language setup'
-    );
-
-    request('/different.tt');
-    BML::set_language_scope('/customize/index.bml');
-    BML::set_language( 'en', sub { return $_[1]; } );
-    is(
-        LJ::Lang::ml('.setstyle.user'),
-        '/customize/index.bml.setstyle.user',
-        'BML scope wins over a different request note'
-    );
-    DW::Request->reset;
-};
-
 subtest 'web keys, scope, and substitutions use the configured getter' => sub {
     my @calls;
     request('/entry/form.tt');
-    local $BML::ML_SCOPE = '';
-    BML::set_language( 'en', sub { push @calls, [@_]; return join '|', @_[ 0, 1 ]; } );
+    LJ::Lang::set_request_context(
+        lang   => 'en',
+        getter => sub { push @calls, [@_]; return join '|', @_[ 0, 1 ]; }
+    );
     is(
         LJ::Lang::ml( '.draft.autosave', { time => 3 } ),
         'en|/entry/form.tt.draft.autosave',
@@ -137,18 +117,20 @@ subtest 'web keys, scope, and substitutions use the configured getter' => sub {
     is(
         LJ::Lang::ml( '/customize/index.bml.title', { name => 'x' } ),
         'en|/customize/index.bml.title',
-        'full BML key stays full'
+        'full key stays full'
     );
     is_deeply( $calls[0][3], { time => 3 }, 'substitutions reach language getter unchanged' );
 };
 
 subtest 'debug language returns keys without invoking a getter' => sub {
     request('/entry/form.tt');
-    local $BML::ML_SCOPE = '';
-    BML::set_language( 'debug', sub { die 'debug must not translate' } );
+    LJ::Lang::set_request_context(
+        lang   => 'debug',
+        getter => sub { die 'debug must not translate' }
+    );
     is( LJ::Lang::ml('.draft.autosave'), '.draft.autosave', 'debug preserves relative key' );
     is(
-        BML::ml('/entry/form.tt.draft.autosave'),
+        LJ::Lang::ml('/entry/form.tt.draft.autosave'),
         '/entry/form.tt.draft.autosave',
         'debug preserves full key'
     );
@@ -171,7 +153,7 @@ subtest 'nonweb callers use default language and direct translation' => sub {
     no warnings 'redefine';
     local *LJ::Lang::get_text = sub { return join ':', @_[ 0, 1 ]; };
     is( LJ::Lang::ml( 'worker.key', { ignored => 1 } ),
-        'zz:worker.key', 'background caller defaults without BML request state' );
+        'zz:worker.key', 'background caller defaults without any active request' );
 };
 
 subtest 'native request context handles DB, fallback, misses, and source autoload' => sub {
@@ -285,41 +267,6 @@ subtest 'native request context handles DB, fallback, misses, and source autoloa
     DW::Request->reset;
     eval { LJ::Lang::remove_text( $dmid, $_ ); $flush->($_); } for @cleanup;
     die $error if $error;
-};
-
-subtest 'RequestWrapper sequential PSGI requests retain legacy BML scope' => sub {
-    my $app = Plack::Middleware::DW::RequestWrapper->wrap(
-        sub {
-            my $env = shift;
-            BML::set_language( 'en', sub { return $_[1]; } );
-            if ( $env->{PATH_INFO} eq '/first' ) {
-                BML::set_language_scope('/first.bml');
-            }
-            else {
-                DW::Request->get->note( ml_scope => '/second.tt' );
-            }
-            my $body = LJ::Lang::ml('.key');
-            return [ 200, [ 'Content-Type' => 'text/plain' ], [$body] ];
-        }
-    );
-    test_psgi $app, sub {
-        my $cb = shift;
-        is( $cb->( GET '/first' )->content, '/first.bml.key', 'first PSGI request has BML scope' );
-        is( $cb->( GET '/second' )->content,
-            '/second.tt.key', 'second PSGI request is isolated from BML scope' );
-    };
-};
-
-subtest 'sequential requests expose the global BML scope migration gap' => sub {
-    request('/first.bml');
-    BML::set_language_scope('/first.bml');
-    BML::set_language( 'en', sub { return $_[1]; } );
-    is( LJ::Lang::ml('.key'), '/first.bml.key', 'BML page scope resolves relative key' );
-
-    request('/second.tt');
-    BML::set_language( 'en', sub { return $_[1]; } );
-    is( LJ::Lang::ml('.key'), '/second.tt.key', 'next request does not inherit prior BML scope' );
-    DW::Request->reset;
 };
 
 done_testing;

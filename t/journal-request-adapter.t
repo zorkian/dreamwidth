@@ -17,7 +17,7 @@ BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Test qw(temp_user);
 use DW::Controller::Journal;
 use DW::Request::Plack;
-use DW::BML;
+use DW::BML::RequestAdapter;
 
 # --- Recording proxy: wraps any DW::BML::RequestAdapter (or object it
 # returns, e.g. ::Connection/::HeadersIn) and logs every method called on
