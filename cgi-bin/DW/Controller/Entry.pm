@@ -837,6 +837,15 @@ sub _edit {
         @_
     );
 
+    return _render_edit_form( $r, $vars, $errors, $warnings, $post, $entry_obj, $remote, $journal,
+        $spellcheck_requested );
+}
+
+sub _render_edit_form {
+    my ( $r, $vars, $errors, $warnings, $post, $entry_obj, $remote, $journal,
+        $spellcheck_requested )
+        = @_;
+
     # now look for errors that we still want to recover from
     my $get = $r->get_args;
     $errors->add( undef, ".error.invalidusejournal" )
