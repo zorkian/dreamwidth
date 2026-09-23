@@ -1360,3 +1360,24 @@ checks, after widgets Terra completes customization1/4.
   Native names retain configured/explicit order and skip unknown languages.
   Plain nonweb get_lang_names currently fails solely on that unused BML call.
   Terra is implementing the finite request/nonweb/PrivList tests separately.
+
+### Moderation baseline and native language names integrated
+
+- Sol cleared moderated baseline `87dd370c9`, integrated as `3862f9eba`.
+  Documentation-only merge conflict was resolved by retaining both the configured
+  spellcheck boundary and moderation evidence. No production posting change.
+- Sol cleared minimal language cleanup `368deaed8`, integrated as `b29e99f50`.
+  Unused BML lookup and uncalled set_lang are removed; actual configured native
+  names and PrivList output are unchanged, and plain nonweb lookup now works.
+- Foreman combined5 files /143 tests pass in
+  `/tmp/bml-moderated-lang-integrated.log`; full tidy1089 and compile1605 pass
+  in `/tmp/bml-lang-names-integrated-{tidy,compile}.log`.
+- Draft `2abd3d682` remains held: independent delayed decline-clear response
+  reproduces lost newly typed subject/body. Widgets now owns that isolated
+  correction; its preview-browser WIP is preserved. Themenav owns preview HTTP
+  and shared-renderer work at incomplete checkpoint `39cf0ff9d`.
+- Preview checkpoint retains BML file and is not integrated. Foreman found
+  legacy stylesys!=2 incorrectly falling into the native S2 choice and an
+  incorrect placeholder scope: the decoder uses global entryform.subject.hint2,
+  with one remaining BML::ml call. Corrections and meaningful locale/style tests
+  are assigned. Browser baseline/final remains a separate finite package.
