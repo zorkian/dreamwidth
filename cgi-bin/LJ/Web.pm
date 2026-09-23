@@ -23,10 +23,6 @@ use Digest::SHA1;
 
 use DW::AccountSwitcher;
 use DW::Auth::Challenge;
-
-# Loads the BML::* shims that did_post()/check_referer() below still call;
-# ljlib-only (non-web) processes have nothing else that pulls this in.
-use DW::BML;
 use DW::External::Site;
 use DW::Entry::Legacy;
 use DW::Request;
@@ -530,9 +526,10 @@ sub make_cookie {
 # args: uri?, referer?
 # des-uri: string; the URI we want the user to come from.
 # des-referer: string; the location the user is posting from.
-#              If not supplied, will be retrieved with BML::get_client_header.
-#              In general, you don't want to pass this yourself unless
-#              you already have it or know we can't get it from BML.
+#              If not supplied, will be retrieved from the active request's
+#              Referer header. In general, you don't want to pass this
+#              yourself unless you already have it or know there's no
+#              active request to get it from.
 # returns: 1 if they're coming from that URI, else undef
 # </LJFUNC>
 sub check_referer {

@@ -1,10 +1,16 @@
 #!/usr/bin/perl
 # Confirms that requiring ljlib.pl alone -- the ljlib-only / non-web process
 # path (background jobs, workers): no app.psgi, no test-harness DW::BML
-# import -- still installs the BML::* shims that LJ::Protocol, LJ::PageStats,
-# and LJ::Web call directly. Runs the require in an isolated perl subprocess
-# so no transitive load from this test file's own imports can mask a
-# regression in what ljlib.pl itself pulls in.
+# import -- still installs the BML::* shims that LJ::Protocol::sendmessage's
+# BML::set_language('en') call needs (the only remaining direct BML::* caller
+# among LJ::Protocol/LJ::PageStats/LJ::Web; the latter two no longer call any
+# BML::* symbol as of E2). LJ::Protocol's own 'use DW::BML;' is reached
+# through an entirely separate chain (LJ::User -> ... -> LJ::Talk ->
+# DW::EmailPost::Comment -> LJ::Protocol) than LJ::S2's former one, so this
+# stays a meaningful regression guard rather than a symbol E2 made moot. Runs
+# the require in an isolated perl subprocess so no transitive load from this
+# test file's own imports can mask a regression in what ljlib.pl itself pulls
+# in.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;

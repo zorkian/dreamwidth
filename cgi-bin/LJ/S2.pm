@@ -17,10 +17,6 @@ package LJ::S2;
 
 use strict;
 use DW;
-
-# Loads the BML::* shims that still-BML-dependent code elsewhere may call;
-# ljlib-only (non-web) processes have nothing else that pulls this in.
-use DW::BML;
 use DW::BML::RequestAdapter;
 use DW::Request;
 use DW::Cache;
