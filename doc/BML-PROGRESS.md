@@ -2210,3 +2210,10 @@ and real browser PASS with no owned helpers. Desktop/390 captures saved and
 narrow output visually checked. Exact legacy title/message and first-guard
 ordering are preserved. Remaining-consumer inventory is documented; callable
 anonymous rendering and community POST browser work continue separately.
+
+### Callable community POST resolver accepted
+
+Sol124473f0 CLEAR; integratedce765e52b. Foreman four suites265 PASS and shared
+full tidy1148/compile1607 PASS. Explicit same-poster community resolver retains
+pre-decoder exclusions and shared native retry after attempted mutation. Public
+dispatch remains unchanged; browser and finite activation matrix are separate.

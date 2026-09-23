@@ -1,3 +1,17 @@
+## Callable community resolver integrated; shared checks green
+
+Sol 124473f0d58d461faee4645a9cd194a3dd0fbd4d CLEAR; integrated ce765e52b.
+Foreman resolver/helper/personal four-suite replay: 265 PASS
+(/tmp/bml-community-resolver-integrated.log). No production registration.
+After accepted save/delete attempts the resolver always returns native output;
+unsupported contexts fall through before decoder/mutation. Browser acceptance
+is active separately; Sol prepares finite public routing requirements.
+
+Integrated terminal/resolver full tidy 1148 and compile 1607 PASS
+(/tmp/bml-terminal-resolver-{tidy,compile}.log). Root sessions 31454/27939 are
+complete. Root has no running test/browser process. Themes callable anonymous
+renderer remains uncommitted WIP, no public/authentication change.
+
 ## Public invalid-target terminal accepted
 
 Sol exact combined tip 24fddcb8244b1b790278f6ad1e12b222d37a3d79 CLEAR;
