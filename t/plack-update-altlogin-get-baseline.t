@@ -169,19 +169,22 @@ my $auth_calls;
             is( $form->value('user'), 'hook <user> & "quote"',
                 "$path uses post-hook user prefill" );
             is( $form->value('password') // '', '', "$path keeps password blank" );
-            my ($update_form_html) =
-                $res->content =~ m{(<form[^>]+id=['"]updateForm['"][\s\S]*?</form>)}i;
-            unlike( $update_form_html || '',
+            my @update_controls = $form->inputs;
+            unlike(
+                join( "\0", map { defined $_->value ? $_->value : '' } @update_controls ),
                 qr/password-marker/i,
-                "$path keeps the password marker out of every updateForm control" );
-            is(
-                $form->action,
-                'http://localhost/update?altlogin=1',
-                "$path keeps the normalized retained updateForm action"
+                "$path keeps the password marker out of every parsed updateForm control"
             );
+            is( $form->action, 'http://localhost/update?altlogin=1',
+                "$path keeps the normalized retained updateForm action" );
+            is( $form->value('password') // '', '', "$path keeps its retained password control blank" );
             if ( $path =~ /case=snapshot/ ) {
-                like( $res->content, qr/password-marker/i,
-                    'the supplied marker is retained only by generic logout returnto navigation' );
+                my ($logout_form) = grep { $_->find_input('returnto') }
+                    HTML::Form->parse( $res->content, 'http://localhost' . $path );
+                ok( $logout_form, 'shared logout form is separately present' );
+                like( ( $logout_form ? $logout_form->value('returnto') : '' ) || '',
+                    qr/password=encoded%3Cpassword-marker%3E/i,
+                    'only shared logout returnto retains the percent-encoded marker' );
             }
 
             like(
