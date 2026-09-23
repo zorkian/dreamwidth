@@ -1458,3 +1458,20 @@ checks, after widgets Terra completes customization1/4.
   editor change caused a save. Widgets isolated subject-only timing in
   `fc570e26e`; fixed run passes, exact known-broken comparison remains underway.
   Production `5b260732a` is independently clear, but permanent-test gate remains.
+
+### Preview method compatibility and draft negative control
+
+- Sol retirement audit identified a material method regression in the accepted
+  preview candidate: POST-only native registration returns405 for GET/HEAD,
+  while old routes returned200 with localized bml.requirepost (HEAD empty).
+  Correction is assigned on the integrated base before executable removal.
+  Both aliases, request getter and HEAD representation parity will be tested;
+  retained .bml.text remains required by the explicit native translation scope.
+- Draft permanent subject-only regression `fc570e26e` passes fixed source and
+  fails known-broken `6616ce8c4` at the intended saved-subject assertion in the
+  worker container; cleanup/restoration completed. Sol exact recheck is underway.
+  Earlier broader timing tests were false positives due an editor change
+  incidentally causing a property save. No additional draft features are added.
+- Spellcheck baseline `3b367d0c` passes worker15 assertions and awaits independent
+  review. Crossposting native-post baseline `785a5004` passes10; actual legacy
+  aliases and native edit followup remain active. Delivery stays stubbed.
