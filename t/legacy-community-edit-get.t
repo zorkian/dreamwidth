@@ -49,8 +49,9 @@ $comm->set_prop( opt_tagpermissions => 'private,private' );
 
 my $own = $manager->t_post_fake_comm_entry(
     $comm,
-    subject => 'own subject',
-    body    => 'own body',
+    subject  => 'own subject',
+    body     => 'own body',
+    security => 'friends',
 );
 $own->set_prop( current_location => 'community native location' );
 $own->set_prop( current_music    => 'community native music' );
@@ -210,9 +211,11 @@ sub native_request {
         ok( $same_poster_form, 'same-poster gets ordinary edit form' );
         is( $same_poster_form->value('subject'), 'own subject', 'ordinary form retains subject' );
         is( $same_poster_form->value('event'),   'own body',    'ordinary form retains body' );
+        is( $same_poster_form->value('security'),
+            'access', 'ordinary form selects nondefault community access security' );
 
         for my $field (
-            qw(security taglist editor current_location current_music prop_picture_keyword entrytime_date entrytime_time)
+            qw(security editor current_location current_music prop_picture_keyword entrytime_date entrytime_time)
             )
         {
             is(
@@ -223,10 +226,15 @@ sub native_request {
         }
         is( $same_poster_form->value('prop_picture_keyword'),
             'community-native-pic', 'ordinary form retains userpic' );
-        is(
-            $same_poster_form->value('taglist'),
-            'community tag, second tag',
+        is_deeply(
+            [ sort grep { length } split /,\s*/, $same_poster_form->value('taglist') ],
+            [ 'community tag', 'second tag' ],
             'ordinary form retains seeded tags'
+        );
+        is_deeply(
+            [ sort grep { length } split /,\s*/, $same_poster_form->value('taglist') ],
+            [ sort grep { length } split /,\s*/, $direct_form->value('taglist') ],
+            'same-poster form matches direct native tag set'
         );
         my @direct_custom_bits = map { $_->value }
             grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $direct_form->inputs;
@@ -423,7 +431,8 @@ is( $fresh->prop('opt_nocomments_maintainer'),
 my $fresh_own = LJ::Entry->new( $comm, ditemid => $own->ditemid );
 is( $fresh_own->event_raw,   'own body',    'GET does not mutate same-poster body' );
 is( $fresh_own->subject_raw, 'own subject', 'GET does not mutate same-poster subject' );
-is( $fresh_own->security,    'public',      'GET does not mutate same-poster security' );
+is( $fresh_own->security,    'usemask',     'GET does not mutate same-poster security' );
+is( $fresh_own->allowmask,   1,             'GET does not mutate same-poster access mask' );
 
 my $fresh_manager = LJ::load_userid( $manager_id, 1 );
 is( $fresh_manager->prop('entry_editor'), 'always_rich',
