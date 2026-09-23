@@ -173,7 +173,6 @@ my @protocol_modes;
 my $set_logprop = \&LJ::set_logprop;
 my $run_hooks   = \&LJ::Hooks::run_hooks;
 my $do_request  = \&LJ::do_request;
-my $mark_spam   = \&LJ::mark_entry_as_spam;
 my @spam_marks;
 
 {
@@ -194,7 +193,7 @@ my @spam_marks;
     };
     local *LJ::mark_entry_as_spam = sub {
         push @spam_marks, [@_];
-        return $mark_spam->(@_);
+        return 0;
     };
 
     my $path =
@@ -413,6 +412,8 @@ my @spam_marks;
         0, 'unsupported actions never execute an edit protocol request' );
     is_deeply( \@spam_marks, [],
         'unsupported delete-spam payload never reaches the report side effect' );
+    is_deeply( \@hook_names, [],
+        'unsupported direct actions invoke no decode, spam, or success hooks' );
 
     my $missing = POST $clear_path,
         Content => [
