@@ -45,3 +45,23 @@ Use local SPELLER plus a stubbed check_html; do not invoke a process.
 - Characterize old update/edit behavior first, including the stored-RTE nuance,
   then verify the native actions. Keep old URL compatibility separate from this
   feature addition; no beta or public-route cutover is included here.
+
+## Native insertion and rendering details from independent plan audit
+
+Detect action:spellcheck and validate the existing form token before calling the
+checker. Short-circuit before normal body validation, login submission work,
+backend conversion, spam/persistence hooks, draft clearing and crosspost scheduling.
+Use a shared helper, then only ordinary form reconstruction. Invalid tokens must
+not invoke the checker.
+
+Pass an explicit configured-and-editable, non-readonly poster/journal boolean;
+module editable flags are not save permission. Add one secondary submit beside
+the bottom save control, not duplicated in quick actions. Use absolute global
+entryform.spellcheck, entryform.spellchecked and entryform.spellcheck.noerrors.
+Construct the helper with spellcommand from SPELLER. Only generated checker HTML
+is trusted in a stable result wrapper; no-errors text uses normal text escaping.
+
+A disposable actual RTE browser case must edit current FCK content, click the
+rendered spellcheck submit and prove the checker receives synchronized GetXHTML
+content and rerender retains rte0/body. HTTP fields alone cannot prove this.
+Do not spawn an external checker in acceptance fixtures.
