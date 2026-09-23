@@ -44,6 +44,16 @@ sub entry_count {
         $fresh->id );
 }
 
+sub fresh_latest_entry {
+    my ($userid) = @_;
+    my $fresh = LJ::load_userid( $userid, 1 );
+    my ($jitemid) = $fresh->selectrow_array(
+        'SELECT jitemid FROM log2 WHERE journalid=? ORDER BY jitemid DESC LIMIT 1',
+        undef, $fresh->id );
+    LJ::Entry::reset_singletons();
+    return LJ::Entry->new( $fresh, jitemid => $jitemid );
+}
+
 sub fresh_state {
     my ($userid) = @_;
     my $fresh  = LJ::load_userid( $userid, 1 );
@@ -330,11 +340,20 @@ test_psgi $app, sub {
                 [qw(decode_entry_form spam_check)],
                 'wrong password still executes retained decoder and spam hook'
             );
-            cmp_ok(
-                position( $trace->{sequence}, 'update_fields' ),
-                '<',
-                position( $trace->{sequence}, 'auth' ),
-                'wrong password runs update_fields before the first failed password check'
+            is_deeply(
+                $trace->{sequence},
+                [qw(update_fields auth login auth decode postevent auth spam)],
+                'wrong password retains the exact cross-stage sequence'
+            );
+            is(
+                $trace->{protocol}[1]{ref},
+                $trace->{hooks}[0]{ref},
+                'wrong password passes the decoded request to postevent'
+            );
+            is(
+                $trace->{protocol}[1]{ref},
+                $trace->{hooks}[1]{ref},
+                'wrong password passes the same postevent request to spam checking'
             );
         }
         else {
@@ -377,8 +396,21 @@ test_psgi $app, sub {
             [qw(decode_entry_form spam_check)],
             'forced protocol login failure still decodes and spam checks once'
         );
-        is( scalar grep( { $_ eq 'auth' } @{ $trace->{sequence} } ),
-            1, 'forced protocol login failure does not add a failed-password check' );
+        is_deeply(
+            $trace->{sequence},
+            [qw(update_fields auth login decode postevent spam)],
+            'forced protocol login failure retains the exact cross-stage sequence'
+        );
+        is(
+            $trace->{protocol}[1]{ref},
+            $trace->{hooks}[0]{ref},
+            'forced protocol login failure passes decoded request to postevent'
+        );
+        is(
+            $trace->{protocol}[1]{ref},
+            $trace->{hooks}[1]{ref},
+            'forced protocol login failure passes one request to spam checking'
+        );
         is( $trace->{scheduled}, 0, 'forced protocol login failure schedules no crossposts' );
 
         my $after = fresh_state( $owner->id );
@@ -387,6 +419,20 @@ test_psgi $app, sub {
             $before->{entries} + 1,
             'forced protocol login failure retains the observed postevent persistence'
         );
+        my $entry = fresh_latest_entry( $owner->id );
+        ok( $entry, 'forced protocol login failure force-loads its new entry' );
+        is(
+            $entry ? $entry->subject_raw : undef,
+            'forced login retained subject',
+            'forced protocol login failure persists the submitted subject'
+        );
+        is(
+            $entry ? $entry->event_raw : undef,
+            'forced login retained body',
+            'forced protocol login failure persists the submitted body'
+        );
+        is( $entry ? $entry->security : undef,
+            'private', 'forced protocol login failure persists private security' );
         is_deeply(
             { map { $_ => $after->{$_} } qw(draft draft_prop editor editor2 formatting) },
             { map { $_ => $before->{$_} } qw(draft draft_prop editor editor2 formatting) },
