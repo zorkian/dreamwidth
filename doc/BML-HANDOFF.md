@@ -1,402 +1,93 @@
-# BML removal: resume handoff
+# BML removal: current resume handoff
 
-## Active continuation: 2026-09-22
+Updated 2026-09-23 after recovery of the same foreman session. This file records
+current state; historical package chronology and evidence are in BML-PROGRESS.md
+and Git history. Read AGENTS.md, BML-PROGRESS.md, BML-REMOVAL-PLAN.md and
+BML-MIGRATION.md before continuing. Do not restart already integrated packages.
 
-Latest accepted state: draft finite range through source `fc570e26e` is Sol-clear
-and integrated as `11fd6c97d`; final root browser suites both exit0; build/scoped
-helper tidy pass and helper cleanup is empty. Sol independently proved exact fixed PASS and broken6616 FAIL
-on isolated subject timing; delayed-image/untouched-decline also pass. No pending
-worker draft process or abandoned helper was retained.
+## Authorization and boundaries
 
-Preview candidate integrated `abc509db6`, root173/build/tidy1091/compile1605 and
-real popup browser pass; captures committed `be2839b6b`. GET/HEAD correction
-`a6277d378` plus file removal `4091af883` await Sol review, not integrated yet.
-Crossposting characterization final `9e6614a3` (50 assertions) and configured
-spellcheck baseline `3b367d0c` (15) await independent review. Preview and stash
-history are preserved. Journal external-hook question and held work unchanged.
+Continue the full BML removal project through unblocked bounded packages, with
+Astra coordination, up to two Terra implementers and one independent Sol reviewer.
+Use the existing Herdr sessions, worktrees and devcontainers. Host edits/Git;
+tests, formatting and builds inside the owning container. Routine local work is
+authorized with workspace sandboxing and automatic approval review; respect
+rejections. Preserve user focus and other checkouts. No pushes, deployment or
+production changes are authorized for these new commits.
 
-Latest 2026-09-23 timing status: `5b260732a` production correction is Sol-clear
-for subject/clear/blur and delayed-image/untouched-decline cases. Permanent test
-`49b75211e` is being tightened to await actual clear completion before blur;
-whole draft range remains unintegrated until that narrow recheck. Preview
-followup `d61cf7537` is committed and awaiting finite review/full gate status.
-Widgets owns draft; Themenav owns preview; crossposting WIP is in named stash.
-No duplicate draft processes were found. External-hook question remains open.
+The separate platform-restricted inbox work remains held: do not retry or
+reassign it around the restriction. The external deployment-hook question is
+unanswered: do deployed extensions consume s2_head_content_extra or data_handler:*
+with an Apache-style request? Leave both Journal adapter interfaces unchanged.
+UniqCookie approval was resolved and its package integrated; do not ask again.
 
-Latest queue, 2026-09-23 (supersedes historical queues below): accepted root
-`a426524be` includes moderated-post characterization `3862f9eba` and native
-language names `b29e99f50`, both independently clear. Foreman combined143,
-full tidy1089 and compile1605 pass. Delete characterization is already integrated.
+## Preserved topology
 
-Draft correction `6616ce8c4` remains held: Sol reproduces subject loss when
-input occurs during pending clear and blur follows clear completion. Widgets
-is preserving crossposting WIP before correcting this exact timing case. No draft candidate is integrated. Preview
-production/browser through `d1fc00e58` is independently bounded clear; HTTP
-followup `45df8b99d` awaits review and Themenav is completing exact formatting
-and native two-poll/embed controls evidence. Legacy BML preview remains present.
-Widgets now audits ordinary crossposting with delivery stubbed; Themenav next
-has test-only configured spellcheck characterization from the finite contract.
-Preserve all three existing sessions, pending external Journal hook question,
-held restrictions, and local-only commits.
+Foreman: /home/mark/dreamwidth/.worktrees/bml-astra-foreman-20260922,
+branch bml-astra-foreman-20260922, Herdr w5:p1, container 8d7783a043d8.
+Session 01a0c9d6-0108-7401-a170-9ada1e2141c2, model gpt-6-astra.
 
-Latest continuation at 2026-09-23: root integrated test-only legacy update
-`b1f8b13cc`, owned delete `440faea99`, legacy edit `53357f450`, and query followup
-`4d72caddd`; all are independently clear. Foreman related tests pass87,51,136
-and51 respectively; delete real browser and disposable cleanup pass. Captures
-are under 2026-09-23/entry-delete-native.
+| Worker | Herdr | Container | Session |
+|---|---|---|---|
+| bml-terra-widgets | w6:p1 | 4da9c8ba2712 | 01a0c9d8-0966-7a70-b058-5a3a4328a791 |
+| bml-terra-themenav | w7:p1 | 48178cc525ed | 01a0c9d8-7910-7fe3-ac68-19dc9567a899 |
+| bml-sol-review | w8:p1 | 904e68156988 | 01a0c9d8-e3d8-7330-bc30-c78bf4ec2b4d |
 
-Current queue: draft range through `2abd3d682` is under Sol recheck, including
-initialization ordering, early input, property reverts and body-only changes.
-Prior failed candidates remain unintegrated. Preview WIP is restored and active
-in Themenav; only smoke9 passes so far, full finite acceptance remains. Widgets
-committed moderated-post characterization `87dd370c9` (awaiting Sol) and is now
-implementing the independently audited small language-name cleanup. Sol owns
-draft then moderated-post review. Existing worker sessions remain unchanged.
-Configured legacy spellcheck has a newly documented source-level parity gap;
-it must be characterized/preserved before editor retirement, not assumed unused.
-External Journal hooks and held inbox work remain unchanged.
+Worker checkouts are /home/mark/dreamwidth/.worktrees/<worker>-20260922.
+Terra uses gpt-5.6-terra; Sol uses gpt-5.6-sol. Preserve exact sessions and WIP.
+Inspect live panes before directing work: scheduled monitoring snapshots can be
+stale. A done badge is not proof a package finished; collect logs/exit status.
+Do not launch duplicate browser runs when an exact run/helper remains alive.
 
-Current queue supersedes older entries below: preview compatibility implementation
-is active in the preserved Themenav session from `83f0e1172`, using the finite
-three-test contract in BML-PREVIEW-ACCEPTANCE.md. Draft initialization range through
-`03b07b101` awaits Sol, including real icon autosave and input before window load.
-Do not integrate it from worker browser success alone. Legacy update baseline
-`821770db5` and owned-delete baseline `53dd7cccd` are queued for independent review.
-Widgets is now characterizing actual legacy owned-edit form/save contracts on a
-separate branch. No editor route cutover has occurred. Keep all held inbox work
-and the unanswered external Journal hook interfaces untouched.
+## Integrated current checkpoint
 
-Latest accepted production is FCK consolidation `6dca2d923` (eight executable
-BML files remain), with exact build/95 HTTP tests/real Image+ImageButton browser
-and tidy1082/compile1605 passing. Timestamp gate `8823c34c1`, exact mode browser
-`e9281a322`, and private-post characterization `42b80ed08` are integrated and
-independently clear. See new evidence folders and latest progress entries.
+- Draft timing is CLOSED: source through fc570e26e independently clear,
+  integrated as 11fd6c97d. Sol exact fixed browser PASS and known-broken6616 FAIL
+  at isolated subject persistence; delayed-image/untouched-decline also PASS.
+  Foreman sequential parity and preview browser suites both exit0, build and
+  scoped helper tidy pass, helpers absent. Final ledger commit 2b164e4ee exists.
+  Do not reopen the old 4c/6616 findings from stale recovery messages.
+- Preview shared renderer integrated as abc509db6, but executable file remains
+  pending method correction below. Foreman3files173 PASS, build PASS,
+  tidy1091/compile1605 PASS, actual popup browser PASS. Before/after captures in
+  doc/bml-evidence/2026-09-23/entry-preview-{before,native}.
+- Spellcheck baseline3b367d0c independently bounded-clear, integrated f6a8261d7;
+  foreman15 PASS in /tmp/bml-spellcheck-baseline-integrated.log.
+- Earlier customization/settings/picker/FCK/native language and ordinary editor
+  packages are integrated and reviewed as recorded in BML-PROGRESS.md.
+  Eight executable BML pages still remain in the foreman tree at this update.
 
-Current draft candidate `2a57cbf58` is held on its broad synthetic-event guard;
-Terra Themenav is implementing initialization-only ordering plus real userpic
-autosave proof. Widgets is characterizing legacy /update GET/valid private POST
-contracts. Sol is auditing ordinary preview differences while those finish.
-No remaining finite ordinary edit-form gate; larger draft/legacy route retirement
-gates are separate. External Journal hook question and held inbox work remain
-unchanged. Preserve exact sessions and local-only commits.
+## Current bounded queue
 
-Latest ordinary editor integration: owned-form HTTP `f07bac73b`, mode HTTP
-`558ba0609`, rendering `0aad3e37f`, draft browser characterization `f86d593dd`.
-Foreman related116 tests, tidy1078/compile1605 and real draft browser pass;
-required captures are in entry-draft-native.
+1. Themenav: preview GET/HEAD compatibility and executable retirement on branch
+   bml-terra-preview-method-retirement-20260923. Commits a6277d378 +4091af883
+   are NOT integrated. Sol found error_ml incorrectly wraps the old bare
+   bml.requirepost response in a full Error page. Worker is returning native
+   localized text directly, asserting exact GET body and matching empty HEAD
+   representation for both aliases. Retain entry.bml.text and index.html.
+   Prior actual popup replay and focused tests pass; await narrow corrected SHA
+   and Sol recheck before integrating removal.
+2. Widgets: expand the already-clear legacy spellcheck baseline to disabled
+   button absence, retained submitted metadata/date/editor controls and the old
+   edit stored-RTE nuance, plus unchanged draft state. Test-only separate branch;
+   see BML-EDITOR-SPELLCHECK-ACCEPTANCE.md. No external checker process.
+3. Sol: review exact crossposting characterization9e6614a3 (parents785a5004,
+   6ec3844f), worker50 PASS. Ordinary own-journal real forms and stubbed scheduler;
+   no delivery. Then review preview correction and remaining spellcheck proofs.
+   Native spellcheck implementation is subsequent bounded work on integrated
+   preview base; /tmp/spellcheck-native-plan.md is in Themenav's checkout host.
 
-Pending finite work: mode browser `a6889cd94` awaits Sol; timestamp candidate
-`fdbb67460` needs checkbox reload assertions and visible panel before browser
-label checks. Terra Themenav is fixing those. Terra Widgets is consolidating
-the static-tree FCK dialog on a separate branch (uncommitted); actual
-ImageButton insert/edit browser validation remains pending. Sol is independently
-probing legacy-format draft restore/decline, then reviewing mode browser.
-Preserve all existing sessions/worktrees. No editor route retirement yet.
+## Working method and evidence
 
-Current accepted local ranges additionally include S2 language `ea61aa63d`,
-Birthday `d50c11eea`, SiteScheme `0838d1028`, Journal/feed characterization
-`24d762c77`, and comment request metadata `fcba06e32`. Foreman comment suite
-passes421 tests. Ordinary editor gates are active; see BML-EDITOR-ACCEPTANCE.md
-and the latest progress entries. External Journal hook usage remains a pending
-user question; both adapters stay unchanged. UniqCookie is completed and
-approved, not pending. Historical queue entries below are superseded.
+Review immutable commits independently. Route concrete findings back to Terra;
+obtain material-fix rechecks. Integrate clean ranges locally and run appropriate
+combined-tree checks. Keep the ledger current without treating a passing
+checkpoint as completion of the whole project. Preserve real URLs/form fields,
+translations, permissions and behavior; retain required visual evidence.
 
-Latest accepted ranges additionally include native control strip `0512f0105`,
-maintainer UI `2a33bfeb7` + heading `8986e7de8`, field lengths `23023f579`,
-OPML `04f0fe2b2`, Support FAQ `7634070da`, and explicitly approved UniqCookie
-`a23efe915`. Latest foreman related regression223, tidy1070 and compile1605 pass.
-S2 language initialization and Birthday labels await Sol; see progress ledger.
-
-
-Latest local integration: `0bceb2942` (S2 request-note rendering), evidence ledger
-`7f3a22a61`. Sol cleared source `c2204e313`; foreman six-view replay passed all
-HTTP/JS/resource checks after server restart. Tidy1063/compile1605 pass. Admin
-FAQ is integrated as `c39b78ca1`, with real-template tests passing. Authas labels
-through `d8d0fa892` are independently cleared and integrated as `363cda887`;
-foreman249 related tests and changed-file tidy pass.
-Ordinary control-strip translation and maintainer UI work continue in preserved
-Terra sessions. Later historical checkpoint sections below are not current gates.
-
-Restricted inbox work remains held under the parent platform-limitation direction;
-do not retry or reassign it around that restriction. The user explicitly approved the separate UniqCookie request-read migration
-with "do it" after asking what the open question was. That bounded package is
-now assigned to Terra under automatic safety review; this does not release held
-inbox work or authorize bypassing any platform restriction. All new work remains local and unpublished.
-
-Implementation has resumed under the dedicated Astra foreman. The earlier
-checkpoint-only instruction and launch caveat below are historical. See the
-latest BML-PROGRESS.md section for live branches, worker session IDs, reproduced
-validation and review status. The user now explicitly authorizes
-`--approve-for-me` for these sessions, retaining automatic safety review and
-workspace sandboxing. New work remains local; no further push or deployment is
-authorized. Parent checkout and preexisting worktrees/containers stay untouched.
-
-Current isolated foreman branch/worktree is `bml-astra-foreman-20260922`.
-Reviewed ThemeNav, Foundation widgets, poll dialog, request-local language and
-native caller/service ranges are integrated locally. Customization migration is
-now integrated as `bcdced59f`: all six finite acceptance gates are resolved,
-including the explicitly inapplicable legacy semantic-validation gate. Ten BML
-page files remain. Foreman validation passes 714 tests across 17 files, both
-customization browser suites, static build, 1047 tidy and 1601 compile checks.
-
-Original access-filter and image dialog/preview production reviews are clear.
-Their disposable browser fixture corrections through worker `74c332713` are
-independently reviewed and integrated locally as `855414735`. Normal and
-intentional-failure runs prove helper cleanup, including signal-exit rejection.
-
-Settings migration is independently cleared through worker `0d8fd5ff6` and
-integrated as `035e27196`. Nine BML page files remain. Foreman integrated tests
-pass17 files /501 assertions, static build, tidy1058, compile1605 and the full
-disposable browser flow. Matching category captures are saved in settings-after;
-all15 states return200 with no JS/resource failures. The old Other Sites JS
-exception is resolved. Notification scope/native error markup/localized dirty
-form config and the final three hook/page/existing-subscription proofs are clear.
-
-Native no-item picker final source `e4e3958b7` is independently cleared and
-integrated as `e83cddf0e`. Foreman regression passes 3 files / 155 tests,
-tidy1051, compile1603 and the real picker browser flow. Screenshots are in
-`doc/bml-evidence/2026-09-22/picker-after`. All itemid requests still fall
-through to the existing BML editor; editor retirement is not approved.
-
-Native account labels and inbox compose repairs are reviewed and integrated as
-`538d5d8dc` and `3dd1c4464`; related foreman regressions pass130 and31 tests.
-Spam sources `038607cea` + `345d6e246` are independently cleared and integrated
-as `e772d7919`; foreman spam/compose regression passes63 assertions.
-Widgets Terra continues uncommitted bookmark handling on preserved branch
-`bml-terra-inbox-bookmark-errors-20260922`. The shared missing-token defect is fixed and integrated as `42840ba7b`
-(sources `2f5509984` + real-token regression `4b557e1af`). Sol independently
-reproduced valid legacy POST -> tokenless modern authorization before the fix,
-then rejection afterward; the corrected permanent test fails on old code.
-Foreman combined six-suite run passes308 assertions, tidy1055 and compile1603.
-Bookmark WIP still needs complete ownership/RPC/browser acceptance and review.
-
-Native Event `eb65a9f66` and S2 `cd45ffb4` are independently cleared and
-integrated as `f4b760a3e` and `5249750db`. Foreman tests pass118 and16 respectively;
-combined formatting1054 and compile1603 pass. Settings is complete as described above. FAQ sources `656b2cbea`, `7c3d81367` and `d719fae1c` are independently
-cleared and integrated as `4f7832ea4`; foreman passes97 tests, tidy1059 and
-compile1605, including process-global modification-time isolation. Themenav Terra proceeds
-with the independently audited five direct DW::Request call sites in Login,
-Administration, Config and S2 FriendsPage (plus middleware comment/tests).
-Widgets Terra continues bookmark browser acceptance; its latest timeout was a
-jQuery .data cache versus native dataset test mismatch, not yet a confirmed
-production RPC failure. No beta cutover, push or deployment is implied.
-
-Preserve all three existing worker sessions/worktrees/containers; use the exact
-session identifiers in BML-PROGRESS.md. Their sessions sometimes end after
-routine edits or while tests are active: inspect and resume concrete unfinished
-work rather than treating such a checkpoint as completion.
-
-Everything below that describes unstarted workers, checkpoint-only authorization
-or thirteen remaining pages is historical context for the original checkpoint.
-
-## Start here
-
-Read this file, [BML-PROGRESS.md](BML-PROGRESS.md),
-[BML-REMOVAL-PLAN.md](BML-REMOVAL-PLAN.md), [BML-MIGRATION.md](BML-MIGRATION.md),
-and the applicable AGENTS.md before work. The inventory in the plan is the
-original baseline; the progress log records subsequent removals.
-
-Checkpoint branch: `zorkian/dreamwidth:bml-overnight-20260921`.
-Baseline: `d9ea4bea6`. Six completed work commits:
-
-| Commit | Package |
-|---|---|
-| ee3db5005 | Inventory, removal plan, initial characterization |
-| c2ed9b0f9 | Access-filter controller/template/JS migration |
-| 0f6bf0fb7 | Shared widget request state and request-isolation fixes |
-| 50276ed0a | Standalone image-preview iframe migration |
-| d5c4037a8 | Standalone rich-text image dialog migration |
-| 65e502439 | Customization HTTP/browser baseline and progress log |
-
-13 BML page files remain, plus three configs, nine translation files, two looks,
-and shared runtime dependencies. The entire BML system is NOT removed.
-The previous agent stopped at a clean checkpoint despite instructions to
-continue. That was not a blocker and must not become the stopping rule again.
-
-## User instructions and current authorization
-
-- Work toward removal of the entire BML system. Continue subsequent packages
-  when prerequisites are satisfied. Keep reviewable commits and a progress log.
-- Do not stop at a clean checkpoint, passing tests, or completion of one package.
-  Once resumed, stop only when done or genuinely blocked across all available
-  independent work. Document unresolved product decisions and continue elsewhere.
-- Run required tests and headless browser checks. Use isolated worktrees and
-  devcontainers. No deployment or production changes.
-- User selected this Herdr session as an **Astra foreman**, **Terra** for
-  implementation, and **Sol** for independent review; multiple agents are allowed.
-  This architecture was planned but NO agents have been started and no Sol review
-  has occurred. Do not describe these existing commits as independently reviewed.
-- The latest task is to preserve/push this checkpoint and open a PR for visibility,
-  rather than start the agent workflow now. Resume implementation when the user
-  explicitly instructs the new window to do so. This push/PR is explicitly
-  authorized; the earlier no-push restriction was superseded for this checkpoint.
-- Questions and discussion are not implementation authorization. Respect any
-  subsequent user instruction, especially stop/pause instructions.
-
-## Foreman/implementation/review workflow on resume
-
-Astra owns the inventory, dependency gates, acceptance criteria, integration,
-review triage, and user updates. Start a Terra worker with a bounded package and
-explicit preserved behavior/tests/deletion criteria. Sol reviews a fixed commit
-ID independently for lost functionality, permissions, CSRF, compatibility,
-request isolation and meaningful test coverage. Astra decides fixes and sends
-concrete corrections back to Terra; Sol rechecks material fixes. Commit and
-integrate validated results, update the ledger, and immediately take the next
-unblocked package. Do not equate one blocked stream with overall blockage.
-
-Use the explicit model overrides `gpt-5.6-terra` for implementers and
-`gpt-5.6-sol` for reviewers; the supervising session should use `gpt-6-astra`.
-Pass a self-contained task/handoff when starting agents with limited context.
-With four total slots, use Astra + up to two independent Terra workers + Sol.
-Separate implementation worktrees/containers; no agents write to the same checkout.
-Review fixed commits in a separate review checkout when running tests. Do not
-invent Herdr window-control capabilities: use available agents/worktrees and
-report any orchestration limitation honestly.
-
-## Immediate next package
-
-Customization migration, detailed in the progress log:
-
-1. Make widget JS/resources compatible with Foundation resource ordering and
-   initialization, including nested widgets and AJAX refresh. Legacy widgets use
-   DOM-style `$`, while Foundation uses jQuery. A global replacement is unsafe.
-2. Replace ThemeNav BML query/redirect helpers and explicitly propagate redirects
-   through widget dispatch. Preserve search/page/show/authas and POST semantics.
-3. Migrate customize/index and customize/options into controllers/Foundation
-   templates; preserve style initialization, strings, permissions and widgets.
-4. Extend tests beyond baseline rendering/title updates to theme application and
-   preview, layouts, all option-widget families, reset/save/reload, community
-   targeting, old URLs, and responsive rendering. Delete BML pages only when ready.
-
-Independent later work includes settings, remaining FCK poll dialog, entry
-picker/parity, inbox parity, translation/request runtime, then engine deletion.
-Use the dependency sequence and validation matrix in the removal plan.
-
-## Existing environment and portable setup
-
-Same-machine worktree: `/private/tmp/dreamwidth-bml-20260921`.
-Existing container: `4e7a47333842` (verify current availability; IDs are not portable).
-Container mount: `/workspaces/dreamwidth`. Its MySQL volume is isolated.
-Original checkout `/Users/mark/src/dreamwidth` and the pre-existing
-`bml-be-gone` worktree were not modified. Do not repurpose another session's state.
-
-For another machine/window, fetch the branch from zorkian/dreamwidth and create
-an isolated worktree from it. Follow AGENTS.md to start its devcontainer:
-
-```bash
-npx @devcontainers/cli up --workspace-folder .
-docker ps --filter "label=devcontainer.local_folder=$(pwd)" --format '{{.ID}}'
-docker port <container-id>
-```
-
-Edit/run Git on the host. Run tests/builds/formatting inside the container.
-Setup seeds test_user, test_friend, test_paid and test_comm; the browser tests
-expect the repository's development seed credentials. See bin/dev/seed-testdata.
-Customization integration requires compiled ciel/indil and uses temporary users
-in the development database, not the minimal theme-less test database.
-The existing test_user title is a test fixture value, not a production title.
-
-## Reproduce validation
-
-Inside the container, with development fixtures:
-
-```bash
-prove t/plack-access-filters.t t/widget-request.t t/plack-image-preview.t \
-  t/plack-image-dialog.t t/plack-customize.t t/plack-bml.t t/wtf.t \
-  t/content-filters.t t/tags-trustmask-count.t t/ml.t
-perl extlib/bin/tidyall -a
-perl t/02-tidy.t
-perl t/00-compile.t
-bin/build-static.sh
-bin/dev/screenshot /login
-node t/browser/access-filters.js
-node t/browser/widget-titles.js
-node t/browser/image-preview.js /tmp/image-dialog-after
-node t/browser/customize-baseline.js /tmp/customize-baseline
-```
-
-The screenshot helper installs Chrome/Puppeteer prerequisites. Browser scripts
-currently use `/opt/dw-screenshot/node_modules/puppeteer-core`,
-`/usr/bin/google-chrome-stable`, and container localhost:8080. Access-filter
-browser testing expects test_user initially has no access groups; use a dedicated
-seeded container. Baseline capture is not complete customization acceptance.
-Restart only your own container's Starman after route/startup changes as AGENTS.md
-specifies. Never use desktop browser automation for these checks.
-
-Last recorded combined suite: 261 tests / 10 files passed. Formatting: 1,031
-assertions passed. Compilation: 1,597 assertions including existing skips passed.
-Full static build passed for access-filter JS. Actual headless flows passed for
-access filters, personal/community title RPCs, and image insert/edit/preview.
-These results belong to the checkpoint; validate new changes appropriately.
-
-Portable screenshots and customization results are committed under
-[bml-evidence/2026-09-21](bml-evidence/2026-09-21/README.md). Raw test logs are only
-in the existing container's /tmp; they are not required for a fresh setup and
-have not been uploaded. The progress log summarizes their results and limitations.
-
-## Remaining decisions and definition of done
-
-Do not remove beta-gated entry/inbox flows until their parity and cutover gates
-are resolved, including sender eligibility and old POST actions. The alternate
-ImageButton dialog contains legacy host/upload branches and is not proven
-redundant. The root upload-return callback was preserved; no upload service was
-certified. Deployed local overlays/BMLInit/AJAX mappings need a deployment
-inventory before final engine deletion; production access was not used here.
-
-Done means every inventory item has a tested disposition, compatible routes
-remain where needed, and startup/acceptance work with the BML engine physically
-absent. Merely eliminating .bml page files, renaming adapters, or retaining a
-permanent BML shim does not satisfy that goal.
-
-
-## Continuation update — 2026-09-22, 18:33 UTC
-
-All work remains local, with the same Herdr sessions/worktrees/devcontainers and
-reviewed automatic approvals. Do not restart or replace workers. Terra workers
-sometimes end after a partial step or while a browser is running; inspect and
-resume them with the concrete remaining deliverable rather than treating that
-as completion. Never edit their active checkouts concurrently.
-
-Foreman integrated native controller caller commits as `2f9b0f43f`, `51666e404`
-and native services as `ba3604b24`, all independently cleared by Sol. Foreman
-native/return coverage passed 67 assertions, service/poll rerun passed, and later
-full tidy/compile passed 1,042/1,599 (`/tmp/bml-foreman-picker-{tidy,compile}.log`).
-
-Settings characterization through `2fecefaed` is integrated and cleared (57).
-Foreman return test `ff2b5abb9` plus `86b144d66` is reviewed, with 22 assertions
-and two explicit legacy off-origin receiver TODO failures; migration must fix
-receiver validation. New worker category `fde5bdc43` adds 72 total assertions;
-Sol found a weak privacy unchanged assertion, fixed by `de562134176` and awaiting
-recheck. Browser `05d14a830` saves community/privacy/mobile using disposable
-accounts, but cleanup lifecycle still needs correction. Settings Terra is
-actively fixing that, then must add actual notifications/unsaved acceptance.
-No settings production conversion is integrated; wait for customization gate.
-
-Customization production plus acceptance remains on the widgets branch, not
-integrated. Alias and disposable fixture lifecycle findings are cleared. HTTP
-reset correction `8917dc475` passes 169; remaining text-click serialization was
-fixed in `c5b939a15`, along with the first narrow input-width correction. Foreman
-viewed its screenshot and found fields still clipped out of view. Widgets Terra
-is running a follow-up that stacks narrow navigation/content and verifies visible
-focused input area (`/tmp/linkslist-visible-browser`). Then finish initialization,
-style ownership/name migration, logged-out/options aliases/validation gates.
-Sol is reviewing fixed immutable ranges; no blanket custom gate approval yet.
-
-Picker HTTP baseline `95fcdf04c` is independently cleared (64): exact dated latest
-entries, direct POST aliases, pre-request body snapshots/fresh reads, community
-manager and retained other-poster editor controls. Browser baseline `de14507c5`
-is independently cleared: actual keyboard/recent/date/community/narrow, normal
-and intentional failure cleanup. Screenshots are committed under
-`doc/bml-evidence/2026-09-22/picker-before`. Legacy extensionless title is missing,
-explicit .bml is correct; require translated replacement heading. The current
-permission model does not allow delegated personal authas; do not invent a grant.
-`BML-ENTRY-PICKER-ACCEPTANCE.md` records the source-backed temporary route decline
-approach to preserve itemid requests through existing BML fallback, still needing
-actual dispatch tests before extraction. Editor beta/parity gates remain separate.
-
-Next integration after customization gate: use `git log --reverse --cherry-pick
---right-only foreman...widgets` to avoid duplicate widget patches; run combined
-native+custom tests and static/browser on the foreman container after restart.
-Then Terra can extract the picker while settings Terra converts its hub. Other
-independent inbox/image-dialog/native runtime packages remain as documented;
-external beta/overlay/upload decisions do not justify stopping all work.
+Root checkout and documentation update were confirmed clean/committed after the
+reported recovery. Docker containers survived. Historical macOS /private/tmp
+paths and old container IDs in older logs are not current resources. Shell
+sandbox bwrap loopback errors have required reviewed escalations; do not bypass
+approval review. Use Herdr skill with HERDR_ENV=1, preserve focus, and keep
+unresolved external decisions separate from independent implementation work.
