@@ -2092,3 +2092,12 @@ are accepted. Foreman seven suites787 PASS, tidy1134/compile1607 PASS, actual
 plain-app browser PASS/cleanup empty. Public desktop/narrow captures preserved;
 390px visually inspected and usable. Retained update.bml still serves remaining
 contexts; this is not retirement approval.
+
+### Private terminal response renderer accepted
+
+Sol e16cdedeb CLEAR, integrated1aca57868. Dedicated native template preserves
+identity Sorry title and message, cannot-post title plus configured MSG_NO_POST
+HTML precedence and translated fallback. Classified callable only; no route,
+authentication, anonymous/share or readonly behavior changes. Foreman three
+adjacent suites96 PASS in /tmp/bml-terminal-renderer-integrated.log. Public
+classification activation and its real-session/browser proofs remain separate.

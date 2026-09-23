@@ -1,3 +1,14 @@
+## Latest private terminal renderer integration
+
+Sol e16cdedeb411c87572816e5c58e8ac1b326fc3e4 CLEAR, integrated1aca57868. Foreman
+three suites96 PASS in /tmp/bml-terminal-renderer-integrated.log; session15329
+complete. No route/classifier/auth change; trusted translated/configured HTML,
+legacy titles and request-local getter preserved. Themes public terminal-response
+matrix/browser implementation active, not accepted. Widgets same-poster public
+community candidate354fd2ee7 source committed, actual public HTTP/browser pending;
+other-poster manager BML delete/control surface must remain unchanged. Sol c4
+checkbox browser recheck/source-boundary audit ongoing. No root test session active.
+
 ## Priority public community activation correction
 
 Foreman found native maintainer.tt omits retained manager delete controls; the
