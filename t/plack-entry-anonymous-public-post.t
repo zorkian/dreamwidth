@@ -193,11 +193,40 @@ sub trace_anonymous_post {
 sub post_with_native_attempt_counts {
     my ( $send, $post ) = @_;
     my %attempts;
-    my $flat = \&DW::Controller::Entry::_legacy_flat_post_attempt;
-    my $save = \&DW::Controller::Entry::_do_post;
+    my $flat      = \&DW::Controller::Entry::_legacy_flat_post_attempt;
+    my $save      = \&DW::Controller::Entry::_do_post;
+    my $anonymous = \&DW::Controller::Entry::legacy_anonymous_update_handler;
+    my $auth_okay = \&LJ::auth_okay;
+    my $request   = \&LJ::do_request;
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    my $active;
     my $response;
     {
         no warnings 'redefine';
+        local *DW::Controller::Entry::legacy_anonymous_update_handler = sub {
+            ++$active;
+            my ( $result, $ok, $error );
+            {
+                local $@;
+                $ok    = eval { $result = $anonymous->(@_); 1 };
+                $error = $@;
+            }
+            --$active;
+            die $error unless $ok;
+            return $result;
+        };
+        local *LJ::auth_okay = sub {
+            ++$attempts{auth} if $active;
+            return $auth_okay->(@_);
+        };
+        local *LJ::do_request = sub {
+            ++$attempts{login} if $active && ( $_[0]->{mode} || '' ) eq 'login';
+            return $request->(@_);
+        };
+        local *LJ::Hooks::run_hooks = sub {
+            ++$attempts{decode} if $active && $_[0] eq 'decode_entry_form';
+            return $run_hooks->(@_);
+        };
         local *DW::Controller::Entry::_legacy_flat_post_attempt = sub {
             ++$attempts{flat};
             return $flat->(@_);
@@ -209,6 +238,15 @@ sub post_with_native_attempt_counts {
         $response = $send->($post);
     }
     return ( $response, \%attempts );
+}
+
+sub assert_structural_attempts {
+    my ( $attempts, $label ) = @_;
+    is( $attempts->{auth}   || 0, 0, "$label makes no anonymous password check" );
+    is( $attempts->{login}  || 0, 0, "$label makes no anonymous protocol login" );
+    is( $attempts->{decode} || 0, 0, "$label makes no anonymous decode hook call" );
+    is( $attempts->{flat}   || 0, 0, "$label makes no native flat post attempt" );
+    is( $attempts->{save}   || 0, 0, "$label makes no native save attempt" );
 }
 
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -231,9 +269,10 @@ local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'anonymousPublicPost';
 
 test_psgi $app, sub {
     my $send = shift;
-    my ( $authenticated_calls, $anonymous_calls );
+    my ( $authenticated_calls, $anonymous_calls, $anonymous_auth_calls, $anonymous_active );
     my $authenticated = \&DW::Controller::Entry::legacy_update_handler;
     my $anonymous     = \&DW::Controller::Entry::legacy_anonymous_update_handler;
+    my $auth_okay     = \&LJ::auth_okay;
 
     no warnings 'redefine';
     local *DW::Controller::Entry::legacy_update_handler = sub {
@@ -242,7 +281,14 @@ test_psgi $app, sub {
     };
     local *DW::Controller::Entry::legacy_anonymous_update_handler = sub {
         ++$anonymous_calls;
-        return $anonymous->(@_);
+        ++$anonymous_active;
+        my $result = $anonymous->(@_);
+        --$anonymous_active;
+        return $result;
+    };
+    local *LJ::auth_okay = sub {
+        ++$anonymous_auth_calls if $anonymous_active;
+        return $auth_okay->(@_);
     };
     local *LJ::Protocol::schedule_xposts =
         sub { die 'anonymous public post must not schedule xposts' };
@@ -749,6 +795,58 @@ test_psgi $app, sub {
     }
 
     for my $case (
+        [ 'nonindividual candidate', sub { ( user   => $community_target, suffix => '' ) } ],
+        [ 'ineligible candidate',    sub { ( suffix => '?cantpost=1' ) } ],
+        [ 'readonly candidate',      sub { ( suffix => '?readonly=1' ) } ],
+        )
+    {
+        my ( $label, $setup ) = @$case;
+        for my $alias ( '/update', '/update.bml' ) {
+            my $fallback_owner = temp_user();
+            $fallback_owner->update_self( { status => 'A' } );
+            $fallback_owner->set_password( 'fallback-correct-' . LJ::rand_chars(24) );
+            my %setup     = $setup->();
+            my $form_user = $setup{user} || $fallback_owner;
+            my $before    = fresh_state( $fallback_owner->id );
+            $authenticated_calls = $anonymous_calls = $anonymous_auth_calls = 0;
+            my $post = form_post(
+                $send, $alias . ( $setup{suffix} || '' ), $form_user,
+                'fallback-wrong-' . LJ::rand_chars(24),
+                subject  => "$label $alias subject",
+                body     => "$label $alias body",
+                security => 'private'
+            );
+            my $orig_can_post = \&LJ::User::can_post;
+            my $orig_readonly = \&LJ::User::readonly;
+            my ( $res, $attempts );
+            {
+                no warnings 'redefine';
+                local *LJ::User::can_post = sub {
+                    return 0 if DW::Request->get->get_args->{cantpost};
+                    return $orig_can_post->(@_);
+                };
+                local *LJ::User::readonly = sub {
+                    return 1 if DW::Request->get->get_args->{readonly};
+                    return $orig_readonly->(@_);
+                };
+                ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
+            }
+            is( $authenticated_calls, 1, "$label $alias reaches authenticated handler once" );
+            is( $anonymous_calls,     1, "$label $alias reaches anonymous classifier once" );
+            assert_structural_attempts( $attempts, "$label $alias" );
+            unlike( $res->content, qr/id=['"]js-post-entry['"]/,
+                "$label $alias stays out of native retry" );
+            like(
+                $res->content,
+                qr/(?:id=['"]updateForm['"]|Can't Post|Error|Sorry)/,
+                "$label $alias retains a safe BML fallback boundary"
+            );
+            is_deeply( fresh_state( $fallback_owner->id ),
+                $before, "$label $alias leaves fresh owned state unchanged" );
+        }
+    }
+
+    for my $case (
         [ 'missing user', sub { ( missing_user => 1 ) } ],
         [
             'unknown user',
@@ -756,13 +854,8 @@ test_psgi $app, sub {
         ],
         [ 'GET target',      sub { ( path_suffix => '?usejournal=' . $community_target->user ) } ],
         [ 'alternate login', sub { ( path_suffix => '?altlogin=1' ) } ],
-        [
-            'challenge',
-            sub {
-                ( extra_pairs =>
-                        [ [ chal => 'fixture-challenge' ], [ response => 'fixture-response' ] ] )
-            }
-        ],
+        [ 'challenge',       sub { ( extra_pairs => [ [ chal => 'fixture-challenge' ] ] ) } ],
+        [ 'response',        sub { ( extra_pairs => [ [ response => 'fixture-response' ] ] ) } ],
         )
     {
         my ( $label, $options ) = @$case;
@@ -784,8 +877,7 @@ test_psgi $app, sub {
             my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
             is( $authenticated_calls, 1, "$label $alias reaches authenticated handler once" );
             is( $anonymous_calls,     1, "$label $alias reaches anonymous classifier once" );
-            is( $attempts->{flat} || 0, 0, "$label $alias makes no native flat post attempt" );
-            is( $attempts->{save} || 0, 0, "$label $alias makes no native save attempt" );
+            assert_structural_attempts( $attempts, "$label $alias" );
             unlike( $res->content, qr/id=['"]js-post-entry['"]/,
                 "$label $alias stays out of native retry" );
             like(
@@ -799,9 +891,10 @@ qr/(?:id=['"]updateForm['"]|Invalid username|Enter Password|Error updating journ
     }
 
     for my $case (
-        [ 'transform',    [ transform   => 1 ] ],
-        [ 'show form',    [ showform    => 1 ] ],
-        [ 'more options', [ moreoptsbtn => 1 ] ],
+        [ 'transform',      [ transform             => 1 ] ],
+        [ 'show form',      [ showform              => 1 ] ],
+        [ 'more options',   [ moreoptsbtn           => 1 ] ],
+        [ 'unknown action', [ 'action:unrecognized' => 1 ] ],
         )
     {
         my ( $label, $pair ) = @$case;
@@ -822,8 +915,7 @@ qr/(?:id=['"]updateForm['"]|Invalid username|Enter Password|Error updating journ
             my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
             is( $authenticated_calls, 1, "$label $path reaches authenticated handler once" );
             is( $anonymous_calls,     1, "$label $path reaches anonymous classifier once" );
-            is( $attempts->{flat} || 0, 0, "$label $path makes no native flat post attempt" );
-            is( $attempts->{save} || 0, 0, "$label $path makes no native save attempt" );
+            assert_structural_attempts( $attempts, "$label $path" );
             unlike( $res->content, qr/id=['"]js-post-entry['"]/,
                 "$label $path stays out of native retry" );
             like( $res->content, qr/id=['"]updateForm['"]/,
@@ -831,6 +923,83 @@ qr/(?:id=['"]updateForm['"]|Invalid username|Enter Password|Error updating journ
             is_deeply( fresh_state( $structural_owner->id ),
                 $before, "$label $path leaves fresh owner state unchanged" );
         }
+    }
+
+    # Preview and spellcheck are claimed by the authenticated-first retained
+    # transform handler even without a session; the anonymous classifier must
+    # therefore never see their real named controls.
+    for my $case (
+        [ 'preview',    [ 'action:preview'    => 'Preview' ] ],
+        [ 'spellcheck', [ 'action:spellcheck' => 'Spell Check' ] ],
+        )
+    {
+        my ( $label, $pair ) = @$case;
+        for my $path ( '/update', '/update.bml' ) {
+            my $transform_owner = temp_user();
+            $transform_owner->update_self( { status => 'A' } );
+            $transform_owner->set_password( 'transform-correct-' . LJ::rand_chars(24) );
+            my $before = fresh_state( $transform_owner->id );
+            $authenticated_calls = $anonymous_calls = $anonymous_auth_calls = 0;
+            my $post = form_post(
+                $send, $path, $transform_owner, 'transform-wrong-' . LJ::rand_chars(24),
+                subject     => "$label $path subject",
+                body        => "$label $path body",
+                security    => 'private',
+                extra_pairs => [$pair]
+            );
+            my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
+            is( $authenticated_calls, 1, "$label $path reaches the first retained handler once" );
+            is( $anonymous_calls, 1,
+                "$label $path reaches and declines in the anonymous classifier" );
+            is( $anonymous_auth_calls, 0, "$label $path has no anonymous auth call" );
+            assert_structural_attempts( $attempts, "$label $path" );
+            like( $res->content, qr/id=['"]updateForm['"]/,
+                "$label $path retains the BML action response" );
+            is_deeply( fresh_state( $transform_owner->id ),
+                $before, "$label $path is a nonpersisting retained action" );
+        }
+    }
+
+    for my $path ( '/update', '/update.bml' ) {
+        $authenticated_calls = $anonymous_calls = $anonymous_auth_calls = 0;
+        my $get = GET "http://localhost$path";
+        my ( $get_res, $get_attempts ) = post_with_native_attempt_counts( $send, $get );
+        is( $authenticated_calls, 0, "GET $path stays with the retained GET handler" );
+        is( $anonymous_calls,     0, "GET $path never enters the anonymous classifier" );
+        assert_structural_attempts( $get_attempts, "GET $path" );
+        like( $get_res->content, qr/id=['"]updateForm['"]/, "GET $path retains the legacy form" );
+
+        $authenticated_calls = $anonymous_calls = $anonymous_auth_calls = 0;
+        my $head = HTTP::Request->new( HEAD => "http://localhost$path" );
+        my ( $head_res, $head_attempts ) = post_with_native_attempt_counts( $send, $head );
+        is( $authenticated_calls, 1, "HEAD $path reaches the authenticated-first handler" );
+        is( $anonymous_calls, 1, "HEAD $path reaches and declines in the anonymous classifier" );
+        assert_structural_attempts( $head_attempts, "HEAD $path" );
+        unlike( $head_res->content, qr/id=['"]js-post-entry['"]/,
+            "HEAD $path has no native retry" );
+
+        my $nontext_owner = temp_user();
+        $nontext_owner->update_self( { status => 'A' } );
+        $nontext_owner->set_password( 'nontext-correct-' . LJ::rand_chars(24) );
+        my $before = fresh_state( $nontext_owner->id );
+        $authenticated_calls = $anonymous_calls = $anonymous_auth_calls = 0;
+        my $nontext = form_post(
+            $send, $path, $nontext_owner, 'nontext-wrong-' . LJ::rand_chars(24),
+            subject  => "nontext $path subject",
+            body     => "nontext $path body",
+            security => 'private'
+        );
+        $nontext->content( $nontext->content . '&subject=%FF' );
+        $nontext->header( 'Content-Length' => length $nontext->content );
+        my ( $nontext_res, $nontext_attempts ) = post_with_native_attempt_counts( $send, $nontext );
+        is( $authenticated_calls, 1, "non-text $path reaches the authenticated-first handler" );
+        is( $anonymous_calls, 1,
+            "non-text $path reaches and declines in the anonymous classifier" );
+        assert_structural_attempts( $nontext_attempts, "non-text $path" );
+        unlike( $nontext_res->content, qr/id=['"]js-post-entry['"]/,
+            "non-text $path has no native retry" );
+        is_deeply( fresh_state( $nontext_owner->id ),
+            $before, "non-text $path leaves fresh owner state unchanged" );
     }
 
     for my $case (
@@ -859,11 +1028,12 @@ qr/(?:id=['"]updateForm['"]|Invalid username|Enter Password|Error updating journ
                     "$path community target request contains exactly one intended usejournal value"
                 );
             }
-            my $res = $send->($post);
+            my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
             is( $authenticated_calls, 1,
                 "$path $label reaches authenticated handler before retained fallback" );
             is( $anonymous_calls, 1,
                 "$path $label reaches anonymous classifier before retained fallback" );
+            assert_structural_attempts( $attempts, "$path $label" );
             unlike( $res->content, qr/id=['"]js-post-entry['"]/,
                 "$path $label does not enter the native retry renderer" );
             if ( $label eq 'community target' ) {
