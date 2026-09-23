@@ -10,6 +10,7 @@ use Test::More;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
+use DW::Controller::Entry;
 use DW::Entry::Legacy;
 
 sub canonical {
@@ -272,7 +273,8 @@ subtest 'arbitrary extension deltas and all returned values are independent' => 
     local *LJ::Hooks::run_hooks                 = sub { ++$hooks;    die 'hook must not run'; };
     local *LJ::auth_okay                        = sub { ++$auth;     die 'auth must not run'; };
     local *LJ::Protocol::do_request             = sub { ++$protocol; die 'protocol must not run'; };
-    local *DW::Entry::Legacy::legacy_new_rerender = sub { ++$render; die 'renderer must not run'; };
+    local *DW::Controller::Entry::legacy_new_rerender =
+        sub { ++$render; die 'renderer must not run'; };
     my $result = compose( $base, $before, $after );
 
     is_deeply(
@@ -303,13 +305,38 @@ subtest 'arbitrary extension deltas and all returned values are independent' => 
     is_deeply( $before, $before_before, 'before input remains independent' );
     is_deeply( $after,  $after_before,  'after input remains independent' );
 
-    my $native_hmv = Hash::MultiValue->new( extension => 'native input' );
-    is( $native_hmv->{extension}, 'native input', 'composition invokes no native post processing' );
-    is( $decode,                  0,              'composition does not decode' );
-    is( $hooks,                   0,              'composition does not invoke hooks' );
-    is( $auth,                    0,              'composition does not authenticate' );
-    is( $protocol,                0,              'composition does not call protocol' );
-    is( $render,                  0,              'composition does not render' );
+    # Contract item 6 also requires the original native HMV to be mutually
+    # independent from every returned structure. Build canonical from a real
+    # HMV via the accepted mapper, then prove mutating every returned
+    # structure cannot reach back into it.
+    my $native_hmv = Hash::MultiValue->new(
+        'action:update' => 'Update',
+        subject         => 'native subject',
+        event           => 'native event',
+    );
+    my $hmv_prepared = DW::Entry::Legacy::prepare_altlogin_native_form(
+        $native_hmv,
+        canonical_seed => { tz => 'guess', props => { native_nested => { value => 'seed' } } },
+        legacy_seed    => { tz => 'guess' },
+    );
+    my $hmv_before_hash = dclone( DW::Entry::Legacy::legacy_post_hash($native_hmv) );
+    my $hmv_result      = compose(
+        $hmv_prepared->{canonical},
+        { extension => { value => 'before' } },
+        { extension => { value => 'after' } },
+    );
+    $hmv_result->{canonical_for_attempt}{extension}{value}          = 'attempt mutation';
+    $hmv_result->{canonical_for_retry}{props}{native_nested}{value} = 'retry mutation';
+    $hmv_result->{before_snapshot}{extension}{value}                = 'before snapshot mutation';
+    $hmv_result->{after_snapshot}{extension}{value}                 = 'after snapshot mutation';
+    is_deeply( DW::Entry::Legacy::legacy_post_hash($native_hmv),
+        $hmv_before_hash,
+        'mutating every returned composition structure cannot alter the original native HMV' );
+    is( $decode,   0, 'composition does not decode' );
+    is( $hooks,    0, 'composition does not invoke hooks' );
+    is( $auth,     0, 'composition does not authenticate' );
+    is( $protocol, 0, 'composition does not call protocol' );
+    is( $render,   0, 'composition does not render' );
 
     # Cross-structure independence: the returned structures must not alias
     # each other even though attempt/retry both derive from the same canonical
