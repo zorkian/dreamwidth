@@ -1,3 +1,16 @@
+## Latest callable community integration
+
+Sol finalcf2b4032 CLEAR for production6b90 and finite HTTP range. Integrated
+003e8c593/ddb2d38b4/d7c4b9058/81fc421f4/36465e9e4/d00ab5dbb. Foreman four
+rendering suites352 PASS in /tmp/bml-community-get-integrated.log; session70598
+complete. No public community route change. Widgets browser WIP active; resumed
+exact existing run through exit/cleanup rather than duplicating it.
+Sol reviews public update GETa0d94015a; worker reported711 HTTP/tidy1133/compile1607
+and actual plain-app normal/named-failure browser pass. Foreman exact branch check
+found invalid-target regex correction had not applied; pending real test-only
+followup. Themes next independent terminal-response renderer branch is preserved.
+All external/held restrictions unchanged; root clean, no active test sessions.
+
 ## Latest retained-update prerequisite integration
 
 Sol359579574 +9ceede79d CLEAR; integrated8c9813584/11c75c53e. Foreman real

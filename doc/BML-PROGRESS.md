@@ -2069,3 +2069,15 @@ and named failure cleanup independently passed. Stale spellcheck assertions now
 parse current native response, require real old backdating control and verify
 native entrytime_outoforder=1. Foreman four suites632 PASS in
 /tmp/bml-update-fixture-integrated.log. Public eligible GET activation separate.
+
+### Callable community GET renderer accepted
+
+Sol final6b90..cf2 CLEAR; integrated003e8c593 throughd00ab5dbb. Same-poster uses
+shared ordinary editor; authorized other-poster manager uses property-only
+maintainer rendering. Explicit canonical/raw-query actions, readonly/context
+fallbacks and beta distinction preserved. Finite HTTP proofs include real
+sessions, supported nondefault usemask1/access security, sorted saved tags,
+userpic/native form parity, anonymous isolation, fresh entry/user draft state,
+and explicit absence of unsupported community custom-group controls. Foreman
+four suites352 PASS in /tmp/bml-community-get-integrated.log. Browser and public
+community activation remain separate unaccepted work.
