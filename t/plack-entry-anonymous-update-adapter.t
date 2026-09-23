@@ -20,11 +20,21 @@ use DW::Request;
 use DW::Request::Plack;
 use LJ::Entry;
 use LJ::Test qw(temp_user);
+use LJ::Userpic;
 use LJ::Test::LegacyOwnedEditRoute;
 use Plack::Middleware::DW::RequestWrapper;
 
 plan skip_all => 'Anonymous update adapter requires a development server'
     unless $LJ::IS_DEV_SERVER;
+
+sub file_contents {
+    my ($path) = @_;
+    open my $fh, '<', $path or die "open $path: $!";
+    binmode $fh;
+    local $/;
+    my $contents = <$fh>;
+    return \$contents;
+}
 
 sub retained_form {
     my ($content) = @_;
@@ -61,6 +71,7 @@ sub user_state {
         entry_editor     => $user->prop('entry_editor'),
         entry_editor2    => $user->entry_editor2,
         autoformat       => $user->prop('disable_auto_formatting') || 0,
+        displaydate      => $user->displaydate_check,
     };
 }
 
@@ -82,8 +93,14 @@ $owner->set_prop(
 $owner->set_prop( entry_editor => 'always_rich' );
 $owner->entry_editor2('markdown0');
 $owner->set_prop( disable_auto_formatting => 0 );
+$owner->displaydate_check(0);
 my $owner_id     = $owner->id;
 my $owner_before = user_state($owner_id);
+my $userpic =
+    LJ::Userpic->create( $owner, data => file_contents("$ENV{LJHOME}/t/data/userpics/good.jpg"), );
+ok( $userpic, 'disposable anonymous owner userpic is created' )
+    or BAIL_OUT('cannot exercise anonymous legacy-schema userpic payload');
+$userpic->set_keywords('anonymous-adapter-pic');
 
 my $other = temp_user();
 $other->update_self( { status => 'A' } );
@@ -219,8 +236,15 @@ test_psgi $adapter, sub {
         prop_taglist          => 'anonymous-one, anonymous-two',
         prop_current_location => 'Anonymous location',
         prop_current_music    => 'Anonymous music',
-        event_format          => 1,
-        editor                => 'markdown0',
+        event_format          => 'preformatted',
+        switched_rte_on       => '',
+        date_ymd_yyyy         => '2020',
+        date_ymd_mm           => '02',
+        date_ymd_dd           => '03',
+        hour                  => '04',
+        min                   => '05',
+        date_diff             => 1,
+        prop_opt_backdated    => 1,
     );
     @order = ();
     my $success_res = $request->($success);
@@ -234,6 +258,17 @@ test_psgi $adapter, sub {
     is( $entry->prop('taglist'), 'anonymous-one, anonymous-two', 'success persists tags' );
     is( $entry->prop('current_location'), 'Anonymous location', 'success persists location' );
     is( $entry->prop('current_music'),    'Anonymous music',    'success persists music' );
+    is( $entry->prop('opt_preformatted'),
+        1, 'actual retained preformatted control persists legacy formatting semantics' );
+    is( $entry->prop('used_rte') || 0, 0,
+        'preformatted retained post does not set the RTE marker' );
+    is( $entry->prop('opt_backdated'),
+        1, 'actual retained backdate control persists the backdated property' );
+    is(
+        $entry->eventtime_mysql,
+        '2020-02-03 04:05:00',
+        'actual retained date controls persist the submitted timestamp'
+    );
     is_deeply(
         \@order,
         [qw(login decode save spam success success)],
@@ -260,10 +295,40 @@ test_psgi $adapter, sub {
     my $after_on = user_state($owner_id);
     is( $after_on->{autoformat}, 1, 'event_format on updates poster formatting preference' );
     is_deeply(
-        { map { $_ => $after_on->{$_} } qw(draft draft_properties entry_editor entry_editor2) },
-        { map { $_ => $owner_before->{$_} } qw(draft draft_properties entry_editor entry_editor2) },
+        {
+            map { $_ => $after_on->{$_} }
+                qw(draft draft_properties entry_editor entry_editor2 displaydate)
+        },
+        {
+            map { $_ => $owner_before->{$_} }
+                qw(draft draft_properties entry_editor entry_editor2 displaydate)
+        },
         'anonymous success leaves remote-only draft and editor sentinels unchanged'
     );
+    ok( !$retained->find_input('prop_picture_keyword'),
+        'anonymous retained form has no session-only userpic picker' );
+
+    # The retained anonymous form cannot render a picker without a session
+    # remote. Preserve its accepted legacy-schema property separately rather
+    # than presenting it as a rendered-control claim.
+    my $schema_userpic = post_from_retained(
+        user     => $owner->user,
+        password => 'anonymous-adapter-password',
+        subject  => 'Anonymous schema userpic subject',
+        event    => 'Anonymous schema userpic body',
+        security => 'private',
+    );
+    $schema_userpic->content(
+        $schema_userpic->content . '&prop_picture_keyword=anonymous-adapter-pic' );
+    $schema_userpic->header( 'Content-Length' => length $schema_userpic->content );
+    my $schema_userpic_res = $request->($schema_userpic);
+    is( $schema_userpic_res->code, 200,
+        'accepted legacy-schema userpic payload renders native success' );
+    LJ::Entry::reset_singletons();
+    my $schema_userpic_entry = LJ::Entry->new( $owner, jitemid => 2 );
+    is( $schema_userpic_entry->userpic_kw,
+        'anonymous-adapter-pic',
+        'force-fresh entry persists the owned legacy-schema userpic keyword' );
 
     my $off = post_from_retained(
         user         => $owner->user,
@@ -336,6 +401,7 @@ test_psgi $adapter, sub {
     );
 
     my $before_invalid = entry_count($owner);
+    my $invalid_state  = user_state($owner_id);
     my $invalid        = post_from_retained(
         user          => $owner->user,
         password      => 'anonymous-adapter-password',
@@ -352,6 +418,8 @@ test_psgi $adapter, sub {
     my $invalid_res = $request->($invalid);
     is( $invalid_res->code,  200,             'invalid date returns native retry' );
     is( entry_count($owner), $before_invalid, 'invalid date creates no entry' );
+    is_deeply( user_state($owner_id), $invalid_state,
+        'callable invalid attempt preserves draft, editor, and displaydate sentinels' );
     like( $invalid_res->content, qr/id="js-post-entry"/, 'invalid date uses shared native retry' );
     like( $invalid_res->content, qr/not-a-year/,         'invalid date retry retains raw year' );
     my $retry = ( grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
