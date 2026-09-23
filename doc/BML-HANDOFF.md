@@ -1,3 +1,27 @@
+## Callable alternate-login range integrated; public posting matrix remains held
+
+Source14db/67a/ec706/bd787/aa2 is independently clear and integrated as
+4d3c64c78/6efc4451e/a239fd248/05d40134a/d4e5cac46. Root combined six-suite
+run passed245 assertions, exact static build and normal callable browser passed,
+full tidy1172 and compile1607 passed. Logs are in root container8d7783a043d8 at
+/tmp/bml-altlogin-integrated-{prove,build,browser,tidy,compile}.log. Narrow capture
+was visually inspected; desktop/narrow captures are preserved under
+bml-evidence/2026-09-23/update-altlogin-callable. No public alternate-login GET or
+credential submission activation. Sol aa2 confirms nonblank draft/frozen state
+while the restore dialog remains open; deliberate dismissal is outside that
+GET-nonmutation claim. Earlier pending notes below are historical.
+
+Public anonymous browserf029 is independently plain-app clear. Full HTTP matrix
+still held; Widgets has passing exact auth/order/ref, authenticated-first and
+forced-login increments and is finishing finite exclusions/isolation and error
+precedence. Do not integrate its public route from partial evidence.
+
+Retained alternate-login POST test-only9718f68c76bfdd8e9acf821deba4484371e38b71
+is queued to Sol. Themes is preparing a source-only native TT schema mapping
+handoff; no new auth execution or route change in that audit. Existing deployment,
+message/inbox and valid reporting holds remain unchanged. All root validation
+processes above completed; no root test remains running.
+
 ## Final callable altlogin review and next retained characterization
 
 Themes bd7878fb6f22f912563a92514534da4602e9224e is Sol production-clear: actual

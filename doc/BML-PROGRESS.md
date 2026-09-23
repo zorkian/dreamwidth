@@ -2374,3 +2374,20 @@ Preserved final anonymous public activation matrix after accepted native failure
 Cleared and integrated anonymous callable failure browser7d4 as906fd65f4: own normal replay PASS, cleanup empty, wrong-password390 capture visually usable. Integrated retained altlogin baseline through7144 asf04f3877d; own adjacent pair129 PASS. Public anonymous and callable altlogin candidates remain separate pending their finite acceptance.
 
 Public anonymous source fd76 independently bounded-clear, matrix/browser fidelity still held. Altlogin callable held for crosspost module suppression and exact panel assertions plus final browser correction; root remains at accepted callable-only behavior.
+
+## Callable alternate-login rendering integration (2026-09-23)
+
+Integrated independently cleared14db/67a/ec706/bd787/aa2 through d4e5cac46.
+The opt-in form keeps authenticated editor context, displays escaped legacy
+credentials with a blank password, uses the fixed alternate-login action, and
+suppresses remote crosspost accounts and controls. Ordinary new/edit forms retain
+their native submit action and configured crosspost behavior. No public route or
+credential submission is added.
+
+Root validation: six suites245 assertions PASS; static build and normal browser
+PASS; tidy1172 and compile1607 PASS. Narrow capture visually inspected and both
+viewport captures preserved in update-altlogin-callable. Independent normal,
+named failure and early EOF reviews are clear, including nonblank draft state
+checked while the restore dialog is open. Public anonymous POST remains a
+separate held HTTP matrix; retained alternate-login POST characterization9718
+is under independent review.
