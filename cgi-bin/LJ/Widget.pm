@@ -1020,11 +1020,3 @@ defined by the page or in en(_LJ).dat, or a string in the widget domain that was
 defined by a user via a tool.
 
 =back
-
-=head1 EXAMPLES
-
-See these widgets for some basic examples of different types of widgets:
-
-    cgi-bin/LJ/Widget/ExampleRenderWidget.pm
-    cgi-bin/LJ/Widget/ExamplePostWidget.pm
-    cgi-bin/LJ/Widget/ExampleAjaxWidget.pm
