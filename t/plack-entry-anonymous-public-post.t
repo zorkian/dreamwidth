@@ -107,10 +107,11 @@ sub form_post {
 sub trace_anonymous_post {
     my ( $send, $post, %opts ) = @_;
     my ( @sequence, @protocol, @refs );
-    my $auth_okay  = \&LJ::auth_okay;
-    my $do_request = \&LJ::do_request;
-    my $run_hook   = \&LJ::Hooks::run_hook;
-    my $run_hooks  = \&LJ::Hooks::run_hooks;
+    my $auth_okay        = \&LJ::auth_okay;
+    my $do_request       = \&LJ::do_request;
+    my $protocol_request = \&LJ::Protocol::do_request;
+    my $run_hook         = \&LJ::Hooks::run_hook;
+    my $run_hooks        = \&LJ::Hooks::run_hooks;
     my $response;
 
     {
@@ -129,6 +130,16 @@ sub trace_anonymous_post {
                 return;
             }
             return $do_request->(@_);
+        };
+        local *LJ::Protocol::do_request = sub {
+            my ( $mode, $request, $error_ref, $flags ) = @_;
+            if ( $opts{force_postevent_error} && $mode eq 'postevent' ) {
+                push @sequence, 'postevent';
+                push @protocol, [ $mode, refaddr($request) ];
+                $$error_ref = 153;
+                return undef;
+            }
+            return $protocol_request->(@_);
         };
         local *LJ::Hooks::run_hook = sub {
             my ( $name, @args ) = @_;
@@ -424,6 +435,56 @@ test_psgi $app, sub {
             },
             "$label does not run success housekeeping"
         );
+    }
+
+    {
+        my $postevent_owner = temp_user();
+        $postevent_owner->update_self( { status => 'A' } );
+        my $postevent_password = 'anonymous-public-' . LJ::rand_chars(24);
+        $postevent_owner->set_password($postevent_password);
+        $postevent_owner->set_draft_text('postevent error draft sentinel');
+        $postevent_owner->set_prop(
+            draft_properties => nfreeze( { subject => 'postevent frozen subject' } ) );
+        $postevent_owner->set_prop( entry_editor => 'always_plain' );
+        $postevent_owner->entry_editor2('markdown0');
+        $postevent_owner->set_prop( disable_auto_formatting => 1 );
+        $postevent_owner->displaydate_check(1);
+        my $before = fresh_state( $postevent_owner->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $post = form_post(
+            $send, '/update', $postevent_owner, $postevent_password,
+            subject  => 'forced postevent subject',
+            body     => 'forced postevent body',
+            security => 'private'
+        );
+        my $trace = trace_anonymous_post( $send, $post, force_postevent_error => 1 );
+        my $res   = $trace->{response};
+        is( $authenticated_calls, 1, 'forced postevent error reaches authenticated handler once' );
+        is( $anonymous_calls, 1, 'forced postevent error is claimed by anonymous handler once' );
+        is_deeply( [ map { $_->[0] } @{ $trace->{protocol} } ],
+            [qw(login postevent)], 'forced postevent error performs one login and one postevent' );
+        like(
+            $res->content,
+            qr/Incorrect time value/,
+            'forced postevent error renders the protocol error'
+        );
+        unlike( $res->content, qr/id=['"]updateForm['"]/,
+            'forced postevent error does not fall back to BML' );
+        my ($retry) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/update' );
+        ok( $retry, 'forced postevent error renders native retry' );
+        is(
+            $retry ? $retry->value('subject') : undef,
+            'forced postevent subject',
+            'forced postevent error retains subject'
+        );
+        is(
+            $retry ? $retry->value('event') : undef,
+            'forced postevent body',
+            'forced postevent error retains body'
+        );
+        is_deeply( fresh_state( $postevent_owner->id ),
+            $before, 'forced postevent error leaves fresh owner state unchanged' );
     }
 
     {
