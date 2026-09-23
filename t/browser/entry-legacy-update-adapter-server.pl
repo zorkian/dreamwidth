@@ -8,9 +8,10 @@ use warnings;
 use Starman::Server;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
-use DW::Controller::Entry;
 use DW::Routing;
+use LJ::Test::LegacyOwnedEditRoute;
 
 my ($port) = @ARGV;
 die "usage: $0 PORT\n" unless $port;
@@ -18,14 +19,10 @@ die "usage: $0 PORT\n" unless $port;
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
 
-# This exists only in the dedicated browser server.  It intentionally accepts
-# every method so retained GET and unsupported POSTs can return undef and fall
-# through to the BML resolver exactly as they do before route registration.
-DW::Routing->register_string(
-    '/update',
-    sub { return DW::Controller::Entry::legacy_update_handler(); },
-    app          => 1,
-    no_redirects => 1,
-);
+# This short-lived browser server retains BML only to generate the old form.
+# Its captured production handler still receives every POST and non-GET request.
+my $production_update_route = $DW::Routing::string_choices{'app/update'};
+$DW::Routing::string_choices{'app/update'} =
+    LJ::Test::LegacyOwnedEditRoute::retained_bml_get_route($production_update_route);
 
 Starman::Server->new->run( $app, { port => $port, host => '127.0.0.1', workers => 1 } );

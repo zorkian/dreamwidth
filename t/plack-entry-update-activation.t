@@ -12,17 +12,20 @@ use Plack::Test;
 use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
 use LJ::Entry;
 use LJ::Session;
 use LJ::SpellCheck;
 use LJ::Test qw(temp_comm temp_user);
+use LJ::Test::LegacyOwnedEditRoute;
 
 plan skip_all => 'Legacy update activation requires a development server'
     unless $LJ::IS_DEV_SERVER;
 
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
+my $production_update_route = $DW::Routing::string_choices{'app/update'};
 
 sub form_from_content {
     my ( $content, $base ) = @_;
@@ -63,7 +66,8 @@ sub get_form {
     my ( $res, $form );
     test_psgi $app, sub {
         my $send = shift;
-        $res = $send->( GET $path, Cookie => $cookie );
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $res = $send->( GET $path, Cookie => $cookie ); } );
     };
     is( $res->code, 200, "$label GET returns retained form representation" );
     $form = form_from_content( $res->content, 'http://localhost' . $path );
@@ -367,5 +371,9 @@ like(
     qr/(?:invalid|does not exist|not found)/i,
     'invalid GET usejournal retains a meaningful BML error'
 );
+
+is( $DW::Routing::string_choices{'app/update'},
+    $production_update_route,
+    'scoped retained update form route restores before direct public fallback checks' );
 
 done_testing;

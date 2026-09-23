@@ -13,18 +13,22 @@ use Plack::Test;
 use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
 use LJ::Entry;
 use LJ::Session;
 use LJ::SpellCheck;
 use LJ::Test qw(temp_user);
 use LJ::Userpic;
+use LJ::Test::LegacyOwnedEditRoute;
 
 plan skip_all => 'Legacy update integration requires a development server'
     unless $LJ::IS_DEV_SERVER;
 
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
+my $production_update_route = $DW::Routing::string_choices{'app/update'};
+my $production_edit_route   = $DW::Routing::string_choices{'app/editjournal'};
 
 sub update_form {
     my ($content) = @_;
@@ -40,6 +44,16 @@ sub update_form {
 sub edit_form {
     return ( grep { ( $_->attr('id') || '' ) eq 'updateForm' && $_->find_input('itemid') }
             HTML::Form->parse( $_[0], 'http://localhost/editjournal.bml' ) )[0];
+}
+
+sub native_form {
+    return (
+        grep {
+                   ( $_->attr('id') || '' ) eq 'js-post-entry'
+                && $_->find_input('subject')
+                && $_->find_input('event')
+        } HTML::Form->parse( $_[0], 'http://localhost/entry/new' )
+    )[0];
 }
 
 sub fresh_draft_properties {
@@ -82,7 +96,9 @@ test_psgi $app, sub {
     my $request = sub { my ($req) = @_; $req->header( Cookie => $cookie ); return $send->($req); };
     {
         local $LJ::SPELLER;
-        my $disabled = $request->( GET '/update.bml' );
+        my $disabled;
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $disabled = $request->( GET '/update.bml' ); } );
         is( $disabled->code, 200, 'legacy update renders with spellcheck disabled' );
         my $disabled_form = update_form( $disabled->content );
         ok( $disabled_form, 'disabled legacy update form parses' );
@@ -92,7 +108,9 @@ test_psgi $app, sub {
         );
     }
 
-    my $res = $request->( GET '/update.bml' );
+    my $res;
+    LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+        sub { $res = $request->( GET '/update.bml' ); } );
     is( $res->code, 200, 'legacy update renders' );
     my $form = update_form( $res->content );
     ok( $form,                                  'legacy update form parses' );
@@ -120,33 +138,28 @@ test_psgi $app, sub {
     is( $res->code, 200, 'spellcheck response renders' );
     like( $res->content, qr/suggestion/, 'suggestions visible' );
     is( $checked[-1], 'misspell body', 'checker receives exact body' );
-    my $retained = update_form( $res->content );
-    ok( $retained, 'spellcheck response rerenders the update form' );
-    is( $retained->value('subject'), 'Spell subject', 'spellcheck retains submitted subject' );
-    is( $retained->value('event'),   'misspell body', 'spellcheck retains submitted body' );
+    my $retry = native_form( $res->content );
+    ok( $retry, 'spellcheck response rerenders the native correction form' );
+    is( $retry->value('subject'), 'Spell subject', 'spellcheck retains submitted subject' );
+    is( $retry->value('event'),   'misspell body', 'spellcheck retains submitted body' );
     is(
-        $retained->value('prop_taglist'),
+        $retry->value('taglist'),
         'spell-tag-one, spell-tag-two',
         'spellcheck retains submitted tags'
     );
     is(
-        $retained->value('prop_current_location'),
+        $retry->value('current_location'),
         'Spellcheck location marker',
         'spellcheck retains submitted location'
     );
     is(
-        $retained->value('prop_current_music'),
+        $retry->value('current_music'),
         'Spellcheck music marker',
         'spellcheck retains submitted music'
     );
-    is( $retained->value('security'),      'private', 'spellcheck retains submitted security' );
-    is( $retained->value('opt_backdated'), 1,         'spellcheck retains submitted backdating' )
-        if $retained->find_input('opt_backdated');
-    is_deeply(
-        [ map { $retained->value($_) } qw(date_ymd_yyyy date_ymd_mm date_ymd_dd hour min) ],
-        [ 2024, '02', 3, '04', '05' ],
-        'spellcheck retains submitted date and time controls'
-    );
+    is( $retry->value('security'),       'private',  'spellcheck retains submitted security' );
+    is( $retry->value('entrytime_date'), '2024-2-3', 'spellcheck retains submitted date' );
+    is( $retry->value('entrytime_time'), '04:05',    'spellcheck retains submitted time' );
     my $fresh_owner = LJ::load_userid( $owner_id, 1 );
     is(
         $fresh_owner->draft_text,
@@ -161,7 +174,8 @@ test_psgi $app, sub {
     my ($after) =
         $owner->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef, $owner_id );
     is( $after, $before, 'spellcheck does not post' );
-    $res  = $request->( GET '/update.bml' );
+    LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+        sub { $res = $request->( GET '/update.bml' ); } );
     $form = update_form( $res->content );
     $form->action('http://localhost/update.bml');
     $form->value( event => 'clean body' );
@@ -180,14 +194,17 @@ test_psgi $app, sub {
     my $stored_rte = fresh_entry( $owner, $entry->jitemid );
     is( $stored_rte->prop('used_rte'), 1, 'fixture persists stored rich-text entry state' );
     my $path = '/editjournal.bml?itemid=' . $entry->ditemid;
-    $res = $request->( GET $path);
+    LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/editjournal',
+        sub { $res = $request->( GET $path ); } );
     is( $res->code, 200, 'owned legacy edit renders' );
     my $edit = edit_form( $res->content );
     ok( $edit,                                  'owned legacy edit form parses' );
     ok( $edit->find_input('action:spellcheck'), 'configured legacy edit shows spellcheck' );
     {
         local $LJ::SPELLER;
-        my $disabled_edit      = $request->( GET $path );
+        my $disabled_edit;
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/editjournal',
+            sub { $disabled_edit = $request->( GET $path ); } );
         my $disabled_edit_form = edit_form( $disabled_edit->content );
         ok( $disabled_edit_form, 'disabled legacy edit form parses' );
         ok(
@@ -230,7 +247,9 @@ test_psgi $app, sub {
     );
     $plain_entry->set_prop( 'used_rte', 0 );
     my $plain_path = '/editjournal.bml?itemid=' . $plain_entry->ditemid;
-    my $plain_res  = $request->( GET $plain_path );
+    my $plain_res;
+    LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/editjournal',
+        sub { $plain_res = $request->( GET $plain_path ); } );
     my $plain_edit = edit_form( $plain_res->content );
     ok( $plain_edit, 'non-rich legacy edit form parses' );
     $plain_edit->action( 'http://localhost' . $plain_path );
@@ -242,4 +261,11 @@ test_psgi $app, sub {
     my $fresh = LJ::Entry->new( $owner, ditemid => $entry->ditemid );
     is( $fresh->event_raw, 'Stored body', 'spellcheck leaves owned entry unchanged' );
 };
+is( $DW::Routing::string_choices{'app/update'},
+    $production_update_route,
+    'scoped retained update form route restores after spellcheck POST coverage' );
+is( $DW::Routing::string_choices{'app/editjournal'},
+    $production_edit_route,
+    'scoped retained edit form route restores after spellcheck POST coverage' );
+
 done_testing;

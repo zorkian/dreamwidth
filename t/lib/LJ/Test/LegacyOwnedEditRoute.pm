@@ -40,4 +40,20 @@ sub retained_bml_get_route {
     };
 }
 
+# Temporarily compose one application route so fixtures can obtain a retained
+# BML form without making their subsequent POST exercise a test-only handler.
+# The dynamic scope is deliberately callback-only: callers retain parsed
+# controls and submit after it returns.
+sub with_retained_bml_get_route {
+    my ( $route, $callback ) = @_;
+    die 'missing route name' unless defined $route && length $route;
+    die 'missing retained BML callback' unless ref $callback eq 'CODE';
+
+    my $original = $DW::Routing::string_choices{$route};
+    die "missing $route route" unless $original && $original->{sub};
+
+    local $DW::Routing::string_choices{$route} = retained_bml_get_route($original);
+    return $callback->($original);
+}
+
 1;

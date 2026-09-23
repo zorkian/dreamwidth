@@ -13,16 +13,19 @@ use HTML::Form;
 use Plack::Test;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
 use LJ::Entry;
 use LJ::Session;
 use LJ::Test qw(temp_user);
+use LJ::Test::LegacyOwnedEditRoute;
 
 plan skip_all => 'Legacy update integration requires a development server'
     unless $LJ::IS_DEV_SERVER;
 
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
+my $production_update_route = $DW::Routing::string_choices{'app/update'};
 
 sub update_form {
     my ($content) = @_;
@@ -65,7 +68,9 @@ test_psgi $app, sub {
 
     for my $index ( 0, 1 ) {
         my $path = $index ? '/update.bml' : '/update';
-        my $res  = $request->( GET $path );
+        my $res;
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $res = $request->( GET $path ); } );
         is( $res->code, 200, "$path renders the retained legacy form outside beta" );
         unlike( $res->header('Location') || '', qr{/entry/new}, "$path is not beta-redirected" );
         my $form = update_form( $res->content );
@@ -244,5 +249,9 @@ test_psgi $app, sub {
         }
     }
 };
+
+is( $DW::Routing::string_choices{'app/update'},
+    $production_update_route,
+    'scoped retained update form route restores after legacy POST coverage' );
 
 done_testing;

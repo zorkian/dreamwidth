@@ -14,6 +14,7 @@ use Scalar::Util qw(refaddr);
 use Storable qw(nfreeze thaw);
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
 use DW::Controller::Entry;
 use DW::Request;
@@ -22,6 +23,7 @@ use LJ::Entry;
 use LJ::Session;
 use LJ::Test qw(temp_comm temp_user);
 use LJ::Userpic;
+use LJ::Test::LegacyOwnedEditRoute;
 use Plack::Middleware::DW::RequestWrapper;
 
 plan skip_all => 'Legacy update adapter integration requires a development server'
@@ -55,6 +57,7 @@ sub fresh_entry {
 
 my $legacy_app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $legacy_app eq 'CODE';
+my $production_update_route = $DW::Routing::string_choices{'app/update'};
 
 my $owner = temp_user();
 $owner->update_self( { status => 'A' } );
@@ -106,7 +109,9 @@ for my $index ( 0, 1 ) {
     my $legacy_form;
     test_psgi $legacy_app, sub {
         my $send = shift;
-        my $res  = $send->( GET $path, Cookie => $cookie );
+        my $res;
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $res = $send->( GET $path, Cookie => $cookie ); } );
         is( $res->code, 200, "$path renders the retained old-schema form" );
         $legacy_form = update_form( $res->content );
         $valid_form_auth ||= $legacy_form->value('lj_form_auth') if $legacy_form;
@@ -421,7 +426,9 @@ sub retained_form {
     my $form;
     test_psgi $legacy_app, sub {
         my $send = shift;
-        my $res  = $send->( GET $path, Cookie => $cookie );
+        my $res;
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $res = $send->( GET $path, Cookie => $cookie ); } );
         is( $res->code, 200, "$label retained form GET succeeds" );
         $form = update_form( $res->content );
     };
@@ -1056,5 +1063,9 @@ is( $prepared_xpost->{canonical}{crosspost}{41}{password},
     'GET-secret', 'empty transform xpost credential inherits GET value before native rendering' );
 is( $xpost_passwords[0], '',
     'native crosspost password control deliberately does not reflect a secret' );
+
+is( $DW::Routing::string_choices{'app/update'},
+    $production_update_route,
+    'scoped retained update form route restores the production update route' );
 
 done_testing;
