@@ -366,8 +366,8 @@ sub did_post {
     my $r = DW::Request->get;
     return $r->did_post if $r;
 
-    # no active request (e.g. a background job); preserve the old fallback
-    return ( BML::get_method() eq "POST" );
+    # no active request (e.g. a background job): never a POST.
+    return '';
 }
 
 # <LJFUNC>
@@ -540,7 +540,7 @@ sub check_referer {
     my $referer =
            shift(@_)
         || ( DW::Request->get && DW::Request->get->header_in('Referer') )
-        || BML::get_client_header('Referer');
+        || '';
 
     # get referer and check
     return 1 unless $referer;

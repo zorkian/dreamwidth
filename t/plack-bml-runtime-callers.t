@@ -172,7 +172,7 @@ subtest 'LJ::start_request resets BML cookie cache without a blanket eval' => su
     is( $BML::COOKIES_PARSED, 0, 'start_request resets the BML cookies-parsed flag' );
 };
 
-subtest 'LJ::did_post prefers DW::Request over BML::get_method' => sub {
+subtest 'LJ::did_post uses DW::Request, with no BML::get_method fallback' => sub {
     DW::Request->reset;
     my $get_r = DW::Request::Standard->new( GET 'http://localhost/foo' );
     $get_r->header_in( Host => 'localhost' );
@@ -184,10 +184,10 @@ subtest 'LJ::did_post prefers DW::Request over BML::get_method' => sub {
     ok( LJ::did_post(), 'POST request is a post' );
 
     DW::Request->reset;
-    ok( !LJ::did_post(), 'no active request falls back to BML::get_method, which is false' );
+    ok( !LJ::did_post(), 'no active request is never a post' );
 };
 
-subtest 'LJ::check_referer prefers DW::Request over BML::get_client_header' => sub {
+subtest 'LJ::check_referer uses DW::Request, with no BML::get_client_header fallback' => sub {
     DW::Request->reset;
     my $r =
         DW::Request::Standard->new( GET 'http://localhost/foo', Referer => 'http://localhost/bar' );
@@ -195,6 +195,10 @@ subtest 'LJ::check_referer prefers DW::Request over BML::get_client_header' => s
     ok( LJ::check_referer('/bar'), 'referer picked up from the active native request matches' );
     ok( !LJ::check_referer('/other'),
         'referer picked up from the active request does not match /other' );
+    DW::Request->reset;
+
+    DW::Request->reset;
+    ok( LJ::check_referer('/bar'), 'no active request and no explicit referer is treated as OK' );
     DW::Request->reset;
 };
 
