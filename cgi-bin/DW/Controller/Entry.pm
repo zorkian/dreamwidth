@@ -27,6 +27,7 @@ use DW::Template;
 use DW::FormErrors;
 use DW::Formats;
 use DW::Entry;
+use DW::Entry::Legacy;
 
 use Hash::MultiValue;
 use HTTP::Status qw( :constants );
@@ -269,7 +270,9 @@ sub new_handler {
 }
 
 sub _render_new_form {
-    my ( $vars, $post, $get, $remote, $errors, $warnings, $spellcheck_requested ) = @_;
+    my ( $vars, $post, $get, $remote, $errors, $warnings, $spellcheck_requested, $render_opts ) =
+        @_;
+    $render_opts ||= {};
 
 # this is an error in the user-submitted data, so regenerate the form with the error message and previous values
     $vars->{errors}   = $errors;
@@ -301,7 +304,8 @@ sub _render_new_form {
 
     $vars->{editable} = { map { $_ => 1 } @modules };
 
-    $vars->{action} = { url => LJ::create_url( undef, keep_args => 1 ), };
+    $vars->{action} =
+        { url => $render_opts->{action_url} // LJ::create_url( undef, keep_args => 1 ), };
 
     $vars->{js_for_rte} = LJ::rte_js_vars();
     $vars->{sitevalues} = to_json( \@sitevalues );
@@ -345,6 +349,66 @@ sub _render_new_form {
     $vars->{autosave_interval} = $LJ::AUTOSAVE_DRAFT_INTERVAL;
 
     return DW::Template->render_template( 'entry/form.tt', $vars );
+}
+
+# Render a retained legacy new-entry error or transform response through the
+# shared native form. This is deliberately not a route or save adapter: callers
+# retain authorization and action decisions, and provide the already-prepared
+# legacy decoder result.
+sub legacy_new_rerender {
+    my ( $prepared, %opts ) = @_;
+
+    my $r           = DW::Request->get;
+    my $remote      = $opts{remote};
+    my $get         = $opts{get} || ( $r ? $r->get_args : Hash::MultiValue->new );
+    my $canonical   = $prepared->{canonical};
+    my $legacy_post = $prepared->{post};
+    my $formdata    = DW::Entry::Legacy::formdata_from_legacy( $canonical, $legacy_post );
+
+    # A submitted empty usejournal deliberately selects the owner. Only fall
+    # back to the request query when the legacy submission did not name it.
+    my $usejournal =
+        exists $legacy_post->{usejournal}
+        ? $legacy_post->{usejournal}
+        : $get->{usejournal};
+
+    my %crosspost = map { $_ => 1 }
+        grep { $canonical->{crosspost}{$_}{id} }
+        keys %{ $canonical->{crosspost} || {} };
+
+    my $datetime = '';
+    if (   defined $canonical->{year}
+        && defined $canonical->{mon}
+        && defined $canonical->{day}
+        && defined $canonical->{hour}
+        && defined $canonical->{min} )
+    {
+        $datetime = join( ' ',
+            join( '-', @{$canonical}{qw(year mon day)} ),
+            join( ':', @{$canonical}{qw(hour min)} ) );
+    }
+
+    my $vars = _init(
+        {
+            usejournal           => $usejournal,
+            remote               => $remote,
+            datetime             => $datetime,
+            trust_datetime_value => !exists $canonical->{tz},
+            crosspost            => \%crosspost,
+        }
+    );
+
+    my $action_url = $opts{action_url};
+    $action_url //= LJ::create_url( '/entry/new', keep_query_string => 1 ) if $r;
+    $action_url //= '/entry/new';
+
+    return _render_new_form(
+        $vars, $formdata, $get, $remote,
+        $opts{errors}   || DW::FormErrors->new,
+        $opts{warnings} || DW::FormErrors->new,
+        $opts{spellcheck_requested},
+        { action_url => $action_url },
+    );
 }
 
 # Spellcheck is intentionally a non-persisting form transform. Its HTML is
