@@ -12,9 +12,6 @@ $u->update_self( { status => 'A' } );
 $u->set_password( my $p = 'update-get-' . LJ::rand_chars(12) );
 $u->set_prop( 'entry_editor', 'always_rich' );
 $u->entry_editor2('markdown0');
-$u->set_prop( 'entry_draft', '"update GET draft"' );
-$u->set_prop( 'draft_properties',
-    nfreeze( { subject => 'update GET draft subject', editor => 'markdown0' } ) );
 
 sub state {
     my $f = LJ::load_userid( $u->id, 1 );
@@ -27,4 +24,12 @@ sub state {
 }
 $| = 1;
 print encode_json( { user => $u->user, password => $p, state => state() } ) . "\n";
-while (<STDIN>) { my $q = decode_json($_); print encode_json( state() ) . "\n" if $q->{state}; }
+while (<STDIN>) {
+    my $q = decode_json($_);
+    if ( $q->{seed_draft} ) {
+        $u->set_prop( 'entry_draft', '"update GET draft"' );
+        $u->set_prop( 'draft_properties',
+            nfreeze( { subject => 'update GET draft subject', editor => 'markdown0' } ) );
+    }
+    print encode_json( state() ) . "\n" if $q->{state} || $q->{seed_draft};
+}
