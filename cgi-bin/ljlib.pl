@@ -492,9 +492,6 @@ sub start_request {
     # the connection ID... just as fast, but with a point!)
     $LJ::DBIRole->trigger_weight_reload();
 
-    # reset BML's cookies (some non-web scripts never load BML at all)
-    BML::reset_cookies() if defined &BML::reset_cookies;
-
     # reload config if necessary
     LJ::Config->start_request_reload;
 
