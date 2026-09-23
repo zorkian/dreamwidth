@@ -313,19 +313,25 @@ sub render {
 
     # Main journal rendering via LJ::make_journal. LJ::make_journal/s2_run's
     # own use of 'r' is plain DW::Request methods (OK, NOT_FOUND, note,
-    # status, content_type); the s2_head_content_extra hook (a held external
-    # ABI) constructs its own DW::BML::RequestAdapter at its call site in
-    # LJ::S2.pm instead of reusing this one.
+    # status, content_type). The s2_head_content_extra hook (a held external
+    # ABI) needs an Apache-shaped DW::BML::RequestAdapter here, same as
+    # always -- but LJ::S2::Page (which fires that hook) is also called
+    # directly by DW::Controller::Entry's journal-style preview with a plain
+    # DW::Request in $opts->{r} and no such marker, so LJ::S2.pm:2468 only
+    # wraps an adapter when this flag says the caller is the real journal
+    # render path; the preview path keeps getting the plain DW::Request it
+    # always has.
     my $handle_with_siteviews = 0;
     my %headers;
 
     my $opts = {
-        'r'         => $r,
-        'headers'   => \%headers,
-        'args'      => $args,
-        'vhost'     => 'users',
-        'pathextra' => $pe,
-        'header'    => {
+        'r'               => $r,
+        's2_hook_adapter' => 1,
+        'headers'         => \%headers,
+        'args'            => $args,
+        'vhost'           => 'users',
+        'pathextra'       => $pe,
+        'header'          => {
             'If-Modified-Since' => $r->header_in("If-Modified-Since") // '',
         },
         'handle_with_siteviews_ref' => \$handle_with_siteviews,

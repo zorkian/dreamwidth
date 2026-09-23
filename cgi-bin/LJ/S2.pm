@@ -2467,12 +2467,19 @@ sub Page {
 
     if ( LJ::Hooks::are_hooks('s2_head_content_extra') ) {
 
-        # Held external hook ABI: this must keep receiving an Apache-shaped
-        # DW::BML::RequestAdapter, not the plain DW::Request $opts->{r} is
-        # elsewhere (see doc/BML-JOURNAL-ADAPTER.md).
-        $p->{head_content} .=
-            LJ::Hooks::run_hook( 's2_head_content_extra', $remote,
-            DW::BML::RequestAdapter->new($r) );
+        # Held external hook ABI: on the real journal-render path (marked by
+        # DW::Controller::Journal.pm's 's2_hook_adapter' opt), this must keep
+        # receiving an Apache-shaped DW::BML::RequestAdapter, matching what
+        # it always got there (see doc/BML-JOURNAL-ADAPTER.md). Page() is
+        # also called directly by DW::Controller::Entry's journal-style
+        # preview with a plain DW::Request and no such marker; that path
+        # already passed the hook a plain DW::Request before, so it keeps
+        # doing so unchanged here rather than unifying the two shapes.
+        my $hook_r =
+            $opts->{s2_hook_adapter}
+            ? DW::BML::RequestAdapter->new( $opts->{r} )
+            : $opts->{r};
+        $p->{head_content} .= LJ::Hooks::run_hook( 's2_head_content_extra', $remote, $hook_r );
     }
 
     my %meta_opts =

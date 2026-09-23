@@ -42,6 +42,15 @@ sub wrap {
     return bless { real => $real, label => $label || ref($real) }, __PACKAGE__;
 }
 
+# AUTOLOAD-based classes don't answer ->can() truthfully by default; delegate
+# to the wrapped object so callers that probe with ->can (as a production
+# hook reasonably might, to tell an adapter from a plain DW::Request) see
+# the same answer they would against the real, unwrapped object.
+sub can {
+    my ( $self, $method ) = @_;
+    return UNIVERSAL::can( $self, $method ) || ( ref($self) && $self->{real}->can($method) );
+}
+
 our $AUTOLOAD;
 
 sub AUTOLOAD {
@@ -221,56 +230,65 @@ subtest 'FOAF request via a locally-registered data_handler:foaf hook' => sub {
     );
 };
 
-subtest 'Locally-registered s2_head_content_extra hook (post-W8: adapter built at the call site)' =>
-    sub {
+subtest 'LJ::S2::Page: adapter on the marked journal path, plain DW::Request on preview' => sub {
 
-    # LJ::S2.pm:2467-2468 only reaches this hook deep inside a *successful*
-    # S2 page render (building $p->{head_content}), which this environment's
-    # missing S2 style layers prevent (see the HTML subtest above). Exercise
-    # the hook's exact call convention directly instead -- same hook name,
-    # same two positional args (remote, DW::BML::RequestAdapter->new($r)) --
-    # matching W8's LJ::S2.pm:2467-2468 exactly: it no longer reads
-    # $opts->{r}, it constructs its own adapter right there, specifically to
-    # keep this held external ABI unchanged while :317 stops doing so.
-    $ADAPTER_NEW_CALLS = 0;
+    # LJ::S2::Page runs directly in this environment (confirmed by probe: it
+    # needs only $u->{_s2styleid}/_journalbase and a minimal $opts, none of
+    # the style-layer compilation the full make_journal/s2_run pipeline
+    # needs), so drive the *real* production function instead of re-
+    # implementing its call convention. DW::Controller::Entry's journal-
+    # style preview (Entry.pm ~1806-1813) calls this same LJ::S2::Page with
+    # a plain DW::Request in $opts->{r} and no 's2_hook_adapter' marker --
+    # that path must keep receiving a plain DW::Request, unchanged from
+    # before W8, while DW::Controller::Journal.pm's marked $opts must keep
+    # receiving a DW::BML::RequestAdapter, matching what it always got.
+    $u->{_s2styleid}   = 0;
+    $u->{_journalbase} = $u->journal_base;
+
     local $LJ::HOOKS{'s2_head_content_extra'};
     my @hook_args;
     LJ::Hooks::register_hook(
         's2_head_content_extra',
         sub {
             my ( $remote, $r ) = @_;
-            push @hook_args, { remote => $remote, r => $r };
-            $r->connection->client_ip;    # prove it can call methods on the adapter
-            return '<!-- extra head content -->';
+            push @hook_args, $r;
+            $r->connection->client_ip if $r->can('connection');    # only the adapter has this
+            return '';
         }
     );
 
     DW::Request->reset;
     my $plack_r = DW::Request::Plack->new(
         { REQUEST_METHOD => 'GET', PATH_INFO => '/', 'psgi.url_scheme' => 'http' } );
-    @RecordingAdapterProxy::LOG = ();
-    my $extra =
-        LJ::Hooks::run_hook( 's2_head_content_extra', $u, DW::BML::RequestAdapter->new($plack_r) );
 
-    is( scalar(@hook_args), 1, 's2_head_content_extra hook fired exactly once' );
-    is( $ADAPTER_NEW_CALLS, 1, 'exactly one adapter is constructed, at the hook call site' );
-    isa_ok( $hook_args[0]->{r}->{real}, 'DW::BML::RequestAdapter',
-'the object the hook receives really is a DW::BML::RequestAdapter underneath the test\'s recording wrapper'
-    );
-    is(
-        $extra,
-        '<!-- extra head content -->',
-        'hook return value is used as head_content, unmodified'
-    );
-    ok(
-        ( grep { $_->{method} eq 'connection' } @RecordingAdapterProxy::LOG ),
-        'hook was able to call connection on the adapter it received'
-    );
+    # Journal case: DW::Controller::Journal.pm-shaped opts (marked).
+    @RecordingAdapterProxy::LOG = ();
+    $ADAPTER_NEW_CALLS          = 0;
+    my $journal_opts = { r => $plack_r, getargs => {}, s2_hook_adapter => 1 };
+    ok( eval { LJ::S2::Page( $u, $journal_opts ); 1 }, 'LJ::S2::Page runs for journal-shaped opts' )
+        or diag("Page died: $@");
+    is( scalar(@hook_args), 1, 'hook fired once for the journal case' );
+    isa_ok( $hook_args[0]->{real},
+        'DW::BML::RequestAdapter',
+        'journal case: hook receives a DW::BML::RequestAdapter (via the recording wrapper)' );
+    is( $ADAPTER_NEW_CALLS, 1, 'exactly one adapter is constructed for the journal case' );
     ok(
         ( grep { $_->{on} eq 'DW::BML::RequestAdapter::Connection' } @RecordingAdapterProxy::LOG ),
-        'and call client_ip on the connection object it got back'
+        'and connection->client_ip works on it'
     );
-    };
+
+    # Preview case: DW::Controller::Entry-shaped opts (unmarked).
+    @hook_args                  = ();
+    @RecordingAdapterProxy::LOG = ();
+    $ADAPTER_NEW_CALLS          = 0;
+    my $preview_opts = { r => $plack_r, getargs => {} };
+    ok( eval { LJ::S2::Page( $u, $preview_opts ); 1 }, 'LJ::S2::Page runs for preview-shaped opts' )
+        or diag("Page died: $@");
+    is( scalar(@hook_args), 1, 'hook fired once for the preview case' );
+    isa_ok( $hook_args[0], 'DW::Request::Plack',
+        'preview case: hook receives the plain DW::Request, not an adapter' );
+    is( $ADAPTER_NEW_CALLS, 0, 'zero adapters are constructed for the preview case' );
+};
 
 subtest 'no_control_strip note reaches DW::Hooks::NavStrip via plain DW::Request::note' => sub {
 
