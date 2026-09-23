@@ -288,9 +288,19 @@ builder {
     # htdocs/preview/index.html, and raw .scss sources, none of which should be
     # reachable. Path-only matching (not Host-based), so this also covers
     # /favicon.ico on journal subdomains, which relied on the same fallback.
+    #
+    # /robots.txt is the one exception: on a journal host (dw.journal_user set
+    # by SubdomainFunction, which runs before this) it must fall through to
+    # DW::Controller::Journal's own per-journal robots_txt mode (opt_blockrobots,
+    # the robots_txt_extra hook) instead of the site's static file.
     for my $dir ( LJ::get_all_directories('htdocs') ) {
         enable 'Static',
-            path => qr{^/(?:500-error\.html|apple-touch-icon\.png|favicon\.ico|protocol\.dat|robots\.txt|rte/.+)$},
+            path => sub {
+                my ( $path, $env ) = @_;
+                return 0 if $path eq '/robots.txt' && $env->{'dw.journal_user'};
+                return $path =~
+                    m{^/(?:500-error\.html|apple-touch-icon\.png|favicon\.ico|protocol\.dat|robots\.txt|rte/.+)$};
+            },
             root         => $dir,
             pass_through => 1;
     }

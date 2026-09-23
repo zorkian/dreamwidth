@@ -4,8 +4,10 @@
 # used to serve every plain file under any htdocs overlay as a side effect
 # of resolving unmatched paths. Confirms each legitimate file the old
 # fallback served is still reachable with the correct content type
-# (including /favicon.ico on a journal host), and that the excluded paths
-# the old blanket fallback also exposed stay unreachable.
+# (including /favicon.ico on a journal host), that the excluded paths the
+# old blanket fallback also exposed stay unreachable, and that /robots.txt
+# specifically still reaches DW::Controller::Journal's own per-journal mode
+# on a journal host rather than the static site file.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
@@ -15,6 +17,7 @@ use HTTP::Request::Common;
 use Plack::Test;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use LJ::Test qw(temp_user);
 
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
@@ -74,6 +77,49 @@ subtest 'favicon.ico is served on a journal subdomain, not just the site host' =
             $res->header('Content-Type') // '',
             qr{^image/(?:vnd\.microsoft\.icon|x-icon)},
             'journal-host favicon.ico has the expected content type'
+        );
+    };
+};
+
+subtest 'robots.txt on a journal host reaches Journal.pm, not the static allowlist' => sub {
+    local $LJ::USER_DOMAIN = 'example.org';
+    local $LJ::DOMAIN_WEB  = 'www.example.org';
+    local $LJ::DOMAIN      = 'example.org';
+
+    local $LJ::HOOKS{robots_txt_extra} = [ sub { return "# extra line\n" } ];
+
+    my $ordinary = temp_user();
+    $ordinary->update_self( { status => 'A' } );
+
+    my $blocked = temp_user();
+    $blocked->update_self( { status => 'A' } );
+    $blocked->set_prop( opt_blockrobots => 1 );
+
+    test_psgi $app, sub {
+        my $cb = shift;
+
+        my $res = $cb->( GET 'http://' . $ordinary->user . '.example.org/robots.txt' );
+        is( $res->code, 200, "ordinary journal's robots.txt is 200" );
+        is(
+            $res->content,
+            "# extra line\nUser-Agent: *\n",
+"ordinary journal's robots.txt matches Journal.pm's own output, including robots_txt_extra"
+        );
+
+        my $blocked_res = $cb->( GET 'http://' . $blocked->user . '.example.org/robots.txt' );
+        is( $blocked_res->code, 200, "blocked journal's robots.txt is 200" );
+        is(
+            $blocked_res->content,
+            "# extra line\nUser-Agent: *\nDisallow: /\n",
+            "blocked journal's robots.txt is Journal.pm's own output with a bare Disallow: / line"
+        );
+
+        my $site_res = $cb->( GET 'http://www.example.org/robots.txt' );
+        is( $site_res->code, 200, "www's robots.txt is 200" );
+        like(
+            $site_res->content,
+            qr{Disallow: /directorysearch},
+            "www's robots.txt is the static htdocs file, not Journal.pm's per-journal output"
         );
     };
 };
