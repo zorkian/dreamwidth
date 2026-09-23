@@ -269,6 +269,89 @@ sub new_handler {
         $spellcheck_requested );
 }
 
+# Callable compatibility seam for ordinary retained /update POSTs. Route
+# registration, transforms, alternate login, and community posting remain
+# deliberately outside this first adapter slice.
+sub legacy_update_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->did_post;
+
+    my $post        = $r->post_args;
+    my $get         = $r->get_args;
+    my $legacy_post = DW::Entry::Legacy::legacy_post_hash($post);
+    my $legacy_get  = DW::Entry::Legacy::legacy_post_hash($get);
+    my $remote      = $opts{remote} || LJ::get_remote();
+
+    # This initial slice only covers the authenticated owner's ordinary post.
+    # Everything else must continue to the retained BML implementation.
+    return undef unless LJ::isu($remote);
+    return undef
+        if $legacy_get->{altlogin}
+        || $legacy_post->{transform}
+        || $legacy_post->{showform}
+        || $legacy_post->{moreoptsbtn}
+        || $legacy_post->{'action:preview'}
+        || $legacy_post->{'action:spellcheck'};
+    return undef
+        if $legacy_post->{user}
+        && LJ::canonical_username( $legacy_post->{user} ) ne $remote->user;
+
+    my $target =
+        exists $legacy_post->{usejournal}
+        ? $legacy_post->{usejournal}
+        : $legacy_get->{usejournal};
+    return undef
+        if defined $target
+        && length $target
+        && LJ::canonical_username($target) ne $remote->user;
+
+    my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
+    my $errors   = DW::FormErrors->new;
+    my $warnings = DW::FormErrors->new;
+
+    $errors->add( undef, 'error.invalidform' )
+        unless LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer();
+    $errors->add( undef, 'bml.badinput.body1' ) unless length $prepared->{canonical}{event};
+    $errors->add_string( undef, $LJ::MSG_READONLY_USER ) if $remote->readonly;
+
+    return legacy_new_rerender(
+        $prepared,
+        remote   => $remote,
+        errors   => $errors,
+        warnings => $warnings,
+    ) if $errors->exist;
+
+    # _do_post owns the retained post-attempt and successful extension hooks.
+    # Pass the exact flat decoder request there; canonical props are not a
+    # replacement for hook-visible legacy fields.
+    my %post_res = _do_post(
+        $prepared->{canonical},
+        { noauth => 1,       u       => $remote },
+        { poster => $remote, journal => $remote },
+        warnings       => $warnings,
+        legacy_success => {
+            request          => $prepared->{request},
+            poster           => $remote,
+            remote           => $remote,
+            event_format     => $legacy_post->{event_format},
+            switched_rte_on  => $legacy_post->{switched_rte_on},
+            crosspost_master => _legacy_crosspost_master( $legacy_post, $legacy_get ),
+        },
+        legacy_crosspost_callback => _legacy_crosspost_callback( $legacy_post, $legacy_get ),
+    );
+    return $post_res{render} if $post_res{status} eq 'ok';
+
+    $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+    return legacy_new_rerender(
+        $prepared,
+        remote   => $remote,
+        errors   => $errors,
+        warnings => $warnings,
+    );
+}
+
 sub _render_new_form {
     my ( $vars, $post, $get, $remote, $errors, $warnings, $spellcheck_requested, $render_opts ) =
         @_;
