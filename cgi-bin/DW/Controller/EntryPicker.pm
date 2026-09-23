@@ -40,16 +40,13 @@ sub entry_picker_handler {
 
         my $remote = LJ::get_remote();
         my $username =
-               $get->{usejournal}
-            || $get->{journal}
-            || $post->{usejournal}
-            || ( $remote ? $remote->user : undef );
+            LJ::canonical_username( $get->{usejournal}
+                || $get->{journal}
+                || $post->{usejournal}
+                || ( $remote ? $remote->user : undef ) );
 
         if ( $r->method eq 'GET' ) {
-            my $path =
-                ( defined $username && length $username )
-                ? "/entry/$username/$ditemid/edit"
-                : '/entry/new';
+            my $path = length $username ? "/entry/$username/$ditemid/edit" : '/entry/new';
             $r->status(302);
             $r->header_out( Location => LJ::create_url($path) );
             return $r->OK;
@@ -57,28 +54,49 @@ sub entry_picker_handler {
 
         # A POST here is old-schema content from a stale tab: it must never
         # be saved and never be silently discarded. Decode once and hand the
-        # submitted content to the native edit form for review, using the
-        # same carry-over notice as the retired /update page.
-        return error_ml('/entry/form.tt.error.nofind')
-            unless defined $username && length $username;
-        my $journal = LJ::load_user($username);
-        return error_ml('/entry/form.tt.error.nofind') unless LJ::isu($journal);
-        my $entry = LJ::Entry->new( $journal, ditemid => $ditemid );
-        return error_ml('/entry/form.tt.error.nofind')
-            unless LJ::isu($remote) && $entry && $entry->valid && $entry->editable_by($remote);
-
+        # submitted content to the native form for review, using the same
+        # carry-over notice as the retired /update page.
         require DW::Controller::Entry;
         require DW::Entry::Legacy;
         my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
-        my $warnings = DW::FormErrors->new;
-        $warnings->add( undef, '.notice.legacy_carryover' );
-        return DW::Controller::Entry::legacy_owned_edit_rerender(
-            entry    => $entry,
-            remote   => $remote,
-            journal  => $journal,
-            prepared => $prepared,
-            warnings => $warnings,
-        );
+
+        unless ( LJ::isu($remote) ) {
+
+            # A logged-out stale tab (session expired) has no editable entry
+            # to attach to yet: carry the content into the native posting
+            # form with the login modal, exactly like an anonymous /update
+            # POST does.
+            my $warnings = DW::FormErrors->new;
+            $warnings->add( undef, '.notice.legacy_carryover' );
+            return DW::Controller::Entry::legacy_new_rerender(
+                $prepared,
+                remote             => undef,
+                get                => $get,
+                warnings           => $warnings,
+                action_url         => '/entry/new',
+                anonymous_username => $post->{user} // '',
+            );
+        }
+
+        my $journal = length $username ? LJ::load_user($username) : undef;
+        my $entry = LJ::isu($journal) ? LJ::Entry->new( $journal, ditemid => $ditemid ) : undef;
+
+        if ( $entry && $entry->valid && $entry->editable_by($remote) ) {
+            my $warnings = DW::FormErrors->new;
+            $warnings->add( undef, '.notice.legacy_carryover' );
+            return DW::Controller::Entry::legacy_owned_edit_rerender(
+                entry    => $entry,
+                remote   => $remote,
+                journal  => $journal,
+                prepared => $prepared,
+                warnings => $warnings,
+            );
+        }
+
+        # Not an entry this actor can edit (deleted, moved, or never theirs):
+        # never discard what they typed even though there is no editable
+        # form to safely resubmit it through.
+        return DW::Controller::Entry::legacy_carryover_unrecoverable($prepared);
     }
 
     my ( $ok, $rv ) = controller( authas => { type => 'P' } );

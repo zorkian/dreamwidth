@@ -101,11 +101,8 @@ DW::Routing->register_string(
         my $get = $r->get_args;
 
         if ( $r->method eq 'GET' ) {
-            my $usejournal = $get->{usejournal};
-            my $path =
-                ( defined $usejournal && length $usejournal )
-                ? "/entry/$usejournal/new"
-                : '/entry/new';
+            my $usejournal = LJ::canonical_username( $get->{usejournal} );
+            my $path       = length $usejournal ? "/entry/$usejournal/new" : '/entry/new';
 
             my %args;
             for my $name (qw(subject event share)) {
@@ -1392,6 +1389,29 @@ sub legacy_update_get_handler {
     );
 }
 
+# A carried-over custom access-list selection has no equivalent among a
+# community's security options (public/access/private only); an unmatched
+# <select> value submits as whichever option renders first (public) if the
+# user does not notice and simply clicks post. Never let that resolve to
+# public: fall back to the most restrictive option and say so explicitly.
+sub _legacy_carryover_safe_security {
+    my ( $canonical, $journal, $opts ) = @_;
+    return $canonical
+        unless $canonical->{security}
+        && $canonical->{security} eq 'usemask'
+        && LJ::isu($journal)
+        && $journal->is_community;
+
+    $canonical = {%$canonical};
+    $canonical->{security} = 'private';
+    delete $canonical->{allowmask};
+
+    $opts->{warnings} ||= DW::FormErrors->new;
+    $opts->{warnings}->add( undef, '.notice.legacy_security_downgraded' );
+
+    return $canonical;
+}
+
 # Render a retained legacy new-entry error or transform response through the
 # shared native form. This is deliberately not a route or save adapter: callers
 # retain authorization and action decisions, and provide the already-prepared
@@ -1404,11 +1424,6 @@ sub legacy_new_rerender {
     my $get         = $opts{get} || ( $r ? $r->get_args : Hash::MultiValue->new );
     my $canonical   = $prepared->{canonical};
     my $legacy_post = $prepared->{post};
-    my $formdata    = DW::Entry::Legacy::formdata_from_legacy( $canonical, $legacy_post );
-    if ( defined $opts{anonymous_username} ) {
-        $formdata->{username} = $opts{anonymous_username};
-        $formdata->{password} = '';
-    }
 
     # A submitted empty usejournal deliberately selects the owner. Only fall
     # back to the request query when the legacy submission did not name it.
@@ -1416,6 +1431,16 @@ sub legacy_new_rerender {
         exists $legacy_post->{usejournal}
         ? $legacy_post->{usejournal}
         : $get->{usejournal};
+
+    $canonical =
+        _legacy_carryover_safe_security( $canonical,
+        $usejournal ? LJ::load_user($usejournal) : undef, \%opts );
+
+    my $formdata = DW::Entry::Legacy::formdata_from_legacy( $canonical, $legacy_post );
+    if ( defined $opts{anonymous_username} ) {
+        $formdata->{username} = $opts{anonymous_username};
+        $formdata->{password} = '';
+    }
 
     my %crosspost = map { $_ => 1 }
         grep { $canonical->{crosspost}{$_}{id} }
@@ -2017,6 +2042,23 @@ sub _render_edit_form {
 # A retained editjournal adapter supplies the already-resolved, owned entry and
 # prepared legacy data. It intentionally does not dispatch, authenticate, or
 # resolve the entry: maintainer-only editing remains on its separate path.
+# A stale-tab old-schema edit POST that cannot be attributed to an entry the
+# actor can edit (deleted, moved, or never theirs) has no editable form to
+# safely resubmit through. Never discard what was typed: show it back
+# read-only so it can at least be copied out.
+sub legacy_carryover_unrecoverable {
+    my ($prepared) = @_;
+    my $canonical  = $prepared->{canonical} || {};
+    my $subject    = LJ::ehtml( $canonical->{subject} // '' );
+    my $event      = LJ::html_newlines( LJ::ehtml( $canonical->{event} // '' ) );
+
+    my $message =
+        LJ::Lang::ml('/entry/form.tt.notice.legacy_unrecoverable')
+        . "<blockquote><p><b>$subject</b></p><p>$event</p></blockquote>";
+
+    return DW::Template->render_template( 'error.tt', { message => $message } );
+}
+
 sub legacy_owned_edit_rerender {
     my (%opts) = @_;
 
@@ -2025,7 +2067,7 @@ sub legacy_owned_edit_rerender {
     my $remote    = $opts{remote};
     my $journal   = $opts{journal};
     my $prepared  = $opts{prepared};
-    my $canonical = $prepared->{canonical};
+    my $canonical = _legacy_carryover_safe_security( $prepared->{canonical}, $journal, \%opts );
     my $formdata  = DW::Entry::Legacy::formdata_from_legacy( $canonical, $prepared->{post} );
     my $ditemid   = $entry->ditemid;
 

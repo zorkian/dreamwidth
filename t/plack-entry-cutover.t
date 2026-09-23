@@ -16,7 +16,7 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use LJ::Entry;
 use LJ::Session;
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_user temp_comm);
 
 plan skip_all => 'Entry cutover integration requires a development server'
     unless $LJ::IS_DEV_SERVER;
@@ -55,6 +55,11 @@ sub entry_form {
 my $owner = temp_user();
 $owner->update_self( { status => 'A' } );
 my $owner_cookie = cookie_for($owner);
+my $outsider     = temp_user();
+$outsider->update_self( { status => 'A' } );
+my $outsider_cookie = cookie_for($outsider);
+my $comm            = temp_comm();
+LJ::set_rel( $comm, $owner, 'A' );
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'entryCutover';
 
 test_psgi $app, sub {
@@ -62,6 +67,11 @@ test_psgi $app, sub {
     my $as_owner = sub {
         my ($req) = @_;
         $req->header( Cookie => $owner_cookie );
+        return $send->($req);
+    };
+    my $as_outsider = sub {
+        my ($req) = @_;
+        $req->header( Cookie => $outsider_cookie );
         return $send->($req);
     };
 
@@ -261,6 +271,117 @@ test_psgi $app, sub {
         my $fresh = LJ::Entry->new( $owner, ditemid => $entry->ditemid );
         is( $fresh->event_raw, $original_body,
             'the edit carry-over POST does not actually save the entry' );
+    };
+
+    subtest 'a carried-over custom security never resolves to public in a community' => sub {
+        my $res = $as_owner->(
+            POST '/update',
+            Content => [
+                usejournal    => $comm->user,
+                subject       => 'Comm custom security subject',
+                event         => 'Comm custom security body',
+                security      => 'custom',
+                custom_bit_1  => 1,
+                'action:post' => 'Post',
+            ]
+        );
+        is( $res->code, 200, 'comm+custom carry-over returns the carry-over form' );
+        like(
+            $res->content,
+            qr/no equivalent in this community/i,
+            'comm+custom carry-over explains the security downgrade'
+        );
+        my $form = entry_form( $res->content );
+        ok( $form, 'comm+custom carry-over entry form parses' )
+            or BAIL_OUT('comm+custom carry-over entry form missing');
+        isnt( $form->value('security'), 'public', 'comm+custom carry-over never selects public' );
+        is( $form->value('security'),
+            'private', 'comm+custom carry-over selects the most restrictive available option' );
+        is(
+            $form->value('subject'),
+            'Comm custom security subject',
+            'comm+custom carry-over still retains the submitted subject'
+        );
+    };
+
+    subtest 'a logged-out stale edit tab keeps its content and shows the login modal' => sub {
+        my $entry = $owner->t_post_fake_entry(
+            subject => 'Logged-out edit subject',
+            body    => 'Logged-out edit body',
+        );
+        my $res = $send->(
+            POST '/editjournal?itemid=' . $entry->ditemid,
+            Content => [
+                subject       => 'Logged-out carry-over subject',
+                event         => 'Logged-out carry-over body',
+                'action:save' => 'Save',
+            ]
+        );
+        is( $res->code, 200, 'logged-out stale edit tab POST returns the carry-over form' );
+        like(
+            $res->content,
+            qr/previous posting page has been retired/i,
+            'logged-out stale edit tab POST renders the carry-over notice'
+        );
+        like( $res->content, qr/id="js-post-entry-login"/,
+            'logged-out carry-over renders the native login modal' );
+        my $form = entry_form( $res->content );
+        ok( $form, 'logged-out carry-over entry form parses' )
+            or BAIL_OUT('logged-out carry-over entry form missing');
+        is(
+            $form->value('subject'),
+            'Logged-out carry-over subject',
+            'logged-out carry-over keeps the submitted subject (body_kept)'
+        );
+        is(
+            $form->value('event'),
+            'Logged-out carry-over body',
+            'logged-out carry-over keeps the submitted body (body_kept)'
+        );
+        unlike( $res->content, qr/error/i, 'logged-out carry-over does not render an error page' );
+        LJ::Entry::reset_singletons();
+        is(
+            LJ::Entry->new( $owner, ditemid => $entry->ditemid )->event_raw,
+            'Logged-out edit body',
+            'logged-out carry-over never touches the real entry'
+        );
+    };
+
+    subtest 'a non-editable stale edit tab keeps its content read-only' => sub {
+        my $entry = $owner->t_post_fake_entry(
+            subject => 'Not-editable edit subject',
+            body    => 'Not-editable edit body',
+        );
+        my $res = $as_outsider->(
+            POST '/editjournal?itemid=' . $entry->ditemid,
+            Content => [
+                subject       => 'Not-editable carry-over subject',
+                event         => 'Not-editable carry-over body',
+                'action:save' => 'Save',
+            ]
+        );
+        is( $res->code, 200, 'non-editable stale edit tab POST returns a response, not a crash' );
+        like(
+            $res->content,
+            qr/Not-editable carry-over subject/,
+            'non-editable carry-over keeps the submitted subject (body_kept)'
+        );
+        like(
+            $res->content,
+            qr/Not-editable carry-over body/,
+            'non-editable carry-over keeps the submitted body (body_kept)'
+        );
+        like(
+            $res->content,
+            qr/could no longer be found or edited/i,
+            'non-editable carry-over explains why it is read-only'
+        );
+        LJ::Entry::reset_singletons();
+        is(
+            LJ::Entry->new( $owner, ditemid => $entry->ditemid )->event_raw,
+            'Not-editable edit body',
+            'non-editable carry-over never touches the real entry'
+        );
     };
 };
 
