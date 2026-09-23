@@ -3,7 +3,6 @@
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
-no warnings 'once';
 use lib "$ENV{LJHOME}/cgi-bin";
 use Test::More;
 
@@ -42,9 +41,9 @@ sub error_for {
     return $error->field('map')->{$field};
 }
 
-subtest 'validation errors use physical profile template keys despite unrelated BML scope' => sub {
+subtest 'validation errors use physical profile template keys despite unrelated request scope' =>
+    sub {
     request()->note( ml_scope => '/unrelated.tt' );
-    local $BML::ML_SCOPE = '/other/index.bml';
     my @calls;
     LJ::Lang::set_request_context(
         lang   => 'custom-a',
@@ -83,9 +82,9 @@ subtest 'validation errors use physical profile template keys despite unrelated 
             '/manage/profile.tt.error.month.outofrange',
             '/manage/profile.tt.error.day.notinmonth',
         ],
-        'every validation error bypasses unrelated request and BML scopes'
+        'every validation error bypasses the unrelated request scope'
     );
-};
+    };
 
 subtest 'sequential request contexts and default language remain isolated' => sub {
     request()->note( ml_scope => '/wrong.tt' );
