@@ -1549,3 +1549,22 @@ checks, after widgets Terra completes customization1/4.
   visible desktop/narrow popup captures. Final failure cleanup remains in progress.
   Pre-existing dangling resize handler after popup close is explicitly recorded;
   no production change or page-error suppression was used for characterization.
+
+### Native spellcheck integrated after final context correction
+
+- Sol final-clear f8bbe2413 includes the additional explicit-empty owner selection
+  correction: posted field presence wins over stale community GET context.
+  Original owner-switch probe2/2 and final focused41 PASS. Earlier unavailable
+  checker action and writable POST-sentinel findings are resolved. Integrated
+  native range d920 throughf8 as19a32d950.
+- Foreman combined5files205 PASS; full tidy1099 and compile1605 PASS; build PASS;
+  actual isolated configured RTE browser PASS, helpers/server absent afterward.
+  Logs /tmp/bml-native-spellcheck-{combined,tidy,compile,build,browser}.log.
+  Captures preserved in doc/bml-evidence/2026-09-23/entry-spellcheck-native.
+- Legacy image baseline through6af8b9a4d independently clear, integrated61682d4d3,
+  foreman25 PASS. Both normal and intentional-failure lifecycle independently
+  passed. Before captures explicitly record old narrow clipping/overflow.
+- Widgets native URL-insertion10e2 is only an implementation checkpoint; required
+  browser acceptance and refinements remain unaccepted WIP. Themes Protocol notes
+  178af2896 is queued for review, with external getevents callback left unchanged.
+  Sol continues finite ordinary legacy POST mapping audit for the next extraction.

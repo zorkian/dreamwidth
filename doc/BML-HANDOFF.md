@@ -61,23 +61,30 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: native spellcheck d920ae962 plus isolated browser fixture dde8aa7c3
-   and production correction c95084daa await final independent review. Correction
-   recognizes unavailable spellcheck as a nonpersisting action, retains submitted
-   community context and its permission/readonly checks, and uses lexical action
-   state. Worker38 HTTP assertions pass. Browser fixture independently clear with
-   in-process stub and owned loopback server; final production replay/captures and
-   full checks are active. No external checker or production configuration change.
-2. Widgets: legacy URL-image insertion characterization through3998819c17 has
-   normal browser pass; final intentional-failure cleanup evidence is active.
-   The legacy popup leaves a dangling resize handler after close, documented in
-   BML-IMAGE-INSERT-ACCEPTANCE.md; separate fresh viewport lifecycles preserve the
-   useful baseline without suppressing errors. Native plain-editor parity follows
-   a reviewed shared editor base. No actual media upload feature is involved.
-3. Sol: prioritize c95084daa recheck, then immutable image baseline. In parallel
-   between implementation reviews, prepare a read-only map of ordinary legacy
-   update/editjournal POST schema into shared native handlers. Keep held work and
-   deployment interfaces excluded. Preview and draft gates remain closed.
+1. Themenav: two Protocol note writes migrated in178af2896, awaiting independent
+   review. Only clientver and journalid storage changes; getevents external
+   callback adapter stays unchanged. Focused15 and roundtrip10 pass; full protocol
+   and compile validation are active. Next ordinary editor compatibility package
+   will use Sol's finite schema audit.
+2. Widgets: native plain-editor URL/alt insertion image-only branch frombcd40791e.
+   Initial production10e2c0c41 is not accepted: required actual browser fixture and
+   new/edit/mode/narrow/cancel/escaping/persistence evidence are in progress, along
+   with localization/help/license refinements. The worker must continue beyond
+   partial setup and existing unrelated parity tests. No actual uploads involved.
+3. Sol: native spellcheck throughf8bbe2413 is final-clear and integrated19a32d950.
+   Finish ordinary legacy update/editjournal POST-schema audit for a shared native
+   compatibility wrapper; review immutable Protocol notes then image range when
+   ready. Held inbox work and external deployment interfaces remain excluded.
+
+Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
+compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
+with no remaining helper/server. Logs /tmp/bml-native-spellcheck-{combined,tidy,
+compile,build,browser}.log in foreman container. Desktop/narrow captures preserved
+in doc/bml-evidence/2026-09-23/entry-spellcheck-native.
+
+Legacy image URL baseline through6af8b9a4d independently clear, integrated61682d4d3;
+foreman25 PASS in /tmp/bml-imgupload-baseline-integrated.log. Before captures in
+image-insert-before explicitly record old narrow overflow and popup clipping.
 
 ## Working method and evidence
 
