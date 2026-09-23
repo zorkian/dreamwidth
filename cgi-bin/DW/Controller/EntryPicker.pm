@@ -22,8 +22,8 @@ use DW::Request;
 use DW::Routing;
 use DW::Template;
 
-# The retained BML editor still owns every request that identifies an entry.
-# Returning undef makes DW::Routing fall through to app.psgi's BML handler
+# The narrow personal-owned GET renderer returns undef for every retained
+# context it does not own. DW::Routing then reaches app.psgi's BML fallback
 # without changing the request method, body, or query string.
 DW::Routing->register_string( '/editjournal', \&entry_picker_handler, app => 1, no_redirects => 1 );
 
@@ -34,6 +34,7 @@ sub entry_picker_handler {
 
     if ( defined $get->{itemid} || defined $post->{itemid} ) {
         require DW::Controller::Entry;
+        return DW::Controller::Entry::legacy_owned_edit_get_handler() if $r->method eq 'GET';
         return DW::Controller::Entry::legacy_owned_edit_handler();
     }
 
