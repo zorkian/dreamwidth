@@ -103,6 +103,34 @@ is( $form->value('entrytime_date'), '2020-02-03', 'rerender retains submitted le
 is( $form->value('entrytime_time'), '04:05',      'rerender retains submitted legacy time' );
 is( $form->value('entrytime_outoforder'), 1, 'rerender retains submitted backdating metadata' );
 
+my $invalid_post = {
+    %$post,
+    date_ymd_yyyy => 'not-a-year',
+    date_ymd_mm   => '02',
+    date_ymd_dd   => '03',
+    hour          => 'not-hour',
+    min           => 'not-minute',
+};
+my $invalid_prepared = DW::Entry::Legacy::prepare_entry_form( {}, $invalid_post );
+DW::Request->reset;
+my $invalid_request = DW::Request::Standard->new( GET 'http://localhost/editjournal' );
+$invalid_request->header_in( Host => 'localhost' );
+my $invalid_result = DW::Controller::Entry::legacy_owned_edit_rerender(
+    entry    => $entry,
+    remote   => $owner,
+    journal  => $owner,
+    prepared => $invalid_prepared,
+    errors   => $errors,
+);
+is( $invalid_result, $invalid_request->OK, 'invalid legacy date retry renders normally' );
+my $invalid_form = edit_form( $invalid_request->response_content );
+ok( $invalid_form, 'invalid legacy date retry contains the native owned-edit form' )
+    or BAIL_OUT('owned edit form missing from invalid date rerender');
+is( $invalid_form->value('entrytime_date'),
+    'not-a-year-02-03', 'rerender retains the raw invalid legacy date text' );
+is( $invalid_form->value('entrytime_time'),
+    'not-hour:not-minute', 'rerender retains the raw invalid legacy time text' );
+
 my $fresh = fresh_entry( $owner, $ditemid );
 is(
     $fresh->subject_raw,

@@ -916,9 +916,9 @@ sub legacy_owned_edit_rerender {
     my %crosspost = map { $_ => 1 }
         grep { $canonical->{crosspost}{$_}{id} } keys %{ $canonical->{crosspost} || {} };
     my $datetime = $entry->eventtime_mysql;
-    if ( defined $canonical->{year} && defined $canonical->{mon} && defined $canonical->{day} ) {
-        $datetime = sprintf( '%04d-%02d-%02d %02d:%02d', @{$canonical}{qw(year mon day hour min)} );
-    }
+    my $date     = $formdata->get('entrytime_date');
+    my $time     = $formdata->get('entrytime_time');
+    $datetime = "$date $time" if defined $date && defined $time;
     my $vars = _init(
         {
             usejournal           => $journal->username,

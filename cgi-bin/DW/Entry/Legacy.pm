@@ -273,10 +273,18 @@ sub formdata_from_legacy {
         $add->( custom_bit => $bit ) if $legacy_post->{"custom_bit_$bit"};
     }
 
-    if ( defined $canonical->{year} && defined $canonical->{mon} && defined $canonical->{day} ) {
+    my @raw_date = map { "date_ymd_$_" } qw(yyyy mm dd);
+    if ( grep { exists $legacy_post->{$_} } @raw_date ) {
+        $add->( entrytime_date => join( '-', map { $legacy_post->{$_} // '' } @raw_date ) );
+    }
+    elsif ( defined $canonical->{year} && defined $canonical->{mon} && defined $canonical->{day} ) {
         $add->( entrytime_date => join( '-', @{$canonical}{qw(year mon day)} ) );
     }
-    if ( defined $canonical->{hour} && defined $canonical->{min} ) {
+
+    if ( exists $legacy_post->{hour} || exists $legacy_post->{min} ) {
+        $add->( entrytime_time => join( ':', map { $legacy_post->{$_} // '' } qw(hour min) ) );
+    }
+    elsif ( defined $canonical->{hour} && defined $canonical->{min} ) {
         $add->( entrytime_time => join( ':', @{$canonical}{qw(hour min)} ) );
     }
     $add->( trust_datetime       => 1 ) if !exists $canonical->{tz};
