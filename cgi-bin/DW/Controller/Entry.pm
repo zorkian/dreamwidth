@@ -953,6 +953,8 @@ sub _render_new_form {
         { url => $render_opts->{action_url} // LJ::create_url( undef, keep_args => 1 ), };
     $vars->{title_override} = $render_opts->{title_override}
         if exists $render_opts->{title_override};
+    $vars->{legacy_altlogin} = $render_opts->{legacy_altlogin}
+        if $render_opts->{legacy_altlogin};
 
     $vars->{js_for_rte} = LJ::rte_js_vars();
     $vars->{sitevalues} = to_json( \@sitevalues );
@@ -1033,9 +1035,61 @@ sub legacy_update_get_render {
         $opts{warnings} || DW::FormErrors->new,
         undef,
         {
-            action_url     => $opts{action_url} || '/entry/new',
-            title_override => $opts{title_override},
+            action_url      => $opts{action_url} || '/entry/new',
+            title_override  => $opts{title_override},
+            legacy_altlogin => $opts{legacy_altlogin},
         }
+    );
+}
+
+# Callable-only authenticated retained /update alternate-login GET seam.  It
+# renders the legacy credential presentation through the native form, but does
+# not register a route or interpret a credential submission.
+sub legacy_update_altlogin_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+    return undef unless exists $opts{action_url};
+
+    # The retained page's flat GET ABI is preserved exactly once for the
+    # update_fields hook.  Every excluded context remains BML-owned.
+    my $get = $opts{get} || DW::Entry::Legacy::legacy_post_hash( $r->get_args );
+    return undef unless $get->{altlogin};
+    return undef if $get->{share};
+    return undef if $get->{usejournal} && !LJ::load_user( $get->{usejournal} );
+
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($remote);
+    return undef if LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' );
+    return undef if $remote->identity || !$remote->can_post || $remote->readonly;
+
+    # Retained update captures these three before update_fields, while user
+    # and target deliberately remain mutable afterwards.
+    my $prefill    = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
+    my $hook       = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
+    my $usejournal = LJ::canonical_username( $get->{usejournal} || '' );
+    my %crosspost  = map { $_->acctid => $_->xpostbydefault }
+        DW::External::Account->get_external_accounts($remote);
+
+    my $now = DateTime->now;
+    if ( my $timezone = $remote->prop('timezone') ) {
+        my $tz = eval { DateTime::TimeZone->new( name => $timezone ) };
+        $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
+    }
+
+    return legacy_update_get_render(
+        remote          => $remote,
+        get             => $prefill,
+        update_fields   => $hook,
+        legacy_editor   => $remote->new_entry_editor,
+        rte_supported   => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime        => $now->strftime('%F %R'),
+        usejournal      => $usejournal,
+        crosspost       => \%crosspost,
+        action_url      => $opts{action_url},
+        title_override  => LJ::Lang::ml('/update.bml.title2'),
+        legacy_altlogin => { user => $get->{user} // '' },
     );
 }
 

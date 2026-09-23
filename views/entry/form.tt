@@ -138,6 +138,23 @@ postFormInitData.strings = {
 
     [%- dw.form_auth -%]
 
+    [%- IF legacy_altlogin -%]
+    <div id="legacy-altlogin-auth" class="row"><div class="columns">
+        [%- form.textbox(
+            label = dw.ml( ".label.post_as_username" )
+            name = "user"
+            id = "altlogin_username"
+            value = legacy_altlogin.user
+        ) -%]
+        [%- form.password(
+            label = dw.ml( ".label.post_as_password" )
+            name = "password"
+            id = "altlogin_password"
+            value = ""
+        ) -%]
+    </div></div>
+    [%- END -%]
+
     <div class="current-entry row"><div class="columns"><!-- Start main column sub & entry -->
 
         [%- IF remote -%]
