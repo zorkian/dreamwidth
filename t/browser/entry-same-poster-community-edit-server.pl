@@ -13,6 +13,7 @@ die "usage: $0 PORT\n" unless $port;
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
 my $original = $DW::Routing::string_choices{'app/editjournal'};
+
 # GET is retained solely to harvest its legacy form. POST remains the original
 # registered public EntryPicker route and therefore exercises its real dispatch.
 $DW::Routing::string_choices{'app/editjournal'} =

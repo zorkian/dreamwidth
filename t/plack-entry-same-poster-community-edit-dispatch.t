@@ -268,9 +268,11 @@ test_psgi $app, sub {
         $form = form_from( $res->content );
         ok( $form, "$case->[0] harvests an actual retained community form" );
         $form->action( 'http://localhost' . $csrf_path );
-        $form->value( subject      => "$case->[0] changed subject" );
-        $form->value( event        => "$case->[0] changed body" );
-        $form->value( lj_form_auth => $case->[1] );
+        $form->value( subject => "$case->[0] changed subject" );
+        $form->value( event   => "$case->[0] changed body" );
+        my $auth = $form->find_input('lj_form_auth');
+        if   ( $case->[0] eq 'missing token' ) { $auth->disabled(1); }
+        else                                   { $form->value( lj_form_auth => $case->[1] ); }
         my $csrf_post = clicked( $form, 'action:save' );
         $csrf_post->header( Cookie  => $cookie );
         $csrf_post->header( Referer => "http://localhost$csrf_path" );
