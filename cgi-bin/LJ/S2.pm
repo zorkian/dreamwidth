@@ -17,7 +17,7 @@ package LJ::S2;
 
 use strict;
 use DW;
-use DW::BML;
+use DW::BML::RequestAdapter;
 use DW::Request;
 use DW::Cache;
 use lib DW->home . "/src/s2";

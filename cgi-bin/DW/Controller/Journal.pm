@@ -22,7 +22,7 @@ use v5.10;
 use Log::Log4perl;
 my $log = Log::Log4perl->get_logger(__PACKAGE__);
 
-use DW::BML;
+use DW::BML::RequestAdapter;
 use DW::Captcha;
 use DW::Logic::AdultContent;
 use DW::Request;

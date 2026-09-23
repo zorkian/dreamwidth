@@ -14,7 +14,7 @@
 # part of this distribution.
 
 use strict;
-use DW::BML;
+use DW::BML::RequestAdapter;
 use DW::Request;
 no warnings 'uninitialized';
 
@@ -2336,8 +2336,8 @@ sub getevents {
 
         # Held external callback ABI (doc/BML-PROTOCOL-PAGESTATS.md): must
         # keep receiving the same shape BML::get_request() (DW/BML.pm:
-        # 231-236) has always returned here. $Apache::BML::r is only ever
-        # locally set inside DW::BML::render (DW/BML.pm:633) and Apache::BML's
+        # 232-237) has always returned here. $Apache::BML::r is only ever
+        # locally set inside DW::BML::render (DW/BML.pm:634) and Apache::BML's
         # retired mod_perl handler, neither reachable during a live Plack
         # request (DW::BML::render 403s any _config.bml access before that
         # point, and Apache::BML's own handler is unused under Plack), so in
