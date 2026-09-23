@@ -68,13 +68,16 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    rerender helper using shared native renderer, explicit modern retry action
    and retained controls/query. No public route registration or saves yet.
 2. Widgets: image integrated59ebe781c, fully clear. Housekeeping original final
-   427e4109b (0e88/3e876/0aaf/427) is awaiting Sol recheck of credentials, remote
-   identity and raw master GET fallback; not integrated. Separate success-render
-   hook implementation is active on branch carrying equivalent018b/38a fixes.
-3. Sol: housekeeping427, then immutable success-hook/rerender code as ready.
+   427e4109b (0e88/3e876/0aaf/427) is independently clear and integratedd8b910151;
+   foreman housekeeping/crosspost/native-new/moderated216 PASS. Separate hook
+   implementation483f is HELD: it appended HTML to render_template return status
+   after response emission. Worker is fixing actual template variables and adding
+   a real response test; fake string-renderer assertion was insufficient.
+3. Sol: bounded actual canonical-save compatibility audit atd8b910151 while
+   awaiting corrected success-hook/rerender implementations.
    Root actual hook baseline8a55 independently clear149 PASS. Root mechanical
    rendererbe407 independently clear85 HTTP PASS. Root test-only hook timing
-   b762072f0 awaits review75 PASS: old callback observes already-persisted entry
+   b762072f0 independently clear75 PASS: old callback observes already-persisted entry
    and retains original flat request reference. Held inbox work and external
    Journal deployment interfaces remain excluded.
 

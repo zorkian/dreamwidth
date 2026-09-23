@@ -1675,3 +1675,23 @@ checks, after widgets Terra completes customization1/4.
 - No old posting/edit route was changed by these helper packages. Housekeeping
   final427 remains in independent review; success-hook and rerender adapters
   continue in isolated worker branches. No publication or deployment.
+
+
+### Legacy housekeeping integrated; real hook response fix remains held
+
+- Sol final427e4109b clear: actual credential field spelling, session-remote
+  identity, and POST/GET master fallback all verified with no external delivery.
+  Integratedd8b910151; foreman4files216 PASS in
+  /tmp/bml-legacy-housekeeping-integrated.log (including native defaults and
+  actual moderated posting). No legacy route cutover yet.
+- Root hook timingb762 independently clear75/75: actual persisted count and
+  shared original request reference prove the recorded old ordering.
+- Hook implementation483f is NOT accepted. Foreman found it concatenated hook
+  HTML onto DW::Template::render_template's status return, after that API prints
+  the response. Its stub returned fake markup and masked this. Worker correction
+  must pass legacy HTML into real template rendering and prove actual body/status
+  for ordinary and moderated responses. Baseline requires options before HTML;
+  it does not require calling the HTML hook after sitescheme emission.
+- Sol is checking prepared canonical data against an actual disposable native
+  save while independent rerender/hook fixes proceed. No new authorization or
+  deployment-interface decision is inferred.
