@@ -142,11 +142,12 @@ sub get_user {
     return LJ::get_remote();
 }
 
-# return Apache request
+# always undef: nothing under Plack constructs a request object carrying
+# a filesystem path for filename() below to use.
 sub get_request {
     my ($self) = @_;
 
-    return BML::get_request();
+    return undef;
 }
 
 sub get_root {
