@@ -1396,3 +1396,16 @@ checks, after widgets Terra completes customization1/4.
   legacy characterization is next for Themenav after preview evidence. Widgets
   has a separate ordinary crossposting audit, with all delivery stubbed.
 - Existing deployment-hook question and held restrictions remain unchanged.
+
+### Preview popup baseline integrated
+
+- Independently clear browser characterization `bdce75f8c` is integrated as
+  `5f6a1b12d`, without candidate renderer changes. Foreman exact legacy/native
+  popup run passes, fresh entry count remains unchanged and fixture exits.
+  Host log `/tmp/bml-entry-preview-before.log`; focused helper tidy passes.
+- Six before-migration desktop/narrow captures are retained under
+  `doc/bml-evidence/2026-09-23/entry-preview-before/`.
+- Sol confirmed an additional ordinary hook-parity finding: the shared native
+  renderer newly invokes spam_check for legacy previews. Terra is preserving
+  the original native-only invocation and adding a local counter assertion.
+  No external hook interface change is authorized or implemented.
