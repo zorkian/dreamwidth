@@ -139,4 +139,26 @@ subtest 'DW::Hooks::Changelog uses LJ::get_remote_ip, not the crash-prone BML::g
     );
     DW::Request->reset;
     };
+
+subtest 'LJ::Sysban::block logs the ban and leaves the response to its caller' => sub {
+    my @logged;
+    no warnings 'redefine';
+    local *LJ::statushistory_add = sub { push @logged, [@_]; return 1; };
+
+    # no active request at all (e.g. mailgated.pl -> supportlib -> ...)
+    DW::Request->reset;
+    ok( eval { LJ::Sysban::block( 0, 'test block, no request', {} ); 1 },
+        'block does not die with no active request' )
+        or diag("block died: $@");
+    is( scalar @logged, 1, 'block logs to statushistory with no active request' );
+
+    # a native Plack-style request, as DW::Controller::Community/Create call it
+    my $r = DW::Request::Standard->new( GET 'http://localhost/create' );
+    $r->header_in( Host => 'localhost' );
+    ok( eval { LJ::Sysban::block( 0, 'test block, with request', {} ); 1 },
+        'block does not die with an active native request' )
+        or diag("block died: $@");
+    is( scalar @logged, 2, 'block logs to statushistory with an active native request' );
+    DW::Request->reset;
+};
 done_testing;
