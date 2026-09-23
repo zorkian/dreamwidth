@@ -2318,3 +2318,11 @@ was included in this package.
 - Public anonymous audit679c7ad8e documents duplicate failed-login/rate side effects
   from naive fallback. Retained sequence characterization is next, test-only.
   Alternate-login rendering boundary audit preserved14da59427, no activation.
+
+- Share final integration checks completed: tidy1163 and compile1607 PASS. Sol
+  cleared formatting-only bbb0a2970; foreman inspected usable 390px capture.
+- Retained anonymous sequence bc021fbd0 is pending Sol (worker100 PASS). It records
+  three wrong-password checks and persistence after a forced protocol-login error.
+  No native public anonymous composition is enabled.
+- Widgets browser exposed malformed absent-draft JavaScript in retained anonymous
+  GET; separate rendering fix/regression requested. Browser acceptance still open.

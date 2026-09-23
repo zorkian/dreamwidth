@@ -1,3 +1,21 @@
+## Share formatting cleared; retained auth baseline in review
+
+Sol bbb0a2970 formatting-only CLEAR; source behavior unchanged, node checks pass.
+Foreman narrow share capture inspected: populated subject/RTE/tags and controls fit.
+All integrated share checks complete (178 focused, browser, tidy1163, compile1607).
+Themes committed retained anonymous auth sequence bc021fbd0e493654e160e8318ea871c394ae90cb:
+worker100 PASS, now Sol independent review. Forced protocol-login error still leads
+to postevent/persistence in retained code, so future continuation must preserve
+observed behavior rather than assume no save. Themes next implements finite public
+share activation from root86d47ce3f; factory always stubbed in tests.
+
+Widgets browser exposed retained anonymous JavaScript empty assignments caused by
+escaping draft properties only inside the remote branch. Separate narrow rendering
+fix plus real-response regression requested before browser commit. After initializer
+works, FCK asset loading exceeds the harness15s navigation bound; use bounded ready
+checks, retain resource/page-error assertions. Do not suppress errors or change auth.
+No root test sessions active; worker runs owned in their containers.
+
 ## Callable share checks complete; next finite activation prepared
 
 Foreman share tidy1163 and compile1607 PASS, session43129 complete; logs
