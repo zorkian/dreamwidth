@@ -1,3 +1,15 @@
+## Active bounded alternate-login prerequisites
+
+Root through 001ea640f remains clean and validated as recorded below.
+Widgets render-only optional forwarding commit ce4a7d63c57546e8c19e40a7430034e86f3d78f5
+is queued for Sol review, not integrated. Worker focused rerender71 and compile1607
+PASS; separate browser proof is being built without credential submission/save.
+Sol source-only raw-input audit is preserved as BML-ALTLOGIN-RAW-HOOK-BUILDER.md;
+Themes implements only its unused pure builder. Historical known-field filtering
+is explicitly superseded in BML-ALTLOGIN-DECODE-HOOK-SYNC.md by accepted arbitrary
+mutation characterization and delta semantics. Editor/date reconciliation remains
+separate. No public alternate-login activation or held-interface work is approved.
+
 ## Reviewed test correction and unused delta integrated
 
 Sol24bfc0c2ec0cfa7ea3011527c95324c16c20522e CLEAR; integrated as ad3d8d9d0.
