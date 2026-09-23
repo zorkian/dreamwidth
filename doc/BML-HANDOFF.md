@@ -7,7 +7,9 @@ Maintainer renderer extractione16 CLEAR, integratedb92d6bd49. Public personal
 owned GET activation727 CLEAR, integrated5c91b54a2: actual app GET now uses the
 accepted narrow native renderer, while excluded contexts retain BML and POST
 is unchanged. Foreman five focused suites571 PASS in
-/tmp/bml-owned-get-public-integrated.log. Formatting/compile run92196 pending.
+/tmp/bml-owned-get-public-integrated.log. Formatting1132 and compile1607 PASS; run92196 complete. Public owned GET
+browser integration replay PASS; cleanup empty; public desktop/narrow captures
+preserved. Log /tmp/bml-owned-get-public-browser.log. All root runs complete.
 
 Active: Widgets callable-only community GET atop e16; Themes test-only retained
 update-form prerequisite per /tmp/bml-update-get-activation-tests.md, then

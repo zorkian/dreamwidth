@@ -17,3 +17,12 @@ Independent Sol normal and intentional-failure cleanup passed at source03362e229
 Retained old-form captures are in the adjacent `legacy-owned-edit-adapter`
 folder. These screenshots are acceptance evidence, not a claim that all legacy
 edit contexts have migrated or that the BML editor can be deleted.
+
+## Public route activation replay
+
+`public-get-1280.png` and `public-get-390.png` were captured after integration
+of source727 as local5c91b54a2. The server loads plain app.psgi with no test
+route overlay. Foreman normal browser exited0/PASS, distinct save persisted,
+and fixture/server process checks were empty. Log:
+`/tmp/bml-owned-get-public-browser.log` in the foreman container.
+Sol independently passed normal and named intentional-failure cleanup at727.

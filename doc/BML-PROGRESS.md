@@ -2045,3 +2045,8 @@ Foreman five focused suites571 PASS. Update GET browser dc3/b2 separately
 accepted and integrated6e1a52ac1/009a844b8, real foreman replay PASS; desktop and
 390px evidence preserved under legacy-update-get. Public update GET remains
 separate. Next: community callable GET and retained update-form test composition.
+
+Foreman public owned GET browser replay PASS with plain app.psgi, distinct native
+save, and no remaining fixture/server. Public desktop/390px captures preserved
+alongside prior callable captures. Full tidy1132 and compile1607 PASS in
+/tmp/bml-get-integrated-{tidy,compile}.log. No root validation remains running.
