@@ -1,20 +1,12 @@
 #!/usr/bin/perl
-# Confirms that requiring ljlib.pl alone -- the ljlib-only / non-web process
-# path (background jobs, workers): no app.psgi, no test-harness DW::BML
-# import -- still installs the BML::* shims that LJ::Protocol::sendmessage's
-# BML::set_language('en') call needs (the only remaining direct BML::* caller
-# among LJ::Protocol/LJ::PageStats/LJ::Web; the latter two no longer call any
-# BML::* symbol as of E2). LJ::Protocol's own 'use DW::BML;' is reached
-# through an entirely separate chain (LJ::User -> ... -> LJ::Talk ->
-# DW::EmailPost::Comment -> LJ::Protocol) than LJ::S2's former one, so this
-# stays a meaningful regression guard rather than a symbol E2 made moot. Runs
-# the require in an isolated perl subprocess so no transitive load from this
-# test file's own imports can mask a regression in what ljlib.pl itself pulls
-# in.
+# Requiring ljlib.pl alone (workers, maintenance scripts, anything without
+# app.psgi) must not load the BML engine: no ljlib-loaded module calls a
+# BML::* shim any more, so a stray engine import would be a regression. The
+# require runs in an isolated perl subprocess so this test file's own imports
+# cannot mask what ljlib.pl pulls in.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
-
 use Test::More;
 use File::Temp qw(tempfile);
 
@@ -22,9 +14,13 @@ my ( $probe_fh, $probe_file ) = tempfile( SUFFIX => '.pl', UNLINK => 1 );
 print $probe_fh <<'PROBE';
 BEGIN { $LJ::_T_CONFIG = 1; }
 require "$ENV{LJHOME}/cgi-bin/ljlib.pl";
+for my $module (qw(DW/BML.pm Apache/BML.pm LJ/Global/BMLInit.pm)) {
+    print "$module=", ( exists $INC{$module} ? 1 : 0 ), "\n";
+}
 print "GET_REQUEST=",  ( defined &BML::get_request  ? 1 : 0 ), "\n";
 print "SET_LANGUAGE=", ( defined &BML::set_language ? 1 : 0 ), "\n";
-print "ML=",            ( defined &BML::ml           ? 1 : 0 ), "\n";
+print "ML=",           ( defined &BML::ml           ? 1 : 0 ), "\n";
+print "ADAPTER=",      ( exists $INC{'DW/BML/RequestAdapter.pm'} ? 1 : 0 ), "\n";
 PROBE
 close $probe_fh;
 
@@ -37,11 +33,15 @@ is( $? >> 8, 0, 'probe subprocess exited cleanly after requiring ljlib.pl alone'
 
 my %got;
 for (@lines) {
-    $got{$1} = $2 if /^(\w+)=(\d)$/;
+    $got{$1} = $2 if /^([\w\/\.]+)=(\d)$/;
 }
 
-ok( $got{GET_REQUEST},  'BML::get_request is defined after require ljlib.pl alone' );
-ok( $got{SET_LANGUAGE}, 'BML::set_language is defined after require ljlib.pl alone' );
-ok( $got{ML},           'BML::ml is defined after require ljlib.pl alone' );
+ok( !$got{'DW/BML.pm'},            'ljlib.pl alone does not load DW::BML' );
+ok( !$got{'Apache/BML.pm'},        'ljlib.pl alone does not load Apache::BML' );
+ok( !$got{'LJ/Global/BMLInit.pm'}, 'ljlib.pl alone does not load LJ::Global::BMLInit' );
+ok( !$got{GET_REQUEST},            'BML::get_request is not defined without the engine' );
+ok( !$got{SET_LANGUAGE},           'BML::set_language is not defined without the engine' );
+ok( !$got{ML},                     'BML::ml is not defined without the engine' );
+ok( $got{ADAPTER}, 'the hook/callback adapter module still loads without the engine' );
 
 done_testing;
