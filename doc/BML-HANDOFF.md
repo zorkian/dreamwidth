@@ -16,6 +16,25 @@ bml-opus-review) in the same worktrees, branches and containers; the mapping is
 in the checkpoint's resume record. All other held boundaries remain. Entries
 below this line predate the resume.
 
+## Graduation progress (2026-09-23)
+
+- W1 inbox correctness/security 2c8c21f157f29a1cf8c2f45600a992659ee14584
+  (atop e381a77c7) bml-opus-review CLEAR; integrated on root as 627ba13fd.
+  Reviewer proved the old string eval executed injected Perl and the esn RPC
+  accepted unauthenticated mutations at base. Root five inbox suites PASS 198,
+  node --check OK; tidy/compile logs
+  /tmp/bml-inbox-fixes-integrated-{prove,tidy,compile}.log in 8d7783a043d8.
+  Reviewer non-blocking items (undef view warning, no-JS icon preview,
+  messaging-disabled test, GET bookmark toggle CSRF) are folded into W2.
+- T1 native manager moderation 6648e8681 + correction e2b961a02 under review;
+  a further test-only commit is required so the deletespam test stubs
+  LJ::mark_entry_as_spam (a local spamreports write is a moderation side
+  effect; tests stay inert per user boundary).
+- T2 entry cutover (themenav) and W2 inbox cutover (widgets) in progress on
+  bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
+- Obsolete preserved branches (not integrated): hook composition 5d282324c,
+  altlogin characterization a0cfe4f23, draft.bml WIP 68789a565.
+
 ## HOLD: legacy update/RTE port under scope review (2026-09-23)
 
 User directive after the resume: the old update page and RTE may be retired in

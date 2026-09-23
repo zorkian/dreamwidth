@@ -2453,3 +2453,10 @@ Opus CLEAR of5ec8dec2a+d21b1c3a3 integrated as334b531dc/35329b053; root pure6fil
 PASS, tidy1181, compile1607. Unwired. The user then placed the legacy update/RTE
 port on hold pending an assessment of requiring the native entry page instead;
 candidates5d282324c anda0cfe4f23 are preserved unreviewed. See BML-HANDOFF.md.
+
+## Beta graduation started (2026-09-23)
+
+User authorized graduating native entry and inbox (BML-DIRECTION.md). W1 inbox
+fixes integrated as627ba13fd after Opus CLEAR (view eval removed, RPC form auth,
+compose validation). T1 manager moderation under review with inert-test boundary;
+T2/W2 cutovers in progress. Root inbox5files198 PASS.
