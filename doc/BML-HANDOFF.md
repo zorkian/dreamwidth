@@ -1,3 +1,18 @@
+## Current review queue and exact altlogin baseline disposition
+
+Callable continuation3197 is integrated and validated at ca854f263. New test-only
+wrong-password browser7d4df528747d4b9fe268fb33387bb8484a4c9dad is queued for Sol;
+not yet integrated. Final public anonymous matrix is preserved in
+BML-ANONYMOUS-PUBLIC-POST-FINAL-MATRIX.md; no public activation yet.
+
+Sol independently located the altlogin password-marker only in shared logout
+returnto, percent-encoded. The updateForm action is exactly /update?altlogin=1
+and its password blank. Baseline0b remains held for permanent scoped input/action
+proof plus explicit separate returnto characterization, not a header change.
+Themes is correcting it before resuming callable presentation14db+67a. Its first
+390px browser geometry assertion failed; browser WIP is preserved and must be
+finished before acceptance. Neither callable altlogin nor public activation clear.
+
 ## Callable anonymous continuation integrated and validated
 
 Sol3197da9d6ee32668b2705f6132b217ba550b9b55 CLEAR. Integrated rootca854f263;

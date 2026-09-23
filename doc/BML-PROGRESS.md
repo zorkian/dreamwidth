@@ -2368,3 +2368,5 @@ was included in this package.
  wrong-password followup remains separate. Native ownership supersedes cache proposal.
 - Altlogin0b closes A-off assertion but whole-body dummy-query reflection is under
  independent baseline verification; credential/control/action scope must be accurate.
+
+Preserved final anonymous public activation matrix after accepted native failure continuation. Browser7d4 awaits independent review; altlogin baseline explicitly distinguishes updateForm credentials from shared logout returnto reflection. Callable altlogin390 geometry remains under correction.
