@@ -50,6 +50,12 @@ users persists). Nothing external was touched.
   (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
   Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
   s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- KNOWN RED on root (found by widgets during W10, outside every allowlist):
+  t/web-message-language.t subtests 1 and 6 (pre-W5 errorbar markup; deleted
+  LJ::entry_form) and t/web-stdmaxlength-language.t subtest 3
+  (LJ::entry_form). Neither is in CI's list, but root is not green until W11
+  (test repair, widgets) lands. Lesson recorded: after a deletion package,
+  grep t/ for every deleted symbol, not only the allowlist.
 - W9 dead widget cleanup 581927a0d + 7cf7f1ab4 bml-opus-review CLEAR;
   integrated on root as 78a0fc2e3, eab53381e (TagCloud and three Example
   widgets deleted; compile now 1593). W9 doc commit 7e2fbd54d HELD for
