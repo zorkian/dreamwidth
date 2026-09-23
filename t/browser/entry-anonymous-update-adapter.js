@@ -165,6 +165,36 @@ async function closeChild(child, done, label) {
             'fixture seeds frozen draft properties');
         assert.equal(before.displaydate, 1, 'fixture seeds displaydate on before the off/absent invalid attempt');
 
+        // A newly loaded retained form must reach the real public dispatcher
+        // directly, rather than relying only on the later native retry submit.
+        const directSubject = 'Anonymous browser direct public subject';
+        const directBody = 'Anonymous browser direct public body';
+        await page.setViewport({width: 1280, height: 844});
+        await page.goto(legacyURL, {waitUntil: 'networkidle0', timeout: 60000});
+        await page.$eval('#updateForm #altlogin_username', (input, value) => { input.value = value; }, startup.user);
+        await page.$eval('#updateForm #altlogin_password', (input, value) => { input.value = value; }, startup.password);
+        await page.$eval('#updateForm [name=subject]', (input, value) => { input.value = value; }, directSubject);
+        await page.waitForFunction(
+            () => window.FCKeditorAPI && window.FCKeditorAPI.GetInstance('draft'),
+            {timeout: 60000},
+        );
+        await page.evaluate(value => window.FCKeditorAPI.GetInstance('draft').SetHTML(value), directBody);
+        await Promise.all([
+            page.waitForNavigation({waitUntil: 'networkidle0', timeout: 60000}),
+            clickVisible(page, '#updateForm [name="action:update"]'),
+        ]);
+        assert.ok(await page.$('.successlinks'), 'direct retained public post renders native success');
+        assert.equal(await page.$('#updateForm'), null, 'direct retained public post does not return to BML');
+        const afterDirect = await state('after direct retained public post');
+        assert.equal(afterDirect.count, before.count + 1,
+            'direct retained public post creates exactly one entry');
+        assert.equal(afterDirect.subject, directSubject, 'direct retained public post persists its subject');
+        assert.equal(afterDirect.body, directBody, 'direct retained public post persists its body');
+        assert.equal(afterDirect.draft, before.draft,
+            'direct retained public post preserves the remote-only draft body');
+        assert.deepEqual(afterDirect.draft_properties, before.draft_properties,
+            'direct retained public post preserves frozen draft properties');
+
         const wrongPassword = 'wrong-anonymous-browser-password';
         const wrongSubject = 'Anonymous browser wrong-password subject';
         const wrongBody = 'Anonymous browser wrong-password body';
@@ -205,7 +235,7 @@ async function closeChild(child, done, label) {
         await page.screenshot({path: `${output}/wrong-password-retry-390.png`, fullPage: true});
         await page.setViewport({width: 1280, height: 844});
         const afterWrongPassword = await state('after wrong-password attempt');
-        assert.deepEqual(afterWrongPassword, before,
+        assert.deepEqual(afterWrongPassword, afterDirect,
             'wrong-password retry leaves entries and nonblank draft/editor/displaydate state unchanged');
 
         await page.goto(legacyURL, {waitUntil: 'networkidle0', timeout: 60000});
@@ -252,7 +282,7 @@ async function closeChild(child, done, label) {
         assert.equal(await page.$$eval('.alert-box.alert', alerts => alerts.filter(alert => /year|date/i.test(alert.textContent)).length), 1,
             'native retry displays one useful date error');
         const afterRetry = await state('after invalid attempt');
-        assert.deepEqual(afterRetry, before, 'callable invalid retry preserves user draft/editor/displaydate state');
+        assert.deepEqual(afterRetry, afterDirect, 'callable invalid retry preserves user draft/editor/displaydate state');
 
         await page.click('[name="action:post"]');
         await page.waitForSelector('#js-post-entry-login input[name=username][type=text]', {visible: true});
@@ -280,7 +310,7 @@ async function closeChild(child, done, label) {
             (post || '').split('&').filter(pair => pair.startsWith('update_displaydate='))), [[]],
             'unchecked corrected native post omits displaydate');
         const afterSuccess = await state('after corrected native post');
-        assert.equal(afterSuccess.count, before.count + 1, 'corrected native retry creates exactly one entry');
+        assert.equal(afterSuccess.count, afterDirect.count + 1, 'corrected native retry creates exactly one entry');
         assert.equal(afterSuccess.subject, 'Anonymous browser corrected subject');
         assert.equal(afterSuccess.body, 'Anonymous browser corrected body');
         assert.equal(afterSuccess.draft, '', 'native corrected post clears the saved draft body');
