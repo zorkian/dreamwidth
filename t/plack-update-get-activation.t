@@ -141,19 +141,17 @@ my $share_fetches     = 0;
         );
 
         my $share = $request->( GET '/update?share=not-a-url' );
-        is( $share->code, 200, 'share GET keeps retained BML status' );
-        my $share_form = ( grep { ( $_->attr('id') || '' ) eq 'updateForm' }
-                HTML::Form->parse( $share->content, 'http://localhost/update' ) )[0];
-        ok( $share_form, 'share GET reaches the retained BML form' );
-        is( $share_form->value('subject'),
-            'Shared title', 'retained BML share prefill uses stub title' );
+        is( $share->code, 200, 'share GET keeps HTTP status' );
+        my $share_form = native_form( $share->content );
+        ok( $share_form, 'share GET reaches the native share form' );
+        is( $share_form->value('subject'), 'Shared title', 'native share prefill uses stub title' );
         like(
             $share_form->value('event'),
             qr{https://example\.invalid/share},
-            'retained BML share prefill uses stub URL'
+            'native share prefill uses stub URL'
         );
         is( $share_fetches, 1,
-            'share BML fallback performs its retained share prefill exactly once' );
+            'public share dispatch performs its page construction exactly once' );
 
         my $invalid = $request->( GET '/update?usejournal=does-not-exist' );
         is( $invalid->code, 200, 'invalid target GET preserves the retained HTTP status' );

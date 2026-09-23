@@ -1235,9 +1235,12 @@ sub legacy_update_get_handler {
     return legacy_update_terminal_response('identity') if $remote->identity;
     return legacy_update_terminal_response('cantpost') unless $remote->can_post;
 
-    # The first callable package deliberately excludes the retained alternate
-    # login UI and remote share fetch path.
-    return undef if $get->{altlogin} || $get->{share};
+    # Alternate login retains its legacy credential schema. The share callable
+    # returns undef for readonly and every excluded case; return that result
+    # directly so BML retains share prefill plus its own warning/fallback.
+    return undef if $get->{altlogin};
+    return legacy_update_share_get_handler( remote => $remote, get => $get )
+        if $get->{share};
 
     # Retained readonly output carries its own warning. Reuse the same flat
     # GET reference so update_fields can mutate its post-hook target once.
