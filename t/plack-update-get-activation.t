@@ -156,7 +156,7 @@ my $share_fetches     = 0;
             'invalid target GET does not render native form' );
         like(
             $invalid->content,
-            qr/Invalid usejournal argument/,
+            qr/Invalid usejournal argument\./,
             'invalid target GET keeps the exact retained BML error message'
         );
 
