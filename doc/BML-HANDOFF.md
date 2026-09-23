@@ -1,3 +1,21 @@
+## Latest: callable update GET wrapper integrated
+
+Sol final a349/7aa/ec6 CLEAR after the actual default-only crosspost map and
+all-checkbox regression. Integrated8ba47739b/24995c4e5/d77e85b20. Foreman4files302
+PASS, tidy1128 and compile1607 PASS in /tmp/bml-update-get-wrapper-{integrated,
+tidy,compile}.log. All root validation sessions complete. No public GET switch.
+
+Widgets browser WIP is preserved on bml-terra-update-get-browser-20260923
+(dc3a781bd plus ec6 cherry-pickf7f3f687b). Foreman diagnosed its repeated timeout:
+fixture still seeded a draft at initial supposedly-empty GET; JS sent seed_draft
+command unimplemented by fixture; navigation awaited before answering modal.
+Worker resumed concrete fixture/protocol/order correction. Do not call this a
+confirmed FCK production defect or accept swallowed navigation errors.
+Themes continues retained-form test composition on
+bml-terra-owned-get-test-fixture-20260923, passing HTTP/browser but final explicit
+status run/commit pending. Then separate narrow public owned GET activation.
+Sol browser03362 and both callable GET production ranges are clear.
+
 ## Latest GET acceptance and pending wrapper
 
 Owned GET browser ee8/03362 independently clear and integrated as

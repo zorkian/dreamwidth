@@ -2017,3 +2017,12 @@ checked. Production still ORs raw GET with defaults; the test only inspects
 HTML::Form->value, which returns first selected input and misses42. Routed
 narrow direct-default map plus every-checkbox assertion. Redirect302 correction
 is clear. Browser WIP preserved; no a349/7aa integration or public GET activation.
+
+### Callable update GET wrapper accepted
+
+Sol a349..ec6 CLEAR:45 assertions including actual302 and both account checkbox
+states, hook/reference/order/query and fresh state. Integrated8ba47739b/24995c4e5/
+d77e85b20. Foreman4files302 PASS, tidy1128/compile1607 PASS in
+/tmp/bml-update-get-wrapper-{integrated,tidy,compile}.log. Public GET unchanged.
+Update browser WIP timeout traced to seeded first-visit modal, missing fixture
+seed_draft command and modal/navigation await order; fixes active, not accepted.
