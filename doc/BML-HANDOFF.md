@@ -1,3 +1,17 @@
+## Live queue after accepted public owned GET
+
+Root001757d13 is clean; all integration runs complete: focused571, retained
+old-form241, tidy1132, compile1607, public owned GET browser PASS/cleanup empty.
+Sol reviews callable community GET6b90c2ac9 atop accepted e16. Foreman found its
+final draft assertions read LJ::Entry instead of user; Terra is correcting with
+seeded user draft/prefs and force-fresh reads. No production finding from that.
+Themes implements test-only retained update-form scope prerequisite from5c91,
+normal and named-failure browser pass; formatting and true multi-file prove
+pending. Foreman corrected a perl-with-multiple-script-names invocation, which
+only executes the first file. Then separate public eligible update GET activation.
+Remaining display audit recorded in BML-UPDATE-GET-REMAINING.md. External and
+platform-held work unchanged. No root test process remains active.
+
 ## Latest accepted GET integrations
 
 Update GET callable browser dc3/b2 independently CLEAR, integrated6e1a52ac1/
