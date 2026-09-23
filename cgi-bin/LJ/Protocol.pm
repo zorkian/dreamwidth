@@ -14,6 +14,7 @@
 # part of this distribution.
 
 use strict;
+use DW::Request;
 no warnings 'uninitialized';
 
 use Digest::MD5;
@@ -680,10 +681,8 @@ sub login {
     LJ::text_out( \$res->{'fullname'} ) if $ver >= 1;
 
     if ( $req->{'clientversion'} =~ /^\S+\/\S+$/ ) {
-        eval {
-            my $apache_r = BML::get_request();
-            $apache_r->notes->{clientver} = $req->{'clientversion'};
-        };
+        my $r = DW::Request->get;
+        $r->note( clientver => $req->{'clientversion'} ) if $r;
     }
 
     ## update or add to clientusage table
@@ -3417,9 +3416,9 @@ sub check_altusage {
     # we are going to load the alt user
     $flags->{u_owner} = LJ::load_user($alt);
     $flags->{ownerid} = $flags->{u_owner} ? $flags->{u_owner}->id : undef;
-    my $apache_r = eval { BML::get_request() };
-    $apache_r->notes->{journalid} = $flags->{ownerid}
-        if $apache_r && !$apache_r->notes->{journalid};
+    my $r = DW::Request->get;
+    $r->note( journalid => $flags->{ownerid} )
+        if $r && !$r->note('journalid');
 
     # allow usage if we're told explicitly that it's okay
     if ( $flags->{usejournal_okay} ) {
