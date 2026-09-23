@@ -264,4 +264,19 @@ subtest 'LJ::Poll::render needlogin branch emits a real login link' => sub {
     like( $html, qr/log in/i, 'poll voting prompt tells the anonymous viewer to log in' );
     DW::Request->reset;
 };
+
+subtest 'LJ::Console::command_reference_html emits a real ml lookup, not the broken <?_ml?> tag' =>
+    sub {
+    LJ::set_remote(undef);
+    my $html = LJ::Console->command_reference_html;
+    like( $html, qr/\(unavailable\)/,
+        'reference page has at least one unavailable command to exercise' );
+    unlike( $html, qr/<\?_ml/, 'no longer emits the literal <?_ml ... _ml?> tag' );
+    like(
+        $html,
+        qr/You are not permitted to run this command\./,
+        'emits the real translated not-permitted message'
+    );
+    };
+
 done_testing;
