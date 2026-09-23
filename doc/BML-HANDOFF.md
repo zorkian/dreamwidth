@@ -1,3 +1,22 @@
+## Corrected anonymous POST source contract preserved
+
+BML-ANONYMOUS-POST-SCHEMA.md is the corrected source-only audit. Retained
+login/postevent seeds do not forward top-level chal/response; response only
+changes missing-password rerender classification. Do not infer unsupported
+challenge behavior. Unknowns are characterization gaps, not product decisions
+that override the requested compatibility default.
+
+Themes next bounded package is test-only retained anonymous password-form
+characterization using disposable local account data, no session cookie, no
+production/auth changes or external delivery. Actual form/ordinary success and
+wrong-empty credential/body responses, fresh state and password rerender behavior
+only. Automatic review remains in force: any affected rejected action must stop,
+not be retried around the guard. This does not activate anonymous native routes.
+
+Widgets final public community matrix1be4ae912 (99 worker assertions) and
+production-POST browser follow-up are queued/in progress for Sol; no integration
+yet. Browser harvest retains GET-only fixture and forwards all POST to real app.
+
 ## Anonymous callable browser accepted
 
 Sol d2dc5a1674a8a1708699be710864bde2919bd015 CLEAR, integrated afeafd8ca.
