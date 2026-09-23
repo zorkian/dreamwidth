@@ -600,6 +600,42 @@ sub _render_new_form {
 # shared native form. This is deliberately not a route or save adapter: callers
 # retain authorization and action decisions, and provide the already-prepared
 # legacy decoder result.
+# Render-only compatibility seam for an already-authorized retained /update GET.
+# The caller retains routing, beta, external fetches, and update_fields ABI.
+sub legacy_update_get_render {
+    my (%opts) = @_;
+    my $remote = $opts{remote};
+    my $get           = $opts{get}           || {};
+    my $hook          = $opts{update_fields} || {};
+    my $legacy_editor = $opts{legacy_editor} || '';
+    my $rich = $opts{rte_supported} && $legacy_editor eq 'rich';
+    my $preformatted =
+        exists $hook->{prop_opt_preformatted}
+        ? $hook->{prop_opt_preformatted}
+        : $remote && $remote->prop('disable_auto_formatting');
+    my $formdata = {
+        subject => exists $hook->{subject} ? $hook->{subject} : $get->{subject},
+        event   => exists $hook->{event}   ? $hook->{event}   : $get->{event},
+        taglist => exists $hook->{tags}    ? $hook->{tags}    : $get->{prop_taglist},
+        editor => $rich ? 'rte0' : $preformatted ? 'html_raw0' : 'html_casual1',
+    };
+    my $vars = _init(
+        {
+            usejournal           => $opts{usejournal},
+            remote               => $remote,
+            datetime             => $opts{datetime} || '',
+            trust_datetime_value => 0,
+            crosspost            => $opts{crosspost} || {},
+        }
+    );
+    return _render_new_form(
+        $vars, $formdata, $get, $remote,
+        $opts{errors}   || DW::FormErrors->new,
+        $opts{warnings} || DW::FormErrors->new,
+        undef, { action_url => $opts{action_url} || '/entry/new' }
+    );
+}
+
 sub legacy_new_rerender {
     my ( $prepared, %opts ) = @_;
 
