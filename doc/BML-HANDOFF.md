@@ -58,7 +58,13 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
-- W12 characterization e286a4730 CLEAR (its comment-only sibling 6b17dfe6c
+- W12 + E1 range 6b17dfe6c, e286a4730, 2d3205dc7, 94eaab56f bml-opus-review
+  CLEAR; integrated on root as b0bc29d0f, 8102da94e, ae2d00875, 49ea6739e.
+  sendmessage now calls LJ::Lang::set_request_context(lang => 'en', getter =>
+  undef) (E1); no BML::* call remains in LJ::Protocol, so its 'use DW::BML'
+  is dropped by a foreman follow-up. Root nine suites 82 PASS; tidy/compile
+  logs /tmp/bml-e1-integrated-*.log.
+- (historical) W12 characterization e286a4730 CLEAR (its comment-only sibling 6b17dfe6c
   and E1 2d3205dc7 held solely on comments narrating history; fix pending).
   E1 equivalence is verified post-F2: DW::BML's set_language also wrote a
   'langpref' request note nothing reads, and would take HOOK-ml_getter only
