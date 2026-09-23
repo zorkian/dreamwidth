@@ -18,13 +18,15 @@ use strict;
 use warnings;
 
 use DW::Controller;
+use DW::FormErrors;
 use DW::Request;
 use DW::Routing;
 use DW::Template;
+use LJ::Entry;
 
-# The narrow personal-owned GET renderer returns undef for every retained
-# context it does not own. DW::Routing then reaches app.psgi's BML fallback
-# without changing the request method, body, or query string.
+# The picker itself is unchanged; an itemid identifies a specific entry to
+# edit and is fully graduated: every GET canonicalizes to the native edit
+# form, and any POST is necessarily a stale tab submitting the old schema.
 DW::Routing->register_string( '/editjournal', \&entry_picker_handler, app => 1, no_redirects => 1 );
 
 sub entry_picker_handler {
@@ -33,22 +35,50 @@ sub entry_picker_handler {
     my $post = $r->post_args;
 
     if ( defined $get->{itemid} || defined $post->{itemid} ) {
-        require DW::Controller::Entry;
+        my $ditemid = $get->{itemid} || $post->{itemid};
+        return undef unless defined $ditemid && $ditemid =~ /\A[1-9][0-9]*\z/;
+
+        my $remote = LJ::get_remote();
+        my $username =
+               $get->{usejournal}
+            || $get->{journal}
+            || $post->{usejournal}
+            || ( $remote ? $remote->user : undef );
+
         if ( $r->method eq 'GET' ) {
-            my $rendered = DW::Controller::Entry::legacy_owned_edit_get_handler();
-            return $rendered if defined $rendered;
-            $rendered =
-                DW::Controller::Entry::legacy_community_edit_get_handler( same_poster_only => 1 );
-            return $rendered if defined $rendered;
-            return undef;
+            my $path =
+                ( defined $username && length $username )
+                ? "/entry/$username/$ditemid/edit"
+                : '/entry/new';
+            $r->status(302);
+            $r->header_out( Location => LJ::create_url($path) );
+            return $r->OK;
         }
-        my $rendered = DW::Controller::Entry::legacy_owned_edit_handler();
-        return $rendered if defined $rendered;
-        $rendered = DW::Controller::Entry::legacy_same_poster_community_edit_handler();
-        return $rendered if defined $rendered;
-        $rendered = DW::Controller::Entry::legacy_manager_property_post_handler();
-        return $rendered if defined $rendered;
-        return undef;
+
+        # A POST here is old-schema content from a stale tab: it must never
+        # be saved and never be silently discarded. Decode once and hand the
+        # submitted content to the native edit form for review, using the
+        # same carry-over notice as the retired /update page.
+        return error_ml('/entry/form.tt.error.nofind')
+            unless defined $username && length $username;
+        my $journal = LJ::load_user($username);
+        return error_ml('/entry/form.tt.error.nofind') unless LJ::isu($journal);
+        my $entry = LJ::Entry->new( $journal, ditemid => $ditemid );
+        return error_ml('/entry/form.tt.error.nofind')
+            unless LJ::isu($remote) && $entry && $entry->valid && $entry->editable_by($remote);
+
+        require DW::Controller::Entry;
+        require DW::Entry::Legacy;
+        my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
+        my $warnings = DW::FormErrors->new;
+        $warnings->add( undef, '.notice.legacy_carryover' );
+        return DW::Controller::Entry::legacy_owned_edit_rerender(
+            entry    => $entry,
+            remote   => $remote,
+            journal  => $journal,
+            prepared => $prepared,
+            warnings => $warnings,
+        );
     }
 
     my ( $ok, $rv ) = controller( authas => { type => 'P' } );

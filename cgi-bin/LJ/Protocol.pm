@@ -1663,9 +1663,7 @@ sub postevent {
     $res->{message} = translate(
         $u, $errref,
         {
-                  aopts => "href='$LJ::SITEROOT/editjournal?journal="
-                . $uowner->user
-                . "&itemid=$ditemid'"
+            aopts => "href='$LJ::SITEROOT/entry/" . $uowner->user . "/$ditemid/edit'"
         }
     ) if $errref;
 
@@ -2185,9 +2183,7 @@ sub editevent {
         translate(
             $u, $errref,
             {
-                      aopts => "href='$LJ::SITEROOT/editjournal?journal="
-                    . $uowner->user
-                    . "&itemid=$ditemid'"
+                aopts => "href='$LJ::SITEROOT/entry/" . $uowner->user . "/$ditemid/edit'"
             }
         )
     ) if $errref;

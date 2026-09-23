@@ -198,8 +198,7 @@ sub link_bar {
             || ( $remote->equals($up) && $up->can_post_to($u) ) )
         )
     {
-        push @linkele,
-            $mlink->( "$LJ::SITEROOT/editjournal?${jargent}itemid=$itemid", "editentry" );
+        push @linkele, $mlink->( "$LJ::SITEROOT/entry/" . $u->user . "/$itemid/edit", "editentry" );
     }
 
     # edit tags

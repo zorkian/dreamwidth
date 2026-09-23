@@ -45,6 +45,8 @@
 
 .event.placeholder=Your entry text...
 
+.notice.legacy_carryover=The previous posting page has been retired. Your content has been carried over below; please review it and post.
+
 .select.security=Security:
 
 .select.security.access.format=an access locked entry

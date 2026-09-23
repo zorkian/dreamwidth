@@ -222,19 +222,13 @@ test_psgi $app, sub {
     );
     my $legacy = $cb->(
         GET '/editjournal.bml?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid );
-    like(
-        $legacy->content,
-        qr/name=["']action:savemaintainer/,
-        'legacy route renders manager save control'
+    is( $legacy->code, 302, 'legacy route redirects instead of rendering inline' );
+    is(
+        URI->new( $legacy->header('Location') )->path,
+        '/entry/' . $comm->user . '/' . $other_entry->ditemid . '/edit',
+        'legacy route redirects to the native maintainer edit URL'
     );
-    like(
-        $legacy->content,
-        qr/name=["']action:delete["']/,
-        'legacy route renders manager delete control'
-    );
-    my ($maintainer_form) =
-        grep { $_->find_input('action:savemaintainer') } picker_forms( $legacy->content );
-    ok( $maintainer_form, 'legacy maintainer form is rendered' );
+
     LJ::set_logprop( $comm, $other_entry->jitemid, { opt_preformatted => 1 } );
     LJ::Entry::reset_singletons();
     my $seeded_entry     = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
@@ -242,28 +236,29 @@ test_psgi $app, sub {
     my $original_subject = $seeded_entry->subject_raw;
     my $unrelated        = $seeded_entry->prop('opt_preformatted') || '';
     is( $unrelated, 1, 'fixture seeds a nondefault unrelated property' );
-    $maintainer_form->value( 'prop_adult_content_maintainer_reason', 'maintainer reason marker' );
-    $maintainer_form->value( 'prop_adult_content_maintainer',        1 );
-    $maintainer_form->value( 'prop_opt_nocomments_maintainer',       1 );
-    $maintainer_form->action( 'http://localhost/editjournal.bml?usejournal=' . $comm->user );
-    my $maintainer_response = $cb->( $maintainer_form->click('action:savemaintainer') );
-    LJ::Entry::reset_singletons();
-    my $saved_maintainer = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
-    is(
-        $saved_maintainer->prop('adult_content_maintainer_reason'),
-        'maintainer reason marker',
-        'legacy maintainer save persists its exact reason'
+
+    # A stale-tab-style old-schema POST to the legacy itemid URL must never
+    # silently save: it renders the native carry-over form instead.
+    my $legacy_post_res = $cb->(
+        POST '/editjournal.bml?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid,
+        Content => [
+            'action:savemaintainer'              => 1,
+            prop_adult_content_maintainer_reason => 'legacy carryover reason attempt',
+            prop_adult_content_maintainer        => 1,
+        ]
     );
-    is( $saved_maintainer->prop('adult_content_maintainer') || 0,
-        1, 'legacy maintainer save persists adult override' );
-    is( $saved_maintainer->prop('opt_nocomments_maintainer') || 0,
-        1, 'legacy maintainer save persists comments override' );
-    is( $saved_maintainer->event_raw,
-        $original_body, 'maintainer save cannot change other poster body' );
-    is( $saved_maintainer->subject_raw,
-        $original_subject, 'maintainer save cannot change other poster subject' );
-    is( $saved_maintainer->prop('opt_preformatted') || '',
-        $unrelated, 'maintainer save preserves unrelated properties' );
+    is( $legacy_post_res->code, 200,
+        'legacy itemid POST returns the carry-over form, not a redirect' );
+    like(
+        $legacy_post_res->content,
+        qr/previous posting page has been retired/i,
+        'legacy itemid POST renders the explicit carry-over notice'
+    );
+    LJ::Entry::reset_singletons();
+    my $unsaved_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
+    is( $unsaved_entry->prop('adult_content_maintainer_reason') || '',
+        '', 'legacy itemid POST does not actually save maintainer properties' );
+
     LJ::set_logprop(
         $comm,
         $other_entry->jitemid,
@@ -462,20 +457,19 @@ test_psgi $app, sub {
     $comm->update_self( { statusvis => 'V' } );
     $res =
         $cb->( GET '/editjournal?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid );
-    is( $res->code, 200, 'manager other-poster editor remains reachable without beta redirect' );
-    my @forms = picker_forms( $res->content );
-    ok(
-        scalar( grep { $_->find_input('action:delete') } @forms ),
-        'manager retains legacy delete action for another poster'
-    );
-    ok(
-        scalar( grep { $_->find_input('action:savemaintainer') } @forms ),
-        'manager retains legacy maintainer controls for another poster'
+    is( $res->code, 302,
+        'manager other-poster editor now redirects to the native maintainer edit URL' );
+    is(
+        URI->new( $res->header('Location') )->path,
+        '/entry/' . $comm->user . '/' . $other_entry->ditemid . '/edit',
+        'manager other-poster editor redirect targets the native maintainer edit URL'
     );
 
     # itemid must override picker mode even when the action comes from the
-    # editor's JavaScript submit_value field. Denied mutations must reach the
-    # retained editor CSRF guard, not disappear into read-only selection.
+    # editor's JavaScript submit_value field. A carry-over POST never saves
+    # regardless of form-auth token, so this no longer reaches an "Invalid
+    # form" CSRF rejection: it renders the same carry-over form every other
+    # old-schema itemid POST does.
     LJ::Entry::reset_singletons();
     my $before_maintainer =
         LJ::Entry->new( $comm, ditemid => $other_entry->ditemid )->prop('opt_nocomments_maintainer')
@@ -491,20 +485,21 @@ test_psgi $app, sub {
             push @payload, lj_form_auth => $token if defined $token;
             for my $path ( '/editjournal', '/editjournal.bml' ) {
                 $res = $cb->( POST $path . '?usejournal=' . $comm->user, Content => \@payload );
+                is( $res->code, 200,
+"$path itemid $action POST returns the carry-over form regardless of the form-auth token"
+                );
                 like(
                     $res->content,
-                    qr/Invalid form/i,
-                    "$path itemid $action reaches CSRF guard despite init mode"
+                    qr/previous posting page has been retired/i,
+                    "$path itemid $action POST renders the explicit carry-over notice"
                 );
                 ok( !$res->header('Location'),
-                    'denied legacy mutation does not redirect away its body' );
+                    'carry-over response does not redirect away its body' );
                 LJ::Entry::reset_singletons();
                 my $fresh_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
-                ok( $fresh_entry->valid,
-                    'denied editor request cannot delete another poster entry' );
+                ok( $fresh_entry->valid, 'carry-over POST cannot delete another poster entry' );
                 is( $fresh_entry->prop('opt_nocomments_maintainer') || 0,
-                    $before_maintainer,
-                    'denied editor request cannot change maintainer properties' );
+                    $before_maintainer, 'carry-over POST cannot change maintainer properties' );
             }
         }
     }

@@ -4325,7 +4325,7 @@ sub _Entry__get_link {
             || $remote->user eq $poster
             || $remote->can_manage($journalu) );
         return LJ::S2::Link(
-            "$LJ::SITEROOT/editjournal?journal=$journal&amp;itemid=$this->{'itemid'}",
+            "$LJ::SITEROOT/entry/$journal/$this->{'itemid'}/edit",
             $ctx->[S2::PROPS]->{"text_edit_entry"},
             LJ::S2::Image_std('editentry')
         );

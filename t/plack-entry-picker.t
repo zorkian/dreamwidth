@@ -246,14 +246,12 @@ test_psgi $app, sub {
             . $own_entry->ditemid
             . '&encoded=a%2Fb%26c&repeated=one&repeated=two';
         my $same = $cb->( GET '/editjournal' . $suffix . '?' . $raw );
-        is( $same->code, 200, "same-poster $suffix GET uses public native rendering" );
-        my ($form) = grep { $_->find_input('subject') } picker_forms( $same->content );
-        ok( $form, "same-poster $suffix GET returns native edit form" );
-        like(
-            $form->action,
-qr{^http://localhost/entry/\Q@{[$comm->user]}\E/\Q@{[$own_entry->ditemid]}\E/edit\?\Q$raw\E$},
-            "same-poster $suffix form preserves canonical raw action"
-        ) if $form;
+        is( $same->code, 302, "same-poster $suffix GET now redirects to the native edit URL" );
+        is(
+            URI->new( $same->header('Location') )->path,
+            '/entry/' . $comm->user . '/' . $own_entry->ditemid . '/edit',
+            "same-poster $suffix GET redirects to the canonical native edit path"
+        );
     }
 
     my $res = $cb->(
@@ -310,20 +308,19 @@ qr{^http://localhost/entry/\Q@{[$comm->user]}\E/\Q@{[$own_entry->ditemid]}\E/edi
     $comm->update_self( { statusvis => 'V' } );
     $res =
         $cb->( GET '/editjournal?usejournal=' . $comm->user . '&itemid=' . $other_entry->ditemid );
-    is( $res->code, 200, 'manager other-poster editor remains reachable without beta redirect' );
-    my @forms = picker_forms( $res->content );
-    ok(
-        scalar( grep { $_->find_input('action:delete') } @forms ),
-        'manager retains legacy delete action for another poster'
-    );
-    ok(
-        scalar( grep { $_->find_input('action:savemaintainer') } @forms ),
-        'manager retains legacy maintainer controls for another poster'
+    is( $res->code, 302,
+        'manager other-poster editor now redirects to the native maintainer edit URL' );
+    is(
+        URI->new( $res->header('Location') )->path,
+        '/entry/' . $comm->user . '/' . $other_entry->ditemid . '/edit',
+        'manager other-poster editor redirect targets the native maintainer edit URL'
     );
 
     # itemid must override picker mode even when the action comes from the
-    # editor's JavaScript submit_value field. Denied mutations must reach the
-    # retained editor CSRF guard, not disappear into read-only selection.
+    # editor's JavaScript submit_value field. A carry-over POST never saves
+    # regardless of form-auth token, so this no longer reaches an "Invalid
+    # form" CSRF rejection: it renders the same carry-over form every other
+    # old-schema itemid POST does.
     my $before_maintainer = $other_entry->prop('opt_nocomments_maintainer') || 0;
     for my $token ( undef, 'invalid' ) {
         for my $action ( 'action:delete', 'action:savemaintainer' ) {
@@ -336,20 +333,21 @@ qr{^http://localhost/entry/\Q@{[$comm->user]}\E/\Q@{[$own_entry->ditemid]}\E/edi
             push @payload, lj_form_auth => $token if defined $token;
             for my $path ( '/editjournal', '/editjournal.bml' ) {
                 $res = $cb->( POST $path . '?usejournal=' . $comm->user, Content => \@payload );
+                is( $res->code, 200,
+"$path itemid $action POST returns the carry-over form regardless of the form-auth token"
+                );
                 like(
                     $res->content,
-                    qr/Invalid form/i,
-                    "$path itemid $action reaches CSRF guard despite init mode"
+                    qr/previous posting page has been retired/i,
+                    "$path itemid $action POST renders the explicit carry-over notice"
                 );
                 ok( !$res->header('Location'),
-                    'denied legacy mutation does not redirect away its body' );
+                    'carry-over response does not redirect away its body' );
                 LJ::Entry::reset_singletons();
                 my $fresh_entry = LJ::Entry->new( $comm, ditemid => $other_entry->ditemid );
-                ok( $fresh_entry->valid,
-                    'denied editor request cannot delete another poster entry' );
+                ok( $fresh_entry->valid, 'carry-over POST cannot delete another poster entry' );
                 is( $fresh_entry->prop('opt_nocomments_maintainer') || 0,
-                    $before_maintainer,
-                    'denied editor request cannot change maintainer properties' );
+                    $before_maintainer, 'carry-over POST cannot change maintainer properties' );
             }
         }
     }

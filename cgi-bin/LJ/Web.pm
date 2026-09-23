@@ -2624,8 +2624,9 @@ sub control_strip {
     my %links = (
         'login' =>
             "<a href='$LJ::SITEROOT/?returnto=$euri'>$ml{'web.controlstrip.links.login'}</a>",
-        'post_journal' => "<a href='$LJ::SITEROOT/update'>$ml{'web.controlstrip.links.post2'}</a>",
-        'home'         => "<a href='$LJ::SITEROOT/'>" . $ml{'web.controlstrip.links.home'} . "</a>",
+        'post_journal' =>
+            "<a href='$LJ::SITEROOT/entry/new'>$ml{'web.controlstrip.links.post2'}</a>",
+        'home' => "<a href='$LJ::SITEROOT/'>" . $ml{'web.controlstrip.links.home'} . "</a>",
         'recent_comments' =>
 "<a href='$LJ::SITEROOT/comments/recent'>$ml{'web.controlstrip.links.recentcomments'}</a>",
         'manage_friends' =>
@@ -2682,7 +2683,7 @@ sub control_strip {
             $links{'unwatch_community'} =
 "<a href='$LJ::SITEROOT/circle/$journal->{user}/edit'>$ml{'web.controlstrip.links.removecomm'}</a>";
             $links{'post_to_community'} =
-"<a href='$LJ::SITEROOT/update?usejournal=$journal->{user}'>$ml{'web.controlstrip.links.postcomm'}</a>";
+"<a href='$LJ::SITEROOT/entry/$journal->{user}/new'>$ml{'web.controlstrip.links.postcomm'}</a>";
             $links{'edit_community_profile'} =
 "<a href='$LJ::SITEROOT/manage/profile/?authas=$journal->{user}'>$ml{'web.controlstrip.links.editcommprofile'}</a>";
             $links{'edit_community_invites'} =

@@ -90,25 +90,56 @@ DW::Routing->register_regex( '^/entry/(?:(.+)/)?(\d+)/edit$', \&edit_handler, ap
 
 DW::Routing->register_string( '/entry/new', \&_new_handler_userspace, user => 1 );
 
-# Keep this all-method route so a handler undef result reaches the retained BML
-# resolver.  Restricting registration to POST would turn GET and unsupported
-# retained actions into a router 405 instead of preserving their old behavior.
-# DW::Routing strips the legacy .bml suffix before lookup, covering both URLs.
+# The retired posting page is fully graduated: every GET canonicalizes to the
+# native form, and any POST is necessarily a stale tab submitting the old
+# schema. DW::Routing strips the legacy .bml suffix before lookup, covering
+# both URLs.
 DW::Routing->register_string(
     '/update',
     sub {
-        my $r = DW::Request->get;
-        return legacy_update_get_handler() if $r && $r->method eq 'GET';
+        my $r   = DW::Request->get;
+        my $get = $r->get_args;
 
-        # Keep authenticated/session-owned retained update work first. Only an
-        # undef structural decline may continue into the anonymous owner slice
-        # and then retained BML fallback.
-        my $result = legacy_update_handler( include_transforms => 1 );
-        return $result if defined $result;
-        return legacy_anonymous_update_handler();
+        if ( $r->method eq 'GET' ) {
+            my $usejournal = $get->{usejournal};
+            my $path =
+                ( defined $usejournal && length $usejournal )
+                ? "/entry/$usejournal/new"
+                : '/entry/new';
+
+            my %args;
+            for my $name (qw(subject event share)) {
+                $args{$name} = $get->{$name} if defined $get->{$name} && length $get->{$name};
+            }
+            $args{tags} = $get->{prop_taglist}
+                if defined $get->{prop_taglist} && length $get->{prop_taglist};
+
+            $r->status(302);
+            $r->header_out( Location => LJ::create_url( $path, args => \%args ) );
+            return $r->OK;
+        }
+
+        # A POST here is old-schema content from a stale tab: it must never be
+        # saved and never be silently discarded. Decode once and hand the
+        # submitted content to the native form for the poster to review and
+        # resubmit; this applies uniformly regardless of which old submit
+        # button (post, preview, spellcheck, a transform) was clicked.
+        my $post     = $r->post_args;
+        my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
+        my $warnings = DW::FormErrors->new;
+        $warnings->add( undef, '.notice.legacy_carryover' );
+        my $remote = LJ::get_remote();
+
+        return legacy_new_rerender(
+            $prepared,
+            remote     => $remote,
+            get        => $get,
+            warnings   => $warnings,
+            action_url => '/entry/new',
+            ( LJ::isu($remote) ? () : ( anonymous_username => $post->{user} // '' ) ),
+        );
     },
-    app          => 1,
-    no_redirects => 1
+    app => 1,
 );
 
 # redirect to app-space
@@ -1658,9 +1689,6 @@ sub _init {
             subject_length => LJ::CMAX_SUBJECT,
             current_length => LJ::std_max_length,
         },
-
-        # TODO: Remove this when beta is over
-        betacommunity => LJ::load_user("dw_beta"),
     };
 
     return $vars;

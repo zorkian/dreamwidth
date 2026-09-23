@@ -95,7 +95,7 @@ sub _as_email {
                     !$u->trusts( $self->fromuser ) ? 0 : 2,
                     "$LJ::SITEROOT/circle/$postername/edit"
                 ],
-                'esn.post_entry'   => [ 3, "$LJ::SITEROOT/update" ],
+                'esn.post_entry'   => [ 3, "$LJ::SITEROOT/entry/new" ],
                 'esn.edit_friends' => [ 4, "$LJ::SITEROOT/manage/circle/edit" ],
                 'esn.edit_groups'  => [ 5, "$LJ::SITEROOT/manage/circle/editfilters" ],
             }
@@ -111,7 +111,7 @@ sub _as_email {
                     !$u->watches( $self->fromuser ) ? 0 : 2,
                     "$LJ::SITEROOT/circle/$postername/edit"
                 ],
-                'esn.post_entry'   => [ 3, "$LJ::SITEROOT/update" ],
+                'esn.post_entry'   => [ 3, "$LJ::SITEROOT/entry/new" ],
                 'esn.edit_friends' => [ 4, "$LJ::SITEROOT/manage/circle/edit" ],
                 'esn.edit_groups'  => [ 5, "$LJ::SITEROOT/manage/circle/editfilters" ],
             }

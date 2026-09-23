@@ -258,7 +258,7 @@ sub render {
 
     if ( $mode eq "update" ) {
         $u or return 404;
-        return $r->redirect( "$LJ::SITEROOT/update.bml?usejournal=" . $u->{'user'} );
+        return $r->redirect( "$LJ::SITEROOT/entry/" . $u->{'user'} . "/new" );
     }
 
     # Robots.txt

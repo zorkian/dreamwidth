@@ -18,7 +18,7 @@
     <h2>[% '.saved.header' | ml %]</h2>
     <p>[% '.saved.text' | ml %]</p>
     <ul>
-        <li><a href="[% site.root %]/update">[% '.saved.action.post' | ml %]</a></li>
+        <li><a href="[% site.root %]/entry/new">[% '.saved.action.post' | ml %]</a></li>
         <li><a href="[% site.root %]/manage/subscriptions/filters">[% '.saved.action.subscription' | ml %]</a></li>
     </ul>
 [% ELSE %]
