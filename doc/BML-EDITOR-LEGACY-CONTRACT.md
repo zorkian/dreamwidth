@@ -47,3 +47,21 @@ own field names; the names are not interchangeable at the rendered-form layer.
 actual legacy form and its CSRF token, then posts distinct private subject/body,
 tags, location and music through both old URL spellings.  It force-loads the
 created entry and verifies exactly one new row and every persisted value.
+
+## Remaining configured-feature boundary
+
+Source audit at `4d72caddd`: when `$LJ::SPELLER` is configured, the shared
+legacy form renders `action:spellcheck` (LJ::Web), and update/editjournal invoke
+`LJ::SpellCheck->check_html` before posting or saving. This preserves the form
+and shows suggestions or the existing no-errors message. No equivalent action
+was found in the native Entry controller or entry templates/scripts. This is
+an uncharacterized existing beta parity gap, not a regression introduced by
+these tests and not evidence that any deployment enables the setting.
+
+Before removing those forms, characterize configured and disabled behavior
+with a stubbed spellchecker (no external process required), then preserve the
+configured action in the native editor or obtain an explicit retirement
+choice. Do not silently infer that the commented example setting is unused.
+Moderated posting and selected crossposting also remain distinct from the
+private owned-entry baseline above; external crosspost delivery must be
+stubbed during acceptance.
