@@ -68,10 +68,12 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    BML-UPDATE-COMMUNITY-INTEGRATION.md. No public route registration.
 2. Widgets: rerender bdc+755 and success015 are integrated and clear. Callable
    owned-edit helperbeb+771 is clear and integrated5af39e827/88e2c2cc8; raw decoded
-   hook reference corrected. Worker must finish actual retained-form HTTP wrapper
-   with real persistence for both aliases; helper stub tests alone are insufficient.
+   hook reference corrected. Actual middleware tests757/8d are held: empty same-name submit selection
+   omitted security and changed private to public. Worker must fix truthy visible
+   control selection, remove submit_value rewrite, assert fresh security, then
+   complete denial/retry cases. Helper stub tests alone are insufficient.
 3. Sol: independently cleared current callable corrections and completed bounded
-   community/moderation source handoff. Ready for immutable browser/HTTP packages.
+   community/moderation source handoff. Latest757/8d test finding is routed; ready for immutable corrections and browser.
    Held inbox and pending external Journal interfaces remain excluded.
 
 Current combined-tree callable/retained/native6files462 PASS, tidy1116 PASS,

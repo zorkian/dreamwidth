@@ -1791,3 +1791,25 @@ checks, after widgets Terra completes customization1/4.
   BML-UPDATE-COMMUNITY-INTEGRATION.md (fb550e880). POST usejournal alone selects
   the save target; absent/empty means owner, named missing/denied never falls
   back to owner. Existing policy, moderation and extension contracts stay intact.
+
+
+### Real-request acceptance remains held on fixture corrections
+
+- Widgets test-only real middleware increment757 and direct-alias increment8d
+  are NOT accepted. Sol added fresh security assertions and reproduced private
+  entries becoming public: visible_click selected the first empty same-name
+  control, and manual submit_value rewriting hid the wrong form serialization.
+  Fix requires the established truthy visible submit predicate, removing the
+  rewrite, and exact fresh security retention. Baseline22 passing assertions
+  miss this; reviewer corrected diagnostic24 passes. No canonical production
+  defect is established by this fixture failure.
+- Sol proper-seed helper diagnostic25 passes canonical body/subject/metadata/
+  security and delete ordering with no persistence claim. Real denied/retry
+  alias matrix remains separate worker WIP; unsupported source fallback alone
+  is not accepted test coverage.
+- Themes browser harness remains uncommitted. Foreman identified old FCK
+  instance draft versus native entry-body, and old alias GET form action differs
+  from the page URL; those harness assumptions were corrected. Current work
+  diagnoses native retry editor initialization from exact runtime state. No
+  browser pass or route activation is claimed; disposable processes are checked
+  before reruns rather than launching duplicates.
