@@ -673,6 +673,8 @@ entryform.spellcheck=Spell check
 
 entryform.spellcheck.noerrors=No spelling errors found
 
+entryform.spellcheck.unavailable=Spell check is currently unavailable
+
 entryform.spellchecked=Spell-checked entry:
 
 entryform.subject=Subject:

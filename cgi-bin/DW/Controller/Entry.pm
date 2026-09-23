@@ -31,6 +31,7 @@ use DW::Entry;
 use Hash::MultiValue;
 use HTTP::Status qw( :constants );
 use LJ::JSON;
+use LJ::SpellCheck;
 
 use DW::External::Account;
 use DW::External::Site;
@@ -155,7 +156,16 @@ sub new_handler {
     }
 
     my $get = $r->get_args;
-    $usejournal ||= $get->{usejournal};
+
+    # A spellcheck transform must use the posted journal selection, just as a
+    # real save would, rather than falling back to the route or prior GET. An
+    # empty submitted value deliberately selects the owner journal.
+    my $spellcheck_has_posted_usejournal =
+        $post && $post->{"action:spellcheck"} && exists $post->{usejournal};
+    if ($spellcheck_has_posted_usejournal) {
+        $usejournal = $post->{usejournal};
+    }
+    $usejournal ||= $get->{usejournal} unless $spellcheck_has_posted_usejournal;
     my $vars = _init(
         {
             usejournal => $usejournal,
@@ -173,74 +183,83 @@ sub new_handler {
     $errors->add( undef, ".error.invalidusejournal" )
         if defined $usejournal && !$vars->{usejournal};
 
+    my $spellcheck_requested;
     if ( $r->did_post ) {
-        my $mode_preview = $post->{"action:preview"} ? 1 : 0;
-
-        $errors->add( undef, 'bml.badinput.body1' )
-            unless LJ::text_in($post);
-
+        $spellcheck_requested = $post->{"action:spellcheck"} ? 1 : 0;
+        my $mode_preview  = $post->{"action:preview"} ? 1 : 0;
         my $okay_formauth = !$remote || LJ::check_form_auth( $post->{lj_form_auth} );
 
-        $errors->add( undef, "error.invalidform" )
-            unless $okay_formauth;
-
-        if ($mode_preview) {
-
-            # do nothing
+        # Spellcheck is a form transform: validate its existing CSRF token, then
+        # return the submitted form before body validation, auth, or persistence.
+        if ($spellcheck_requested) {
+            $errors->add( undef, "error.invalidform" ) unless $okay_formauth;
+            $spellcheck_requested = 0 unless $okay_formauth;
         }
-        elsif ( $okay_formauth && $post->{showform} )
-        {    # some other form posted content to us, which the user will want to edit further
+        else {
+            $errors->add( undef, 'bml.badinput.body1' )
+                unless LJ::text_in($post);
 
-        }
-        elsif ($okay_formauth) {
-            my $flags = {};
+            $errors->add( undef, "error.invalidform" )
+                unless $okay_formauth;
 
-            my %auth = _auth( $flags, $post, $remote );
+            if ($mode_preview) {
 
-            my $uj = $auth{journal};
-            $errors->add_string( undef, $LJ::MSG_READONLY_USER )
-                if $uj && $uj->readonly;
+                # do nothing
+            }
+            elsif ( $okay_formauth && $post->{showform} )
+            {    # some other form posted content to us, which the user will want to edit further
 
-            # do a login action to check if we can authenticate as unverified_username
-            # and to display any important messages connected to your account
-            {
-                # build a clientversion string
-                my $clientversion = "Web/3.0.0";
+            }
+            elsif ($okay_formauth) {
+                my $flags = {};
 
-                # build a request object
-                my %login_req = (
-                    ver           => $LJ::PROTOCOL_VER,
-                    clientversion => $clientversion,
-                    username      => $auth{unverified_username},
-                );
+                my %auth = _auth( $flags, $post, $remote );
 
-                my $err;
-                my $login_res = LJ::Protocol::do_request( "login", \%login_req, \$err, $flags );
+                my $uj = $auth{journal};
+                $errors->add_string( undef, $LJ::MSG_READONLY_USER )
+                    if $uj && $uj->readonly;
 
-                unless ($login_res) {
-                    $errors->add( undef, ".error.login",
-                        { error => LJ::Protocol::error_message($err) } );
+                # do a login action to check if we can authenticate as unverified_username
+                # and to display any important messages connected to your account
+                {
+                    # build a clientversion string
+                    my $clientversion = "Web/3.0.0";
+
+                    # build a request object
+                    my %login_req = (
+                        ver           => $LJ::PROTOCOL_VER,
+                        clientversion => $clientversion,
+                        username      => $auth{unverified_username},
+                    );
+
+                    my $err;
+                    my $login_res = LJ::Protocol::do_request( "login", \%login_req, \$err, $flags );
+
+                    unless ($login_res) {
+                        $errors->add( undef, ".error.login",
+                            { error => LJ::Protocol::error_message($err) } );
+                    }
+
+                    # e.g. not validated
+                    $warnings->add_string( undef,
+                        LJ::auto_linkify( LJ::ehtml( $login_res->{message} ) ) )
+                        if $login_res->{message};
                 }
 
-                # e.g. not validated
-                $warnings->add_string( undef,
-                    LJ::auto_linkify( LJ::ehtml( $login_res->{message} ) ) )
-                    if $login_res->{message};
-            }
+                my $form_req = {};
+                DW::Entry::_form_to_backend( 0, $form_req, $post, errors => $errors );
 
-            my $form_req = {};
-            DW::Entry::_form_to_backend( 0, $form_req, $post, errors => $errors );
+                # check for spam domains
+                LJ::Hooks::run_hooks( 'spam_check', $auth{poster}, $form_req, 'entry' );
 
-            # check for spam domains
-            LJ::Hooks::run_hooks( 'spam_check', $auth{poster}, $form_req, 'entry' );
+                # if we didn't have any errors with decoding the form, proceed to post
+                unless ( $errors->exist ) {
+                    my %post_res = _do_post( $form_req, $flags, \%auth, warnings => $warnings );
+                    return $post_res{render} if $post_res{status} eq "ok";
 
-            # if we didn't have any errors with decoding the form, proceed to post
-            unless ( $errors->exist ) {
-                my %post_res = _do_post( $form_req, $flags, \%auth, warnings => $warnings );
-                return $post_res{render} if $post_res{status} eq "ok";
-
-                # oops errors when posting: show error, fall through to show form
-                $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+                    # oops errors when posting: show error, fall through to show form
+                    $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+                }
             }
         }
     }
@@ -260,6 +279,14 @@ sub new_handler {
         preferred => $remote ? $remote->prop('entry_editor2') : '',
     );
     $vars->{formdata}->{editor} = $vars->{editors}->{selected};
+
+    $vars->{spellcheck_enabled} = _spellcheck_enabled( $remote, $vars->{journalu} );
+    if ($spellcheck_requested) {
+        $vars->{spellcheck} =
+            $vars->{spellcheck_enabled}
+            ? _spellcheck_result($post)
+            : _spellcheck_unavailable();
+    }
 
     # Set up info for the icon select/preview/browse components
     $vars->{current_icon_kw} = $vars->{formdata}->{prop_picture_keyword};
@@ -311,6 +338,33 @@ sub new_handler {
     $vars->{autosave_interval} = $LJ::AUTOSAVE_DRAFT_INTERVAL;
 
     return DW::Template->render_template( 'entry/form.tt', $vars );
+}
+
+# Spellcheck is intentionally a non-persisting form transform. Its HTML is
+# generated by the configured checker; user-submitted text is escaped before it
+# crosses that trusted-result boundary.
+sub _spellcheck_result {
+    my ($post) = @_;
+
+    my $event   = LJ::ehtml( $post->{event} // '' );
+    my $checker = LJ::SpellCheck->new( { spellcommand => $LJ::SPELLER } );
+    my $html    = $checker->check_html( \$event );
+
+    return {
+        did  => 1,
+        html => length $html ? $html : LJ::Lang::ml('entryform.spellcheck.noerrors'),
+    };
+}
+
+sub _spellcheck_unavailable {
+    return { did => 1, html => LJ::Lang::ml('entryform.spellcheck.unavailable') };
+}
+
+sub _spellcheck_enabled {
+    my ( $remote, $journal ) = @_;
+    return 0 unless $LJ::SPELLER && LJ::isu($remote) && LJ::isu($journal);
+    return 0 if $remote->readonly || $journal->readonly;
+    return $remote->can_post_to($journal) ? 1 : 0;
 }
 
 # Initializes entry form values.
@@ -539,6 +593,7 @@ sub _edit {
     my $errors   = DW::FormErrors->new;
     my $warnings = DW::FormErrors->new;
     my $post;
+    my $spellcheck_requested;
 
     my $maintainer_post = $r->did_post ? $r->post_args : undef;
     if ( $maintainer_post && $maintainer_post->{'action:savemaintainer'} ) {
@@ -581,59 +636,65 @@ sub _edit {
 
         my $mode_preview = $post->{"action:preview"} ? 1 : 0;
         my $mode_delete  = $post->{"action:delete"}  ? 1 : 0;
-
-        $errors->add( undef, 'bml.badinput.body1' )
-            unless LJ::text_in($post);
+        $spellcheck_requested = $post->{"action:spellcheck"} ? 1 : 0;
 
         my $okay_formauth = LJ::check_form_auth( $post->{lj_form_auth} );
-        $errors->add( undef, "error.invalidform" )
-            unless $okay_formauth;
-
-        if ($mode_preview) {
-
-            # do nothing
+        if ($spellcheck_requested) {
+            $errors->add( undef, "error.invalidform" ) unless $okay_formauth;
+            $spellcheck_requested = 0 unless $okay_formauth;
         }
-        elsif ($okay_formauth) {
-            $errors->add_string( undef, $LJ::MSG_READONLY_USER )
-                if $journal && $journal->readonly;
+        else {
+            $errors->add( undef, 'bml.badinput.body1' )
+                unless LJ::text_in($post);
+            $errors->add( undef, "error.invalidform" )
+                unless $okay_formauth;
 
-            my $form_req = {};
-            DW::Entry::_form_to_backend(
-                0, $form_req, $post,
-                allow_empty => $mode_delete,
-                errors      => $errors
-            );
+            if ($mode_preview) {
 
-            # check for spam domains
-            LJ::Hooks::run_hooks( 'spam_check', $remote, $form_req, 'entry' );
+                # do nothing
+            }
+            elsif ($okay_formauth) {
+                $errors->add_string( undef, $LJ::MSG_READONLY_USER )
+                    if $journal && $journal->readonly;
 
-            # if we didn't have any errors with decoding the form, proceed to post
-            unless ( $errors->exist ) {
-
-                if ($mode_delete) {
-                    $form_req->{event} = "";
-
-                    # now log the event created above
-                    $journal->log_event(
-                        'delete_entry',
-                        {
-                            remote       => $remote,
-                            actiontarget => $ditemid,
-                            method       => 'web',
-                        }
-                    );
-
-                }
-
-                my %edit_res = _do_edit(
-                    $ditemid, $form_req,
-                    { poster => $remote, journal => $journal },
-                    warnings => $warnings,
+                my $form_req = {};
+                DW::Entry::_form_to_backend(
+                    0, $form_req, $post,
+                    allow_empty => $mode_delete,
+                    errors      => $errors
                 );
-                return $edit_res{render} if $edit_res{status} eq "ok";
 
-                # oops errors when posting: show error, fall through to show form
-                $errors->add_string( undef, $edit_res{errors} ) if $edit_res{errors};
+                # check for spam domains
+                LJ::Hooks::run_hooks( 'spam_check', $remote, $form_req, 'entry' );
+
+                # if we didn't have any errors with decoding the form, proceed to post
+                unless ( $errors->exist ) {
+
+                    if ($mode_delete) {
+                        $form_req->{event} = "";
+
+                        # now log the event created above
+                        $journal->log_event(
+                            'delete_entry',
+                            {
+                                remote       => $remote,
+                                actiontarget => $ditemid,
+                                method       => 'web',
+                            }
+                        );
+
+                    }
+
+                    my %edit_res = _do_edit(
+                        $ditemid, $form_req,
+                        { poster => $remote, journal => $journal },
+                        warnings => $warnings,
+                    );
+                    return $edit_res{render} if $edit_res{status} eq "ok";
+
+                    # oops errors when posting: show error, fall through to show form
+                    $errors->add_string( undef, $edit_res{errors} ) if $edit_res{errors};
+                }
             }
         }
     }
@@ -723,6 +784,14 @@ sub _edit {
     # The template helper uses "formdata" to set the default values for fields,
     # so we'll update it in place with what DW::Formats thinks we should use.
     $vars->{formdata}->{editor} = $vars->{editors}->{selected};
+
+    $vars->{spellcheck_enabled} = _spellcheck_enabled( $remote, $journal );
+    if ($spellcheck_requested) {
+        $vars->{spellcheck} =
+            $vars->{spellcheck_enabled}
+            ? _spellcheck_result($post)
+            : _spellcheck_unavailable();
+    }
 
     # Set up info for the icon select/preview/browse components
     $vars->{current_icon_kw} = $vars->{formdata}->{prop_picture_keyword};

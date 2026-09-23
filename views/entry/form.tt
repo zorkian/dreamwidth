@@ -229,6 +229,9 @@ postFormInitData.strings = {
                     placeholder = dw.ml(".event.placeholder")
                 ) -%]
                 <small id="draftstatus" type="text" disabled="disabled" name="draftstatus" role="status" aria-live="polite"></small>
+                [%- IF spellcheck.did -%]
+                <div id="spellcheck-results"><strong>[% 'entryform.spellchecked' | ml %]</strong><br />[% spellcheck.html %]</div>
+                [%- END -%]
             </div>
         </div></div>
 
@@ -389,6 +392,14 @@ postFormInitData.strings = {
                                  class = "button left"
                                  )
                 -%]
+
+                [%- IF spellcheck_enabled -%]
+                    [%- form.submit( value = dw.ml('entryform.spellcheck')
+                                     name = "action:spellcheck"
+                                     class = "button secondary left"
+                                     )
+                    -%]
+                [%- END -%]
 
                 [% IF action.edit %]
                     [%- form.submit( value = dw.ml( '.button.delete' )
