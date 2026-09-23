@@ -15,7 +15,7 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use DW::Controller::Entry;
 use LJ::Entry;
-use LJ::Test qw(temp_user);
+use LJ::Test qw(temp_comm temp_user);
 
 plan skip_all => 'Anonymous public update activation requires a development server'
     unless $LJ::IS_DEV_SERVER;
@@ -85,7 +85,8 @@ sub form_post {
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
 
-my $owner = temp_user();
+my $owner            = temp_user();
+my $community_target = temp_comm();
 $owner->update_self( { status => 'A' } );
 my $password = 'anonymous-public-' . LJ::rand_chars(24);
 $owner->set_password($password);
