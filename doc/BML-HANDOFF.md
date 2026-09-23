@@ -1,3 +1,14 @@
+## Anonymous ordinary composition handoff
+
+BML-ANONYMOUS-POST-COMPOSITION.md preserves Sol's corrected source-only design.
+First callable slice owns successful password authentication only, with no public
+registration. Missing/empty or failed credentials decline before decoder/render;
+retained BML keeps its distinct failure timing. A later failure migration must
+preserve login -> decode -> protocol attempt -> spam hook for nonempty wrong
+password, versus hook-free missing-password rerender. Do not collapse those
+paths into an early generic native error. Existing native legacy-success helpers
+already separate poster formatting changes from remote-only draft/editor writes.
+
 ## Latest finite corrections and anonymous baseline recheck
 
 Community corrections through6b8556dfe2a930642e96457463139b9678a55e13 now have
