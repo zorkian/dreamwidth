@@ -94,7 +94,7 @@ DW::Routing->register_string( '/entry/new', \&_new_handler_userspace, user => 1 
 # retained actions into a router 405 instead of preserving their old behavior.
 # DW::Routing strips the legacy .bml suffix before lookup, covering both URLs.
 DW::Routing->register_string(
-    '/update', sub { return legacy_update_handler() },
+    '/update', sub { return legacy_update_handler( include_transforms => 1 ) },
     app          => 1,
     no_redirects => 1
 );
@@ -343,8 +343,8 @@ sub legacy_owned_edit_handler {
     return undef;
 }
 
-# Callable compatibility seam for retained /update POSTs. Route registration,
-# transforms, and alternate login remain deliberately outside this adapter.
+# Callable compatibility seam for retained /update POSTs. Alternate login and
+# every action outside the classified retained subset remain in BML.
 sub legacy_update_handler {
     my (%opts) = @_;
 

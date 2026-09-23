@@ -15,6 +15,7 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use LJ::Entry;
 use LJ::Session;
+use LJ::SpellCheck;
 use LJ::Test qw(temp_comm temp_user);
 
 plan skip_all => 'Legacy update activation requires a development server'
@@ -162,40 +163,195 @@ if ($empty_form) {
     is( entry_count($owner), $before, 'empty body does not persist an entry' );
 }
 
-my $preview_form = get_form( '/update', 'preview fallback' );
-if ($preview_form) {
-    $preview_form->value( subject => 'activation preview subject' );
-    $preview_form->value( event   => 'activation preview body' );
-
-    # update.bml recognizes this legacy action even though the retained form
-    # has no visible preview submit in this configuration. Keep its real token
-    # and ordinary controls rather than routing it through the native schema.
-    my $preview = POST(
-        '/update',
-        [
-            'action:preview' => 'Preview',
-            lj_form_auth     => $preview_form->value('lj_form_auth'),
-            subject          => $preview_form->value('subject'),
-            event            => $preview_form->value('event'),
-            security         => $preview_form->value('security'),
-        ]
-    );
-    $preview->header( Cookie  => $cookie );
-    $preview->header( Referer => 'http://localhost/update' );
+sub post_legacy_action {
+    my ( $path, $fields, $label ) = @_;
+    my $post = POST( $path, $fields );
+    $post->header( Cookie  => $cookie );
+    $post->header( Referer => 'http://localhost' . $path );
     my $res;
-    test_psgi $app, sub { $res = shift->($preview); };
-    is( $res->code, 200, 'unsupported preview action remains HTTP 200 through BML' );
-    like( $res->content, qr/name="event"/,
-        'unsupported preview action retains the BML body control' );
-    like( $res->content, qr/entryPreview\(/,
-        'unsupported preview action retains BML preview controls' );
-    like(
-        $res->content,
-        qr/activation preview subject/,
-        'unsupported preview retains submitted subject'
+    test_psgi $app, sub { $res = shift->($post); };
+    is( $res->code, 200, "$label returns HTTP 200" );
+    return $res;
+}
+
+sub native_form_from_content {
+    my ( $content, $base ) = @_;
+    return (
+        grep {
+                   ( $_->attr('id') || '' ) eq 'js-post-entry'
+                && $_->find_input('subject')
+                && $_->find_input('event')
+        } HTML::Form->parse( $content, $base )
+    )[0];
+}
+
+# The reviewed rerender actions are now enabled only through the real public
+# registration.  Exercise every legacy spelling and retain the real BML token
+# rather than mounting an adapter-only test route.
+for my $path ( '/update', '/update.bml' ) {
+    for my $action (
+        [ showform         => 1,         'showform' ],
+        [ moreoptsbtn      => 1,         'moreopts' ],
+        [ 'action:preview' => 'Preview', 'direct preview' ],
+        )
+    {
+        my ( $field, $value, $name ) = @$action;
+        my $legacy  = get_form( $path, "$path $name rerender" ) or next;
+        my $subject = "$path $name public transform subject";
+        my $body    = "$path $name public transform body";
+        my $before  = entry_count($owner);
+        my $res     = post_legacy_action(
+            $path,
+            [
+                $field       => $value,
+                lj_form_auth => $legacy->value('lj_form_auth'),
+                subject      => $subject,
+                event        => $body,
+                security     => 'private',
+                prop_taglist => "$name-public-tag",
+            ],
+            "$path $name"
+        );
+        my $native = native_form_from_content( $res->content, 'http://localhost/entry/new' );
+        ok( $native, "$path $name uses native correction form" ) or next;
+        is( $native->value('subject'), $subject, "$path $name retains subject" );
+        is( $native->value('event'),   $body,    "$path $name retains body" );
+        is( entry_count($owner),       $before,  "$path $name does not persist an entry" );
+    }
+}
+
+# Dynamic transforms retain the hook ABI under the public app: one mutable
+# invocation and no legacy decoder invocation.
+my $dynamic_form = get_form( '/update.bml', 'public dynamic transform' );
+if ($dynamic_form) {
+    my ( $calls, $decode ) = ( 0, 0 );
+    my $before = entry_count($owner);
+    local $LJ::HOOKS{transform_update_public_activation} = [
+        sub {
+            my ( $get, $post ) = @_;
+            ++$calls;
+            $post->{subject}      = 'public dynamic subject';
+            $post->{event}        = 'public dynamic body';
+            $post->{prop_taglist} = 'public-dynamic-tag';
+        }
+    ];
+    local $LJ::HOOKS{decode_entry_form} = [ sub { ++$decode; } ];
+    my $res = post_legacy_action(
+        '/update.bml',
+        [
+            transform    => 'public_activation',
+            lj_form_auth => $dynamic_form->value('lj_form_auth'),
+            subject      => 'ignored submitted subject',
+            event        => 'ignored submitted body',
+            security     => 'public',
+        ],
+        'public dynamic transform'
     );
-    unlike( $res->content, qr/id="js-post-entry"/,
-        'unsupported preview action does not use native correction form' );
+    my $native = native_form_from_content( $res->content, 'http://localhost/entry/new' );
+    ok( $native, 'public dynamic transform returns native correction form' );
+    is(
+        $native->value('subject'),
+        'public dynamic subject',
+        'dynamic hook mutation retains subject'
+    ) if $native;
+    is( $native->value('event'), 'public dynamic body', 'dynamic hook mutation retains body' )
+        if $native;
+    is( $calls,              1,       'public dynamic transform runs exactly once' );
+    is( $decode,             0,       'public dynamic transform does not invoke the decoder hook' );
+    is( entry_count($owner), $before, 'public dynamic transform does not persist an entry' );
+}
+
+# The public spellcheck path is nonpersisting whether configured, unavailable
+# after form render, or rejected for a missing/invalid old form token.
+my $spell_before = entry_count($owner);
+{
+    local $LJ::SPELLER = 'public-activation-stub';
+    my $spell_form = get_form( '/update', 'public configured spellcheck' );
+    if ($spell_form) {
+        ok(
+            $spell_form->find_input('action:spellcheck'),
+            'configured retained form renders Spell Check control'
+        );
+        my $checks = 0;
+        no warnings 'redefine';
+        local *LJ::SpellCheck::check_html = sub {
+            ++$checks;
+            return '<em class="public-spell-result">public suggestion</em>';
+        };
+        my $configured = post_legacy_action(
+            '/update',
+            [
+                'action:spellcheck' => 'Spell Check',
+                lj_form_auth        => $spell_form->value('lj_form_auth'),
+                subject             => 'public spellcheck subject',
+                event               => 'public misspell body',
+                security            => 'private',
+            ],
+            'public configured spellcheck'
+        );
+        like(
+            $configured->content,
+            qr/public suggestion/,
+            'configured public spellcheck shows checker result'
+        );
+        is( $checks, 1, 'configured public spellcheck invokes checker once' );
+        is( entry_count($owner), $spell_before, 'configured public spellcheck does not persist' );
+
+        my $unavailable;
+        {
+            local $LJ::SPELLER;
+            $unavailable = post_legacy_action(
+                '/update',
+                [
+                    'action:spellcheck' => 'Spell Check',
+                    lj_form_auth        => $spell_form->value('lj_form_auth'),
+                    subject             => 'public unavailable subject',
+                    event               => 'public unavailable body',
+                    security            => 'private',
+                ],
+                'public unavailable spellcheck'
+            );
+        }
+        like(
+            $unavailable->content,
+            qr/Spell check is currently unavailable/,
+            'unavailable public spellcheck rerenders a meaningful result'
+        );
+        is( entry_count($owner), $spell_before, 'unavailable public spellcheck does not persist' );
+
+        for my $token_case ( [ missing => undef ], [ invalid => 'not-a-valid-token' ], ) {
+            my ( $label, $token ) = @$token_case;
+            my $before_checks = $checks;
+            my @fields        = (
+                'action:spellcheck' => 'Spell Check',
+                subject             => "public $label token subject",
+                event               => "public $label token body",
+                security            => 'private',
+            );
+            push @fields, ( lj_form_auth => $token ) if defined $token;
+            my $denied = post_legacy_action( '/update', \@fields, "public $label spellcheck" );
+            like(
+                $denied->content,
+                qr/(?:Invalid form submission|invalid form)/i,
+                "public $label spellcheck shows form-auth error"
+            );
+            is( $checks, $before_checks, "public $label spellcheck does not invoke checker" );
+            is( entry_count($owner), $spell_before, "public $label spellcheck does not persist" );
+        }
+    }
+}
+
+# GET, alternate-login, and share requests are deliberately still BML
+# fallthroughs; registration must not turn them into the native correction form.
+for my $case ( [ '/update?altlogin=1', 'alternate-login GET' ],
+    [ '/update?share=not-a-url', 'share GET' ], )
+{
+    my ( $path, $label ) = @$case;
+    my $res;
+    test_psgi $app, sub { $res = shift->( GET $path, Cookie => $cookie ); };
+    is( $res->code, 200, "$label retains BML HTTP status" );
+    like( $res->content, qr/id=['"]updateForm['"]/, "$label retains BML update form" );
+    unlike( $res->content, qr/id="js-post-entry"/, "$label remains outside native rerender" );
 }
 
 my $invalid_get;
