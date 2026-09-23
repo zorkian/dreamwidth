@@ -2268,3 +2268,10 @@ Tiny test-only4c replaces the report delegate with a zero-effect counter and add
 post-loop no-hook proof (worker95 PASS). Callable browser4a has worker normal,
 named-failure and clean-EOF passes. Both immutable commits are queued for Sol;
 public activation remains uncommitted while its finite matrix is prepared.
+
+### Manager callable property HTTP accepted
+
+Sol82 production plus66/4c finite tests CLEAR, final95 assertions. Integrated as
+d5d91fc4f..a88bb4e97. Foreman action/maintainer/property/community dispatch four-file
+regression387 PASS. Only three property values are written by the callable;
+no public route or manager delete/report change. Browser gate remains separate.
