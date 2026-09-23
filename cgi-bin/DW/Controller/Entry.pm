@@ -759,6 +759,31 @@ sub legacy_update_get_render {
     );
 }
 
+# Render the two retained terminal update responses after a caller has already
+# applied legacy request ordering.  This intentionally does not inspect a
+# request or initialize entry-form state.
+sub legacy_update_terminal_response {
+    my ($variant) = @_;
+    die 'missing legacy update terminal variant' unless defined $variant;
+
+    my ( $title, $message );
+    if ( $variant eq 'identity' ) {
+        $title = LJ::Lang::ml('Sorry');
+        $message =
+            LJ::Lang::ml( '/update.bml.error.nonusercantpost', { sitename => $LJ::SITENAME } );
+    }
+    elsif ( $variant eq 'cantpost' ) {
+        $title   = LJ::Lang::ml('/update.bml.error.cantpost.title');
+        $message = $LJ::MSG_NO_POST || LJ::Lang::ml('/update.bml.error.cantpost');
+    }
+    else {
+        die "unknown legacy update terminal variant: $variant";
+    }
+
+    return DW::Template->render_template( 'entry/update-terminal.tt',
+        { title => $title, message => $message } );
+}
+
 # Callable-only retained /update GET wrapper. A future route adapter owns
 # public registration; excluded contexts return undef so retained BML continues
 # to own its authentication, share-fetch, and warning behavior.
