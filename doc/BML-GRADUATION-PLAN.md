@@ -111,3 +111,51 @@ authentication policy, no changes to held external contracts.
   draft unchanged), never echoes a password; anonymous carry-over; edit GET
   redirect and edit POST carry-over; no `updatepage` check remains; native
   success links point at native edit.
+
+## Status and open decisions (2026-09-23, evening)
+
+Done on root and independently reviewed: T1 manager moderation, W1 inbox
+fixes, W2 inbox cutover, W3 inbox legacy removal, T2 entry cutover, T3 entry
+adapter deletion, W4 string relocation, W5 ordinary BML runtime callers, F2
+entry page deletion, W7-A dead RPC fallback, W7-B/W8 journal request
+decoupling, T4/T6/W6/W9 audits, T5 cleanup, W9 dead widgets, W10 help icon,
+W11 test repair. No BML page remains except the three `_config*.bml` engine
+files. CI-equivalent suites are green on root under the allowlist discipline.
+
+Remaining in flight: T8 (adapter module extraction; fix for the non-web shim
+load regression), W12 (sendmessage language characterization, test-only).
+
+Concrete decisions still needed from the user (everything else proceeds
+without them):
+
+1. **Sendmessage forced English** (`cgi-bin/LJ/Protocol.pm:563`
+   `BML::set_language('en')`): T4 shows it only forwards to
+   `LJ::Lang::set_request_context`. Authorize the mechanical replacement with
+   `LJ::Lang::set_request_context(lang => 'en')` once W12's characterization
+   test proves equivalence? This is the last non-engine `BML::set_language`
+   caller and gates removal of the RequestWrapper shim.
+2. **BML engine retirement**: after (1), authorize the package sequence in
+   `BML-ENGINE-RETIREMENT.md` and `BML-PROTOCOL-PAGESTATS.md`: drop the
+   RequestWrapper `BML::set_language` shim, the `LJ::Web` no-request fallbacks
+   (`Web.pm:391/:564`), the `BML::get_request` call in PageStats (already
+   undef-safe), then delete `Apache/BML.pm`, `DW/BML.pm` (the adapter now lives
+   in `DW/BML/RequestAdapter.pm`), `lj-bml-blocks.pl`, `BMLInit.pm`, the scheme
+   looks, the three `_config*.bml`, the app.psgi BML fallback and
+   `t/plack-bml.t`. Held hook ABIs (`DISABLE_PROTOCOL` third argument,
+   `data_handler:*`, `s2_head_content_extra`) keep receiving a
+   `DW::BML::RequestAdapter`, so they need no decision unless the user wants
+   them changed.
+3. **Transitional old-schema POST carry-over** (`/update` and
+   `/editjournal?itemid` POST): keep indefinitely, or set a removal date after
+   which those POSTs get a plain notice; removal also deletes
+   `DW::Entry::Legacy` and the three rerender helpers.
+4. **Deploy-time checks** (not code decisions): expire or remove `updatepage`
+   and `inbox` from production `%LJ::BETA_FEATURES` (the retired strings are
+   now in deadphrases); confirm `ext/local` does not implement
+   `update_fields`, `transform_update_*`, `after_entry_post_extra_*`,
+   `entry_deleted_page_extras`, `entryforminfo` or `LJ::Local::BMLInit`, and
+   does not populate `%LJ::AJAX_URI_MAP`; note `help_icon` now renders wherever
+   `%LJ::HELPURL` is configured.
+5. **Obsolete worker branches** (hook composition, altlogin characterization,
+   draft.bml WIP): preserved and unintegrated per direction; delete later or
+   keep as history.
