@@ -101,6 +101,21 @@ test_psgi $app, sub {
         );
     };
 
+    subtest 'a hostile usejournal never reaches the redirect Location unsanitized' => sub {
+        for my $hostile ( '//evil.example/x', '..%2F..' ) {
+            my $res = $as_owner->( GET '/update?subject=Hostile+subject&usejournal=' . $hostile );
+            is( $res->code, 302, "usejournal=$hostile GET still redirects" );
+            my $location = URI->new( $res->header('Location') );
+            is( $location->path, '/entry/new', "usejournal=$hostile falls back to /entry/new" );
+            my %query = $location->query_form;
+            is(
+                $query{subject},
+                'Hostile subject',
+                "usejournal=$hostile still maps other query args"
+            );
+        }
+    };
+
     subtest 'old-schema POST carry-over renders every submitted field and saves nothing' => sub {
         $owner->set_draft_text('cutover draft sentinel');
         my $draft_before   = $owner->draft_text;
@@ -226,6 +241,27 @@ test_psgi $app, sub {
             );
         }
     };
+
+    subtest 'a hostile journal/usejournal never reaches the edit redirect Location unsanitized' =>
+        sub {
+        my $entry = $owner->t_post_fake_entry(
+            subject => 'Hostile edit redirect subject',
+            body    => 'Hostile edit redirect body',
+        );
+        for my $hostile ( '//evil.example/x', '..%2F..' ) {
+            for my $param (qw(usejournal journal)) {
+                my $res =
+                    $as_owner->(
+                    GET '/editjournal?itemid=' . $entry->ditemid . "&$param=" . $hostile );
+                is( $res->code, 302, "$param=$hostile edit GET still redirects" );
+                is(
+                    URI->new( $res->header('Location') )->path,
+                    '/entry/new',
+                    "$param=$hostile falls back to /entry/new, never an unsanitized path"
+                );
+            }
+        }
+        };
 
     subtest 'edit POST carry-over renders the native edit form and saves nothing' => sub {
         my $entry = $owner->t_post_fake_entry(
