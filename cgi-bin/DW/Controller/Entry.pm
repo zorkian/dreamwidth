@@ -785,6 +785,55 @@ sub legacy_update_terminal_response {
         { title => $title, message => $message } );
 }
 
+# Render-only readonly slice of retained /update GET.  Its caller owns the
+# retained request ordering and authorization classification; this routine only
+# composes the already-classified readonly form through the shared native renderer.
+sub legacy_update_readonly_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless $remote && $remote->readonly;
+
+    my $get = $opts{get} || DW::Entry::Legacy::legacy_post_hash( $r->get_args );
+
+    # Retained update snapshots these prefill values before update_fields gets
+    # its mutable flat GET reference.
+    my $prefill = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
+    my $hook    = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
+
+    my $warnings = DW::FormErrors->new;
+    my ( $a_open, $a_close ) = ( '', '' );
+    if ( $LJ::HELPURL{readonly} ) {
+        $a_open  = q{<a href="} . $LJ::HELPURL{readonly} . q{">};
+        $a_close = '</a>';
+    }
+    $warnings->add( undef, '/update.bml.rowarn', { a_open => $a_open, a_close => $a_close } );
+
+    my %crosspost = map { $_->acctid => $_->xpostbydefault }
+        DW::External::Account->get_external_accounts($remote);
+    my $now = DateTime->now;
+    if ( my $timezone = $remote->prop('timezone') ) {
+        my $tz = eval { DateTime::TimeZone->new( name => $timezone ) };
+        $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
+    }
+
+    return legacy_update_get_render(
+        remote        => $remote,
+        get           => $prefill,
+        update_fields => $hook,
+        legacy_editor => $remote->new_entry_editor,
+        rte_supported => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime      => $opts{datetime} || $now->strftime('%F %R'),
+        usejournal    => $opts{usejournal},
+        crosspost     => \%crosspost,
+        warnings      => $warnings,
+        action_url    => $opts{action_url} || '/entry/new',
+    );
+}
+
 # Callable-only retained /update GET wrapper. A future route adapter owns
 # public registration; excluded contexts return undef so retained BML continues
 # to own its authentication, share-fetch, and warning behavior.
