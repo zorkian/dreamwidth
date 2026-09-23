@@ -1,3 +1,9 @@
+## PAUSED by explicit user directive
+
+See [durable pause checkpoint](BML-PAUSED-2026-09-23.md). Do not resume any
+implementation, review, testing, or assignments until explicit USER resume.
+Worker WIP, held findings, identities, and process cleanup are recorded there.
+
 ## Pure raw-hook builder candidate pending review
 
 Themes d19ba22d5fcd06622c9a3a9fefb593c577663d8f is committed but NOT
