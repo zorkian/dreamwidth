@@ -55,7 +55,22 @@ below this line predate the resume.
   and 390 (captures in doc/bml-evidence/2026-09-23/inbox-native-cutover);
   anonymous /inbox/ and /inbox/new redirect to login. Full tidy/compile PASS
   for the integration.
-- T2 entry cutover (themenav, rebasing/squashing onto root) and W3 inbox legacy
+- W3 inbox legacy removal 9831050718c9a521c9229de068d2e4dd7e6c256a (atop
+  d680ac1e7) bml-opus-review CLEAR; integrated on root as f5c142e72.
+  htdocs/inbox/ is gone with its widgets, esn_inbox.js and stc/inbox.css;
+  /__rpc_esn_inbox serves only get_unread_items. Root seven inbox suites 286
+  PASS, tidy1182, compile1603, build-static PASS:
+  /tmp/bml-inbox-removal-integrated-*.log. DEPLOY GATE (concrete): production
+  %LJ::BETA_FEATURES must drop or expire 'inbox' with this change, or
+  /betafeatures renders missing-string titles. Non-blocking: spam-errors test
+  still writes a local userlog row via log_event('ban_set'); stub folded into
+  W4.
+- T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
+  (community custom-security carry-over fell back to public; logged-out or
+  not-editable /editjournal carry-over lost the body) plus the condition that
+  the 13 retired-route tests are deleted in the same landing; fix in progress
+  on the T2 branch, then T3 rebases.
+- T2 entry cutover (themenav) and W3 inbox legacy
   removal (widgets) in progress on
   bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
 - Obsolete preserved branches (not integrated): hook composition 5d282324c,

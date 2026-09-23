@@ -2464,3 +2464,6 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   inert tests). Pre-existing t/post.t key expectation fixed in02bce1487.
 - W2 inbox cutover integrated asab4fb2c8e/5ab7031b9 (Opus CLEAR). Old /inbox/new*
   POSTs are served natively; GET redirects to canonical. Root inbox7files270 PASS.
+- W3 inbox legacy removal integrated asf5c142e72 (Opus CLEAR): inbox .bml pages,
+  widgets, esn_inbox.js, inbox.css deleted; compile now1603. Deploy gate: drop the
+  'inbox' beta from production config.
