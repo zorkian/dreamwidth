@@ -15,10 +15,6 @@
 
 use strict;
 
-# Loads the BML::* shims that sendmessage's BML::set_language('en') below
-# still calls; ljlib-only (non-web) processes have nothing else that pulls
-# this in.
-use DW::BML;
 use DW::BML::RequestAdapter;
 use DW::Request;
 no warnings 'uninitialized';
@@ -2344,15 +2340,9 @@ sub getevents {
     my $reject_code = $LJ::DISABLE_PROTOCOL{getevents};
     if ( ref $reject_code eq "CODE" ) {
 
-        # Held external callback ABI (doc/BML-PROTOCOL-PAGESTATS.md): must
-        # keep receiving the same shape BML::get_request() (DW/BML.pm:
-        # 232-237) has always returned here. $Apache::BML::r is only ever
-        # locally set inside DW::BML::render (DW/BML.pm:634) and Apache::BML's
-        # retired mod_perl handler, neither reachable during a live Plack
-        # request (DW::BML::render 403s any _config.bml access before that
-        # point, and Apache::BML's own handler is unused under Plack), so in
-        # practice this was already always either a DW::BML::RequestAdapter
-        # over the current DW::Request, or undef.
+        # Held external callback ABI (doc/BML-PROTOCOL-PAGESTATS.md): the
+        # callback's third argument is a DW::BML::RequestAdapter over the
+        # current DW::Request, or undef outside a request.
         my $apache_r = do {
             my $r = eval { DW::Request->get };
             $r ? DW::BML::RequestAdapter->new($r) : undef;
