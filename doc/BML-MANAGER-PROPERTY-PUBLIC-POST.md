@@ -25,8 +25,9 @@ routing and actual-app representation rather than duplicate every helper asserti
 ## Actual-app HTTP proof
 
 Use disposable session manager, poster, outsider, two communities, target and unrelated entries,
-and real two-cookie sessions. Wrap production handlers/writer/report function only with delegating
-counters; do not replace their decisions.
+and real two-cookie sessions. Wrap production handlers and the property writer with delegating counters; do not
+replace their decisions. The report marker must use a count-only, zero-effect stub
+that never delegates to the real reporter. Delete/report rows use invalid tokens only.
 
 1. **GET remains retained.** For both `/editjournal` and `.bml`, an other-poster manager GET returns
    the retained BML form with `action:delete`, `action:deletespam`, and
