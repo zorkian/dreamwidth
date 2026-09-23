@@ -1,3 +1,16 @@
+## Community POST helper accepted; readonly test correction pending
+
+Sol55c9 helper CLEAR, integrated184a32c7a. Root three-suite replay session67807
+running (/tmp/bml-community-edit-helper-integrated.log). Explicit community opt-in
+only; personal defaults, session-log/effective-actor distinction and native retry
+are preserved. Widgets now implements separate callable resolver; no public route.
+
+Public readonly production/browser4493 remains independently clear and integrated;
+root broader stale tests await Solc9fb04a1 review, then exact merged five-suite
+rerun. Public captures preserved under update-readonly-public. Sol invalid-target
+callablea662 integrated51a7 and root17PASS; Themes public invalid-target WIP is
+separate and not accepted. All held interfaces remain unchanged.
+
 ## Public readonly integration follow-up required
 
 Sol4493 CLEAR, integrateda564e9e50. Root plain-app actual-readonly browser PASS
@@ -10,7 +23,7 @@ correction, preserving invalid-target WIP. Do not report full combined suite cle
 until this fix is independently reviewed and rerun. Root sessions9852/15505 done.
 
 Sol callable invalid-targeta662 CLEAR, integrated51a7ec6c1; no public invalid-target
-route. Focused root replay session73750 pending (log /tmp/bml-invalid-target-callable-integrated.log).
+route. Focused root replay17 PASS (log /tmp/bml-invalid-target-callable-integrated.log); session73750 complete.
 
 Widgets helper55c9e8a7ad468e0579c734a13cbd5dad2beb8be6 queued Sol: explicit community
 opt-in, personal default unchanged, session log actor vs effective spam/protocol,
