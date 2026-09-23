@@ -1343,3 +1343,20 @@ checks, after widgets Terra completes customization1/4.
   static initial-properties comparison suppresses later reverts and precedes
   the body-change branch. Terra is correcting those paths and adding permanent
   early-input/change-revert coverage before any integration.
+
+### Query compatibility and next bounded packages
+
+- Sol cleared `5016ad50e`; integrated as `4d72caddd`, foreman51 assertions pass
+  in `/tmp/bml-legacy-update-query-integrated.log`. Encoded values and the old
+  repeated-value NUL representation survive the beta GET redirect in both aliases.
+- Draft range through `2abd3d682` now contains permanent delayed-image,
+  property-revert and body-only coverage; Sol is independently rechecking it.
+  Preview WIP is restored separately and remains uncommitted/incomplete.
+- Moderated posting baseline `87dd370c9` passes worker66 assertions and awaits
+  Sol. It records legacy retained draft properties versus native full clearing;
+  external delivery is stubbed, and no production change is made.
+- Independent language audit identified a minimal cleanup: remove the unused
+  BML::ml call from get_lang_names and delete the uncalled set_lang method.
+  Native names retain configured/explicit order and skip unknown languages.
+  Plain nonweb get_lang_names currently fails solely on that unused BML call.
+  Terra is implementing the finite request/nonweb/PrivList tests separately.

@@ -2,6 +2,23 @@
 
 ## Active continuation: 2026-09-22
 
+Latest continuation at 2026-09-23: root integrated test-only legacy update
+`b1f8b13cc`, owned delete `440faea99`, legacy edit `53357f450`, and query followup
+`4d72caddd`; all are independently clear. Foreman related tests pass87,51,136
+and51 respectively; delete real browser and disposable cleanup pass. Captures
+are under 2026-09-23/entry-delete-native.
+
+Current queue: draft range through `2abd3d682` is under Sol recheck, including
+initialization ordering, early input, property reverts and body-only changes.
+Prior failed candidates remain unintegrated. Preview WIP is restored and active
+in Themenav; only smoke9 passes so far, full finite acceptance remains. Widgets
+committed moderated-post characterization `87dd370c9` (awaiting Sol) and is now
+implementing the independently audited small language-name cleanup. Sol owns
+draft then moderated-post review. Existing worker sessions remain unchanged.
+Configured legacy spellcheck has a newly documented source-level parity gap;
+it must be characterized/preserved before editor retirement, not assumed unused.
+External Journal hooks and held inbox work remain unchanged.
+
 Current queue supersedes older entries below: preview compatibility implementation
 is active in the preserved Themenav session from `83f0e1172`, using the finite
 three-test contract in BML-PREVIEW-ACCEPTANCE.md. Draft initialization range through
