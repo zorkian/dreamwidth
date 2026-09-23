@@ -242,6 +242,9 @@ test_psgi $app, sub {
         ok( $form->find_input("action:$action"), "manager retained form exposes $action" );
     }
     $form->value( lj_form_auth => 'invalid-manager-routing-token' );
+    my $report_calls = 0;
+    my $mark_as_spam = \&LJ::mark_entry_as_spam;
+    local *LJ::mark_entry_as_spam = sub { ++$report_calls; return $mark_as_spam->(@_) };
     $post = clicked( $form, 'action:deletespam' );
     $post->header( Cookie  => $manager_cookie );
     $post->header( Referer => "http://localhost$managed_path" );
@@ -254,6 +257,7 @@ test_psgi $app, sub {
         'invalid manager delete-spam reaches both public dispatch candidates' );
     ok( fresh( $comm, $managed->ditemid )->valid,
         'invalid manager routing assertion does not mutate entry' );
+    is( $report_calls, 0, 'invalid manager delete-spam never calls report marker' );
 
     for my $case ( [ 'missing token', '' ], [ 'invalid token', 'invalid-community-token' ] ) {
         my $csrf_target = $poster->t_post_fake_comm_entry(
@@ -445,38 +449,58 @@ test_psgi $app, sub {
         'spellcheck leaves stored community body unchanged'
     );
 
+    my $competing_comm = temp_comm();
+    $poster->join_community( $competing_comm, 1, 1 );
+    LJ::set_rel( $competing_comm->userid, $poster->userid, 'A' );
+    DW::Cache->request->remove( 'rel', $competing_comm->userid . '-' . $poster->userid . '-A' );
     my $precedence = $poster->t_post_fake_comm_entry(
         $comm,
         subject  => 'precedence old',
         body     => 'precedence body',
         security => 'public'
     );
+
     for my $case (
         [
             'GET usejournal wins over POST',
             '/editjournal?usejournal=' . $comm->user . '&itemid=' . $precedence->ditemid,
-            [ usejournal => 'not-a-journal' ]
+            [ usejournal => $competing_comm->user ]
         ],
         [
             'POST usejournal wins over GET journal',
-            '/editjournal?journal=not-a-journal&itemid=' . $precedence->ditemid,
-            [ usejournal => $comm->user ]
+            '/editjournal?journal=' . $competing_comm->user . '&itemid=' . $precedence->ditemid,
+            [ usejournal => $comm->user ],
+            '/editjournal?usejournal=' . $comm->user . '&itemid=' . $precedence->ditemid
         ],
         )
     {
-        $post = POST $case->[1],
-            [ itemid => $precedence->ditemid, @{ $case->[2] }, 'action:unsupported' => '1' ];
-        $post->header( Cookie  => $cookie );
-        $post->header( Referer => 'http://localhost' . $case->[1] );
+        $res  = $retained_get->( $case->[3] || $case->[1] );
+        $form = form_from( $res->content );
+        ok( $form, "$case->[0] harvests intended community form" );
+        $form->action( 'http://localhost' . $case->[1] );
+        $form->value( date_ymd_yyyy => 'not-a-year' );
+        $form->value( subject       => "$case->[0] changed" );
+        $form->value( event         => "$case->[0] changed body" );
+        my $precedence_post = clicked( $form, 'action:save' );
+        $precedence_post->header( Cookie  => $cookie );
+        $precedence_post->header( Referer => 'http://localhost' . $case->[1] );
         $personal_calls = $community_calls = 0;
         @dispatch_order = ();
-        $res            = $send->($post);
+        $res            = $send->($precedence_post);
         is_deeply( \@dispatch_order, [qw(personal community)],
-            "$case->[0] reaches community context before retained fallback" );
+            "$case->[0] reaches community resolver after personal decline" );
+        like( $res->content, qr{id="js-post-entry"},
+            "$case->[0] returns native nonpersisting retry" );
+        like( $res->content, qr/not-a-year/, "$case->[0] retains raw invalid date" );
+        like(
+            $res->content,
+            qr{/entry/\Q@{[$comm->user]}\E/\Q@{[$precedence->ditemid]}\E/edit},
+            "$case->[0] retry targets the chosen community entry"
+        );
         is(
             fresh( $comm, $precedence->ditemid )->subject_raw,
             'precedence old',
-            "$case->[0] does not mutate target"
+            "$case->[0] leaves intended target unchanged"
         );
     }
     my $collapse = $poster->t_post_fake_entry(
