@@ -18,6 +18,39 @@ below this line predate the resume.
 
 ## Graduation progress (2026-09-23)
 
+**Test-execution boundary (user rule, restated 2026-09-23 after two reviewer
+disclosures):** moderation, report, ban, suspension and other admin-mutation
+paths stay inert in every test or probe we write or run: stub them as
+recorders and assert call counts, never row or state changes, even for local
+disposable fixtures. Every review or validation assignment carries an explicit
+allowlist of test files; no broad console/sysban/moderation globs. Before
+executing any existing suite outside the allowlist, inspect its side-effect
+paths first. Do not attempt cleanup of past local mutations through further
+admin mutations. Reviewer disclosures on record: two local spamreports rows
+(T1 probe and 6648 test run) and the W5 sweep that executed console-ban,
+console-suspend, console-sysban, console-syndelete, console-suspenduserpic,
+console-expungeuserpic and plack-sysban on temp fixtures in container
+904e68156988 (sysban table empty afterwards; suspension/ban status on temp
+users persists). Nothing external was touched.
+
+- W5 ordinary BML runtime callers, range f32511bad..a0db3a691 (six commits atop
+  db46632da) bml-opus-review CLEAR; integrated on root as 5f4e27909, cef93957e,
+  99c8717b4, cb0a1a6f0, 42e556589, db4b029c1 (clean picks). Reviewer claim
+  correction: <?errorbar?>/<?warningbar?> WERE registered for BML pages in
+  cgi-bin/bml/scheme/global.look:45/53 and <?needlogin?> DID redirect inside
+  BML pages; the change is a real fix only in native contexts (literal tags
+  visible in DW::Widget::LatestInbox and the anonymous poll vote RPC) and
+  changes retained-BML error markup from blockquote/hr to a div, accepted.
+  check_form_auth's DW::Request fallback cannot weaken CSRF (explicit args
+  short-circuit). Root validation (allowlist only, no moderation suites):
+  14 files 432 PASS incl. t/plack-bml-runtime-callers.t; tidy/compile logs
+  /tmp/bml-runtime-callers-integrated-*.log.
+- W6 engine retirement audit 18affb0c3 (docs only, not independently
+  reviewed) integrated as doc/BML-ENGINE-RETIREMENT.md: the app.psgi
+  %LJ::AJAX_URI_MAP fallback is dead; DW::BML::RequestAdapter remains
+  load-bearing for LJ::make_journal and the data_handler/s2_head_content_extra
+  hooks independent of any .bml page; held external ABIs need user decisions.
+
 - W1 inbox correctness/security 2c8c21f157f29a1cf8c2f45600a992659ee14584
   (atop e381a77c7) bml-opus-review CLEAR; integrated on root as 627ba13fd.
   Reviewer proved the old string eval executed injected Perl and the esn RPC

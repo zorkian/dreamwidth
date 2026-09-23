@@ -2473,3 +2473,7 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   (Opus CLEAR / HELD-then-fixed). Old /update and /editjournal redirect GET to native
   and carry over old POSTs without saving. Root sweep30files1132 PASS, tidy1107,
   compile1603. W5 runtime-caller conversions (6 commits) queued for review.
+- W5 runtime-caller conversions integrated as5f4e27909..db4b029c1 (Opus CLEAR,
+  claim correction recorded). Allowlist-only validation14files432 PASS. W6 engine
+  retirement audit added (docs). Test-execution boundary restated after reviewer
+  disclosures.
