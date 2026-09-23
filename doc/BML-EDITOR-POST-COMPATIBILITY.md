@@ -111,3 +111,28 @@ Extend existing disposable tests rather than create a new broad matrix.
 - The external `decode_entry_form` hook has no in-tree implementation but remains an unresolved deployment interface.
 - `action:deletespam` needs its own bounded migration if the physical edit BML file is to be deleted.
 - After implementation, repeat the existing legacy/new/edit/crosspost/moderation/delete/spellcheck suites plus one real browser submission through each old alias. No broader editor redesign is required.
+
+## Success-render extension boundary follow-up
+
+Foreman source audit after helper integration, 2026-09-23: the old successful
+update response has two additional extension calls which a wrapper must retain.
+Neither has an in-tree implementation under `cgi-bin` or
+`ext/dw-nonfree/cgi-bin` at this checkpoint; absence is not permission to remove
+its deployment interface.
+
+- `after_entry_post_extra_options` runs only for an item-bearing success, after
+  crosspost scheduling, with `user => $ju, itemlink => $itemlink`. The old code
+  joins the first return element from every `run_hooks` result and appends the
+  resulting HTML to the success link list.
+- `after_entry_post_extra_html` runs after either success branch with
+  `user => $ju, itemlink => $itemlink, request => \%req`. For moderated success
+  the old local `$ju` and `$itemlink` are unset. The request is the old flat
+  protocol-shaped request, not the normalized native `props` hash.
+
+The native `_do_post`/`entry/success.tt` path currently has neither call. Keep
+any compatibility invocation explicitly legacy-only and preserve its arguments,
+ordering and request representation; do not add it to ordinary native requests
+or replace its output with a renamed API. A fixture hook should prove ordinary
+and moderated arguments and visible output without external code. This is a
+wrapper implementation requirement, not an approval to change a deployment
+hook or the separately pending Journal hook interfaces.
