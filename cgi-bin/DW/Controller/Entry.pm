@@ -279,6 +279,76 @@ sub new_handler {
         $spellcheck_requested );
 }
 
+# Render the narrow ordinary-owned GET subset of retained editjournal. This is
+# intentionally callable only: the picker route keeps public GET fallthrough in
+# BML until this composition has its own review. The item is resolved solely
+# from one canonical GET value, never a hidden POST control or a decoded last
+# value of a repeated query key.
+sub legacy_owned_edit_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+
+    my $get     = $r->get_args;
+    my @itemids = $get->get_all('itemid');
+    return undef unless @itemids == 1;
+    my $ditemid = $itemids[0];
+    return undef unless defined $ditemid && $ditemid =~ /\A[1-9][0-9]*\z/;
+
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($remote) && $remote->is_individual && !$remote->readonly;
+
+    # This slice owns only the remote's personal journal. Explicit self aliases
+    # collapse to it; all community and auth-as contexts retain BML behavior.
+    for my $name (qw(authas usejournal journal)) {
+        next unless defined $get->{$name} && length $get->{$name};
+        return undef unless LJ::canonical_username( $get->{$name} ) eq $remote->user;
+    }
+
+    my $entry = LJ::Entry->new( $remote, ditemid => $ditemid );
+    return undef unless $entry && $entry->valid && $entry->visible_to($remote);
+    return undef unless $entry->editable_by($remote) && $entry->poster->equals($remote);
+    return undef unless $entry->ditemid == $ditemid;
+
+    # Match retained editjournal's pre-render beta redirect exactly. Its query
+    # dropping is intentional legacy behavior, unlike the native form action.
+    if ( LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' ) ) {
+        $r->status(302);
+        $r->header_out( Location => '/entry/' . $remote->user . '/' . $ditemid . '/edit' );
+        return $r->OK;
+    }
+
+    my %crosspost;
+    if ( my $xpost = $entry->prop('xpostdetail') ) {
+        my $xposthash = DW::External::Account->xpost_string_to_hash($xpost);
+        %crosspost = map { $_ => 1 } keys %{ $xposthash || {} };
+    }
+
+    my $vars = _init(
+        {
+            usejournal           => $remote->username,
+            remote               => $remote,
+            datetime             => $entry->eventtime_mysql,
+            trust_datetime_value => 1,
+            crosspost            => \%crosspost,
+            sticky_entry         => $remote->sticky_entries_lookup->{ $entry->ditemid },
+        },
+        undef
+    );
+    my $action_path = '/entry/' . $remote->user . '/' . $ditemid . '/edit';
+    return _render_edit_form(
+        $r, $vars,
+        DW::FormErrors->new,
+        DW::FormErrors->new,
+        undef, $entry, $remote, $remote, 0,
+        action => {
+            edit => 1,
+            url  => LJ::create_url( $action_path, keep_query_string => 1 ),
+        },
+    );
+}
+
 # Dispatch the narrow ordinary-owned retained edit subset after the route
 # composition has preserved picker and BML fallthroughs.  The retained resolver
 # decides the item from GET first and then the hidden POST field; only a
