@@ -5,6 +5,16 @@ use Test::More;
 use HTTP::Request::Common;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+
+{
+
+    package UpdateTerminal::SharePage;
+    sub new { my ( $class, %args ) = @_; return bless \%args, $class; }
+    sub title       { return $_[0]->{title}; }
+    sub url         { return $_[0]->{url}; }
+    sub description { return $_[0]->{description}; }
+}
+use DW::External::Page;
 use DW::Request;
 use LJ::Entry;
 use LJ::Session;
@@ -24,13 +34,15 @@ my $cookie =
     . $session->master_cookie_string
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
-my $orig_identity   = \&LJ::User::identity;
-my $orig_can_post   = \&LJ::User::can_post;
-my $orig_readonly   = \&LJ::User::readonly;
-my $orig_run_hook   = \&LJ::Hooks::run_hook;
-my $orig_accounts   = \&DW::External::Account::get_external_accounts;
-my $update_fields   = 0;
-my $account_lookups = 0;
+my $orig_identity          = \&LJ::User::identity;
+my $orig_can_post          = \&LJ::User::can_post;
+my $orig_readonly          = \&LJ::User::readonly;
+my $orig_run_hook          = \&LJ::Hooks::run_hook;
+my $orig_accounts          = \&DW::External::Account::get_external_accounts;
+my $update_fields          = 0;
+my $account_lookups        = 0;
+my $share_constructions    = 0;
+my $terminal_share_request = 0;
 {
     no warnings 'redefine';
     local *LJ::User::identity =
@@ -50,6 +62,17 @@ my $account_lookups = 0;
     local *DW::External::Account::get_external_accounts = sub {
         ++$account_lookups;
         return $orig_accounts->(@_);
+    };
+    local *DW::External::Page::new = sub {
+        if ($terminal_share_request) {
+            ++$share_constructions;
+            die 'terminal response must not construct a shared page';
+        }
+        return UpdateTerminal::SharePage->new(
+            title       => 'Retained share title',
+            url         => 'https://example.invalid/shared',
+            description => 'Retained share description',
+        );
     };
     local $LJ::MSG_NO_POST = q{Configured <a href="/no-post">cannot post</a>};
     test_psgi $app, sub {
@@ -97,6 +120,35 @@ my $account_lookups = 0;
                 );
             }
         }
+        for my $case (
+            [ 'identity', 'Sorry',       qr/Non-\Q$LJ::SITENAME\E users can't post entries/ ],
+            [ 'cantpost', q{Can't Post}, qr{Configured <a href="/no-post">cannot post</a>} ],
+            )
+        {
+            my ( $variant, $title, $message ) = @$case;
+            for my $excluded (qw(altlogin share)) {
+                my $value = $excluded eq 'share' ? 'https://example.invalid/shared' : 1;
+                $terminal_share_request = $excluded eq 'share';
+                my $res = $request->( GET "/update?$variant=1&$excluded=$value" );
+                $terminal_share_request = 0;
+                is( $res->code, 200, "$variant precedes $excluded with terminal status" );
+                like(
+                    $res->content,
+                    qr/<title>\Q$title\E<\/title>/i,
+                    "$variant precedes $excluded with terminal title"
+                );
+                like( $res->content, $message,
+                    "$variant precedes $excluded with terminal message" );
+                unlike(
+                    $res->content,
+                    qr/id=['"](?:updateForm|js-post-entry)['"]/,
+                    "$variant plus $excluded has no form"
+                );
+            }
+        }
+        is( $share_constructions, 0,
+            'terminal identity/cannot-post responses do not construct shared pages' );
+
         for my $variant (qw(identity cantpost)) {
             my $invalid = $request->( GET "/update?$variant=1&usejournal=does-not-exist" );
             like(
