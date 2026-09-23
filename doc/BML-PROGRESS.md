@@ -2462,3 +2462,5 @@ compose validation). T1 manager moderation under review with inert-test boundary
 T2/W2 cutovers in progress. Root inbox5files198 PASS.
 - T1 manager moderation integrated asabc4e531d..0aa11d135 (Opus FINAL CLEAR,
   inert tests). Pre-existing t/post.t key expectation fixed in02bce1487.
+- W2 inbox cutover integrated asab4fb2c8e/5ab7031b9 (Opus CLEAR). Old /inbox/new*
+  POSTs are served natively; GET redirects to canonical. Root inbox7files270 PASS.

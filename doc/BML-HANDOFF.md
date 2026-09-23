@@ -43,7 +43,16 @@ below this line predate the resume.
   reviewer probe and one run of the 6648 test each wrote a local spamreports
   row for disposable fixtures in reviewer container 904e68156988; nothing
   external; rows left in place.
-- T2 entry cutover (themenav) and W2 inbox cutover (widgets) in progress on
+- W2 inbox cutover range 13d112a73 + d680ac1e7 bml-opus-review CLEAR;
+  integrated on root as ab4fb2c8e, 5ab7031b9. Canonical /inbox, /inbox/compose,
+  /inbox/markspam are native; old /inbox/new* redirect on GET only and serve
+  POST natively (reviewer proved the first version dropped POST bodies via
+  303, and a stale compose tab now sends). Root seven suites 270 PASS; logs
+  /tmp/bml-inbox-cutover-integrated-*.log. Non-blocking items (old .bml
+  variants not canonicalized, /inbox/new/ trailing-slash POST, inert user-ban
+  stub in spam-errors test, orphan .beta.on) folded into W3.
+- T2 entry cutover (themenav, rebasing/squashing onto root) and W3 inbox legacy
+  removal (widgets) in progress on
   bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
 - Obsolete preserved branches (not integrated): hook composition 5d282324c,
   altlogin characterization a0cfe4f23, draft.bml WIP 68789a565.
