@@ -1951,3 +1951,18 @@ checks, after widgets Terra completes customization1/4.
   then remaining GET/unsupported paths. Editor mapping uses already accepted
   retry semantics per BML-UPDATE-GET-EDITORS.md; no invented product gate.
   All integrations local, no push/deploy or BML editor deletion.
+
+### Next GET packages and public transform review
+
+- Public transform activation565eb2cff19f52981086f4b6770744ab603fb1d5
+  is committed with111 worker assertions and queued for independent Sol review;
+  it is not integrated yet.
+- Callable update GET rendererc5d862a8009c017de6bbca3e05e02665f66408ee
+  has9 template-variable assertions. Actual template acceptance is in progress;
+  foreman identified the retained user-preformat OR hook-preformat contract at
+  LJ/Web.pm:1267 and routed the false-hook/true-user case for correction.
+- Independent ordinary owned-edit GET audit is preserved in
+  BML-OWNED-EDIT-GET.md. Themes is implementing a callable-only wrapper on an
+  isolated branch, with canonical native form action and raw query preservation.
+  No GET route activation, deployment interface change or held inbox work is
+  authorized by these increments.
