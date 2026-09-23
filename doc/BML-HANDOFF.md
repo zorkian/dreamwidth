@@ -1,3 +1,23 @@
+## Public terminal update GET accepted
+
+Sol final2ed/a93/3f315 CLEAR; integrated2f36ed6fc/653c12cba/f47aab510. Identity
+and cannot-post responses now use the native terminal renderer, preserving
+legacy titles/localization/configured HTML and invalid-target/beta precedence.
+Combined altlogin/share checks prove early terminal return and no share fetch.
+Startup early-exit cleanup is independently proved; anonymous/readonly remain
+BML. Foreman five adjacent suites266 PASS, normal browser PASS/nohelpers,
+compile1607 PASS. Fulltidy initially found one extra blank line in the community
+browser server; format-onlyeb47aca13 removed it, fulltidy1139 PASS. No behavioral
+change. Captures under update-terminal;390px cannot-post visually inspected.
+Logs /tmp/bml-terminal-public-integrated.log, /tmp/bml-terminal-public-browser.log,
+/tmp/bml-get-followups-compile.log, /tmp/bml-get-followups-tidy-fixed.log.
+All root sessions40196/23701/13879 complete; checkout clean after this record.
+
+Readonly callablee30 remains unaccepted pending target-after-hook correction,
+legacy editor preservation and browser validation. Widgets characterizes ordinary
+manager deletion only; Sol audits bounded Web error/warning language helpers.
+Held inbox/platform and external deployment-hook decisions remain untouched.
+
 ## Public same-poster community GET accepted
 
 Sol final354fd2ee7..77382f0a6 CLEAR. Integrated af0643fbe/0c5b6f927/f468b49ac/

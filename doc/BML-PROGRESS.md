@@ -2145,3 +2145,13 @@ browser PASS, helpers absent. Public desktop/narrow captures preserved under
 community-edit-get-public; native390 form visually fits. Retained manager title
 missing-string diagnostic is documented baseline. No BML retirement or manager
 mutation/activation claim.
+
+### Public terminal update responses accepted
+
+Sol2ed/a93/3f315 CLEAR; integrated2f36ed6fc/653c12cba/f47aab510. Identity and
+cannot-post legacy GETs use native terminal output with retained titles, keys,
+MSG_NO_POST HTML and ordering. No form/hooks/share construction; anonymous and
+readonly forms remain BML. Foreman five suites266 PASS, real browser PASS and
+helper cleanup empty, compile1607 PASS. Fulltidy1139 PASS after removing one extra
+blank line from community browser server ineb47aca13. Desktop/narrow terminal
+captures preserved; narrow cannot-post verified visually. No BML deletion/push.
