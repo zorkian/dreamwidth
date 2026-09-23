@@ -8,6 +8,7 @@ use warnings;
 use Test::More;
 use HTTP::Request::Common;
 use URI;
+use Scalar::Util qw(refaddr);
 use HTML::Form;
 use Plack::Test;
 
@@ -92,7 +93,55 @@ test_psgi $app, sub {
         my $post = $form->click('action:update');
         $post->uri( 'http://localhost' . $path );
         $post->header( Referer => 'http://localhost' . $path );
-        $res = $request->($post);
+        my ( @success_hooks, $decoded_request );
+        my $run_hooks = \&LJ::Hooks::run_hooks;
+        my $run_hook  = \&LJ::Hooks::run_hook;
+        {
+            no warnings 'redefine';
+            local *LJ::Hooks::run_hooks = sub {
+                my ( $name, @args ) = @_;
+                $decoded_request = $args[1] if $name eq 'decode_entry_form';
+                if ( $name eq 'after_entry_post_extra_options' ) {
+                    push @success_hooks, [ $name, {@args} ];
+                    return ['<li>Legacy hook option marker</li>'];
+                }
+                return $run_hooks->(@_);
+            };
+            local *LJ::Hooks::run_hook = sub {
+                my ( $name, @args ) = @_;
+                if ( $name eq 'after_entry_post_extra_html' ) {
+                    push @success_hooks, [ $name, {@args} ];
+                    return '<p>Legacy hook HTML marker</p>';
+                }
+                return $run_hook->(@_);
+            };
+            $res = $request->($post);
+        }
+        is_deeply(
+            [ map { $_->[0] } @success_hooks ],
+            [qw(after_entry_post_extra_options after_entry_post_extra_html)],
+            "$path invokes both success hooks in the retained order"
+        );
+        like( $res->content, qr/Legacy hook option marker/, "$path renders extra hook option" );
+        like( $res->content, qr/Legacy hook HTML marker/,   "$path renders extra hook HTML" );
+        if ( @success_hooks == 2 ) {
+            my $options = $success_hooks[0][1];
+            my $html    = $success_hooks[1][1];
+            is( $options->{user}->id, $owner_id, "$path option hook receives target journal" );
+            is( $html->{user}->id,    $owner_id, "$path HTML hook receives target journal" );
+            is( $html->{itemlink}, $options->{itemlink}, "$path hooks share the exact entry URL" );
+            like( $html->{itemlink}, qr/\.html$/, "$path hook URL names the saved entry" );
+            is(
+                refaddr( $html->{request} ),
+                refaddr($decoded_request),
+                "$path success hook receives the original decoder request reference"
+            );
+            is(
+                $html->{request}{prop_current_location},
+                "Legacy $index location",
+                "$path success hook retains flat legacy properties"
+            );
+        }
         is( $res->code, 200, "$path direct valid legacy POST returns a response" );
         like(
             $res->content,
