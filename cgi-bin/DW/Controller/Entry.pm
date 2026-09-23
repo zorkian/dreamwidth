@@ -2073,19 +2073,15 @@ sub _get_extradata {
 sub _do_post {
     my ( $form_req, $flags, $auth, %opts ) = @_;
 
-    my $res            = DW::Entry::_save_new_entry( $form_req, $flags, $auth );
-    my $legacy_attempt = $opts{legacy_success};
-    my $legacy_success =
-        $legacy_attempt && !$opts{legacy_suppress_success} ? $legacy_attempt : undef;
-    _legacy_post_spam_check( $legacy_attempt, $auth->{poster} );
+    my $res = DW::Entry::_save_new_entry( $form_req, $flags, $auth );
+    _legacy_post_spam_check( $opts{legacy_success}, $auth->{poster} );
     return %$res if $res->{errors};
 
-    # A retained login error still attempts the protocol post, but it does not
-    # execute the success-only housekeeping or extension hooks before rerender.
-    if ($legacy_success) {
-        _legacy_success_housekeeping( $legacy_success, $form_req );
+    # post succeeded, time to do some housecleaning
+    if ( my $legacy = $opts{legacy_success} ) {
+        _legacy_success_housekeeping( $legacy, $form_req );
     }
-    elsif ( !$legacy_attempt ) {
+    else {
         _persist_props( $auth->{poster}, $form_req, 0 );
         if ( $auth->{poster} ) {
             $auth->{poster}->set_prop( 'entry_draft',      '' );
@@ -2105,7 +2101,8 @@ sub _do_post {
             'entry/success.tt',
             {
                 moderated_message => $res->{message},
-                legacy_extra_html => _legacy_success_extra_html( $legacy_success, undef, undef ),
+                legacy_extra_html =>
+                    _legacy_success_extra_html( $opts{legacy_success}, undef, undef ),
             }
         );
     }
@@ -2171,15 +2168,15 @@ sub _do_post {
         # Legacy update keeps its master checkbox outside normalized form data.
         # Its POST-first, GET-fallback value is passed explicitly by its adapter.
         my $crosspost_form = $form_req;
-        if ( $legacy_attempt && exists $legacy_attempt->{crosspost_master} ) {
+        if ( $opts{legacy_success} && exists $opts{legacy_success}{crosspost_master} ) {
             $crosspost_form =
-                { %$form_req, crosspost_entry => $legacy_attempt->{crosspost_master} };
+                { %$form_req, crosspost_entry => $opts{legacy_success}{crosspost_master} };
         }
 
         # crosspost!
         my @crossposts = _queue_crosspost(
             $crosspost_form,
-            remote             => $legacy_attempt ? $legacy_attempt->{remote} : $u,
+            remote             => $opts{legacy_success} ? $opts{legacy_success}{remote} : $u,
             journal            => $journal,
             deleted            => 0,
             editurl            => $edititemlink,
@@ -2189,9 +2186,10 @@ sub _do_post {
 
         my $legacy_extra_options =
             defined $res->{itemid}
-            ? _legacy_success_extra_options( $legacy_success, $journal, $itemlink )
+            ? _legacy_success_extra_options( $opts{legacy_success}, $journal, $itemlink )
             : '';
-        my $legacy_extra_html = _legacy_success_extra_html( $legacy_success, $journal, $itemlink );
+        my $legacy_extra_html =
+            _legacy_success_extra_html( $opts{legacy_success}, $journal, $itemlink );
 
         # set sticky
         if ( $form_req->{sticky_entry} && $u->can_manage($journal) ) {

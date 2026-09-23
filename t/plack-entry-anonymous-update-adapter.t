@@ -527,42 +527,4 @@ test_psgi $adapter, sub {
         'implicit ordinary retained update posts exactly one additional entry' );
 };
 
-# The legacy attempt context survives a response-suppressed post attempt so
-# its explicit no-crosspost master and anonymous remote still control queueing.
-# This guards the distinction between attempt timing and success rendering.
-{
-    my $save_new_entry = \&DW::Entry::_save_new_entry;
-    no warnings 'redefine';
-    local *DW::Entry::_save_new_entry = sub {
-        return {
-            itemid => 999,
-            anum   => 0,
-            url    => $owner->journal_base . '999.html',
-        };
-    };
-    local *DW::Template::render_template = sub { return 0; };
-
-    my $before_scheduler = $scheduler_calls;
-    DW::Controller::Entry::_do_post(
-        {
-            subject         => 'Suppressed legacy success subject',
-            event           => 'Suppressed legacy success body',
-            security        => 'private',
-            props           => {},
-            crosspost_entry => 1,
-        },
-        { noauth => 1,      u       => $owner },
-        { poster => $owner, journal => $owner },
-        legacy_success => {
-            request          => { mode => 'postevent' },
-            poster           => $owner,
-            remote           => undef,
-            crosspost_master => 0,
-        },
-        legacy_suppress_success => 1,
-    );
-    is( $scheduler_calls, $before_scheduler,
-        'suppressed legacy attempt retains explicit no-crosspost queue behavior' );
-}
-
 done_testing;
