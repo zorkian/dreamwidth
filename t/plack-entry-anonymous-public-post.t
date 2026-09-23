@@ -790,47 +790,51 @@ test_psgi $app, sub {
         )
     {
         my ( $label, $changes ) = @$case;
-        my $before = fresh_state($owner_id);
-        $authenticated_calls = $anonymous_calls = 0;
-        my $post = form_post(
-            $send, '/update.bml', $owner, $changes->{password} // $password,
-            subject          => "$label subject",
-            body             => "$label body",
-            security         => 'private',
-            missing_password => $changes->{missing_password},
-            usejournal       => $changes->{usejournal},
-        );
-        if ( $changes->{usejournal} ) {
-            my @targets = $post->content =~ /(?:^|&)usejournal=([^&]*)/g;
-            is_deeply(
-                \@targets,
-                [ $changes->{usejournal} ],
-                'community target request contains exactly one intended usejournal value'
+        for my $path ( '/update', '/update.bml' ) {
+            my $before = fresh_state($owner_id);
+            $authenticated_calls = $anonymous_calls = 0;
+            my $post = form_post(
+                $send, $path, $owner, $changes->{password} // $password,
+                subject          => "$label subject",
+                body             => "$label body",
+                security         => 'private',
+                missing_password => $changes->{missing_password},
+                usejournal       => $changes->{usejournal},
             );
-        }
-        my $res = $send->($post);
-        is( $authenticated_calls, 1,
-            "$label reaches authenticated handler before retained fallback" );
-        is( $anonymous_calls, 1, "$label reaches anonymous classifier before retained fallback" );
-        unlike( $res->content, qr/id=['"]js-post-entry['"]/,
-            "$label does not enter the native retry renderer" );
-        if ( $label eq 'community target' ) {
-            like(
-                $res->content,
+            if ( $changes->{usejournal} ) {
+                my @targets = $post->content =~ /(?:^|&)usejournal=([^&]*)/g;
+                is_deeply(
+                    \@targets,
+                    [ $changes->{usejournal} ],
+                    "$path community target request contains exactly one intended usejournal value"
+                );
+            }
+            my $res = $send->($post);
+            is( $authenticated_calls, 1,
+                "$path $label reaches authenticated handler before retained fallback" );
+            is( $anonymous_calls, 1,
+                "$path $label reaches anonymous classifier before retained fallback" );
+            unlike( $res->content, qr/id=['"]js-post-entry['"]/,
+                "$path $label does not enter the native retry renderer" );
+            if ( $label eq 'community target' ) {
+                like(
+                    $res->content,
 qr/Error updating journal:<\/strong>\s*Client error: Don&#39;t have access to requested journal/,
-                'community target retains the real BML authorization denial'
-            );
-            unlike(
-                $res->content,
-                qr/Invalid users passed to/,
-                'community target is not an invalid composite usejournal error'
-            );
+                    'community target retains the real BML authorization denial'
+                );
+                unlike(
+                    $res->content,
+                    qr/Invalid users passed to/,
+                    'community target is not an invalid composite usejournal error'
+                );
+            }
+            else {
+                like( $res->content, qr/id=['"]updateForm['"]/,
+                    "$path $label retains the ordinary BML fallback form" );
+            }
+            is_deeply( fresh_state($owner_id), $before,
+                "$path $label leaves fresh owner state unchanged" );
         }
-        else {
-            like( $res->content, qr/id=['"]updateForm['"]/,
-                "$label retains the ordinary BML fallback form" );
-        }
-        is_deeply( fresh_state($owner_id), $before, "$label leaves fresh owner state unchanged" );
     }
 };
 
