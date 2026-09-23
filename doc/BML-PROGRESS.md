@@ -1322,3 +1322,12 @@ checks, after widgets Terra completes customization1/4.
   normal autosave delay. Candidate stays unintegrated. Terra preserves preview
   WIP in a named stash while correcting initialization ordering and adding the
   delayed-image regression, then resumes preview work.
+
+### 2026-09-23 owned-delete characterization integrated
+
+- Sol cleared `53dd7cccd`: HTTP16, real normal browser, intentional-failure
+  exit1 and helper cleanup. Integrated locally as `440faea99`.
+- Foreman delete/edit2 files /51 assertions and real browser pass; no fixture
+  helper remains. Captures are under `2026-09-23/entry-delete-native`.
+- Legacy owned-edit `b4d28421e` is now independently reviewing; no old editor
+  route is removed by these test-only characterizations.
