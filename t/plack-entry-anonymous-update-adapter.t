@@ -400,6 +400,9 @@ test_psgi $adapter, sub {
         'empty body still performs legacy login, decode, save attempt, then spam check'
     );
 
+    # A retained invalid attempt omits native update_displaydate. Seed it on
+    # first so an accidental native persistence write of off cannot pass.
+    $owner->displaydate_check(1);
     my $before_invalid = entry_count($owner);
     my $invalid_state  = user_state($owner_id);
     my $invalid        = post_from_retained(
