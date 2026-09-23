@@ -182,17 +182,22 @@ sub legacy_post_hash {
     return \%legacy;
 }
 
-sub normalize_entry_form {
-    my ( $req, $post ) = @_;
+# Convert the decoder's legacy-shaped request to the canonical native entry
+# shape.  Retained callers still require the in-place behavior, while a later
+# success renderer needs the original flat request for extension hooks.
+sub decoded_to_canonical {
+    my ( $decoded, $legacy_post, %opts ) = @_;
 
-    my $legacy_post = legacy_post_hash($post);
-    my $decoded     = decode_entry_form( $req, $legacy_post );
-    $decoded->{props} ||= {};
+    my $canonical = $opts{in_place} ? $decoded : {%$decoded};
+    $canonical->{props} =
+        $opts{in_place}
+        ? ( $canonical->{props} ||= {} )
+        : { %{ $canonical->{props} || {} } };
 
-    foreach my $name ( keys %$decoded ) {
+    foreach my $name ( keys %$canonical ) {
         next unless $name =~ /^prop_(.+)$/;
         next if $name =~ /^prop_xpost_/;
-        $decoded->{props}{$1} = delete $decoded->{$name};
+        $canonical->{props}{$1} = delete $canonical->{$name};
     }
 
     my %crosspost_ids;
@@ -201,10 +206,10 @@ sub normalize_entry_form {
         $crosspost_ids{$1} = 1;
     }
 
-    $decoded->{crosspost_entry} = $legacy_post->{prop_xpost_check} ? 1 : 0;
-    $decoded->{crosspost}       = {};
+    $canonical->{crosspost_entry} = $legacy_post->{prop_xpost_check} ? 1 : 0;
+    $canonical->{crosspost}       = {};
     foreach my $acctid ( keys %crosspost_ids ) {
-        $decoded->{crosspost}{$acctid} = {
+        $canonical->{crosspost}{$acctid} = {
             id       => $legacy_post->{"prop_xpost_$acctid"} ? $acctid : undef,
             password => $legacy_post->{"prop_xpost_password_$acctid"},
             chal     => $legacy_post->{"prop_xpost_chal_$acctid"},
@@ -212,7 +217,31 @@ sub normalize_entry_form {
         };
     }
 
-    return $decoded;
+    return $canonical;
+}
+
+# Decode once while retaining the original flat request for legacy success
+# hooks.  The canonical copy can independently feed the native retry mapper.
+sub prepare_entry_form {
+    my ( $req, $post ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my $decoded     = decode_entry_form( $req, $legacy_post );
+    my $canonical   = decoded_to_canonical( $decoded, $legacy_post );
+
+    return {
+        request   => $decoded,
+        canonical => $canonical,
+        post      => $legacy_post,
+    };
+}
+
+sub normalize_entry_form {
+    my ( $req, $post ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my $decoded     = decode_entry_form( $req, $legacy_post );
+    return decoded_to_canonical( $decoded, $legacy_post, in_place => 1 );
 }
 
 # Build native form fields for a legacy error rerender. This intentionally does

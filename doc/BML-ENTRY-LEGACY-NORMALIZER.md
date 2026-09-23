@@ -34,6 +34,26 @@ with `each` values joined by NUL exactly as `DW::BML` does; it never mutates the
 multivalue input. Canonical property-to-backend mapping and route cutover are
 deliberately later work.
 
+## Success-hook preparation API
+
+`DW::Entry::Legacy::prepare_entry_form( $seed_req, $post )` decodes exactly
+once and returns a hash with `request`, `canonical`, and `post` keys.
+
+- `request` is the original `$seed_req` reference after the decoder and its
+  hook ran. It retains the old flat `prop_*` fields for retained success hooks,
+  including `after_entry_post_extra_html`.
+- `canonical` is a separate hash built by the same canonicalization stage.
+  Its `props` hash is separate from the seed request's `props`, so moving
+  `prop_*` fields cannot alter the success-hook request. It can be passed with
+  `post` to `formdata_from_legacy` for a native error retry without decoding or
+  invoking hooks again.
+- `post` is the original plain legacy post, or the one BML-compatible NUL-joined
+  plain hash produced from a `Hash::MultiValue` input.
+
+`normalize_entry_form` remains the retained in-place API: it invokes the same
+stage with `in_place => 1`, returning and mutating its original request hash as
+before.
+
 ## Finite tests
 
 1. The preserved decoder is called once, receives the original seed/plain-post
@@ -48,6 +68,10 @@ deliberately later work.
 5. A `Hash::MultiValue` boundary conversion preserves empty-first repeated
    values with NUL joining, does not mutate input, and gives the hook its
    converted legacy scalar.
-6. Existing direct decoder tests continue to cover masks through bit 60,
+6. `prepare_entry_form` decodes once, keeps the same flat request reference for
+   a simulated success hook, and supplies an isolated canonical copy for a
+   retry mapper; it does not alter seed properties, opaque hook values, or raw
+   multivalue input.
+7. Existing direct decoder tests continue to cover masks through bit 60,
    metadata/adult/comment precedence, RTE conversion, mood normalization, and
    hook ordering.
