@@ -843,7 +843,7 @@ sub _edit {
 
 sub _render_edit_form {
     my ( $r, $vars, $errors, $warnings, $post, $entry_obj, $remote, $journal,
-        $spellcheck_requested )
+        $spellcheck_requested, %opts )
         = @_;
 
     # now look for errors that we still want to recover from
@@ -886,15 +886,63 @@ sub _render_edit_form {
     # this can't be edited after posting
     delete $editable{journal};
 
-    $vars->{action} = {
+    $vars->{action} = $opts{action}
+        || {
         edit => 1,
         url  => LJ::create_url( undef, keep_args => 1 ),
-    };
+        };
 
     $vars->{js_for_rte} = LJ::rte_js_vars();
     $vars->{sitevalues} = to_json( \@sitevalues );
 
     return DW::Template->render_template( 'entry/form.tt', $vars );
+}
+
+# A retained editjournal adapter supplies the already-resolved, owned entry and
+# prepared legacy data. It intentionally does not dispatch, authenticate, or
+# resolve the entry: maintainer-only editing remains on its separate path.
+sub legacy_owned_edit_rerender {
+    my (%opts) = @_;
+
+    my $r         = DW::Request->get;
+    my $entry     = $opts{entry};
+    my $remote    = $opts{remote};
+    my $journal   = $opts{journal};
+    my $prepared  = $opts{prepared};
+    my $canonical = $prepared->{canonical};
+    my $formdata  = DW::Entry::Legacy::formdata_from_legacy( $canonical, $prepared->{post} );
+    my $ditemid   = $entry->ditemid;
+
+    my %crosspost = map { $_ => 1 }
+        grep { $canonical->{crosspost}{$_}{id} } keys %{ $canonical->{crosspost} || {} };
+    my $datetime = $entry->eventtime_mysql;
+    if ( defined $canonical->{year} && defined $canonical->{mon} && defined $canonical->{day} ) {
+        $datetime = sprintf( '%04d-%02d-%02d %02d:%02d', @{$canonical}{qw(year mon day hour min)} );
+    }
+    my $vars = _init(
+        {
+            usejournal           => $journal->username,
+            remote               => $remote,
+            datetime             => $datetime,
+            trust_datetime_value => 1,
+            crosspost            => \%crosspost,
+            sticky_entry         => $journal->sticky_entries_lookup->{$ditemid},
+        },
+        undef
+    );
+    my $action_path = '/entry/' . $journal->user . '/' . $ditemid . '/edit';
+
+    return _render_edit_form(
+        $r, $vars,
+        $opts{errors}   || DW::FormErrors->new,
+        $opts{warnings} || DW::FormErrors->new,
+        $formdata,
+        $entry, $remote, $journal, 0,
+        action => {
+            edit => 1,
+            url  => LJ::create_url( $action_path, keep_query_string => 1 ),
+        },
+    );
 }
 
 # returns:
