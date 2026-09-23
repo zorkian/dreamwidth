@@ -967,7 +967,7 @@ sub _render_new_form {
         ? 'action:update'
         : 'action:post';
 
-    $vars->{js_for_rte} = LJ::rte_js_vars();
+    $vars->{js_for_rte} = LJ::rte_js_vars($remote);
     $vars->{sitevalues} = to_json( \@sitevalues );
 
     # Set up vars for drafts
@@ -1752,6 +1752,56 @@ sub _edit {
         return $r->OK;
     }
 
+    # The ordinary edit form also submits action:delete for a poster deleting
+    # their own entry; only treat this as the manager-moderation action when
+    # the poster differs from the actor, so an owner's delete still falls
+    # through to the generic edit/delete handling below unaffected.
+    if ( $maintainer_post
+        && ( $maintainer_post->{'action:delete'} || $maintainer_post->{'action:deletespam'} ) )
+    {
+        my $entry  = LJ::Entry->new( $journal, ditemid => $ditemid );
+        my $anum   = $ditemid % 256;
+        my $itemid = $ditemid >> 8;
+        if (   $entry->editable_by($remote)
+            && $anum == $entry->anum
+            && $itemid == $entry->jitemid
+            && !$entry->poster->equals($remote) )
+        {
+            my $deletespam = $maintainer_post->{'action:deletespam'} ? 1 : 0;
+            return error_ml('/entry/form.tt.error.nofind')
+                unless $journal->is_comm && $remote->can_manage($journal) && !$journal->readonly;
+
+            # Retained editjournal's disabled_spamdelete additionally requires
+            # a clear spamreport sysban; ordinary delete does not.
+            return error_ml('error.invalidform')
+                if $deletespam && LJ::sysban_check( 'spamreport', $journal->user );
+            return error_ml('error.invalidform')
+                unless LJ::check_form_auth( $maintainer_post->{lj_form_auth} );
+
+            LJ::mark_entry_as_spam( $journal, $itemid ) if $deletespam;
+
+            $journal->log_event(
+                'delete_entry',
+                {
+                    remote       => $remote,
+                    actiontarget => $ditemid,
+                    method       => 'web',
+                }
+            );
+
+            my %edit_res = _do_edit(
+                $ditemid,
+                { event  => '' },
+                { poster => $remote, journal => $journal },
+                warnings => $warnings,
+            );
+            return $edit_res{render} if $edit_res{status} eq "ok";
+            return DW::Template->render_template( 'error.tt', { message => $edit_res{errors} } )
+                if $edit_res{errors};
+            return error_ml('error.invalidform');
+        }
+    }
+
     if ( $r->did_post ) {
         $post = $r->post_args;
 
@@ -1926,7 +1976,7 @@ sub _render_edit_form {
         url  => LJ::create_url( undef, keep_args => 1 ),
         };
 
-    $vars->{js_for_rte} = LJ::rte_js_vars();
+    $vars->{js_for_rte} = LJ::rte_js_vars($remote);
     $vars->{sitevalues} = to_json( \@sitevalues );
 
     return DW::Template->render_template( 'entry/form.tt', $vars );
