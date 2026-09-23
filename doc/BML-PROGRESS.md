@@ -2026,3 +2026,11 @@ d77e85b20. Foreman4files302 PASS, tidy1128/compile1607 PASS in
 /tmp/bml-update-get-wrapper-{integrated,tidy,compile}.log. Public GET unchanged.
 Update browser WIP timeout traced to seeded first-visit modal, missing fixture
 seed_draft command and modal/navigation await order; fixes active, not accepted.
+
+### Retained-form fixture prerequisite accepted
+
+Sol860303fd CLEAR: shared test-only GET BML/POST captured-handler composition,
+local routing restoration,493 HTTP and normal/named-failure browser PASS.
+Integratedfa4e13737. Foreman combined four affected/nativeGET suites493 PASS in
+/tmp/bml-owned-get-fixture-integrated.log. Public owned GET activation remains
+separate active work. Update GET browserb2 remains under independent replay.
