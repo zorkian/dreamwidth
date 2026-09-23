@@ -1409,6 +1409,7 @@ sub legacy_new_rerender {
             datetime             => $datetime,
             trust_datetime_value => !exists $canonical->{tz},
             crosspost            => \%crosspost,
+            suppress_crosspost   => $opts{suppress_crosspost},
         }
     );
 
@@ -1417,11 +1418,17 @@ sub legacy_new_rerender {
     $action_url //= '/entry/new';
 
     return _render_new_form(
-        $vars, $formdata, $get, $remote,
+        $vars,
+        $formdata,
+        $get, $remote,
         $opts{errors}   || DW::FormErrors->new,
         $opts{warnings} || DW::FormErrors->new,
         $opts{spellcheck_requested},
-        { action_url => $action_url },
+        {
+            action_url         => $action_url,
+            legacy_altlogin    => $opts{legacy_altlogin},
+            submit_action_name => $opts{submit_action_name},
+        },
     );
 }
 
