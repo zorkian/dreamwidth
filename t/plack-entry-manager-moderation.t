@@ -70,6 +70,20 @@ my $member_cookie   = cookie_for($member);
 my $poster_cookie   = cookie_for($poster);
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'managerModeration';
 
+# A local spamreports write is itself a moderation side effect; stay inert
+# across this whole file by recording calls instead of letting any reach the
+# database. This local stays in effect until the file ends.
+my @spam_calls;
+no warnings 'redefine';
+local *LJ::mark_entry_as_spam = sub {
+    push @spam_calls, [@_];
+    return 1;
+};
+my $spam_dbh = LJ::get_db_writer();
+my ($baseline_spam_rows) =
+    $spam_dbh->selectrow_array( 'SELECT COUNT(*) FROM spamreports WHERE journalid = ?',
+    undef, $comm->userid );
+
 test_psgi $app, sub {
     my $send = shift;
 
@@ -162,11 +176,11 @@ test_psgi $app, sub {
         ok( !$deleted->valid,
             'forced-fresh read proves the entry is deleted after delete-as-spam' );
 
-        my $dbh = LJ::get_db_writer();
-        my ($count) = $dbh->selectrow_array(
-            'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
-            undef, $comm->userid, $poster->userid );
-        ok( $count >= 1, 'delete-as-spam recorded a spamreports row for the deleted poster entry' );
+        is( scalar @spam_calls, 1, 'delete-as-spam calls LJ::mark_entry_as_spam exactly once' );
+        my ( $called_journal, $called_jitemid ) = @{ $spam_calls[0] };
+        ok( LJ::isu($called_journal) && $called_journal->equals($comm),
+            'the spam call is for the expected journal' );
+        is( $called_jitemid, $entry->jitemid, 'the spam call is for the expected entry' );
     };
 
     subtest 'a non-manager cannot delete another poster entry' => sub {
@@ -201,16 +215,9 @@ test_psgi $app, sub {
 
         # A valid CSRF token alone must not be enough: these cases isolate the
         # can_manage/editable_by/poster authorization guards themselves from
-        # the CSRF guard exercised above.
-        my $dbh        = LJ::get_db_writer();
-        my $spam_count = sub {
-            my ($count) = $dbh->selectrow_array(
-                'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
-                undef, $comm->userid, $poster->userid );
-            return $count;
-        };
-        my $before_spam_count = $spam_count->();
-
+        # the CSRF guard exercised above. Check the recorder per attempt, not
+        # only in aggregate: an aggregate-only check can still read as zero
+        # net change if unrelated calls happen to offset each other.
         for my $case (
             [ 'outsider',           $as_outsider, $outsider_cookie ],
             [ 'non-manager member', $as_member,   $member_cookie ],
@@ -221,6 +228,7 @@ test_psgi $app, sub {
             ok( $token, "$label has a real CSRF token to attempt with" );
 
             for my $action (qw(action:delete action:deletespam)) {
+                my $before_calls = scalar @spam_calls;
                 my $post_res =
                     $as->( POST $url, Content => [ $action => 1, lj_form_auth => $token ] );
                 my $after = fresh_entry( $comm, $entry->ditemid );
@@ -232,10 +240,13 @@ test_psgi $app, sub {
                     'Non-manager target body',
                     "$label with a VALID token and $action leaves the entry body unchanged"
                 );
+                is(
+                    scalar @spam_calls,
+                    $before_calls,
+                    "$label with a VALID token and $action calls LJ::mark_entry_as_spam zero times"
+                );
             }
         }
-        is( $spam_count->(), $before_spam_count,
-            'no non-manager attempt, with any token, recorded a spamreports row' );
     };
 
     subtest
@@ -250,16 +261,11 @@ test_psgi $app, sub {
         my $token = $valid_token_for->($as_poster);
         ok( $token, 'poster has a real CSRF token' );
 
-        my $dbh = LJ::get_db_writer();
-        my ($before) = $dbh->selectrow_array(
-            'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
-            undef, $comm->userid, $poster->userid );
+        my $spam_calls_before = scalar @spam_calls;
         $as_poster->( POST $url, Content => [ 'action:deletespam' => 1, lj_form_auth => $token ] );
-        my ($after) = $dbh->selectrow_array(
-            'SELECT COUNT(*) FROM spamreports WHERE journalid = ? AND posterid = ?',
-            undef, $comm->userid, $poster->userid );
-        is( $after, $before,
-            'a poster sending deletespam on their own entry records no spamreports row' );
+        is( scalar @spam_calls,
+            $spam_calls_before,
+            'a poster sending deletespam on their own entry never calls LJ::mark_entry_as_spam' );
         };
 
     subtest 'a poster deleting their own community entry is unaffected' => sub {
@@ -299,23 +305,57 @@ test_psgi $app, sub {
         ok( $form, 'maintainer form parses for CSRF case' ) or BAIL_OUT('maintainer form missing');
         $form->value( 'lj_form_auth', 'deliberately-invalid-token' );
         $form->action( 'http://localhost' . $url );
-        my $res = $as_manager->( $form->click('action:delete') );
+        my $before_invalid = scalar @spam_calls;
+        my $res            = $as_manager->( $form->click('action:delete') );
         unlike( $res->content, qr/deleted|entry.*removed/i,
             'an invalid form-auth token does not perform a delete' );
         ok(
             fresh_entry( $comm, $entry->ditemid )->valid,
             'an invalid form-auth token leaves the entry intact'
         );
+        is( scalar @spam_calls,
+            $before_invalid, 'an invalid form-auth token calls LJ::mark_entry_as_spam zero times' );
 
         $form = maintainer_form( $as_manager->( GET $url )->content );
         $form->value( 'lj_form_auth', '' );
         $form->action( 'http://localhost' . $url );
+        my $before_missing = scalar @spam_calls;
         $res = $as_manager->( $form->click('action:deletespam') );
         unlike( $res->content, qr/deleted|entry.*removed/i,
             'a missing form-auth token does not perform a delete-as-spam' );
         ok(
             fresh_entry( $comm, $entry->ditemid )->valid,
             'a missing form-auth token leaves the entry intact'
+        );
+        is( scalar @spam_calls,
+            $before_missing, 'a missing form-auth token calls LJ::mark_entry_as_spam zero times' );
+    };
+
+    subtest 'a wrong-target deletespam cannot mark a nonexistent entry as spam' => sub {
+        my $unrelated = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject => 'Wrong-target unrelated entry subject',
+            body    => 'Wrong-target unrelated entry body',
+        );
+
+        # A bogus ditemid in the URL itself: nothing in this community was
+        # ever posted at this id, so editable_by must decline before the
+        # anum/itemid consistency check or can_manage are ever reached.
+        my $bogus_ditemid = ( ( $unrelated->jitemid + 999_000 ) << 8 ) + $unrelated->anum;
+        my $url           = '/entry/' . $comm->user . '/' . $bogus_ditemid . '/edit';
+        my $token         = $valid_token_for->($as_manager);
+        ok( $token, 'manager has a real CSRF token for the wrong-target case' );
+
+        my $before_calls = scalar @spam_calls;
+        my $res          = $as_manager->(
+            POST $url, Content => [ 'action:deletespam' => 1, lj_form_auth => $token ]
+        );
+        ok( $res->code, 'a bogus ditemid does not crash the handler' );
+        is( scalar @spam_calls,
+            $before_calls, 'a bogus ditemid calls LJ::mark_entry_as_spam zero times' );
+        ok(
+            fresh_entry( $comm, $unrelated->ditemid )->valid,
+            'a bogus ditemid leaves the real unrelated entry intact'
         );
     };
 };
@@ -347,5 +387,13 @@ subtest 'rte_js_vars follows the remote capability, not a fixed default' => sub 
         );
     };
 };
+
+is( scalar @spam_calls,
+    1, 'exactly one LJ::mark_entry_as_spam call happened across the whole file' );
+my ($final_spam_rows) =
+    $spam_dbh->selectrow_array( 'SELECT COUNT(*) FROM spamreports WHERE journalid = ?',
+    undef, $comm->userid );
+is( $final_spam_rows, $baseline_spam_rows,
+    'no spamreports row was ever actually written, across the whole file' );
 
 done_testing;
