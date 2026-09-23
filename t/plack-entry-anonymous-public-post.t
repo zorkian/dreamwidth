@@ -8,14 +8,18 @@ use warnings;
 use HTML::Form;
 use HTTP::Request::Common;
 use Plack::Test;
+use Scalar::Util qw(refaddr);
 use Storable qw(nfreeze thaw);
 use Test::More;
 
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use lib "$ENV{LJHOME}/t/lib";
 
 use DW::Controller::Entry;
 use LJ::Entry;
+use LJ::Session;
 use LJ::Test qw(temp_comm temp_user);
+use LJ::Test::LegacyOwnedEditRoute;
 
 plan skip_all => 'Anonymous public update activation requires a development server'
     unless $LJ::IS_DEV_SERVER;
@@ -49,8 +53,8 @@ sub fresh_state {
     my ($count) =
         $user->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef, $user->id );
     return {
-        count            => $count || 0,
-        draft            => $user->draft_text,
+        count => $count            || 0,
+        draft => $user->draft_text || '',
         draft_properties => length $frozen ? thaw($frozen) : {},
         editor           => $user->prop('entry_editor') || '',
         editor2          => $user->entry_editor2 || '',
@@ -61,7 +65,16 @@ sub fresh_state {
 
 sub form_post {
     my ( $send, $path, $user, $password, %values ) = @_;
-    my $get = $send->( GET $path );
+    my $get_request = GET $path;
+    $get_request->header( Cookie => $values{cookie} ) if $values{cookie};
+    my $get;
+    if ( $values{retained_get} ) {
+        LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+            sub { $get = $send->($get_request); } );
+    }
+    else {
+        $get = $send->($get_request);
+    }
     is( $get->code, 200, "$path GET renders the retained anonymous form" );
     my $form = retained_form( $get->content, $path );
     ok( $form, "$path GET has a real retained anonymous form" ) or return;
@@ -87,7 +100,61 @@ sub form_post {
     }
     $post->uri("http://localhost$path");
     $post->header( Referer => "http://localhost$path" );
+    $post->header( Cookie  => $values{cookie} ) if $values{cookie};
     return $post;
+}
+
+sub trace_anonymous_post {
+    my ( $send, $post ) = @_;
+    my ( @sequence, @protocol, @refs );
+    my $auth_okay  = \&LJ::auth_okay;
+    my $do_request = \&LJ::do_request;
+    my $run_hook   = \&LJ::Hooks::run_hook;
+    my $run_hooks  = \&LJ::Hooks::run_hooks;
+    my $response;
+
+    {
+        no warnings 'redefine';
+        local *LJ::auth_okay = sub {
+            push @sequence, 'auth';
+            return $auth_okay->(@_);
+        };
+        local *LJ::do_request = sub {
+            my ( $request, $response_hash, $flags ) = @_;
+            my $mode = $request->{mode} || '';
+            push @sequence, $mode;
+            push @protocol, [ $mode, refaddr($request) ];
+            return $do_request->(@_);
+        };
+        local *LJ::Hooks::run_hook = sub {
+            my ( $name, @args ) = @_;
+            if ( $name eq 'update_fields' ) {
+                push @sequence, 'update_fields';
+                $refs[0] = refaddr( $args[0] );
+            }
+            return $run_hook->( $name, @args );
+        };
+        local *LJ::Hooks::run_hooks = sub {
+            my ( $name, @args ) = @_;
+            if ( $name eq 'decode_entry_form' ) {
+                push @sequence, 'decode';
+                $refs[1] = refaddr( $args[1] );
+            }
+            if ( $name eq 'spam_check' ) {
+                push @sequence, 'spam';
+                $refs[2] = refaddr( $args[1] );
+            }
+            return $run_hooks->( $name, @args );
+        };
+        $response = $send->($post);
+    }
+
+    return {
+        response => $response,
+        sequence => \@sequence,
+        protocol => \@protocol,
+        refs     => \@refs
+    };
 }
 
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -201,7 +268,36 @@ test_psgi $app, sub {
             body     => "wrong $path body",
             security => 'private'
         );
-        my $res = $send->($post);
+        my $trace = trace_anonymous_post( $send, $post );
+        my $res   = $trace->{response};
+        is_deeply(
+            $trace->{sequence},
+            [qw(update_fields auth login auth decode postevent auth spam)],
+            "$path wrong-password retains the exact cross-stage sequence"
+        );
+        is( scalar grep( { $_ eq 'auth' } @{ $trace->{sequence} } ),
+            3, "$path wrong-password has exactly three password checks" );
+        is_deeply( [ map { $_->[0] } @{ $trace->{protocol} } ],
+            [qw(login postevent)], "$path wrong-password performs one login and one postevent" );
+        ok(
+            $trace->{refs}[0] && $trace->{refs}[1] && $trace->{refs}[2],
+            "$path records original GET and decoded POST references"
+        );
+        isnt(
+            $trace->{refs}[0],
+            $trace->{refs}[1],
+            "$path keeps the flat update_fields GET request separate from decoded POST data"
+        );
+        is(
+            $trace->{protocol}[1][1],
+            $trace->{refs}[1],
+            "$path passes the decoded POST reference to postevent"
+        );
+        is(
+            $trace->{refs}[1],
+            $trace->{refs}[2],
+            "$path passes that exact decoded POST reference to spam checking"
+        );
         is( $authenticated_calls, 1,
             "$path wrong-password request reaches authenticated handler once" );
         is( $anonymous_calls, 1,
@@ -237,6 +333,41 @@ test_psgi $app, sub {
         ) if $retry;
         is_deeply( fresh_state($wrong_owner_id),
             $before, "$path wrong password leaves fresh owner state unchanged" );
+    }
+
+    {
+        my $session = LJ::Session->create( $owner, nolog => 1 );
+        my $cookie =
+              'ljmastersession='
+            . $session->master_cookie_string
+            . '; ljloggedin='
+            . $session->loggedin_cookie_string;
+        my $before = fresh_state($owner_id);
+        $authenticated_calls = $anonymous_calls = 0;
+        my $post = form_post(
+            $send, '/update', $owner, $password,
+            cookie       => $cookie,
+            retained_get => 1,
+            subject      => 'authenticated public subject',
+            body         => 'authenticated public body',
+            security     => 'private'
+        );
+        my $res = $send->($post);
+        is( $authenticated_calls, 1,
+            'authenticated session request is handled by the authenticated handler once' );
+        is( $anonymous_calls, 0,
+            'authenticated session request never enters anonymous composition' );
+        is( $res->code, 200, 'authenticated session request returns HTTP 200' );
+        like(
+            $res->content,
+            qr/(?:successlinks|posted|updated)/i,
+            'authenticated session request has a meaningful success response'
+        );
+        is(
+            fresh_state($owner_id)->{count},
+            $before->{count} + 1,
+            'authenticated session request creates one entry through its existing handler'
+        );
     }
 
     for my $case (
