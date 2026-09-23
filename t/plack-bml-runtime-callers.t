@@ -71,4 +71,72 @@ subtest 'LJ::User::_logout_common no longer depends on BML::set_scheme' => sub {
     ok( !LJ::Session->instance( $u, $sessid ), 'session no longer resolves after logout' );
     DW::Request->reset;
 };
+
+subtest 'DW::User::Rename logs the real request IP via LJ::get_remote_ip' => sub {
+    my $u = temp_user();
+
+    DW::Request->reset;
+    my $r = DW::Request::Standard->new( GET 'http://localhost/rename' );
+    $r->header_in( Host => 'localhost' );
+
+    my @captured;
+    no warnings qw(redefine once);
+    local *LJ::Event::SecurityAttributeChanged::new = sub {
+        my ( $class, $u, $opts ) = @_;
+        push @captured, $opts;
+        return bless {}, $class;
+    };
+    local *LJ::Event::SecurityAttributeChanged::fire = sub { return 1; };
+
+    ok(
+        $u->rename(
+            $u->user . "_renameto",
+            token => DW::RenameToken->create_token( ownerid => $u->id ),
+        ),
+        'rename succeeds'
+    );
+    is( scalar @captured, 1, 'account_renamed notification fired exactly once' );
+    is( $captured[0]->{ip},
+        '127.0.0.100', 'notification carries the real request IP, not [unknown]' );
+    DW::Request->reset;
+};
+
+subtest 'DW::Hooks::Changelog uses LJ::get_remote_ip, not the crash-prone BML::get_remote_ip' =>
+    sub {
+    local %LJ::CHANGELOG = (
+        enabled         => 1,
+        community       => 'changelog_test_comm',
+        allowed_posters => ['changelog_test_poster'],
+        allowed_ips     => ['127.0.0.100'],
+    );
+
+    DW::Request->reset;
+    my $r = DW::Request::Standard->new( GET 'http://localhost/interface/xmlrpc' );
+    $r->header_in( Host => 'localhost' );
+
+    ok(
+        eval {
+            LJ::Hooks::run_hook(
+                'post_noauth',
+                {
+                    usejournal => 'changelog_test_comm',
+                    username   => 'changelog_test_poster',
+                }
+            );
+            1;
+        },
+        'post_noauth hook does not die when called from a native request context'
+    ) or diag("post_noauth died: $@");
+    ok(
+        LJ::Hooks::run_hook(
+            'post_noauth',
+            {
+                usejournal => 'changelog_test_comm',
+                username   => 'changelog_test_poster',
+            }
+        ),
+        'post_noauth allows a post from an allowed IP, matched via the real request IP'
+    );
+    DW::Request->reset;
+    };
 done_testing;
