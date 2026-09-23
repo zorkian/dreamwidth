@@ -1,3 +1,17 @@
+## Anonymous callable integration validation complete
+
+Foreman browser session29015 PASS (/tmp/bml-anonymous-callable-browser.log),
+owned fixture/server and port18117 clear. Native390 capture inspected: retained
+body/subject, one visible date error, usable in-bounds controls. Six captures
+preserved under anonymous-update-callable. Full tidy1166 and compile1607 PASS
+(/tmp/bml-anonymous-final-{tidy,compile}.log), session77452 complete. No active
+root tests remain. Callable anonymous source/HTTP/browser gate complete; public
+failure-continuation implementation remains separate and active in Widgets.
+
+Sol public sharefa176 exact HTTP78 PASS, plain-app browser review running. Themes
+retained altlogin GET baseline still test-only WIP, correcting actual retained
+control expectations. No public share integration until Sol final disposition.
+
 ## Anonymous callable browser accepted and integrated
 
 Sol64ce682e7b9d78c7824303fafa8a3955cc542660 CLEAR: independent normal,

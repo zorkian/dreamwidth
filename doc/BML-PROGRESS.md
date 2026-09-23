@@ -2345,3 +2345,8 @@ was included in this package.
   cleanup and visual; integratedd5aa0905b. Foreman replay session29015 active at
   this checkpoint. Native narrow retry usable; retained narrow overflow baseline.
   Public anonymous activation remains separate from this accepted callable gate.
+
+- Foreman integrated anonymous callable browser PASS with owned fixture/server/port
+  cleanup; six screenshots preserved in anonymous-update-callable. Native390
+  visually usable with exactly one date error and retained content. Full tidy1166
+  and compile1607 PASS. No active root validation processes at this checkpoint.
