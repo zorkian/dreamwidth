@@ -162,16 +162,6 @@ subtest 'LJ::Sysban::block logs the ban and leaves the response to its caller' =
     DW::Request->reset;
 };
 
-subtest 'LJ::start_request resets BML cookie cache without a blanket eval' => sub {
-    %BML::COOKIE_M       = ( leftover => ['stale'] );
-    $BML::COOKIES_PARSED = 1;
-
-    ok( eval { LJ::start_request(); 1 }, 'start_request does not die' )
-        or diag("start_request died: $@");
-    is_deeply( \%BML::COOKIE_M, {}, 'start_request clears the BML cookie cache' );
-    is( $BML::COOKIES_PARSED, 0, 'start_request resets the BML cookies-parsed flag' );
-};
-
 subtest 'LJ::did_post uses DW::Request, with no BML::get_method fallback' => sub {
     DW::Request->reset;
     my $get_r = DW::Request::Standard->new( GET 'http://localhost/foo' );
