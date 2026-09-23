@@ -90,7 +90,6 @@ sub with_make_journal_stubs {
     local *LJ::res_includes_head               = sub { '' };
     local *LJ::S2::get_script_tags             = sub { '' };
     local *LJ::PageStats::new = sub { bless {}, 'S2MakeJournalLanguage::PageStats' };
-    local *BML::set_language  = sub { die 'S2 rendering must not install BML language callbacks' };
     my $constructor = sub {
         push @$labels, LJ::Lang::ml('.label');
         return { head_content => '', show_control_strip => 0 };

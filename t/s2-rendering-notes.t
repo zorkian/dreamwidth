@@ -130,9 +130,8 @@ subtest 'control-strip hooks and current datetime use only native journal notes'
     );
 };
 
-subtest 'ordinary Entry and control-strip visibility do not consult BML requests' => sub {
+subtest 'ordinary Entry and control-strip visibility work without any active request' => sub {
     no warnings 'redefine';
-    local *BML::get_request    = sub { die 'BML request must not be consulted' };
     local *LJ::currents        = sub { return () };
     local *LJ::Hooks::run_hook = sub { return 1 };
     my $journal = bless {}, 'S2RenderingNotes::Journal';
@@ -152,9 +151,9 @@ subtest 'ordinary Entry and control-strip visibility do not consult BML requests
             itemid              => 1,
         }
     );
-    isa_ok( $entry, 'HASH', 'ordinary Entry renders without a BML request' );
+    isa_ok( $entry, 'HASH', 'ordinary Entry renders without any active request' );
     ok( S2::Builtin::LJ::viewer_sees_control_strip(),
-        'ordinary control-strip hook remains callable without BML' );
+        'ordinary control-strip hook remains callable without any active request' );
 };
 
 done_testing;

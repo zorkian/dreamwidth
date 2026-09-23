@@ -56,8 +56,6 @@ subtest 'legacy decoder uses native request language for the global subject plac
         },
     );
     my %decoded;
-    no warnings 'redefine';
-    local *BML::ml = sub { die 'entry_form_decode must not use BML::ml' };
     LJ::entry_form_decode(
         \%decoded,
         {

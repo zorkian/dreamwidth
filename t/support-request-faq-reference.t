@@ -111,8 +111,6 @@ sub run_reference_list {
 
     no warnings 'redefine';
     local $LJ::DEFAULT_LANG = 'en';
-    local *BML::get_language_default =
-        sub { die 'Support references must use application default language' };
     local *DW::Controller::Support::Request::controller =
         sub { return ( 1, { remote => $remote } ) };
     local *LJ::get_db_reader         = sub { return $db };

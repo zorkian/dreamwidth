@@ -47,7 +47,6 @@ sub render_strip {
     local *LJ::get_remote       = sub { $remote };
     local *LJ::Hooks::are_hooks = sub { 0 };
     local *LJ::Hooks::run_hook  = sub { return };
-    local *BML::ml              = sub { return "bml:$_[0]" };
     local *DW::Template::template_string = sub {
         $captured = $_[2];
         return join "\n", @{ $_[2]{actionlinks} || [] }, $_[2]{userpic_html} || '';
@@ -139,7 +138,6 @@ subtest 'actual control-strip TT preserves default labels and hook arguments' =>
         return;
         return;
     };
-    local *BML::ml = sub { return "bml:$_[0]" };
     my $out = LJ::control_strip( user => $journal->user );
     like( $out, qr/<div id='lj_controlstrip'>/, 'actual control-strip TT renders its wrapper' );
     like( $out, qr/Learn More/, 'actual TT output contains the default migrated learn-more label' );
@@ -169,7 +167,6 @@ subtest 'default-language fallback does not retain request labels' => sub {
     local *LJ::get_remote                = sub { return undef };
     local *LJ::Hooks::are_hooks          = sub { 0 };
     local *LJ::Hooks::run_hook           = sub { return };
-    local *BML::ml                       = sub { return "bml:$_[0]" };
     local *DW::Template::template_string = sub { $captured = $_[2]; return 'background' };
     is( LJ::control_strip( user => $journal->user ),
         'background', 'control strip retains default-language fallback' );

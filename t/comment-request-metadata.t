@@ -16,7 +16,6 @@
 
 use strict;
 use warnings;
-no warnings 'redefine';
 
 use Test::More;
 
@@ -77,12 +76,7 @@ subtest 'set_poster_ip preserves no-request, forwarded, and historical values' =
 
     my $comment = post_comment($journal);
     request('192.0.2.10');
-    {
-        local *BML::get_remote_ip     = sub { die 'BML remote IP getter must not be used' };
-        local *BML::get_client_header = sub { die 'BML header getter must not be used' };
-        is( $comment->set_poster_ip, '192.0.2.10',
-            'native request records an unforwarded address' );
-    }
+    is( $comment->set_poster_ip, '192.0.2.10', 'native request records an unforwarded address' );
     is( fresh_comment($comment)->poster_ip,
         '192.0.2.10', 'unforwarded address is persisted for display' );
 
@@ -125,12 +119,7 @@ subtest 'set_poster_ip preserves no-request, forwarded, and historical values' =
 
 subtest 'comment posting stores native request metadata through LJ::Talk' => sub {
     request( '192.0.2.20', '198.51.100.20' );
-    my $comment;
-    {
-        local *BML::get_remote_ip     = sub { die 'LJ::Talk must not use BML remote IP getter' };
-        local *BML::get_client_header = sub { die 'LJ::Talk must not use BML header getter' };
-        $comment = post_comment($journal);
-    }
+    my $comment = post_comment($journal);
 
     is(
         $comment->poster_ip,
