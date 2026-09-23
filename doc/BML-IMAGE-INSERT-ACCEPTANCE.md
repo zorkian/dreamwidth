@@ -32,3 +32,19 @@
 - Actual upload API: `cgi-bin/DW/Controller/API/Media.pm:48-99`
 
 No upload request, external delivery, or data mutation was performed during this audit.
+
+
+## Retained legacy limitation
+
+Closing the legacy URL dialog leaves `window.onresize` pointing at
+`InOb.smallCenter`. Resizing that same editor page afterward calls `setHeight`
+against the removed popup and raises a null `style` error. The browser baseline
+uses a fresh page per desktop/narrow viewport to characterize normal insertion
+without suppressing that defect. Native parity must clear its resize lifecycle;
+the exact legacy reproduction stack is retained in
+`/tmp/imgupload-browser-diagnostic.log`.
+
+At 390px the retained popup also horizontally overflows and is clipped at the
+left edge. The capture proves the dialog exists but does not establish that its
+labels and controls are fully viewport-visible. Native plain-editor UI must fit
+within the narrow viewport rather than reproduce this limitation.
