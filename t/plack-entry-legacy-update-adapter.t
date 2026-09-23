@@ -786,4 +786,38 @@ for my $case ( [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
         "$name does not change drafts" );
 }
 
+
+
+# Spellcheck is also callable-only here: a configured checker and a checker
+# that disappears after form render both rerender without save-side hooks.
+my $spell_form = retained_form( '/update', 'callable spellcheck' );
+if ($spell_form) {
+    $spell_form->value( subject => 'callable spellcheck subject' );
+    $spell_form->value( event => 'callable misspell body' );
+    my $spell_post = POST('/update', [
+        'action:spellcheck' => 'Spell Check', lj_form_auth => $spell_form->value('lj_form_auth'),
+        subject => 'callable spellcheck subject', event => 'callable misspell body', security => 'public',
+    ]);
+    $spell_post->header( Referer => 'http://localhost/update' );
+    my ($checked, $decode, $spam, $options, $html) = (0, 0, 0, 0, 0);
+    my $run_hooks = \&LJ::Hooks::run_hooks;
+    my $run_hook = \&LJ::Hooks::run_hook;
+    my $before = entry_count($owner);
+    {
+        local $LJ::SPELLER = 'callable-stub';
+        no warnings 'redefine';
+        local *LJ::SpellCheck::check_html = sub { ++$checked; return '<em class="spell-suggestion">callable suggestion</em>'; };
+        local *LJ::Hooks::run_hooks = sub { my ($name, @args) = @_; ++$decode if $name eq 'decode_entry_form'; ++$spam if $name eq 'spam_check'; ++$options if $name eq 'after_entry_post_extra_options'; return $run_hooks->($name, @args); };
+        local *LJ::Hooks::run_hook = sub { my ($name, @args) = @_; ++$html if $name eq 'after_entry_post_extra_html'; return $run_hook->($name, @args); };
+        my $res; test_psgi $adapter_app, sub { $res = shift->($spell_post); };
+        like($res->content, qr/callable suggestion/, 'configured callable spellcheck renders checker output');
+    }
+    is($checked, 1, 'configured callable spellcheck invokes checker once');
+    is_deeply([$decode,$spam,$options,$html], [0,0,0,0], 'callable spellcheck invokes no save hook family');
+    is(entry_count($owner), $before, 'configured callable spellcheck creates no entry');
+    my $unavailable; { local $LJ::SPELLER; test_psgi $adapter_app, sub { $unavailable = shift->($spell_post); }; }
+    like($unavailable->content, qr/Spell check is currently unavailable/, 'unavailable callable spellcheck remains nonpersisting');
+    is(entry_count($owner), $before, 'unavailable callable spellcheck creates no entry');
+}
+
 done_testing;
