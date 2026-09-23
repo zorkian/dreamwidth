@@ -94,7 +94,12 @@ below this line predate the resume.
   legacy_carryover_unrecoverable and legacy_preview_handler kept with
   callers. Root validation: 30-file entry+inbox sweep 1132 PASS, tidy1107,
   compile1603, build PASS: /tmp/bml-t2t3-integrated-*.log. Reviewer root
-  recheck of f89f4029c..508229ae9 requested. Orphan strings now:
+  recheck of f89f4029c..508229ae9 PASS (patch-ids identical, resolution as
+  described, 30/30 consolidated T2 probe on root). Foreman browser sanity on
+  root: t/browser/entry-draft-parity.js PASS with own server; GET /update
+  and /update.bml 302 to /entry/new with args; /entry/new capture without the
+  beta banner in doc/bml-evidence/2026-09-23/entry-native-cutover. Orphan
+  strings now:
   views/editjournal.tt.text .success.editedstillsuspended (F2 cleanup).
 - (historical) T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
   (community custom-security carry-over fell back to public; logged-out or
