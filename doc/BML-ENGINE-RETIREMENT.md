@@ -215,10 +215,10 @@ table above, i.e. `use`/`->new`/`->render`/`->resolve_path` style):
 
 | Site | Literal | Disposition |
 | --- | --- | --- |
-| `cgi-bin/LJ/Web.pm:269` (`help_icon`) | `"$pre<?help ... help?>$post"` | **New finding.** `help_icon` (BML) has 8 live call sites feeding *native* TT templates or template variables directly — see §5.2. A native sibling, `help_icon_html` ("like help_icon, but no BML"), already exists one function below it and is unused by any of them. |
+| `cgi-bin/LJ/Web.pm:269` (`help_icon`) | `"$pre<?help ... help?>$post"` | **New finding, corrected.** `help_icon` (BML) has live call sites feeding *native* TT templates or template variables directly — see §5.2 for the corrected producer list (an earlier version of this table over-included two callers that actually already use the native sibling). Only visible wherever `%LJ::HELPURL` has the relevant topic key configured; this dev config has none set, so the literal is latent rather than guaranteed-visible here (production config not verified). |
 | `cgi-bin/LJ/Web.pm:295` (`bad_input`) | `"<?badcontent?>\n<ul>\n"` | **New finding.** Zero callers anywhere (`grep -rn "LJ::bad_input\b"` matches only the definition and its own doc comment) — dead code, and the tag itself doesn't even match `global.look`'s real `BADINPUT` block (case/name mismatch), so it was already broken even for a hypothetical BML caller. |
 | `views/shop/confirm.tt:15-19` | `<?p $email_checkbox p?>` plus raw `if ( $email_checkbox ) { ... }` Perl inside the template | **New finding, and not really a BML-retirement issue** — this block is corrupted TT (literal Perl control flow and a stray BML tag inside a `.tt` file, plus a malformed `[%` on the line above it). Pre-existing breakage surfaced by this grep, unrelated to F2/W5/W8; flagged for whoever owns `views/shop/confirm.tt`, not actioned here. |
-| `views/beta.tt.text:43,49`, `ext/dw-nonfree/views/beta.tt.text.local:1`, `ext/dw-nonfree/views/index.tt.text.local:12`, `ext/dw-nonfree/bin/upgrading/en_DW.dat:432` | `<?ljuser NAME ljuser?>` / `<?ljcomm NAME ljcomm?>` inside translation *values* | **New finding.** `<?ljuser?>`/`<?ljcomm?>` are the two static blocks `lj-bml-blocks.pl:33-34` registers, resolved only by `bml_decode`/`bml_block` during an actual BML render. `LJ::Lang::ml()` (`LJ/Lang.pm:569-587`, confirmed by grep — no `bml_decode`/`BML::` call anywhere in `LJ::Lang.pm`) does not post-process its return value through BML at all, so any native `.tt` page rendering one of these ml keys via `dw.ml(...)` would show the literal tag text, not a linked username/community. Not verified end-to-end against a live render of every consuming page (out of this docs-only pass's scope) but the mechanism gap is confirmed by source. |
+| `ext/dw-nonfree/views/beta.tt.text.local:1` (`.staytuned.generic`), `ext/dw-nonfree/views/index.tt.text.local:12` (`.create.join_dreamwidth.codeshare`), `ext/dw-nonfree/bin/upgrading/en_DW.dat:432` (`widget.createaccountentercode.getcode`) | `<?ljuser NAME ljuser?>` / `<?ljcomm NAME ljcomm?>` inside translation *values* | **New finding, corrected.** `<?ljuser?>`/`<?ljcomm?>` are the two static blocks `lj-bml-blocks.pl:33-34` registers, resolved only by `bml_decode`/`bml_block` during an actual BML render. `LJ::Lang::ml()` (`LJ/Lang.pm:569-587` — no `bml_decode`/`BML::` call anywhere in `LJ::Lang.pm`) does not post-process its return value through BML at all. **`views/beta.tt.text:43,49` are not affected**: `views/beta.tt:49,56` wrap those specific keys in `replace_ljuser_tag` (`cgi-bin/DW/Controller/Misc.pm:97-100`, a plain native regex — `s/<\?ljuser (.+) ljuser\?>/LJ::ljuser($1)/mge` — with no BML dependency at all), so they already render correctly. The three genuinely-unhandled literal sites are the ones in this row's "Site" column: `ext/dw-nonfree/views/index.tt:69` and `views/create/code.tt:43` render their corresponding keys through a plain `dw.ml(...)`/`| ml` call with no such wrapper. |
 
 `LJ::Widget` (framework + subclass inventory): the framework file itself
 (`cgi-bin/LJ/Widget.pm`) has zero `BML::` references (`grep -c` confirms) and
@@ -236,26 +236,50 @@ broader dead-widget sweep is wanted.
 
 ### 5.2 New findings this re-audit surfaced (not in the original W6 doc)
 
-1. **`LJ::help_icon` (`cgi-bin/LJ/Web.pm:264-270`) is a live, visible bug on
-   multiple native pages.** It returns a literal `<?help URL help?>` BML tag
-   that only resolves inside an actual BML render (`global.look:16`'s
-   `HELP` macro). It is called directly, or passed as a template variable
-   later called from a `.tt` file, from: `cgi-bin/LJ/Widget/S2PropGroup.pm`
-   (4 call sites), `cgi-bin/LJ/Widget/NavStripChooser.pm:60`,
-   `cgi-bin/LJ/Widget/JournalTitles.pm:35`,
-   `cgi-bin/DW/Controller/Manage/Profile.pm:188`,
-   `cgi-bin/DW/Controller/SettingsHub.pm:381` — consumed by
-   `views/manage/profile.tt:50`, `views/widget/journaltitles.tt:7`,
-   `views/widget/moodthemechooser.tt:4`, `views/edit/icons.tt:62,72,82,251`,
-   `views/widget/navstripchooser.tt:7`, all native TT pages. A native
-   sibling already exists and is already used correctly elsewhere
-   (`cgi-bin/LJ/Talk.pm:1585`, `cgi-bin/DW/Controller/EditIcons.pm:298`):
-   `LJ::help_icon_html` ("like help_icon, but no BML"). This looks like a
-   migration gap (callers updated to native TT, but not switched from
-   `help_icon` to `help_icon_html`) rather than anything F2/W5/W8 touched.
-   Not fixed here (Part B is docs-only); flagged as a small, well-scoped
-   future package (swap the call sites, confirm each rendered page shows a
-   real help link instead of literal tag text).
+1. **`LJ::help_icon` (`cgi-bin/LJ/Web.pm:264-270`) is a latent bug reaching
+   multiple native pages, corrected producer list.** It returns a literal
+   `<?help URL help?>` BML tag that only resolves inside an actual BML
+   render (`global.look:16`'s `HELP` macro), and only appears at all when
+   `%LJ::HELPURL` has the relevant topic key set (this dev config has none
+   configured; production config not verified, so this is latent here, not
+   demonstrated live). **Corrected producers** (an earlier version of this
+   entry incorrectly included two callers that are actually fine):
+   `cgi-bin/LJ/Widget/S2PropGroup.pm` (4 call sites),
+   `cgi-bin/LJ/Widget/NavStripChooser.pm:60` (feeds
+   `views/widget/navstripchooser.tt:7`),
+   `cgi-bin/LJ/Widget/JournalTitles.pm:35` (feeds
+   `views/widget/journaltitles.tt:7`),
+   `cgi-bin/DW/Controller/Manage/Profile.pm:188` (feeds
+   `views/manage/profile.tt:50`), `cgi-bin/DW/Controller/SettingsHub.pm:381`
+   (feeds `views/settings/index.tt:74` via `row.helpicon`), and
+   `LJ::Web::subscribe_interface` (`cgi-bin/LJ/Web.pm:2186`, feeding
+   `DW::Controller::Manage::Tracking.pm:76` and `SettingsHub.pm:422`) —
+   though `Web.pm:2186`'s call is itself gated on
+   `$notify_class->help_url`, whose only definition in this tree
+   (`LJ::NotificationMethod::help_url`, `cgi-bin/LJ/NotificationMethod.pm:37`)
+   returns `undef` and is not overridden by any notification-method
+   subclass, so that specific call site is currently unreachable with any
+   in-tree notification method — a live producer in the sense that the
+   code path exists and would fire the moment any method overrides
+   `help_url`, not one currently exercised. **Not affected, despite an
+   earlier version of this entry saying otherwise**:
+   `views/edit/icons.tt:62,72,82,251` and `views/journal/talkform.tt` —
+   `DW::Controller::EditIcons.pm:298` and `cgi-bin/LJ/Talk.pm:1585` both
+   bind their `help_icon` template variable to `LJ::help_icon_html`
+   (the native sibling), not `LJ::help_icon`. **Separate, unrelated bug
+   noted in passing**: `views/widget/moodthemechooser.tt:4` calls
+   `help_icon('mood_themes')`, but `LJ::Widget::MoodThemeChooser`'s
+   `render_body` never puts a `help_icon` key in its `$vars` at all (grep
+   confirms zero `help_icon` references in that file) — this call silently
+   renders nothing rather than erroring or showing a tag; not the same bug
+   as the other sites (no BML tag involved, just a missing template
+   variable) and not actioned here. `LJ::help_icon_html` ("like help_icon,
+   but no BML") is the correct native sibling and is already used properly
+   at the two sites above. Not fixed here (Part B is docs-only); flagged as
+   a small, well-scoped future package (swap the confirmed call sites,
+   confirm each rendered page shows a real help link instead of literal
+   tag text, and separately note the MoodThemeChooser missing-variable
+   bug).
 2. **`LJ::bad_input` (`cgi-bin/LJ/Web.pm:292-299`) is dead code with a
    broken tag** — see table above. Candidate for deletion in a future
    small package, same shape as W9 Part A.
@@ -263,16 +287,26 @@ broader dead-widget sweep is wanted.
    unrelated to BML retirement — flagged for the owning team, not this
    package.
 4. **Translation strings can embed `<?ljuser?>`/`<?ljcomm?>` tags that
-   native `LJ::Lang::ml()` never expands** — see table above. This is a
-   narrower, more general version of the `help_icon` problem (a BML-only
-   content convention silently surviving into native-rendered translation
-   values) and may affect other translation keys beyond the four sites
-   found by this pass's literal grep (a key could embed these tags without
-   the literal `<?` substring being adjacent to `ljuser`/`ljcomm` in a way
-   this grep's pattern would still catch — the pattern used was
-   `<?[a-zA-Z_]`, which is not scope-limited to only these two tag names,
-   so this is unlikely to have missed other tag names, but was not
-   independently re-verified with a second pattern).
+   native `LJ::Lang::ml()` never expands, corrected to three genuine
+   sites** — see table above. `views/beta.tt.text:43,49` are not affected;
+   `views/beta.tt` already wraps those specific keys in a native
+   `replace_ljuser_tag` regex (`cgi-bin/DW/Controller/Misc.pm:97-100`) with
+   no BML dependency. The three genuine sites —
+   `ext/dw-nonfree/views/beta.tt.text.local`'s `.staytuned.generic`,
+   `ext/dw-nonfree/views/index.tt.text.local`'s
+   `.create.join_dreamwidth.codeshare` (rendered plain at
+   `ext/dw-nonfree/views/index.tt:69`), and `en_DW.dat`'s
+   `widget.createaccountentercode.getcode` (rendered plain at
+   `views/create/code.tt:43`) — are a narrower, more general version of the
+   `help_icon` problem (a BML-only content convention silently surviving
+   into native-rendered translation values, this time with an existing
+   native fix pattern — `replace_ljuser_tag` — already proven for one page
+   but not applied to these three). May affect other translation keys
+   beyond these three (a key could embed these tags without the literal
+   `<?` substring being adjacent to `ljuser`/`ljcomm` in a way this pass's
+   grep pattern, `<?[a-zA-Z_]`, would still catch — unlikely to have missed
+   other tag names, but not independently re-verified with a second
+   pattern).
 
 ### 5.3 What W5/W7-A/F2/W8 removed vs. what is left
 
