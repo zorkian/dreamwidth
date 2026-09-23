@@ -1,3 +1,21 @@
+## Latest finite corrections and anonymous baseline recheck
+
+Community corrections through6b8556dfe2a930642e96457463139b9678a55e13 now have
+112 worker assertions: missing token omitted, useful token denial/no redirect,
+exact beta Location (b18a6be69145d4d0a79f4749ce550d1eb7dbaa57), valid-token
+actor/community readonly routing intercepted before retained protocol execution.
+Observable precedence via invalid-date retry and zero mark/report invocation on
+the existing invalid-token-only manager row remain assigned. Sol browser979 is
+clear; do not integrate the public range until final HTTP recheck clears.
+
+Anonymous baseline69d8f68ae7a94b6620f7a0d789ee51196413d7e2 (atop207) has62
+worker assertions and is queued Sol. It distinguishes successful poster formatting
+writes from remote-only draft/editor state and uses exact error/retry controls.
+Foreman asks Sol to check divergent sentinels: failed formatting writes must not
+be masked by stored and submitted values both zero. Manager callable source work
+continues on its preserved branch. Sol also prepares a source-only ordinary
+anonymous callable composition handoff; no public anonymous activation.
+
 ## Public browser clear; finite HTTP and anonymous baseline reviews continue
 
 Sol independently cleared public community browser9790446adebcf991c869befd6473c601f8eff035:
