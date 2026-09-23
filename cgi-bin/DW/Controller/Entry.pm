@@ -722,7 +722,10 @@ sub legacy_update_get_handler {
 
     # Retained /update redirects beta users before identity/can-post checks.
     if ( LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' ) ) {
-        return $r->redirect( LJ::create_url( '/entry/new', cur_args => $get, keep_args => 1 ) );
+        $r->header_out(
+            Location => LJ::create_url( '/entry/new', cur_args => $get, keep_args => 1 ) );
+        $r->status(HTTP_FOUND);
+        return $r->OK;
     }
 
     # Preserve retained BML's own error pages for these contexts.

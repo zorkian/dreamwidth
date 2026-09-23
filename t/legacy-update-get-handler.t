@@ -22,6 +22,16 @@ use LJ::Hooks;
 use LJ::Test qw(temp_user);
 use Plack::Middleware::DW::RequestWrapper;
 
+{
+
+    package UpdateGetFixture::Account;
+    sub new { my $class = shift; bless {@_}, $class }
+    sub acctid         { $_[0]{id} }
+    sub displayname    { $_[0]{name} }
+    sub password       { $_[0]{password} }
+    sub xpostbydefault { $_[0]{default} }
+}
+
 sub entry_form {
     my ($content) = @_;
     return (
@@ -72,7 +82,7 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         my $result = DW::Controller::Entry::legacy_update_get_handler();
         return $result if ref $result;
         if ( defined $result ) {
-            $r->status(200);
+            $r->status(200) unless defined $r->status && $r->status == 302;
             return $r->res;
         }
 
@@ -103,6 +113,11 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         ++$share_fetches;
         die 'share fetch must fall through';
     };
+    my @accounts = (
+        UpdateGetFixture::Account->new( id => 41, name => 'Default account', default => 1 ),
+        UpdateGetFixture::Account->new( id => 42, name => 'Other account',   default => 0 ),
+    );
+    local *DW::External::Account::get_external_accounts = sub { return @accounts; };
     local $LJ::HOOKS{update_fields} = [
         sub {
             my ($get) = @_;
@@ -131,8 +146,10 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
 
     test_psgi $app, sub {
         my $request = shift;
-        my $path    = '/__test_update_get?subject=original&event=original&prop_taglist=original'
-            . '&encoded=one%2Ftwo&repeated=first&repeated=second&authas=ignored';
+        my $path =
+              '/__test_update_get?subject=original&event=original&prop_taglist=original'
+            . '&encoded=one%2Ftwo&repeated=first&repeated=second&authas=ignored'
+            . '&prop_xpost_41=0&prop_xpost_42=1';
         my $res = $request->( GET $path );
         is( $res->code, 200, 'ordinary authenticated callable GET renders native form' );
         my $form = entry_form( $res->content );
@@ -153,10 +170,14 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         is(
             $form->action,
             'http://localhost/entry/new?subject=original&event=original&prop_taglist=original'
-                . '&encoded=one%2Ftwo&repeated=first&repeated=second&authas=ignored',
+                . '&encoded=one%2Ftwo&repeated=first&repeated=second&authas=ignored'
+                . '&prop_xpost_41=0&prop_xpost_42=1',
             'native action preserves raw encoded and repeated GET query'
         );
         like( $res->content, qr/saved draft subject/, 'saved draft restore data is emitted' );
+        my @selected_crosspost = $form->value('crosspost');
+        is_deeply( \@selected_crosspost, ['41'],
+            'only default account stays selected despite contradictory GET' );
         my $mutation = $request->(
             GET '/__test_update_get?mutation=1&subject=before&event=before&prop_taglist=before' );
         is( $mutation->code, 200, 'hook mutation GET still renders native form' );
@@ -203,7 +224,7 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         my $invalid = $request->( GET '/__test_update_get?usejournal=not-a-real-user' );
         is( $invalid->code, 299, 'invalid usejournal falls through before hook' );
         my $beta = $request->( GET '/__test_update_get?beta=1&encoded=one%2Ftwo' );
-        is( $beta->code, 303, 'beta GET keeps retained native redirect status' );
+        is( $beta->code, 302, 'beta GET keeps retained redirect status' );
         $beta_location = $beta->header('Location');
     };
 }
