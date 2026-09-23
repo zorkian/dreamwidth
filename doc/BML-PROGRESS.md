@@ -1988,3 +1988,14 @@ Ordinary GET and excluded contexts still use retained BML. No push/deploy.
   parity/public activation4files228 PASS in /tmp/bml-update-get-render-integrated.log.
 - Owned GETcce03c7bf remains under independent review. Widgets continues the
   callable update GET wrapper; Themes continues callable owned GET browser proof.
+
+### Callable owned-edit GET accepted
+
+Solcce03c7bf CLEAR:89 ownedGET +162 dispatch +35 native parity PASS, exact
+canonical action/query, meaningful distinct save wiring and fallback boundaries.
+Integrateddedfa7bc0. Foreman combined both callable GET paths and adjacent
+public routes5files454 PASS, tidy1125 and compile1607 PASS in
+/tmp/bml-callable-get-{integrated,tidy,compile}.log. No public GET activation.
+Owned GET browser normal/intentional runs pass in worker; final commit/review
+pending. Update callable wrapper remains WIP; foreman routed strict method,
+flat hook ABI, native redirect and retained prefill/hook ordering corrections.

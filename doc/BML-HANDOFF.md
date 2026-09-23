@@ -15,7 +15,8 @@ Current immutable review queue: update GET rendererc5 +72f6116e0 +76d27b19f
 edit GETcce03c7bf (89 focused/286 adjacent, tidy1124/compile1607 PASS).
 Update GET rendererc5/72f/76d is now independently clear and integrated as
 98f202d14/bc52393ca/b8dbb3758. Foreman4files228 PASS in
-/tmp/bml-update-get-render-integrated.log. Owned GETcce remains under review.
+/tmp/bml-update-get-render-integrated.log. Owned GETcce independently clear and integrated asdedfa7bc0. Combined5files454
+PASS plus tidy1125/compile1607 PASS in /tmp/bml-callable-get-{integrated,tidy,compile}.log.
 Widgets continues a callable-only ordinary authenticated update GET wrapper
 around76d, preserving guard/hook/default ordering and altlogin/share/readonly
 fallback. Themes continues browser-only owned GET acceptance atopcce, with
