@@ -367,10 +367,10 @@ test_psgi $app, sub {
             local *LJ::BetaFeatures::user_in_beta = sub { 1 };
             $guard->();
             is( $res->code, 302, 'beta uses the retained redirect status' );
-            like(
+            is(
                 $res->header('Location') || '',
-                qr{^/entry/\Q@{[$comm->user]}\E/\d+/edit$},
-                'beta retains legacy redirect location'
+                '/entry/' . $comm->user . '/' . $gated->ditemid . '/edit',
+                'beta retains the exact legacy redirect location'
             );
         }
         else {
