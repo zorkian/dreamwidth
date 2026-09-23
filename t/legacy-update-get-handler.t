@@ -222,8 +222,23 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
 
         my $anonymous = $request->( GET '/__test_update_get?anonymous=1' );
         is( $anonymous->code, 299, 'anonymous GET falls through to retained BML' );
-        my $readonly = $request->( GET '/__test_update_get?readonly=1' );
-        is( $readonly->code, 299, 'readonly GET falls through to retained BML' );
+        my $readonly = $request->(
+            GET '/__test_update_get?readonly=1&repeated=readonly-first&repeated=readonly-second' );
+        is( $readonly->code, 200, 'readonly GET renders the native warning form' );
+        my $readonly_form = entry_form( $readonly->content );
+        ok( $readonly_form, 'readonly native form parses' );
+        like(
+            $readonly->content,
+            qr/read-only mode/i,
+            'readonly native form retains the visible legacy warning'
+        );
+        is( $hook_calls, 4, 'readonly GET invokes update_fields exactly once' );
+        is(
+            $hook_repeated[-1],
+            "readonly-first\0readonly-second",
+            'readonly hook receives its flat NUL-joined request reference'
+        );
+        ok( $hook_refs[-1], 'readonly hook receives a stable original flat reference' );
         my $altlogin = $request->( GET '/__test_update_get?altlogin=1' );
         is( $altlogin->code, 299, 'altlogin falls through to retained BML' );
         my $share = $request->( GET '/__test_update_get?share=https%3A%2F%2Fexample.invalid%2F' );
@@ -236,13 +251,11 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
     };
 }
 
-is( $hook_calls, 3, 'each ordinary GET invokes update_fields exactly once' );
-is_deeply( \@hook_shapes, [ ('HASH') x 3 ], 'update_fields receives flat legacy hashes' );
+is( $hook_calls, 4, 'ordinary and readonly GETs invoke update_fields exactly once each' );
+is_deeply( \@hook_shapes, [ ('HASH') x 4 ], 'update_fields receives flat legacy hashes' );
 is( $hook_repeated[0], "first\0second", 'update_fields receives NUL-joined repeated values' );
-ok(
-    $hook_refs[0] && $hook_refs[1] && $hook_refs[2],
-    'hooks receive stable original flat references'
-);
+ok( $hook_refs[0] && $hook_refs[1] && $hook_refs[2] && $hook_refs[3],
+    'hooks receive stable original flat references' );
 is( $share_fetches || 0, 0, 'excluded share GET performs no external fetch' );
 is(
     $beta_location,

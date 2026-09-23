@@ -123,17 +123,22 @@ my $share_fetches     = 0;
         is_deeply( thaw( $fresh->prop('draft_properties') ),
             $before_props, 'public GET leaves draft properties unchanged' );
 
-        for my $case ( [ '/update?altlogin=1', 'alternate login' ],
-            [ '/update?readonly=1', 'readonly' ], )
-        {
-            my ( $path, $label ) = @$case;
-            my $res = $request->( GET $path );
-            is( $res->code, 200, "$label GET keeps retained BML status" );
-            like( $res->content, qr/id=['"]updateForm['"]/,
-                "$label GET falls through to retained BML form" );
-            unlike( $res->content, qr/id=['"]js-post-entry['"]/,
-                "$label GET does not render native form" );
-        }
+        my $altlogin = $request->( GET '/update?altlogin=1' );
+        is( $altlogin->code, 200, 'alternate login GET keeps retained BML status' );
+        like( $altlogin->content, qr/id=['"]updateForm['"]/,
+            'alternate login GET falls through to retained BML form' );
+        unlike( $altlogin->content, qr/id=['"]js-post-entry['"]/,
+            'alternate login GET does not render native form' );
+
+        my $readonly = $request->( GET '/update?readonly=1' );
+        is( $readonly->code, 200, 'readonly GET keeps legacy HTTP status' );
+        my $readonly_form = native_form( $readonly->content );
+        ok( $readonly_form, 'readonly GET uses the native warning form' );
+        like(
+            $readonly->content,
+            qr/read-only mode/i,
+            'readonly native form retains the visible legacy warning'
+        );
 
         my $share = $request->( GET '/update?share=not-a-url' );
         is( $share->code, 200, 'share GET keeps retained BML status' );
