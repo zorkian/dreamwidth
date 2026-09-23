@@ -1048,6 +1048,10 @@ sub legacy_new_rerender {
     my $canonical   = $prepared->{canonical};
     my $legacy_post = $prepared->{post};
     my $formdata    = DW::Entry::Legacy::formdata_from_legacy( $canonical, $legacy_post );
+    if ( defined $opts{anonymous_username} ) {
+        $formdata->{username} = $opts{anonymous_username};
+        $formdata->{password} = '';
+    }
 
     # A submitted empty usejournal deliberately selects the owner. Only fall
     # back to the request query when the legacy submission did not name it.
