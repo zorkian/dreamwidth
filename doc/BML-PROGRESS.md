@@ -1331,3 +1331,15 @@ checks, after widgets Terra completes customization1/4.
   helper remains. Captures are under `2026-09-23/entry-delete-native`.
 - Legacy owned-edit `b4d28421e` is now independently reviewing; no old editor
   route is removed by these test-only characterizations.
+
+### Legacy edit baseline integrated
+
+- Sol cleared `b4d28421e` with101 assertions and focused formatting; integrated
+  as `53357f450`. Foreman legacy/native edit2 files /136 assertions pass in
+  `/tmp/bml-legacy-edit-integrated.log`. The actual visible Save submit must
+  be chosen because a falsey hidden action:save precedes it in the old form.
+- Query preservation followup `5016ad50e` awaits narrow independent review.
+- Draft source correction `cdeb4d68b` remains held: foreman identified that a
+  static initial-properties comparison suppresses later reverts and precedes
+  the body-change branch. Terra is correcting those paths and adding permanent
+  early-input/change-revert coverage before any integration.
