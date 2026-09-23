@@ -276,6 +276,128 @@ test_psgi $app, sub {
         );
 
     }
+    my $hidden_entry = $owner->t_post_fake_entry(
+        subject  => 'Hidden item original',
+        body     => 'Hidden item body',
+        security => 'private'
+    );
+    my $hidden_path = '/editjournal?itemid=' . $hidden_entry->ditemid;
+    my $hidden_get  = GET $hidden_path;
+    $hidden_get->header( Cookie => $cookie );
+    my $hidden_form = form_from( $send->($hidden_get)->content );
+    ok( $hidden_form, 'hidden-item POST starts from the retained GET form' );
+    $hidden_form->action('http://localhost/editjournal');
+    $hidden_form->value( subject => 'Hidden item native save' );
+    my $hidden_post = visible_click( $hidden_form, 'action:save' );
+    $hidden_post->header( Cookie => $cookie, Referer => 'http://localhost' . $hidden_path );
+    my $hidden_res = $send->($hidden_post);
+    is( $hidden_res->code, 200, 'hidden POST itemid receives the successful production response' );
+    is(
+        fresh( $owner, $hidden_entry->ditemid )->subject_raw,
+        'Hidden item native save',
+        'hidden POST itemid persists through production dispatch without a query itemid'
+    );
+
+    my $beta_entry = $owner->t_post_fake_entry(
+        subject  => 'Beta fallback original',
+        body     => 'Beta fallback body',
+        security => 'private'
+    );
+    my $beta_path     = '/editjournal?itemid=' . $beta_entry->ditemid;
+    my $beta_form_get = GET $beta_path;
+    $beta_form_get->header( Cookie => $cookie );
+    my $beta_form = form_from( $send->($beta_form_get)->content );
+    ok( $beta_form, 'beta POST starts from the retained non-beta form' );
+    {
+        no warnings 'redefine';
+        local *LJ::BetaFeatures::user_in_beta = sub { 1 };
+        my $beta_get = GET $beta_path;
+        $beta_get->header( Cookie => $cookie );
+        my $beta_get_res = $send->($beta_get);
+        is( $beta_get_res->code, 302, 'beta GET retains the BML redirect' );
+
+        my $form = $beta_form;
+        $form->action( 'http://localhost' . $beta_path );
+        $form->value( subject => 'Beta must not save' );
+        my $beta_post = visible_click( $form, 'action:save' );
+        $beta_post->header( Cookie => $cookie, Referer => 'http://localhost' . $beta_path );
+        @hook_calls = ();
+        my $beta_post_res = $send->($beta_post);
+        is( $beta_post_res->code, 302, 'beta POST retains the BML redirect' );
+        is_deeply( \@hook_calls, [], 'beta POST reaches no decoder or spam hook' );
+    }
+    is(
+        fresh( $owner, $beta_entry->ditemid )->subject_raw,
+        'Beta fallback original',
+        'beta fallback leaves the target unchanged'
+    );
+
+    my $readonly_entry = $owner->t_post_fake_entry(
+        subject  => 'Readonly fallback original',
+        body     => 'Readonly fallback body',
+        security => 'private'
+    );
+    my $readonly_path = '/editjournal?itemid=' . $readonly_entry->ditemid;
+    my $readonly_get  = GET $readonly_path;
+    $readonly_get->header( Cookie => $cookie );
+    my $readonly_form = form_from( $send->($readonly_get)->content );
+    ok( $readonly_form, 'readonly POST starts from the retained non-readonly form' );
+    {
+        my $is_readonly   = \&LJ::User::Account::is_readonly;
+        my $adapter       = \&DW::Controller::Entry::legacy_owned_edit_post;
+        my $adapter_calls = 0;
+        no warnings 'redefine';
+        local *LJ::User::Account::is_readonly = sub {
+            return 1 if $_[0]->equals($owner);
+            return $is_readonly->(@_);
+        };
+        local *LJ::User::is_readonly = sub { return 1 if $_[0]->equals($owner); return 0; };
+        local *DW::Controller::Entry::legacy_owned_edit_post = sub {
+            $adapter_calls++;
+            return $adapter->(@_);
+        };
+        $readonly_form->action( 'http://localhost' . $readonly_path );
+        $readonly_form->value( subject => 'Readonly must not save' );
+        my $readonly_post = visible_click( $readonly_form, 'action:save' );
+        $readonly_post->header( Cookie => $cookie, Referer => 'http://localhost' . $readonly_path );
+        @hook_calls = ();
+        my $readonly_res = $send->($readonly_post);
+        is( $readonly_res->code, 200, 'readonly POST keeps the retained BML response' );
+        ok(
+            grep( $_ eq 'decode_entry_form', @hook_calls ),
+            'readonly POST falls through to the retained BML decoder'
+        );
+        is( $adapter_calls, 0, 'readonly POST does not invoke the production owned-edit adapter' );
+    }
+    is(
+        fresh( $owner, $readonly_entry->ditemid )->subject_raw,
+        'Readonly fallback original',
+        'readonly fallback leaves the target unchanged'
+    );
+
+    my $authas_entry = $owner->t_post_fake_entry(
+        subject  => 'Authas fallback original',
+        body     => 'Authas fallback body',
+        security => 'private'
+    );
+    my $outsider = temp_user();
+    $outsider->update_self( { status => 'A' } );
+    my $authas_path =
+        '/editjournal?itemid=' . $authas_entry->ditemid . '&authas=' . $outsider->user;
+    my $authas_get = GET $authas_path;
+    $authas_get->header( Cookie => $cookie );
+    my $authas_res = $send->($authas_get);
+    is( $authas_res->code, 200, 'different authas keeps the retained BML response' );
+    unlike(
+        $authas_res->content,
+        qr{href="/entry/Q@{[$owner->user]}E/Q@{[$authas_entry->ditemid]}E/edit"},
+        'different authas does not render native owner success'
+    );
+    is(
+        fresh( $owner, $authas_entry->ditemid )->subject_raw,
+        'Authas fallback original',
+        'different authas fallback leaves the owned entry unchanged'
+    );
 };
 
 done_testing;
