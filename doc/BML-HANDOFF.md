@@ -58,6 +58,24 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- E3 engine deletion (themenav, 14 E3-specific commits b7194027e..319a03ca4)
+  HELD by bml-opus-review on one proven regression: app.psgi's BML fallback
+  was also the only server of root-level static files (/robots.txt,
+  /favicon.ico, /apple-touch-icon.png, /protocol.dat, /500-error.html, /rte/*)
+  because Plack::Middleware::Static covers only img/stc/js; fix in progress
+  (native allowlisted static rule with correct content types across htdocs
+  overlays, tests, deploy note; blanket serving stays removed because it
+  exposed /inc, /doc placeholders and scss sources). Everything else in E3
+  verified; root's t/bml-shims-loaded.t is kept over E3's; E3's aeb94fb1b is
+  dropped in favour of the W13 fix. Foreman dry-run of W13 + E3 on a scratch
+  branch: 36-file allowlist 395 PASS, tidy1111, compile1588, build PASS, live
+  probes (/, /login.bml 200; /_config*.bml and unknown URLs 404;
+  /update.bml redirect) and entry-draft-parity.js PASS; not fast-forwarded.
+- W13 range 52ac113bd + c6d55e4b4 + 3f3d93312 CLEAR (pre-characterization
+  tests engine-independent). W14 (14 orphaned keys relocated, texts recovered
+  from the deleting commits' parents) under review; worker notes
+  LJ::Setting::Gender and LJ::Setting::BirthdayDisplay have no live caller
+  (optional cleanup, not a graduation decision).
 - Pre-existing upstream bug surfaced by W13: 14 call sites in six files still
   request .bml-scoped keys (/manage/profile/index.bml.*, /poll/create.bml.*,
   /manage/settings/index.bml.title.anon, /manage/tags.bml.title2,
