@@ -67,12 +67,15 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    ordering, ordinary absent-versus-empty GET defaults, and overly broad
    transform/xpost mapping. Worker fixes these plus finite acceptance; public
    include_transforms remains off. No hook ABI changes authorized.
-2. Widgets: native edit browser cfe had a vacuous unchanged retry assertion;
-   separate b79d7332b distinct-value correction is queued for Sol recheck.
-   Ordinary personal dispatcher38bdc5111 is committed/queued. Worker now tests
-   browser flow against actual public dispatch without the test route overlay.
-   Preserve picker and unsupported BML fallback.
-3. Sol: cleared update activation82a; reviews native edit browser cfe. Community7c/e54
+2. Widgets: callable edit browser0a/cfe/b79 independently clear and integrated
+   42ab08b25/6a26ab7a8/30b7d90f4; foreman exact-assets replay passed, captures
+   preserved by3ecfc9438. Ordinary personal dispatcher38bdc5111 and actual public
+   browser239e355bc are committed/queued. Worker audits ordinary authenticated
+   update GET prefill/render contract while reviews finish. Preserve picker and
+   unsupported BML fallback.
+3. Sol: cleared update activation82a and callable browser b79; reviews owned
+   dispatcher38bd then public browser239e. Transform source corrections through
+   b80/6bd await remaining finite test rows and recheck. Community7c/e54
    independently clear. Transform audit preserved by fc5cfe09b. Held inbox and
    external Journal deployment decisions remain unchanged.
 

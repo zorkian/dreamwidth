@@ -1914,3 +1914,17 @@ checks, after widgets Terra completes customization1/4.
 - Ordinary owned dispatcher38bdc5111 is immutable and queued for Sol. Worker
   progresses separate browser acceptance through actual public app dispatch,
   keeping the callable browser branch and all prior work preserved.
+
+
+### Callable edit browser integration and preserved captures
+
+- Sol exactb79d7332b CLEAR: distinct retry values, modern success link and fresh
+  database values prove retry saved; normal browser/check and lifecycle pass.
+  Integrated0a/cfe/b79 as42ab08b25/6a26ab7a8/30b7d90f4. Foreman exact static build
+  and browser PASS in /tmp/bml-owned-edit-browser-{build,integrated}.log; no
+  fixture or adapter server remains. Captures3ecfc9438 visibly preserve retained
+  baseline versus native desktop/narrow error form. Legacy missing title is
+  explicitly documented, not claimed fixed by this callable browser package.
+- Public dispatcher38bd and overlay-free browser239e remain under review.
+  Transform fixesa6/b80 and token tests6bd are not integrated yet; remaining
+  exact fallback assertions and independent fixed-range recheck are pending.
