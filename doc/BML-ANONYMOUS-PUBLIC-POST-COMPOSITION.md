@@ -1,3 +1,12 @@
+## Accepted continuation supersedes the cache proposal
+
+Callable range3197da9d6 (foremanca854f263) now owns every outcome after the first
+password check and preserves the characterized flat failed-login continuation.
+No request-local BML authentication cache/shim was added or is required. The
+cache-transfer discussion below records the earlier source audit, not the current
+implementation plan. Public routing remains separate pending its finite full-app
+matrix and browser acceptance; only structural declines may reach BML.
+
 # Anonymous `/update` POST public composition handoff
 
 Source-only audit. No route change, request, or authentication execution was performed.
