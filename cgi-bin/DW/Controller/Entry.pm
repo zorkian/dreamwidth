@@ -762,8 +762,8 @@ sub legacy_update_handler {
     );
 }
 
-# Callable-only anonymous retained /update owner-post subset. Public route
-# composition and failed-password compatibility remain with BML.
+# Anonymous retained /update owner-post subset. Public composition claims every
+# attempted password outcome; only structural pre-auth declines remain BML-owned.
 sub legacy_anonymous_update_handler {
     my (%opts) = @_;
     my $r = DW::Request->get or return undef;

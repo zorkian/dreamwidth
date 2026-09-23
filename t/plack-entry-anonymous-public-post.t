@@ -63,6 +63,16 @@ sub fresh_state {
     };
 }
 
+sub fresh_latest_entry {
+    my ($userid) = @_;
+    my $user = LJ::load_userid( $userid, 1 );
+    my ($jitemid) = $user->selectrow_array(
+        'SELECT jitemid FROM log2 WHERE journalid=? ORDER BY jitemid DESC LIMIT 1',
+        undef, $user->id );
+    LJ::Entry::reset_singletons();
+    return LJ::Entry->new( $user, jitemid => $jitemid );
+}
+
 sub form_post {
     my ( $send, $path, $user, $password, %values ) = @_;
     my $get_request = GET $path;
@@ -94,10 +104,14 @@ sub form_post {
     $form->value( prop_xpost_check => 0 ) if $form->find_input('prop_xpost_check');
     my $post = visible_click( $form, 'action:update' );
 
+    for my $pair ( @{ $values{extra_pairs} || [] } ) {
+        $post->content( $post->content . '&' . $pair->[0] . '=' . $pair->[1] );
+    }
+
     if ( defined $values{usejournal} && !$has_usejournal ) {
         $post->content( $post->content . '&usejournal=' . $values{usejournal} );
-        $post->header( 'Content-Length' => length $post->content );
     }
+    $post->header( 'Content-Length' => length $post->content );
     $post->uri("http://localhost$path");
     $post->header( Referer => "http://localhost$path" );
     $post->header( Cookie  => $values{cookie} ) if $values{cookie};
@@ -127,6 +141,10 @@ sub trace_anonymous_post {
             push @protocol, [ $mode, refaddr($request) ];
             if ( $opts{force_login_error} && $mode eq 'login' ) {
                 %$response_hash = ( success => 'FAIL', errmsg => 'forced public login error' );
+                return;
+            }
+            if ( $opts{force_flat_postevent_error} && $mode eq 'postevent' ) {
+                %$response_hash = ( success => 'FAIL', errmsg => 'forced public postevent error' );
                 return;
             }
             return $do_request->(@_);
@@ -170,6 +188,27 @@ sub trace_anonymous_post {
         protocol => \@protocol,
         refs     => \@refs
     };
+}
+
+sub post_with_native_attempt_counts {
+    my ( $send, $post ) = @_;
+    my %attempts;
+    my $flat = \&DW::Controller::Entry::_legacy_flat_post_attempt;
+    my $save = \&DW::Controller::Entry::_do_post;
+    my $response;
+    {
+        no warnings 'redefine';
+        local *DW::Controller::Entry::_legacy_flat_post_attempt = sub {
+            ++$attempts{flat};
+            return $flat->(@_);
+        };
+        local *DW::Controller::Entry::_do_post = sub {
+            ++$attempts{save};
+            return $save->(@_);
+        };
+        $response = $send->($post);
+    }
+    return ( $response, \%attempts );
 }
 
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -424,6 +463,15 @@ test_psgi $app, sub {
             $before->{count} + 1,
             "$label retains the observed postevent persistence"
         );
+        my $entry = fresh_latest_entry( $failure_owner->id );
+        is(
+            $entry ? $entry->subject_raw : undef,
+            "$label subject",
+            "$label persists the exact submitted subject"
+        );
+        is( $entry ? $entry->event_raw : undef,
+            "$label body", "$label persists the exact submitted body" );
+        is( $entry ? $entry->security : undef, 'private', "$label persists private security" );
         is_deeply(
             {
                 map { $_ => $after->{$_} }
@@ -435,6 +483,53 @@ test_psgi $app, sub {
             },
             "$label does not run success housekeeping"
         );
+    }
+
+    {
+        my $combined_owner = temp_user();
+        $combined_owner->update_self( { status => 'A' } );
+        my $combined_password = 'anonymous-public-' . LJ::rand_chars(24);
+        $combined_owner->set_password($combined_password);
+        $combined_owner->set_draft_text('combined failure draft sentinel');
+        $combined_owner->set_prop(
+            draft_properties => nfreeze( { subject => 'combined frozen subject' } ) );
+        $combined_owner->set_prop( entry_editor => 'always_plain' );
+        $combined_owner->entry_editor2('markdown0');
+        $combined_owner->displaydate_check(1);
+        my $before = fresh_state( $combined_owner->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $post = form_post(
+            $send, '/update.bml', $combined_owner, $combined_password,
+            subject  => 'combined failure subject',
+            body     => 'combined failure body',
+            security => 'private'
+        );
+        my $trace = trace_anonymous_post(
+            $send, $post,
+            force_login_error          => 1,
+            force_flat_postevent_error => 1
+        );
+        my $res = $trace->{response};
+        is( $authenticated_calls, 1, 'combined protocol errors reach authenticated handler once' );
+        is( $anonymous_calls, 1, 'combined protocol errors are claimed by anonymous handler once' );
+        is_deeply( [ map { $_->[0] } @{ $trace->{protocol} } ],
+            [qw(login postevent)],
+            'combined protocol errors still attempt one login and one postevent' );
+        like(
+            $res->content,
+            qr/Error logging on:\s+forced public login error/,
+            'combined protocol errors retain the earlier login error'
+        );
+        unlike(
+            $res->content,
+            qr/forced public postevent error/,
+            'combined protocol errors do not replace the earlier login error'
+        );
+        my ($retry) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/update.bml' );
+        ok( $retry, 'combined protocol errors render native retry' );
+        is_deeply( fresh_state( $combined_owner->id ),
+            $before, 'combined protocol errors leave fresh owner state unchanged' );
     }
 
     {
@@ -483,6 +578,23 @@ test_psgi $app, sub {
             'forced postevent body',
             'forced postevent error retains body'
         );
+        is_deeply(
+            $trace->{sequence},
+            [qw(update_fields auth login decode postevent spam)],
+            'forced postevent error has the expected post-attempt sequence'
+        );
+        ok( $trace->{refs}[1] && $trace->{refs}[2],
+            'forced postevent error records flat decode and spam requests' );
+        is(
+            $trace->{refs}[1],
+            $trace->{refs}[2],
+            'forced postevent error sends the same flat request to decode and spam'
+        );
+        isnt(
+            $trace->{protocol}[1][1],
+            $trace->{refs}[1],
+            'forced postevent error uses a distinct canonical backend request'
+        );
         is_deeply( fresh_state( $postevent_owner->id ),
             $before, 'forced postevent error leaves fresh owner state unchanged' );
     }
@@ -520,6 +632,54 @@ test_psgi $app, sub {
             $before->{count} + 1,
             'authenticated session request creates one entry through its existing handler'
         );
+        my $entry = fresh_latest_entry($owner_id);
+        is(
+            $entry ? $entry->subject_raw : undef,
+            'authenticated public subject',
+            'authenticated session request persists its distinct subject'
+        );
+        is(
+            $entry ? $entry->event_raw : undef,
+            'authenticated public body',
+            'authenticated session request persists its distinct body'
+        );
+        is( $entry ? $entry->security : undef,
+            'private', 'authenticated session request preserves private security' );
+    }
+
+    for my $case (
+        [ 'transform',    [ transform   => 1 ] ],
+        [ 'show form',    [ showform    => 1 ] ],
+        [ 'more options', [ moreoptsbtn => 1 ] ],
+        )
+    {
+        my ( $label, $pair ) = @$case;
+        for my $path ( '/update', '/update.bml' ) {
+            my $structural_owner = temp_user();
+            $structural_owner->update_self( { status => 'A' } );
+            my $wrong_password = 'structural-wrong-' . LJ::rand_chars(24);
+            $structural_owner->set_password( 'structural-correct-' . LJ::rand_chars(24) );
+            my $before = fresh_state( $structural_owner->id );
+            $authenticated_calls = $anonymous_calls = 0;
+            my $post = form_post(
+                $send, $path, $structural_owner, $wrong_password,
+                subject     => "$label $path subject",
+                body        => "$label $path body",
+                security    => 'private',
+                extra_pairs => [$pair]
+            );
+            my ( $res, $attempts ) = post_with_native_attempt_counts( $send, $post );
+            is( $authenticated_calls, 1, "$label $path reaches authenticated handler once" );
+            is( $anonymous_calls,     1, "$label $path reaches anonymous classifier once" );
+            is( $attempts->{flat} || 0, 0, "$label $path makes no native flat post attempt" );
+            is( $attempts->{save} || 0, 0, "$label $path makes no native save attempt" );
+            unlike( $res->content, qr/id=['"]js-post-entry['"]/,
+                "$label $path stays out of native retry" );
+            like( $res->content, qr/id=['"]updateForm['"]/,
+                "$label $path retains a meaningful BML form" );
+            is_deeply( fresh_state( $structural_owner->id ),
+                $before, "$label $path leaves fresh owner state unchanged" );
+        }
     }
 
     for my $case (
