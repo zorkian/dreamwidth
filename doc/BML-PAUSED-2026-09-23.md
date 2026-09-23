@@ -1,4 +1,12 @@
-# BML work PAUSED — explicit user directive, 2026-09-23
+# BML work checkpoint — paused then explicitly RESUMED, 2026-09-23
+
+RESUMED by explicit user directive later on 2026-09-23. The pause text below is
+retained as the archival record of the checkpoint at `331f1f042`; its "do not
+resume" wording is superseded. Held boundaries listed under "Held boundaries"
+remain in force. The Codex team named below was replaced by a Claude team in
+the same worktrees, branches and containers; see "Resume record" at the end.
+
+## Archival pause record
 
 Do not resume implementation, review, tests, monitoring, or assignments without
 explicit USER resume. Parent created the monitoring STOP file. Queued tasks below
@@ -157,3 +165,26 @@ Sol reports no running owned test/server/browser/helper. Root process check is
 empty after stopping its owned Starman. Containers/databases remain intact.
 Worker WIP is preserved in place; no implementation was committed during pause.
 Only these checkpoint documents are committed. Wait for explicit USER resume.
+
+## Resume record (2026-09-23, explicit user directive)
+
+- User explicitly resumed the full BML migration and replaced the four paused
+  Codex agents with Claude Code agents. Pause directives above are superseded;
+  every other held boundary still applies. Accepted work stays closed.
+- Team mapping (same worktrees, branches, WIP and containers as above):
+
+  | Old agent | New agent | Model | Pane | Container |
+  |---|---|---|---|---|
+  | bml-astra-foreman | bml-fable-foreman | Fable 5.1 | w5:p1 | 8d7783a043d8 |
+  | bml-terra-widgets | bml-sonnet-widgets | Sonnet 5 | w6:p1 | 4da9c8ba2712 |
+  | bml-terra-themenav | bml-sonnet-themenav | Sonnet 5 | w7:p1 | 48178cc525ed |
+  | bml-sol-review | bml-opus-review | Opus 5.5 | w8:p1 | 904e68156988 |
+
+- Foreman validation at resume: all four containers up, `/workspaces/dreamwidth`
+  mounted, Perl deps load, mysqld alive. Worker branches/WIP match this record:
+  Widgets untracked browser fixture files on `ce4a7d63c`; Themes dirty
+  composition WIP on `145cd1e81` plus preserved `c7170b572`; reviewer detached
+  clean at `c7170b572`. Reviewer independently re-proved both c717 residuals.
+- Resume order is unchanged: c717 residual correction, browser-only rerender
+  package, pure composition WIP, then integrate cleared commits and advance the
+  remaining inventory in `BML-REMOVAL-PLAN.md`.

@@ -1,8 +1,11 @@
-## PAUSED by explicit user directive
+## RESUMED by explicit user directive (2026-09-23)
 
-See [durable pause checkpoint](BML-PAUSED-2026-09-23.md). Do not resume any
-implementation, review, testing, or assignments until explicit USER resume.
-Worker WIP, held findings, identities, and process cleanup are recorded there.
+The pause recorded in [the checkpoint](BML-PAUSED-2026-09-23.md) at `331f1f042`
+was lifted by the user the same day. Work continues from that checkpoint with a
+Claude team (bml-fable-foreman, bml-sonnet-widgets, bml-sonnet-themenav,
+bml-opus-review) in the same worktrees, branches and containers; the mapping is
+in the checkpoint's resume record. All other held boundaries remain. Entries
+below this line predate the resume.
 
 ## Pure raw-hook builder candidate pending review
 
