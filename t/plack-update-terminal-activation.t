@@ -196,8 +196,8 @@ my $terminal_share_request = 0;
             'anonymous retained form has password control' );
 
         my $readonly = $request->( GET '/update?readonly=1' );
-        like( $readonly->content, qr/id=['"]updateForm['"]/,
-            'readonly GET remains the retained form' );
+        like( $readonly->content, qr/id=['"]js-post-entry['"]/,
+            'readonly GET uses the native correction form' );
         like(
             $readonly->content,
             qr/read-only mode/i,

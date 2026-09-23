@@ -876,9 +876,13 @@ sub legacy_update_get_handler {
     # login UI and remote share fetch path.
     return undef if $get->{altlogin} || $get->{share};
 
-    # Retained readonly output carries its own warning; do not replace it with
-    # a form that silently loses that behavior.
-    return undef if $remote->readonly;
+    # Retained readonly output carries its own warning. Reuse the same flat
+    # GET reference so update_fields can mutate its post-hook target once.
+    return legacy_update_readonly_get_handler(
+        remote     => $remote,
+        get        => $get,
+        action_url => LJ::create_url( '/entry/new', keep_query_string => 1 ),
+    ) if $remote->readonly;
 
     # Retained update captures these form values before update_fields runs.
     # Keep that snapshot even if the hook mutates its original flat GET ref.
