@@ -1879,3 +1879,19 @@ checks, after widgets Terra completes customization1/4.
   success markup. Worker normal/retry/save/delete and named intentional exit1
   cleanup pass with desktop/narrow captures. Production dispatcher remains next
   bounded work, preserving existing picker and all unsupported BML branches.
+
+
+### Accepted update POST subset now uses native dispatch locally
+
+- Sol82a496e03 bounded CLEAR: public app43, callable286, retained75, tidy1116,
+  compile1607 PASS. Independent strengthened native retry47 PASS proves visible
+  error, exact subject/empty body and fresh nonmutation. Route wrapper preserves
+  callback ABI, all-method fallback, no_redirects and legacy .bml normalization;
+  old text/GET-target/identity/can_post guards precede decoding.
+- Integrated8ba94e59d. Foreman combined public/callable/retained/moderation/native
+  new5files522 PASS in /tmp/bml-update-activation-integrated.log. GET/unsupported
+  requests remain BML, accepted owner/community/moderated POSTs use native save.
+- Callable transform WIP must retain include_transforms off by default because
+  its base now registers the adapter publicly. Ordinary rerender empty-field
+  retention differs from transform truthy fallback. Worker is implementing the
+  full finite field/hook/nonmutation/isolation matrix before review.

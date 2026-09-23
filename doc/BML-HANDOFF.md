@@ -62,14 +62,14 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 ## Current bounded queue
 
 1. Themenav: community/moderated7c plus e54 test correction independently clear,
-   integrated bdfe83dcd/ad7debbef. Public update activation82a496e03 is committed
-   and under independent review. Active separate nonpersisting update transforms
+   integrated bdfe83dcd/ad7debbef. Public update activation82a496e03 is independently clear
+   and integrated8ba94e59d; foreman combined5files522 PASS. Active separate nonpersisting update transforms
    package follows BML-UPDATE-TRANSFORMS.md; no hook ABI changes authorized.
 2. Widgets: native owned-edit browser final cfe07cdf2 (baseline0a plus corrected
    test server/runner) is committed and queued for review; normal and intentional
    cleanup worker evidence passes. Next bounded ordinary personal owned-edit
    production dispatch is assigned; preserve picker and unsupported BML fallback.
-3. Sol: reviews update activation82a, then native edit browser cfe. Community7c/e54
+3. Sol: cleared update activation82a; reviews native edit browser cfe. Community7c/e54
    independently clear. Transform audit preserved by fc5cfe09b. Held inbox and
    external Journal deployment decisions remain unchanged.
 
@@ -81,7 +81,9 @@ legacy-update-adapter evidence folder. All root test sessions are complete.
 Latest root code93fab and75e674910 are independently clear, evidence5a390efd4.
 Community combined5files629 PASS and full tidy1119/compile1607 PASS in
 /tmp/bml-community-{integrated,tidy,compile}.log. Root sessions complete.
-All integrations remain local; public old routes have not been cut over.
+All integrations remain local. Accepted /update POSTs now use the native
+adapter; GET and unsupported requests still fall through to BML. No BML editor
+page is deleted, and nothing has been pushed or deployed.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
