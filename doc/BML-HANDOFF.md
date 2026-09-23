@@ -1,3 +1,21 @@
+## Anonymous finite persistence review queued
+
+Sol8f60120ec43841e034732a07346f5588c206a56f guard CLEAR85; it declines query
+or POST targets before authentication and failed protocol login before decoding.
+Sole shared-helper cleanup ef1f928c4b1a972a023384d2e6468541d34f8a04 CLEAR84;
+Sol mechanically proved _do_post byte-identical to accepted dc7. Final test-only
+26099bb40e51156a63801b961d0c30f548d87895 is queued for finite persistence review:
+actual editor/format/date controls, explicit missing anonymous userpic picker,
+separate labeled schema userpic persistence, and failure-state sentinels.
+Widgets builds callable-only browser next; public anonymous activation is absent.
+
+Manager public candidate now has130 worker HTTP assertions passing and a plain-app
+normal browser pass. Foreman routed last matrix rows for ineligible routing and
+zero-effect delete/writer counters. Await immutable final candidate and Sol review.
+Root remains clean with no active validation processes; accepted manager callable
+range and captures are already integrated. Pending deployment interfaces and held
+platform work remain unchanged.
+
 ## Anonymous candidate held on finite corrections
 
 Sol provisional5020a4e0cc7ef2f40e87bc61431ee6bf32374e07 confirms the missing
