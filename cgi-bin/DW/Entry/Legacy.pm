@@ -23,7 +23,7 @@ use Hash::MultiValue;
 use LJ::HTMLControls;
 use LJ::Hooks;
 use LJ::Lang;
-use Scalar::Util qw(blessed);
+use Scalar::Util qw(blessed refaddr);
 
 sub decode_entry_form {
     my ( $req, $POST, %opts ) = @_;
@@ -322,6 +322,61 @@ sub decoded_to_canonical {
     }
 
     return $canonical;
+}
+
+# Apply only hook-visible flat-request changes to an independently copied
+# canonical result. The caller supplies snapshots from before and after a hook;
+# this helper neither creates a raw hook POST nor invokes a hook itself.
+sub apply_legacy_request_delta {
+    my ( $canonical, $before, $after ) = @_;
+    die 'canonical and legacy request snapshots must be hash references'
+        unless ref $canonical eq 'HASH' && ref $before eq 'HASH' && ref $after eq 'HASH';
+
+    my %updated = %$canonical;
+    $updated{props} = { %{ $canonical->{props} || {} } };
+
+    my %names = map { $_ => 1 } ( keys %$before, keys %$after );
+    for my $name ( keys %names ) {
+        next unless _legacy_request_value_changed( $before, $after, $name );
+
+        if ( $name =~ /^prop_(.+)$/ && $name !~ /^prop_xpost_/ ) {
+            my $prop = $1;
+            if ( exists $after->{$name} ) {
+                $updated{props}{$prop} = $after->{$name};
+            }
+            else {
+                delete $updated{props}{$prop};
+            }
+            delete $updated{$name};
+            next;
+        }
+
+        # decoded_to_canonical leaves prop_xpost_* top-level. Retain that
+        # namespace exception while applying additions, changes, and deletes.
+        if ( exists $after->{$name} ) {
+            $updated{$name} = $after->{$name};
+        }
+        else {
+            delete $updated{$name};
+        }
+    }
+
+    return \%updated;
+}
+
+sub _legacy_request_value_changed {
+    my ( $before, $after, $name ) = @_;
+    return 1 if exists $before->{$name} != exists $after->{$name};
+    return 0 unless exists $before->{$name};
+
+    my $left  = $before->{$name};
+    my $right = $after->{$name};
+    return 0 unless defined $left || defined $right;
+    return 1 unless defined $left && defined $right;
+
+    return $left ne $right unless ref $left || ref $right;
+    return 1 unless ref $left && ref $right;
+    return refaddr($left) != refaddr($right);
 }
 
 # Decode once while retaining the original flat request for legacy success
