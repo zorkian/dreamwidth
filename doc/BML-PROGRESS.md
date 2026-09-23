@@ -1966,3 +1966,14 @@ checks, after widgets Terra completes customization1/4.
   isolated branch, with canonical native form action and raw query preservation.
   No GET route activation, deployment interface change or held inbox work is
   authorized by these increments.
+
+### Public transforms accepted locally
+
+Sol565eb2cff CLEAR: public111 and callable396 PASS. Integrated asd419097ae;
+foreman combined public update/callable/owned-dispatch3files669 PASS, tidy1123
+and compile1607 PASS. Logs /tmp/bml-public-transform-{integrated,tidy,compile}.log.
+A preliminary invocation used a wrong test filename and is preserved separately
+as invocation-error, not counted as evidence. The comment-context cherry-pick
+conflict retained the existing owned-edit dispatcher unchanged. Public legacy
+showform/moreopts/preview/transforms/spellcheck now use reviewed native rerenders.
+Ordinary GET and excluded contexts still use retained BML. No push/deploy.

@@ -1,3 +1,20 @@
+## Latest continuation: public transforms integrated
+
+Public transform activation565eb2cff is independently clear (111 public +396
+callable assertions) and integrated locally asd419097ae. Conflict resolution
+only retained the existing owned-edit dispatcher beside the changed comment;
+production diff remains the reviewed activation plus comment. Foreman combined
+3files669 PASS in /tmp/bml-public-transform-integrated.log. The first invocation
+used an incorrect test filename before conflict resolution and is preserved as
+/tmp/bml-public-transform-invocation-error.log; it is not passing evidence.
+Full tidy1123 and compile1607 PASS in /tmp/bml-public-transform-{tidy,compile}.log;
+all foreman validation sessions are complete.
+
+Current workers: Widgets is completing actual template proof and the retained
+preformat OR correction for callable GET rendererc5; Sol confirms those two
+held gates, no additional finding. Themes is implementing callable-only owned
+edit GET per BML-OWNED-EDIT-GET.md. Public GET routing remains unchanged.
+
 # BML removal: current resume handoff
 
 Updated 2026-09-23 after recovery of the same foreman session. This file records
