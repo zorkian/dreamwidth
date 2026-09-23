@@ -83,8 +83,11 @@ Use disposable real-session users, two communities, and fresh entry reads.
    GET `usejournal` and GET `journal`; when both are nonempty,
    `usejournal` wins. Empty `usejournal` permits `journal` to win.
 2. Compare the callable same-poster form with direct
-   `/entry/<community>/<ditemid>/edit`: subject, body, security/custom bits,
-   tags, metadata, userpic, editor and date. Its action is the canonical native
+   `/entry/<community>/<ditemid>/edit`: subject, body, a nondefault supported community security selection,
+   tags, metadata, userpic, editor and date. Native `_init` offers community
+   public/members/admin and builds custom groups only for noncommunities;
+   prove custom-bit controls are absent rather than inventing a custom-group
+   community fixture. Its action is the canonical native
    path and preserves exact encoded and repeated raw query components.
 3. An authorized manager viewing another poster's entry gets the existing
    property-only maintainer form with selected override values, one translated

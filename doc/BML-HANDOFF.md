@@ -1,3 +1,15 @@
+## Latest narrow correction queue
+
+Sol86be24e57 CLEAR resolves entry-versus-user draft assertions. Community final
+parityab562 adds meaningful userpic and anonymous sequence, but tag/security
+nondefaults remain active correction. Custom community bits are not a supported
+native control (Entry::_init excludes community customgroups); acceptance doc
+now calls for nondefault members/admin and explicit absence of custom controls.
+Sol reviews retained-update prerequisite359579574 plus backdating9ceede79d;
+real prove4files629 passed before the three added backdating assertions, focused
+backdating47 passed. Themes now implements public update GET separately. Root
+remains accepted through51c6bf8a7; no test process active, no publishing.
+
 ## Live queue after accepted public owned GET
 
 Root001757d13 is clean; all integration runs complete: focused571, retained
