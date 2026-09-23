@@ -1,3 +1,12 @@
+## Finite public community POST matrix preserved
+
+BML-COMMUNITY-POST-ACTIVATION.md records Sol source-only routing requirements
+at ce765e52b. Widgets must finish and commit current callable browser acceptance
+before a separate public composition/matrix commit. Retained GET fixture capture
+may be scoped, but tested POSTs must use actual app dispatch. Manager and
+reporting actions remain routing-only exclusions; no valid mutations in those
+rows. Themes continues anonymous callable rendering only. No root tests running.
+
 ## Callable community resolver integrated; shared checks green
 
 Sol 124473f0d58d461faee4645a9cd194a3dd0fbd4d CLEAR; integrated ce765e52b.
