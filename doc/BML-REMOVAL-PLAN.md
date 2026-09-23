@@ -38,6 +38,21 @@ repo); any production URL that used to resolve to a `.bml` file now hits a
 plain 404 instead of the old engine's page/redirect -- confirm this is the
 intended behavior for any such URL still receiving traffic before deploy.
 
+**Deploy gate found and fixed post-E3:** the deleted BML fallback was also
+the only thing serving `/robots.txt`, `/favicon.ico`, `/apple-touch-icon.png`,
+`/protocol.dat`, `/500-error.html`, and `/rte/*` (the FCK rich-text-editor
+assets) from the htdocs overlays -- `Plack::Middleware::Static` only ever
+covered `^/(img|stc|js)/`. `app.psgi` now serves this fixed, explicitly
+allow-listed set directly (see the follow-up commit atop this package).
+**If production fronts Starman with a CDN or a separate static file
+server** (nginx, an S3/CloudFront origin, etc.), confirm those same paths
+are actually reaching Starman rather than being intercepted upstream and
+already served correctly from a different origin -- if they were relying
+on hitting the app and falling through to the old BML engine, that's the
+same gap this fix closes; if they're served entirely outside Starman
+already, this fix is moot for production but still correct for any
+environment (like this devcontainer) that serves htdocs directly.
+
 | Remaining area | Current native coverage and deletion gate |
 | --- | --- |
 | `update.bml`, `editjournal.bml` | **Graduated and deleted** (package F2, 2026-09-23). T2 (`bml-sonnet-entry-cutover`) put `/update` and `/editjournal?itemid=` on native, always-redirecting-or-carrying-over routes; T3 forward-deleted the now-dead `legacy_*` render/dispatch subs those pages used. F2 deleted the two `.bml` files themselves, `LJ::entry_form` (their last remaining server-side renderer, `cgi-bin/LJ/Web.pm`), and their `.bml.text` companions after grep confirmed no code reads their keys. `LJ::entry_form_decode` and the transitional `legacy_new_rerender`/`legacy_owned_edit_rerender`/`legacy_carryover_unrecoverable` carry-over renderers are kept; none of them reference the deleted `.bml.text` scopes (relocated to `views/entry/form.tt.text` by W4/T2). **Deploy gate:** production `%LJ::BETA_FEATURES` must drop `updatepage`; `ext/local` may implement `update_fields`, `transform_update_*`, `after_entry_post_extra_*`, `entry_deleted_page_extras`, `entryforminfo`, or `LJ::Local::BMLInit` — these are no longer invoked by the native pages (not asserted unused, since `ext/local` is not in this repo). |

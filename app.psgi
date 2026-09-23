@@ -280,6 +280,21 @@ builder {
             pass_through => 1;
     }
 
+    # A fixed set of individual root-level files (plus the FCK rich-text-editor
+    # assets under rte/) that the deleted BML engine fallback used to serve from
+    # any htdocs overlay, as a side effect of serving every plain file under
+    # htdocs. Listed explicitly, not restored as a blanket rule: the old
+    # fallback also exposed htdocs/inc/account-codes, htdocs/doc/.placeholder,
+    # htdocs/preview/index.html, and raw .scss sources, none of which should be
+    # reachable. Path-only matching (not Host-based), so this also covers
+    # /favicon.ico on journal subdomains, which relied on the same fallback.
+    for my $dir ( LJ::get_all_directories('htdocs') ) {
+        enable 'Static',
+            path => qr{^/(?:500-error\.html|apple-touch-icon\.png|favicon\.ico|protocol\.dat|robots\.txt|rte/.+)$},
+            root         => $dir,
+            pass_through => 1;
+    }
+
     # Middleware for ensuring we have the Unique Cookie set up
     enable 'DW::UniqCookie';
 

@@ -430,3 +430,19 @@ matches against (harmless compatibility, not engine-dependent); the
 engine, per §2); production `LJ::Local::BMLInit` and any deployed
 `_config-local.bml` overlay, both pre-existing deploy-time gates this
 document never asserted unused since neither is in this repo.
+
+**Regression found by review, fixed as a follow-up commit:** the deleted
+fallback was also the only thing serving `/robots.txt`, `/favicon.ico`,
+`/apple-touch-icon.png`, `/protocol.dat`, `/500-error.html`, and `/rte/*`
+from the htdocs overlays -- `Plack::Middleware::Static` only ever covered
+`^/(img|stc|js)/`, and journal subdomains relied on the same fallback for
+their own `/favicon.ico` (`DW::Controller::Journal.pm`'s own routing
+returns undef for it). `app.psgi` now serves this specific, explicitly
+allow-listed set of files directly via a second `Static` rule per htdocs
+overlay, same pattern as the existing `img/stc/js` rule -- not a return to
+blanket serving, which also exposed `htdocs/inc/account-codes`,
+`htdocs/doc/.placeholder`, `htdocs/preview/index.html`, and raw `.scss`
+sources. `t/plack-root-static.t` covers both the allow-listed files
+(including on a journal host) and that those excluded paths stay 404. See
+`doc/BML-REMOVAL-PLAN.md`'s "Deploy gate found and fixed post-E3" note for
+the CDN/static-server caveat.
