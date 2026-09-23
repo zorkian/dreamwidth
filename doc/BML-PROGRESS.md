@@ -1862,3 +1862,20 @@ checks, after widgets Terra completes customization1/4.
   apparent successful save therefore fell through to old BML. Worker is fixing
   the test route and asserting native response markup plus modern retry action.
   No native browser gate is claimed from the earlier generic success assertion.
+
+
+### Community acceptance integrated; production route reviews queued
+
+- Sol e54d50c9c test correction CLEAR: selected crosspost master, truly omitted
+  target field, and differing POST/GET community counts pass286 independently.
+  Integrated7c/e54 as bdfe83dcd/ad7debbef. Foreman combined update/retained/
+  moderation/crosspost/edit5files629 PASS, full tidy1119/compile1607 PASS in
+  /tmp/bml-community-{integrated,tidy,compile}.log. All root processes complete.
+- Public update activation82a496e03 is immutable and under independent review,
+  not yet integrated. Worker proceeds separately on nonpersisting rerenders and
+  transforms; audit preserved in BML-UPDATE-TRANSFORMS.md (fc5cfe09b).
+- Native edit browser cfe07cdf2 is queued for review with its baseline fixture0a.
+  Test server now resolves the actual hidden POST itemid and asserts native
+  success markup. Worker normal/retry/save/delete and named intentional exit1
+  cleanup pass with desktop/narrow captures. Production dispatcher remains next
+  bounded work, preserving existing picker and all unsupported BML branches.

@@ -61,22 +61,17 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: owner update752+26c and browser192 independently clear, integrated
-   13cba88f7/c116f5b44 and75e674910. Foreman normal browser/build passed and captures
-   are preserved. Community/moderated extension7c806d7a0 is production-clear; worker and Sol278
-   assertions passed. Permanent tests still need truly omitted usejournal, a
-   selected crosspost positive control, and differing POST/GET target proof.
-   Separate URL activation work is underway; no public routes integrated yet.
-2. Widgets: owned helper and actual HTTP matrix93fab independently clear. Foreman
-   completed the omitted invalid-date/no-action work; worker81 is superseded.
-   Active native owned-edit browser acceptance:0a3513ca1 only exercised old BML
-   at8080, so worker must add isolated native test server and retry flow. Clear93
-   supplied for cherry-pick; preserve test/fixture WIP and separate worktree.
-3. Sol: cleared93 final matrix/duplicate-error fix and192 update browser;
-   community7c production clear with the finite test corrections above pending.
-   Read-only next transform/rerender audit while awaiting immutable corrections
-   and actual native edit-browser package.
-   Held inbox and external Journal deployment decisions remain unchanged.
+1. Themenav: community/moderated7c plus e54 test correction independently clear,
+   integrated bdfe83dcd/ad7debbef. Public update activation82a496e03 is committed
+   and under independent review. Active separate nonpersisting update transforms
+   package follows BML-UPDATE-TRANSFORMS.md; no hook ABI changes authorized.
+2. Widgets: native owned-edit browser final cfe07cdf2 (baseline0a plus corrected
+   test server/runner) is committed and queued for review; normal and intentional
+   cleanup worker evidence passes. Next bounded ordinary personal owned-edit
+   production dispatch is assigned; preserve picker and unsupported BML fallback.
+3. Sol: reviews update activation82a, then native edit browser cfe. Community7c/e54
+   independently clear. Transform audit preserved by fc5cfe09b. Held inbox and
+   external Journal deployment decisions remain unchanged.
 
 Current combined-tree matrix/native edit4files221 PASS; earlier callable/legacy/
 native6files462 and actual edit HTTP3files159 PASS. Full tidy1119 and compile1607
@@ -84,6 +79,8 @@ PASS in /tmp/bml-editor-acceptance-{tidy,compile}.log. Foreman update browser PA
 in /tmp/bml-update-adapter-browser.log after exact static build; captures under
 legacy-update-adapter evidence folder. All root test sessions are complete.
 Latest root code93fab and75e674910 are independently clear, evidence5a390efd4.
+Community combined5files629 PASS and full tidy1119/compile1607 PASS in
+/tmp/bml-community-{integrated,tidy,compile}.log. Root sessions complete.
 All integrations remain local; public old routes have not been cut over.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
