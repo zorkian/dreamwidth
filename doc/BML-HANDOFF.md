@@ -1,3 +1,13 @@
+## Latest callable community browser integration
+
+Sol6860ee931/c4ee4deea CLEAR, integrated17e74d7e2/98c4e1107. Foreman actual
+browser PASS, cleanup empty, fresh user/entry state preserved; captures committed
+under community-edit-get,390px ordinary+manager visually usable. Root session52247
+complete. Source354 same-poster-only public activation is bounded clear but HELD
+for actual public tests/browser XPostAccount attribution. Other-poster manager
+BML retains delete and deletespam; no suppression of browser errors authorized.
+Terminal public matrix/browser continues; private renderer already accepted.
+
 ## Latest private terminal renderer integration
 
 Sol e16cdedeb411c87572816e5c58e8ac1b326fc3e4 CLEAR, integrated1aca57868. Foreman

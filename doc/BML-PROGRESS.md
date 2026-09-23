@@ -2101,3 +2101,12 @@ HTML precedence and translated fallback. Classified callable only; no route,
 authentication, anonymous/share or readonly behavior changes. Foreman three
 adjacent suites96 PASS in /tmp/bml-terminal-renderer-integrated.log. Public
 classification activation and its real-session/browser proofs remain separate.
+
+### Callable community browser accepted
+
+Sol6860/c4 CLEAR, integrated17e74d7e2/98c4e1107. Foreman browser PASS with fresh
+entry/access-mask/maintainer/user-draft/editor preservation, exact canonical raw
+query actions, selected controls including disable-comments, desktop/narrow fit,
+and no JS/network failures. Captures preserved under community-edit-get;390px
+ordinary and manager forms visually inspected. Cleanup empty. Public same-poster
+activation remains separate and manager public GET remains on retained BML.
