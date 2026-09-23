@@ -1070,6 +1070,33 @@ sub edit_handler {
     return _edit(@_);
 }
 
+# Render the property-only community maintainer surface. Callers may provide
+# the canonical native action explicitly; the direct edit route retains its
+# existing current-URL default.
+sub _render_maintainer_form {
+    my ( $entry, $journal, $remote, %opts ) = @_;
+
+    return DW::Template->render_template(
+        'entry/maintainer.tt',
+        {
+            entry                 => $entry,
+            journal               => $journal,
+            adult_content_enabled => LJ::is_enabled('adult_content'),
+            remote                => $remote,
+            action                => $opts{action} // LJ::create_url( undef, keep_args => 1 ),
+            props                 => {
+                adult_content_maintainer_reason => $entry->prop('adult_content_maintainer_reason')
+                    || '',
+                adult_content_maintainer  => $entry->prop('adult_content_maintainer')  || '',
+                opt_nocomments_maintainer => $entry->prop('opt_nocomments_maintainer') || 0,
+                adult_content             => $entry->prop('adult_content')             || '',
+                opt_nocomments            => $entry->prop('opt_nocomments')            || 0,
+            },
+        },
+        { ml_scope => '/entry/form.tt' }
+    );
+}
+
 sub _edit {
     my ( $opts, $username, $ditemid ) = @_;
 
@@ -1214,25 +1241,7 @@ sub _edit {
     unless ( $entry_obj->poster->equals($remote) ) {
         return error_ml('/entry/form.tt.error.nofind')
             unless $journal->is_comm && $remote->can_manage($journal) && !$journal->readonly;
-        return DW::Template->render_template(
-            'entry/maintainer.tt',
-            {
-                entry                 => $entry_obj,
-                journal               => $journal,
-                adult_content_enabled => LJ::is_enabled('adult_content'),
-                remote                => $remote,
-                action                => LJ::create_url( undef, keep_args => 1 ),
-                props                 => {
-                    adult_content_maintainer_reason =>
-                        $entry_obj->prop('adult_content_maintainer_reason') || '',
-                    adult_content_maintainer => $entry_obj->prop('adult_content_maintainer') || '',
-                    opt_nocomments_maintainer => $entry_obj->prop('opt_nocomments_maintainer') || 0,
-                    adult_content  => $entry_obj->prop('adult_content')  || '',
-                    opt_nocomments => $entry_obj->prop('opt_nocomments') || 0,
-                },
-            },
-            { ml_scope => '/entry/form.tt' }
-        );
+        return _render_maintainer_form( $entry_obj, $journal, $remote );
     }
 
     my %crosspost;

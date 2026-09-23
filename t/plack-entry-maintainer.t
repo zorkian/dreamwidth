@@ -8,6 +8,9 @@ use HTML::Form;
 use URI;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use DW::Request;
+use DW::Request::Plack;
+use Plack::Middleware::DW::RequestWrapper;
 use LJ::Test qw(temp_user temp_comm);
 plan skip_all => 'Picker integration requires a development server' unless $LJ::IS_DEV_SERVER;
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -296,6 +299,35 @@ test_psgi $app, sub {
     my ($native_form) = grep { $_->find_input('action:savemaintainer') }
         HTML::Form->parse( $native_get->content, 'http://localhost' . $native_url );
     ok( $native_form, 'native rendered maintainer save form exists' );
+    my $explicit_action =
+          '/entry/'
+        . $comm->user . '/'
+        . $other_entry->ditemid
+        . '/edit?encoded=one%2Ftwo&repeated=first&repeated=second';
+    my $explicit_app = Plack::Middleware::DW::RequestWrapper->wrap(
+        sub {
+            my $r = DW::Request->get;
+            DW::Controller::Entry::_render_maintainer_form( $other_entry, $comm, $owner,
+                action => $explicit_action );
+            $r->status(200);
+            return $r->res;
+        }
+    );
+    test_psgi $explicit_app, sub {
+        my $request  = shift;
+        my $response = $request->( GET '/__test_maintainer_action' );
+        is( $response->code, 200, 'extracted maintainer renderer returns a real response' );
+        my ($explicit_form) = grep { $_->find_input('action:savemaintainer') }
+            HTML::Form->parse( $response->content, 'http://localhost' . $native_url );
+        ok( $explicit_form, 'extracted maintainer renderer returns the real property-only form' );
+        is(
+            $explicit_form->action,
+            'http://localhost' . $explicit_action,
+            'extracted renderer preserves an explicit canonical action and raw query'
+        );
+        ok( !$explicit_form->find_input('subject') && !$explicit_form->find_input('event'),
+            'extracted renderer remains property-only' );
+    };
     $native_form->value( 'prop_adult_content_maintainer_reason', 'native reason marker' );
     $native_form->value( 'prop_adult_content_maintainer',        'concepts' );
     $native_form->value( 'prop_opt_nocomments_maintainer',       1 );
