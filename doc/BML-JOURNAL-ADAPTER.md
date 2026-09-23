@@ -27,13 +27,15 @@ Test-only characterization, no production code changed. Base: root HEAD
 | *(all of the above)* | `LJ::S2.pm:2467-2468`, via `s2_head_content_extra` hook | hook receives `$opts->{r}` as its second positional arg (`($remote, $r)`) | Whatever the production-local hook chooses to call; confirmed via direct invocation in the test that a hook can call `connection->client_ip` and any other adapter method | Same surface as above; the hook itself is the "held" part (see below) |
 | `content_type`, `print`, *(unbounded)* | `DW::Controller::Journal.pm:286`, via `data_handler:$mode` hook's returned coderef | coderef receives the fresh adapter as its sole arg | Hook is expected to write a complete response (headers + body) itself | `content_type`/`print` both already exist on `DW::Request`; the coderef could accept a plain `DW::Request` instead, since nothing here needs Apache-specific shape |
 
-**Confirmed empirically not used**: `uri`, `method`, `args`, `path_info`,
-`hostname`, `header_only`, `headers_in`, `headers_out`, `err_headers_out`,
-`document_root`, `pool`, `dir_config`, `DECLINED`, `status_line`, `finfo`,
-`filename`, `connection->remote_host`, `connection->user` — none of these
-appear in `LJ::S2.pm`'s or `LJ::Feed.pm`'s own use of `$opts->{r}`/`$apache_r`
-(verified by grep, not just the test run). They exist on the adapter only
-because it implements the general Apache-request shape uniformly; a
+**Not used by in-tree code (source read)**: `uri`, `method`, `args`,
+`path_info`, `hostname`, `header_only`, `headers_in`, `headers_out`,
+`err_headers_out`, `document_root`, `pool`, `dir_config`, `DECLINED`,
+`status_line`, `finfo`, `filename`, `connection->remote_host`,
+`connection->user` — none of these appear in `LJ::S2.pm`'s or
+`LJ::Feed.pm`'s own use of `$opts->{r}`/`$apache_r` (verified by grep, not
+by driving a real render, since this environment can't produce one for the
+HTML path — see "Test environment note" below). They exist on the adapter
+only because it implements the general Apache-request shape uniformly; a
 production-local `data_handler:*` or `s2_head_content_extra` hook could still
 call any of them — see "Held" below.
 
@@ -54,11 +56,38 @@ historical example — no "foaf" string appears anywhere in `LJ::S2.pm` or
 For the main adapter (`Journal.pm:317` -> `LJ::make_journal` -> `s2_run`):
 every method actually called (`OK`, `NOT_FOUND`, `status`, `content_type`,
 plus the `notes` tied-hash sugar) already exists on `DW::Request` with the
-identical name and signature. `s2_run`/`LJ::S2.pm` could take a plain
-`DW::Request` in place of the adapter with **no new native code needed** —
-only the removal of `DW::BML::RequestAdapter->new($r)` at `Journal.pm:317`
-and passing `$r` itself as `$opts->{r}`. The one dead call
-(`send_http_header`, commented out) needs no replacement.
+identical name and signature. The one dead call (`send_http_header`,
+commented out) needs no replacement.
+
+**This is gated by the same `s2_head_content_extra` inventory as the "Held"
+section below, not independent of it.** `$opts` is threaded unchanged, by
+reference, from `Journal.pm:317`'s construction all the way to
+`LJ::S2.pm:2468`: `make_journal($user, $mode, $remote, $opts)` (`LJ::S2.pm:49`)
+passes that same `$opts` into `$cv->($u, $remote, $opts)` (the per-view
+`${class}::print` dispatch, `LJ::S2.pm:167`) and into `s2_run($apache_r,
+$ctx, $opts, $entry, $page)` (`LJ::S2.pm:228`); every view's `print()`
+in turn calls the shared `LJ::S2::Page($u, $opts)` (`LJ::S2.pm:2343`),
+which reads `$opts->{r}` directly at `:2468` for the `s2_head_content_extra`
+hook call. No copy or re-wrap happens anywhere in that chain (checked for
+any `$opts = {...}` reassignment between the two ends; found none) — so
+`$opts->{r}` at the hook call site *is* the identical object `Journal.pm:317`
+constructs. Simply changing `Journal.pm:317` to pass a plain `DW::Request`
+would silently change `s2_head_content_extra`'s second argument for every
+hook ever registered against it, which is exactly the external-ABI concern
+in "Held" below.
+
+**Decoupled form**, which preserves the external ABI exactly and *is*
+independent of the hook inventory: keep `make_journal`/`s2_run`'s internal
+use of `$opts->{r}` as a plain `DW::Request` (removing
+`DW::BML::RequestAdapter->new($r)` from `Journal.pm:317`, and rewriting
+`LJ::S2.pm:118`'s `$apache_r->notes->{'no_control_strip'} = 1` tied-hash
+sugar to `$apache_r->note('no_control_strip', 1)`, since `DW::Request` has
+`note` as a plain method, not hash-sugar), while `LJ::S2.pm:2468` constructs
+its *own* `DW::BML::RequestAdapter->new($r)` solely for the
+`s2_head_content_extra` call, so the hook keeps receiving exactly the
+object shape it gets today. This makes the two adapter roles genuinely
+independent: `make_journal`'s internal fast path never touches the adapter,
+and the held hook's contract is untouched.
 
 For `Journal.pm:285`'s `data_handler:*` construction: same conclusion for
 the methods *this codebase's own code* would call, but this adapter is
