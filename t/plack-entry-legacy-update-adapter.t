@@ -770,7 +770,7 @@ for my $case ( [ alpha => 'alpha subject', 'alpha body', 'alpha-tag' ],
         is( $form->value('subject'), $subject, "$name hook mutation retains subject" );
         is( $form->value('event'), $body, "$name hook mutation retains body" );
         is( $form->value('taglist'), $tag, "$name hook mutation retains tags" );
-        is( $form->value('current_location'), 'submitted location', "$name retains metadata" );
+        is( $form->value('current_location'), '', "$name ignores transform metadata outside retained fallback fields" );
         is( $form->value('editor'), 'html_raw0', "$name retains event formatting" );
         like( $form->action, qr/encoded=a%2Fb%26c.*repeated=one.*repeated=two/,
             "$name retains encoded/repeated query context" );

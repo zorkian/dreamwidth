@@ -420,7 +420,10 @@ sub _legacy_update_rerender {
         }
     }
     else {
-        %render = %$get;
+        # Retained ordinary rerenders default only these values from GET, then
+        # overlay every present POST control (including explicit empties).
+        $render{$_} = $get->{$_} for qw(subject event prop_taglist usejournal);
+        $render{$_} = $get->{$_} for grep { /^prop_xpost_/ } keys %$get;
         $render{$_} = $post->{$_} for keys %$post;
     }
 
@@ -441,6 +444,7 @@ sub _legacy_update_rerender {
         $prepared,
         remote               => $remote,
         get                  => DW::Request->get->get_args,
+        errors               => $opts{errors},
         spellcheck_requested => $opts{spellcheck_requested},
     );
 }
