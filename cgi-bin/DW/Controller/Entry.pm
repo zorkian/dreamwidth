@@ -99,7 +99,13 @@ DW::Routing->register_string(
     sub {
         my $r = DW::Request->get;
         return legacy_update_get_handler() if $r && $r->method eq 'GET';
-        return legacy_update_handler( include_transforms => 1 );
+
+        # Keep authenticated/session-owned retained update work first. Only an
+        # undef structural decline may continue into the anonymous owner slice
+        # and then retained BML fallback.
+        my $result = legacy_update_handler( include_transforms => 1 );
+        return $result if defined $result;
+        return legacy_anonymous_update_handler();
     },
     app          => 1,
     no_redirects => 1
