@@ -321,6 +321,12 @@ sub legacy_update_handler {
         return undef unless $opts{include_transforms};
         LJ::Hooks::run_hooks( "transform_update_$transform", $legacy_get, $legacy_post )
             if $transform;
+        if ( $legacy_post->{'action:spellcheck'}
+            && !( LJ::check_form_auth( $legacy_post->{lj_form_auth} ) && LJ::check_referer() ) ) {
+            my $errors = DW::FormErrors->new;
+            $errors->add( undef, 'error.invalidform' );
+            return _legacy_update_rerender( $legacy_post, $legacy_get, $remote, errors => $errors );
+        }
         return _legacy_update_rerender(
             $legacy_post,
             $legacy_get,
@@ -401,19 +407,21 @@ sub legacy_update_handler {
 sub _legacy_update_rerender {
     my ( $post, $get, $remote, %opts ) = @_;
 
-    # update.bml uses truthy POST-or-GET fallback only for transforms. Its
-    # ordinary showform/moreopts/preview branches copy every submitted field,
-    # including explicit empty values.
-    my %render = $opts{transform} ? %$get : ();
+    my %render;
     if ( $opts{transform} ) {
-        $render{$_} = $post->{$_} for grep { $post->{$_} } keys %$post;
-        for my $name (qw(event_format richtext_default)) {
-            $render{$name} = $post->{$name} if exists $post->{$name};
+        for my $name (qw(subject event prop_taglist usejournal)) {
+            $render{$name} = $post->{$name} || $get->{$name};
         }
-        $render{$_} = $post->{$_} for grep { /^prop_xpost_/ } keys %$post;
+        for my $name ( grep { /^prop_xpost_/ } keys %$get, keys %$post ) {
+            $render{$name} = $post->{$name} || $get->{$name};
+        }
+        for my $name (qw(event_format richtext_default)) {
+            $render{$name} = $post->{$name} if defined $post->{$name};
+        }
     }
     else {
-        %render = %$post;
+        %render = %$get;
+        $render{$_} = $post->{$_} for keys %$post;
     }
 
     my $prepared = DW::Entry::Legacy::prepare_rerender_entry_form(

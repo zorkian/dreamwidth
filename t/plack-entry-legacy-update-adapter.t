@@ -58,6 +58,7 @@ die $@ unless ref $legacy_app eq 'CODE';
 
 my $owner = temp_user();
 $owner->update_self( { status => 'A' } );
+$owner->create_trust_group( groupname => 'Legacy adapter custom group' );
 my $owner_id = $owner->id;
 my $userpic =
     LJ::Userpic->create( $owner, data => file_contents("$ENV{LJHOME}/t/data/userpics/good.jpg"), );
@@ -818,6 +819,48 @@ if ($spell_form) {
     my $unavailable; { local $LJ::SPELLER; test_psgi $adapter_app, sub { $unavailable = shift->($spell_post); }; }
     like($unavailable->content, qr/Spell check is currently unavailable/, 'unavailable callable spellcheck remains nonpersisting');
     is(entry_count($owner), $before, 'unavailable callable spellcheck creates no entry');
+}
+
+
+
+# Ordinary rerenders copy explicit empty submitted controls instead of using the
+# GET fallback that is specific to transforms.
+$owner->set_draft_text('ordinary rerender draft body');
+$owner->set_prop(draft_properties => nfreeze({ subject => 'ordinary rerender draft subject', taglist => 'draft-tag' }));
+my $ordinary_before_props = thaw(LJ::load_userid($owner_id,1)->prop('draft_properties'));
+for my $action ( [ showform => 1 ], [ moreoptsbtn => 1 ], [ 'action:preview' => 'Preview' ] ) {
+    my ($field, $value) = @$action;
+    my $path = '/update?usejournal=' . $owner->user . '&subject=GET+subject&event=GET+body';
+    my $form = retained_form($path, "ordinary $field") or next;
+    my $post = POST($path, [
+        $field => $value, lj_form_auth => $form->value('lj_form_auth'),
+        subject => '', event => '', usejournal => '', security => 'custom', custom_bit_1 => 1,
+        prop_taglist => '', prop_current_location => '', prop_current_music => '',
+        prop_picture_keyword => 'legacy-update-pic', prop_opt_backdated => 1,
+        date_ymd_mm => '02', date_ymd_dd => '03', date_ymd_yyyy => '2020', hour => '04', min => '05', date_diff => 1,
+        comment_settings => 'noemail', prop_xpost_check => 1, prop_xpost_9 => 1,
+    ]);
+    $post->header(Referer => 'http://localhost/update');
+    my ($decode,$spam,$options,$html,$xpost)=(0,0,0,0,0);
+    my $rh=\&LJ::Hooks::run_hooks; my $rhook=\&LJ::Hooks::run_hook;
+    my $res;
+    { no warnings 'redefine';
+      local *LJ::Hooks::run_hooks=sub { my($n,@a)=@_; ++$decode if $n eq 'decode_entry_form'; ++$spam if $n eq 'spam_check'; ++$options if $n eq 'after_entry_post_extra_options'; return $rh->($n,@a); };
+      local *LJ::Hooks::run_hook=sub { my($n,@a)=@_; ++$html if $n eq 'after_entry_post_extra_html'; return $rhook->($n,@a); };
+      local *LJ::Protocol::schedule_xposts=sub { ++$xpost; return([],[]); };
+      test_psgi $adapter_app, sub { $res=shift->($post); };
+    }
+    my $native=(grep {($_->attr('id')||'') eq 'js-post-entry'} HTML::Form->parse($res->content,'http://localhost/entry/new'))[0];
+    ok($native,"$field returns native ordinary rerender");
+    is($native->value('subject'),'',"$field retains empty submitted subject over GET");
+    is($native->value('event'),'',"$field retains empty submitted body over GET");
+    is($native->value('security'),'custom',"$field retains custom security");
+    is($native->value('entrytime_date'),'2020-02-03',"$field retains submitted date");
+    is($native->value('entrytime_outoforder'),1,"$field retains backdating");
+    is($native->value('prop_picture_keyword'),'legacy-update-pic',"$field retains userpic");
+    is_deeply([$decode,$spam,$options,$html,$xpost],[0,0,0,0,0],"$field has no save-side hooks");
+    is(entry_count($owner),$before_transform_entries,"$field creates no entry");
+    is_deeply(thaw(LJ::load_userid($owner_id,1)->prop('draft_properties')),$ordinary_before_props,"$field retains full draft properties");
 }
 
 done_testing;
