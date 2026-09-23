@@ -1,3 +1,23 @@
+## Callable failure browser and retained altlogin baseline integrated
+
+Sol7d4df528747d4b9fe268fb33387bb8484a4c9dad CLEAR; root906fd65f4. Foreman
+normal replay PASS (/tmp/bml-anonymous-failure-integrated-browser.log), session67467
+complete, owned fixture/server absent. Narrow wrong-password capture visually
+inspected and desktop/narrow evidence preserved in anonymous-failure-callable.
+Public anonymous candidate remains separate Widgets WIP, not root activated.
+
+Sol7144fa64a14fdfe3c69dc962d740d818ca5acf4e baseline CLEAR; source919/1092/0b/14f/7144
+integrated as3d68a723a/7e2ec8b73/29cc1537a/33674d641/f04f3877d. Foreman baseline
+plus adjacent GET suite129 PASS (/tmp/bml-altlogin-baseline-integrated.log),
+session58482 complete. Parsed updateForm credential/action proof is distinct
+from documented shared logout returnto reflection. No production change.
+
+Callable altlogin14db+67a+ec706 remains under Sol source/HTTP review. Themes browser
+still needs diagnosis and acceptance; latest actual log failed username geometry
+at1280, not390. Requested actual rectangle/style evidence, readable harness and
+explicit clean-EOF state-reader handling. Do not accept a status-only stop or
+remove the visibility assertion without evidence. All current root sessions done.
+
 ## Altlogin shared-template correction and review sequencing
 
 Foreman found67a submit_action_name was set only by the new renderer although
