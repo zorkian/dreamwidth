@@ -1030,6 +1030,7 @@ sub legacy_update_get_render {
             datetime             => $opts{datetime} || '',
             trust_datetime_value => 0,
             crosspost            => $opts{crosspost} || {},
+            suppress_crosspost   => $opts{suppress_crosspost},
         }
     );
     return _render_new_form(
@@ -1074,10 +1075,7 @@ sub legacy_update_altlogin_get_handler {
     my $prefill    = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
     my $hook       = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
     my $usejournal = LJ::canonical_username( $get->{usejournal} || '' );
-    my %crosspost  = map { $_->acctid => $_->xpostbydefault }
-        DW::External::Account->get_external_accounts($remote);
-
-    my $now = DateTime->now;
+    my $now        = DateTime->now;
     if ( my $timezone = $remote->prop('timezone') ) {
         my $tz = eval { DateTime::TimeZone->new( name => $timezone ) };
         $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
@@ -1091,7 +1089,7 @@ sub legacy_update_altlogin_get_handler {
         rte_supported      => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
         datetime           => $now->strftime('%F %R'),
         usejournal         => $usejournal,
-        crosspost          => \%crosspost,
+        suppress_crosspost => 1,
         action_url         => '/update?altlogin=1',
         title_override     => LJ::Lang::ml('/update.bml.title2'),
         legacy_altlogin    => { username => $get->{user} // '' },
@@ -1504,8 +1502,12 @@ sub _init {
         @journallist = ( $u, $u->posting_access_list )
             unless $usejournal;
 
-        # crosspost
-        my @accounts = DW::External::Account->get_external_accounts($u);
+        # The retained alternate-login presentation never exposes crossposting.
+        # Keep its render-only compatibility seam from enumerating accounts.
+        my @accounts =
+            $form_opts->{suppress_crosspost}
+            ? ()
+            : DW::External::Account->get_external_accounts($u);
         if ( scalar @accounts ) {
             foreach my $acct (@accounts) {
                 my $id = $acct->acctid;

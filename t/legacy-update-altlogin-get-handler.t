@@ -20,6 +20,16 @@ use LJ::Hooks;
 use LJ::Test qw(temp_comm temp_user);
 use Plack::Middleware::DW::RequestWrapper;
 
+{
+
+    package AltloginCrosspostFixture::Account;
+    sub new { bless {}, shift }
+    sub acctid         { 991 }
+    sub xpostbydefault { 0 }
+    sub displayname    { 'Configured crosspost fixture' }
+    sub password       { 1 }
+}
+
 sub form {
     return (
         grep {
@@ -64,18 +74,27 @@ my $comm = temp_comm();
 $a->join_community( $comm, 1, 1 );
 $b->join_community( $comm, 1, 1 );
 
-my ( $hooks, @hook_refs, @repeats, @cases, $auth_calls );
-my $orig_enabled  = \&LJ::is_enabled;
-my $orig_identity = \&LJ::User::identity;
-my $orig_can_post = \&LJ::User::can_post;
-my $orig_readonly = \&LJ::User::readonly;
-my $orig_auth     = \&LJ::auth_okay;
+my ( $hooks, @hook_refs, @repeats, @cases, $auth_calls, $account_calls );
+my @configured_accounts = ( AltloginCrosspostFixture::Account->new );
+my $orig_enabled        = \&LJ::is_enabled;
+my $orig_identity       = \&LJ::User::identity;
+my $orig_can_post       = \&LJ::User::can_post;
+my $orig_readonly       = \&LJ::User::readonly;
+my $orig_auth           = \&LJ::auth_okay;
 
 my $app = Plack::Middleware::DW::RequestWrapper->wrap(
     sub {
         my $r      = DW::Request->get;
         my $remote = ( $r->get_args->{which} || '' ) eq 'b' ? $b : $a;
-        my $ret = DW::Controller::Entry::legacy_update_altlogin_get_handler( remote => $remote, );
+        my $ret =
+            $r->get_args->{ordinary}
+            ? DW::Controller::Entry::legacy_update_get_render(
+            remote     => $remote,
+            get        => $r->get_args,
+            usejournal => $remote->user,
+            action_url => '/entry/new',
+            )
+            : DW::Controller::Entry::legacy_update_altlogin_get_handler( remote => $remote, );
         if ( defined $ret ) {
             $r->status(200);
             return $r->res;
@@ -107,7 +126,11 @@ LJ::Hooks::are_hooks('update_fields');
     };
     local *LJ::BetaFeatures::user_in_beta = sub { return DW::Request->get->get_args->{beta}; };
     local *LJ::auth_okay                  = sub { ++$auth_calls; return $orig_auth->(@_); };
-    local $LJ::HOOKS{update_fields}       = [
+    local *DW::External::Account::get_external_accounts = sub {
+        ++$account_calls;
+        return @configured_accounts;
+    };
+    local $LJ::HOOKS{update_fields} = [
         sub {
             my ($get) = @_;
             ++$hooks;
@@ -186,7 +209,25 @@ LJ::Hooks::are_hooks('update_fields');
         );
         unlike( $a_res->content, qr/name=["']username["']/,
             'legacy-auth presentation does not emit native username controls' );
-        is( $hooks,      1,          'altlogin calls update_fields exactly once' );
+        is( $hooks,              1, 'altlogin calls update_fields exactly once' );
+        is( $account_calls || 0, 0, 'altlogin does not enumerate configured crosspost accounts' );
+        unlike( $a_res->content, qr/crosspost-component/,
+            'altlogin does not render the crosspost panel wrapper' );
+        unlike(
+            $a_res->content,
+            qr/data-collapse=["']crosspost["']/,
+            'altlogin does not retain an empty crosspost collapse component'
+        );
+        unlike(
+            $a_res->content,
+            qr/manage\/settings\/\?cat=othersites/,
+            'altlogin does not render the crosspost setup link'
+        );
+        unlike(
+            $a_res->content,
+            qr/id=["']js-crosspost-entry["']/,
+            'altlogin does not render configured crosspost controls'
+        );
         is( $repeats[0], "one\0two", 'hook receives NUL-joined flat repeated GET values' );
         is_deeply( state($a), $before_a, 'altlogin render leaves A state unchanged' );
 
@@ -211,6 +252,20 @@ LJ::Hooks::are_hooks('update_fields');
             'sequential requests use distinct flat hashes'
         );
         is_deeply( state($b), $before_b, 'altlogin render leaves B state unchanged' );
+
+        my $ordinary_res  = $request->('/__test_altlogin?ordinary=1&subject=ordinary');
+        my $ordinary_form = form( $ordinary_res->content );
+        ok( $ordinary_form, 'ordinary shared rendering parses its native form' );
+        ok( $account_calls, 'ordinary shared rendering enumerates configured crosspost accounts' );
+        like( $ordinary_res->content, qr/crosspost-component/,
+            'ordinary shared rendering keeps the crosspost panel wrapper' );
+        ok( $ordinary_form->find_input('crosspost_entry'),
+            'ordinary shared rendering keeps configured crosspost controls' );
+        like(
+            $ordinary_res->content,
+            qr/Configured crosspost fixture/,
+            'ordinary shared rendering keeps configured account content'
+        );
 
         for my $path (
             '/__test_altlogin',
