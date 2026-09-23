@@ -52,9 +52,9 @@ Checking with `check_password` directly before BML is not compatible: it bypasse
 
 Actual full-app tests should cover both `/update` and `/update.bml` and prove:
 
-1. **Valid personal owner:** authenticated handler declines, anonymous path claims once, BML does not run; one password check, one login, one decoder/save attempt, exact hook reference/order, persisted editor/date/metadata, and established native housekeeping.
+1. **Valid personal owner:** authenticated handler declines, anonymous path claims once, BML does not run; one password check, one login, one decoder/save attempt, exact hook reference/order, persisted editor/date/metadata, and the established legacy anonymous success housekeeping (formatting may change; remote-only drafts/editor writes remain absent).
 2. **Wrong password:** exactly the retained count/order of `auth_okay`/`handle_bad_login`, retained exact error and blank-password retry, retained decode/post-attempt/spam-hook behavior once, and no entry or user-state mutation. Count with scoped delegates or inert counters rather than changing rate policy.
-3. **Protocol login failure after valid password:** no repeated password/login attempt; retained failure response and no decode/save effects unless the legacy baseline performs them for that exact failure.
+3. **Protocol login failure after valid password:** no repeated password/login attempt; retained failure response and the exact characterized continuation. The test-only bc021 baseline observes decode/postevent/spam and one persisted entry after a forced protocol-login error, while error-response housekeeping stays unchanged; its final order/reference and fresh-content assertions are still under review.
 4. **Structural declines:** missing/empty credentials, challenge fields, POST or GET target, alternate login, transforms, preview, and spellcheck reach BML with zero anonymous authentication attempts. These remain excluded from the callable slice.
 5. **Method/action fallback:** unsupported non-POST methods and actions retain existing BML behavior; successful claimed attempts never fall through after effects.
 6. **Isolation:** sequential wrong-password then valid-password requests, and users A then B, cannot reuse the transferred auth state.
