@@ -237,6 +237,51 @@ without depending on `Apache::BML::is_initialized()`/`HOOK-ml_getter`
 resolution at all. This document does not recommend making that change — see
 §8 gates.
 
+### Observed behaviour (`t/protocol-sendmessage-language.t`)
+
+W12 adds a test that drives `sendmessage` through a real `DW::Request`
+context and observes the effect directly, confirming and extending the
+mechanism traced above:
+
+- With a request-context language of `ru` and a custom recorder getter
+  installed beforehand, sending a message to a community (which fails
+  `LJ::Message::can_send`'s `is_person`/`is_identity` check, before
+  `LJ::Message::send` is ever reached — no persistence, no moderation
+  side effect) produces an error string built from genuine, natively-fetched
+  **English** text (`LJ::Lang::get_text('en', 'error.message.individual',
+  ...)`), and the custom getter records **zero** calls. This empirically
+  confirms §3's `getter => undef` clobbering claim is not merely theoretical:
+  a getter that was already installed and differs from the default
+  (`\&LJ::Lang::get_text`) is silently discarded, not just defaulted.
+- The forced state is not scoped to the `sendmessage`/`can_send` call chain:
+  after `sendmessage` returns, `LJ::Lang::ml()` for the same key still
+  resolves via the real native getter on `en`, not the `ru` recorder that was
+  active before the call. Nothing restores the prior context.
+- With no active `DW::Request` (e.g. an ljlib-only script context),
+  `BML::set_language('en')`'s forwarding into
+  `LJ::Lang::set_request_context`/`LJ::Lang::request_context` is a safe
+  no-op — both functions early-return without a request (`LJ/Lang.pm:539,
+  545`) — and `LJ::Lang::get_effective_lang()` still falls back to
+  `$LJ::DEFAULT_LANG`.
+
+Nuance for the §4 "smallest native equivalent" proposal above: a literal
+`LJ::Lang::set_request_context(lang => 'en')` replacement (passing no
+`getter` key at all) would leave any *existing* getter in the context
+untouched, rather than overwriting it to `undef`. For real request traffic
+this is equivalent in output, because `RequestWrapper.pm:56` (§2) always
+installs `\&LJ::Lang::get_text` as the getter before dispatch, and `undef`
+falls back to the exact same function (§3) — so `can_send`'s error text
+comes out identical either way. It stops being equivalent only for a caller
+that has installed some other, non-default getter on the request before
+`sendmessage` runs (as this test does, and as `lang => 'debug'` callers do,
+per §3's debug-key handling) — the current code destroys that getter, the
+proposed replacement would preserve it. No in-tree production caller does
+this today (grepped for `set_request_context.*getter` outside `RequestWrapper.pm`
+and this test); it is a latent difference, not an active regression.
+
+No code change is made in this commit. This subsection is evidence for a
+future decision at §8/§9, not an implementation of one.
+
 ## 5. `LJ::Global::BMLInit.pm` hooks — which matter for non-BML requests
 
 | Hook (registered at) | What it does | Matters for a native (non-`.bml`) request? |
