@@ -2134,3 +2134,14 @@ initializer regression and static build PASS. Permanent test fails preguard at
 the intended no-master assertion; independent real browser confirms both normal
 legacy initialization and manager action surfaces with no page errors. This
 resolves the pre-existing baseline bug; public community activation is separate.
+
+### Public same-poster community GET accepted
+
+Sol final354..773 CLEAR; integratedaf0643fbe/0c5b6f927/f468b49ac/ea8ad7aca.
+Personal wrapper remains first; community same-poster wrapper uses canonical
+native action with raw query, while other-poster manager falls through to BML
+and retains all three actions. Foreman four suites530 PASS, exact-assets public
+browser PASS, helpers absent. Public desktop/narrow captures preserved under
+community-edit-get-public; native390 form visually fits. Retained manager title
+missing-string diagnostic is documented baseline. No BML retirement or manager
+mutation/activation claim.

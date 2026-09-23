@@ -1,3 +1,18 @@
+## Public same-poster community GET accepted
+
+Sol final354fd2ee7..77382f0a6 CLEAR. Integrated af0643fbe/0c5b6f927/f468b49ac/
+ea8ad7aca, with already accepted XPost guard. Foreman four adjacent suites530
+PASS (/tmp/bml-community-public-integrated.log); exact plain-app browser PASS
+(/tmp/bml-community-public-browser.log), helper check empty. Public captures
+preserved under community-edit-get-public;390px native editor visually usable.
+Manager remains retained BML with maintainer/delete/deletespam, including known
+legacy extensionless title diagnostic. No manager native activation or new POST.
+Root test sessions35579/62331 complete.
+
+Terminal2ed/a93/3f315 final recheck queued; readonly callablee30 target/editor
+correction plus browser is active and unaccepted. Widgets next test-only ordinary
+manager-delete characterization excludes spam-report implementation and routing.
+
 ## XPost guard integrated
 
 Sol source/runtime/permanent regression gate CLEAR for3a7923d89+73b560543.
