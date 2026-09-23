@@ -1,3 +1,23 @@
+## Callable anonymous continuation integrated and validated
+
+Sol3197da9d6ee32668b2705f6132b217ba550b9b55 CLEAR. Integrated rootca854f263;
+foreman four retained/callable/native suites343 PASS
+(/tmp/bml-anonymous-continuation-integrated.log), session57383 complete. Full
+tidy1168/compile1607 PASS (/tmp/bml-anonymous-continuation-{tidy,compile}.log),
+session71798 complete. _do_post defaults unchanged; no public anonymous route.
+Earlier cache proposal explicitly superseded74d1284df by native outcome ownership.
+Widgets separate wrong-password browser normal/named passes, final commit/review
+pending. Sol source-only final public matrix underway; no route activation yet.
+
+Altlogin baseline0b979ee5361d86688f44bf625aca21b0443f52fe adds actual A-off proof,
+but does NOT add whole-body unique-marker absence. Foreman initially misdescribed
+that diff to Sol and immediately corrected it. Worker reports retained generic
+returnto links reflect the raw dummy query; Sol must verify marker location and
+scope credential/form-action assertions truthfully. Do not claim whole-body
+nonreflection or introduce an unrelated navigation/auth change. Baseline not clear.
+Themes callable presentation WIP follows concrete audit66888c8af; public schema
+and credential submission remain excluded. No root test sessions active.
+
 ## Public share integration complete; callable continuation under review
 
 Sol fa176+d973 CLEAR; integrated94a035428/7f5dc5da1. Foreman corrected six-suite

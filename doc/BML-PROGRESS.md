@@ -2362,3 +2362,9 @@ was included in this package.
  the authenticated share public gate; excluded contexts remain retained.
 - Callable anonymous continuation3197 is immutable and queued Sol (worker237 PASS);
  its separate wrong-password browser proof is assigned. No public anonymous route.
+
+- Callable anonymous continuation3197 accepted Sol, integratedca854f263. Foreman
+ 343 focused PASS, tidy1168/compile1607 PASS. No public anonymous route; browser
+ wrong-password followup remains separate. Native ownership supersedes cache proposal.
+- Altlogin0b closes A-off assertion but whole-body dummy-query reflection is under
+ independent baseline verification; credential/control/action scope must be accurate.
