@@ -1,5 +1,7 @@
 ;; -*- coding: utf-8 -*-
 
+.auth.poster=Poster:
+
 .btn.proceed=Proceed
 
 .certainday=Certain Day:
@@ -27,6 +29,12 @@
 .recententries=Most recent entries
 
 .recententry=Most recent entry
+
+.security.groups=Custom access entry
+
+.security.private=Private entry
+
+.security.protected=Friends-only entry
 
 .success.editedstillsuspended=Please note that your entry is still suspended.
 

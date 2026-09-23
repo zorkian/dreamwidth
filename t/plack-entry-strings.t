@@ -92,6 +92,26 @@ test_psgi $app, sub {
         '/editjournal renders its relocated .desc text'
     );
 
+    # --- /editjournal picker (community context): relocated
+    # editjournal.bml.{auth.poster,security.*} keys, which live in
+    # views/editjournal.tt itself rather than in EntryPicker.pm ---
+    my $comm = temp_comm();
+    LJ::set_rel( $comm, $u, 'A' );
+    $u->t_post_fake_comm_entry( $comm, security => 'private' );
+    my $comm_picker_res = $cb->( GET '/editjournal?usejournal=' . $comm->user );
+    is( $comm_picker_res->code, 200, '/editjournal community picker renders' );
+    no_missing_string( $comm_picker_res->content, '/editjournal community picker' );
+    like(
+        $comm_picker_res->content,
+        qr/entry-picker-poster">Poster:/,
+        '/editjournal renders the relocated .auth.poster label'
+    );
+    like(
+        $comm_picker_res->content,
+        qr/<img\b[^>]*\balt=["']Private entry["'][^>]*\btitle=["']Private entry["'][^>]*>/,
+        '/editjournal renders the relocated .security.private icon alt/title text'
+    );
+
     # --- /imguploadrte dialog: relocated imgupload.bml.insertimage.alt.* ---
     my $dialog_res = $cb->( GET '/imguploadrte' );
     is( $dialog_res->code, 200, '/imguploadrte dialog renders' );
