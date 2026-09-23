@@ -1443,3 +1443,18 @@ checks, after widgets Terra completes customization1/4.
   raw/casual newlines, two poll controls in both pipelines, and preserved
   native-only hook invocation. Independent finite review and full validation
   status are pending. Preview WIP/history and crossposting stash are preserved.
+
+### Preview candidate integrated and verified
+
+- Sol cleared finite candidate through `e6847b817`; integrated final range as
+  `abc509db6` with the legacy BML file retained pending method/fallback audit.
+- Foreman preview plus shared-decoder legacy new/edit suite: 3files173 PASS;
+  static build PASS, full tidy1091 and compile1605 PASS. Container logs
+  `/tmp/bml-preview-integrated-{prove,build,tidy,compile}.log`.
+- Exact integrated popup browser PASS after clean server restart; no entry
+  creation or JS/HTTP failures; helper absent. Host log
+  `/tmp/bml-entry-preview-native.log`, captures under entry-preview-native.
+- Final draft test ordering alone still passed old code because an unrelated
+  editor change caused a save. Widgets isolated subject-only timing in
+  `fc570e26e`; fixed run passes, exact known-broken comparison remains underway.
+  Production `5b260732a` is independently clear, but permanent-test gate remains.
