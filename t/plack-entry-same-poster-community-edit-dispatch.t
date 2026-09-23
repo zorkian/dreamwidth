@@ -343,42 +343,69 @@ test_psgi $app, sub {
         security => 'public'
     );
     my $gated_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $gated->ditemid;
-    for my $gate ( 'beta', 'readonly' ) {
-        my $guard = sub {
-            $post = POST $gated_path,
-                [
-                itemid        => $gated->ditemid,
-                usejournal    => $comm->user,
-                'action:save' => 'Save Changes',
-                lj_form_auth  => 'invalid-gate-token'
-                ];
-            $post->header( Cookie  => $cookie );
-            $post->header( Referer => "http://localhost$gated_path" );
-            $personal_calls = $community_calls = 0;
-            @dispatch_order = ();
-            $res            = $send->($post);
-            unlike( $res->content, qr{id="js-post-entry"}, "$gate gate remains BML-owned" );
-            is_deeply( \@dispatch_order, [qw(personal community)],
-                "$gate gate declines through both resolvers" );
-            is( fresh( $comm, $gated->ditemid )->subject_raw,
-                'gated old', "$gate gate leaves target unchanged" );
+    {
+        local *LJ::BetaFeatures::user_in_beta = sub { 1 };
+        $post = POST $gated_path,
+            [
+            itemid        => $gated->ditemid,
+            usejournal    => $comm->user,
+            'action:save' => 'Save Changes',
+            lj_form_auth  => 'invalid-gate-token'
+            ];
+        $post->header( Cookie  => $cookie );
+        $post->header( Referer => "http://localhost$gated_path" );
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($post);
+        unlike( $res->content, qr{id="js-post-entry"}, 'beta gate remains BML-owned' );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            'beta gate declines through both resolvers' );
+        is( fresh( $comm, $gated->ditemid )->subject_raw,
+            'gated old', 'beta gate leaves target unchanged' );
+        is( $res->code, 302, 'beta uses the retained redirect status' );
+        is(
+            $res->header('Location') || '',
+            '/entry/' . $comm->user . '/' . $gated->ditemid . '/edit',
+            'beta retains the exact legacy redirect location'
+        );
+    }
+    for my $readonly_case ( [ 'actor', $poster ], [ 'community', $comm ] ) {
+        $res  = $retained_get->($gated_path);
+        $form = form_from( $res->content );
+        ok( $form, "$readonly_case->[0] readonly case harvests valid retained form" );
+        $form->action( 'http://localhost' . $gated_path );
+        $form->value( subject => "$readonly_case->[0] readonly changed" );
+        my $readonly_post = clicked( $form, 'action:save' );
+        $readonly_post->header( Cookie  => $cookie );
+        $readonly_post->header( Referer => "http://localhost$gated_path" );
+        my $helper_calls = 0;
+        my $helper       = \&DW::Controller::Entry::legacy_owned_edit_post;
+        my $route        = $DW::Routing::string_choices{'app/editjournal'};
+        my $is_readonly  = \&LJ::User::is_readonly;
+        local *DW::Controller::Entry::legacy_owned_edit_post =
+            sub { ++$helper_calls; return $helper->(@_) };
+        local *LJ::User::is_readonly =
+            sub { return 1 if $_[0]->equals( $readonly_case->[1] ); return $is_readonly->(@_) };
+        local $DW::Routing::string_choices{'app/editjournal'} = {
+            %$route,
+            sub => sub {
+                my $rendered = $route->{sub}->(@_);
+                return $rendered if defined $rendered;
+                my $request = DW::Request->get;
+                $request->print('READONLY_BML_FALLBACK');
+                return $request->OK;
+            },
         };
-        if ( $gate eq 'beta' ) {
-            local *LJ::BetaFeatures::user_in_beta = sub { 1 };
-            $guard->();
-            is( $res->code, 302, 'beta uses the retained redirect status' );
-            is(
-                $res->header('Location') || '',
-                '/entry/' . $comm->user . '/' . $gated->ditemid . '/edit',
-                'beta retains the exact legacy redirect location'
-            );
-        }
-        else {
-            my $is_readonly = \&LJ::User::is_readonly;
-            local *LJ::User::is_readonly =
-                sub { return 1 if $_[0]->equals($poster); return $is_readonly->(@_) };
-            $guard->();
-        }
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($readonly_post);
+        like( $res->content, qr/READONLY_BML_FALLBACK/,
+            "$readonly_case->[0] readonly reaches intercepted retained fallback" );
+        is( $helper_calls, 0, "$readonly_case->[0] readonly declines before native edit helper" );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$readonly_case->[0] readonly checks both dispatch candidates" );
+        is( fresh( $comm, $gated->ditemid )->subject_raw,
+            'gated old', "$readonly_case->[0] readonly leaves target unchanged" );
     }
 
     local $LJ::SPELLER = 'local-community-stub';
