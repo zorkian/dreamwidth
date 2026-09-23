@@ -64,10 +64,8 @@ my $terminal_share_request = 0;
         return $orig_accounts->(@_);
     };
     local *DW::External::Page::new = sub {
-        if ($terminal_share_request) {
-            ++$share_constructions;
-            die 'terminal response must not construct a shared page';
-        }
+        ++$share_constructions;
+        die 'terminal response must not construct a shared page' if $terminal_share_request;
         return UpdateTerminal::SharePage->new(
             title       => 'Retained share title',
             url         => 'https://example.invalid/shared',
@@ -204,10 +202,31 @@ my $terminal_share_request = 0;
             'readonly GET retains the legacy visible warning'
         );
 
-        for my $path ( '/update?altlogin=1', '/update?share=not-a-url' ) {
-            my $res = $request->( GET $path );
-            like( $res->content, qr/id=["']updateForm["']/, "$path remains retained BML form" );
-        }
+        my $altlogin = $request->( GET '/update?altlogin=1' );
+        like( $altlogin->content, qr/id=["']updateForm["']/,
+            'alternate-login remains the retained BML form' );
+
+        my $before_share_hooks    = $update_fields;
+        my $before_share_accounts = $account_lookups;
+        my $share                 = $request->( GET '/update?share=not-a-url' );
+        like( $share->content, qr/id=["']js-post-entry["']/,
+            'share now uses the native compatibility form' );
+        like(
+            $share->content,
+            qr/Retained share title/,
+            'share native form uses the inert local page title'
+        );
+        is( $share_constructions, 1, 'ordinary share constructs the local page exactly once' );
+        is(
+            $update_fields,
+            $before_share_hooks + 1,
+            'ordinary share invokes update_fields exactly once'
+        );
+        is(
+            $account_lookups,
+            $before_share_accounts + 2,
+            'ordinary share retains its handler and native-form account lookups'
+        );
     };
 }
 done_testing;

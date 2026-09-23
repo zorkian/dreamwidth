@@ -32,6 +32,15 @@ use Plack::Middleware::DW::RequestWrapper;
     sub xpostbydefault { $_[0]{default} }
 }
 
+{
+
+    package UpdateGetFixture::SharePage;
+    sub new { my ( $class, %args ) = @_; return bless \%args, $class; }
+    sub title       { return $_[0]{title}; }
+    sub url         { return $_[0]{url}; }
+    sub description { return $_[0]{description}; }
+}
+
 sub entry_form {
     my ($content) = @_;
     return (
@@ -110,8 +119,14 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         return DW::Request->get->get_args->{beta} ? 1 : 0;
     };
     local *DW::External::Page::new = sub {
+        my ( $class, %args ) = @_;
         ++$share_fetches;
-        die 'share fetch must fall through';
+        return undef if $args{url} eq 'none';
+        return UpdateGetFixture::SharePage->new(
+            title       => 'Callable share title',
+            url         => 'https://example.invalid/callable-share',
+            description => 'Callable share description',
+        );
     };
     my @accounts = (
         UpdateGetFixture::Account->new( id => 41, name => 'Default account', default => 1 ),
@@ -241,8 +256,27 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         ok( $hook_refs[-1], 'readonly hook receives a stable original flat reference' );
         my $altlogin = $request->( GET '/__test_update_get?altlogin=1' );
         is( $altlogin->code, 299, 'altlogin falls through to retained BML' );
-        my $share = $request->( GET '/__test_update_get?share=https%3A%2F%2Fexample.invalid%2F' );
-        is( $share->code, 299, 'share falls through to retained BML' );
+        my $share =
+            $request->( GET
+'/__test_update_get?share=https%3A%2F%2Fexample.invalid%2F&repeated=share-one&repeated=share-two'
+            );
+        is( $share->code, 200, 'share GET renders the accepted native compatibility form' );
+        my $share_form = entry_form( $share->content );
+        ok( $share_form, 'share callable response parses as the native form' );
+        is(
+            $share_form->value('subject'),
+            'hook <subject> & "quote"',
+            'share callable keeps update_fields subject precedence after page prefill'
+        );
+        is(
+            $share_form->value('event'),
+            'hook <event> & "quote"',
+            'share callable keeps update_fields event precedence after page prefill'
+        );
+        is( $share_fetches, 1, 'share callable constructs its local page exactly once' );
+        is( $hook_calls,    5, 'share callable invokes update_fields exactly once' );
+        is( $hook_repeated[-1], "share-one\0share-two",
+            'share callable hook receives its NUL-joined GET values' );
         my $invalid = $request->( GET '/__test_update_get?usejournal=not-a-real-user' );
         is( $invalid->code, 200, 'invalid usejournal returns the native terminal before hook' );
         like(
@@ -261,12 +295,12 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
     };
 }
 
-is( $hook_calls, 4, 'ordinary and readonly GETs invoke update_fields exactly once each' );
-is_deeply( \@hook_shapes, [ ('HASH') x 4 ], 'update_fields receives flat legacy hashes' );
+is( $hook_calls, 5, 'ordinary, readonly, and share GETs invoke update_fields exactly once each' );
+is_deeply( \@hook_shapes, [ ('HASH') x 5 ], 'update_fields receives flat legacy hashes' );
 is( $hook_repeated[0], "first\0second", 'update_fields receives NUL-joined repeated values' );
-ok( $hook_refs[0] && $hook_refs[1] && $hook_refs[2] && $hook_refs[3],
+ok( $hook_refs[0] && $hook_refs[1] && $hook_refs[2] && $hook_refs[3] && $hook_refs[4],
     'hooks receive stable original flat references' );
-is( $share_fetches || 0, 0, 'excluded share GET performs no external fetch' );
+is( $share_fetches || 0, 1, 'share GET uses exactly one inert local factory invocation' );
 is(
     $beta_location,
     'http://localhost/entry/new?beta=1&encoded=one/two',
