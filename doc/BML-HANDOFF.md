@@ -1,3 +1,30 @@
+## Reviewed test correction and unused delta integrated
+
+Sol24bfc0c2ec0cfa7ea3011527c95324c16c20522e CLEAR; integrated as ad3d8d9d0.
+Retained anonymous baselines now explicitly scope GET and POST to retained BML
+and prove route restoration. Actual activation evidence continues to use the
+production route, including native share and invalid-target rendering.
+Root combined six suites PASS: 1132 assertions, log
+/tmp/bml-anonymous-public-corrected-prove.log in container 8d7783a043d8.
+The earlier stale-test failures are resolved; production/browser gates unchanged.
+
+Sol full unused delta range 8b144572f..05d595f1b CLEAR; integrated as
+c7a4131c1, f62a8b25e, 17b61d7f1. Final implementation normalizes before/after
+property namespaces, applies only observed deltas, preserves native-only props,
+and deep-clones serializable output. Deeply independent before/after snapshots
+are required; shared-reference mutation history cannot be reconstructed.
+No hook, auth, save, or route caller has been added.
+Root pure mapper/preparation/normalizer/delta four suites PASS, 15 top-level tests;
+full tidy1176 and compile1607 PASS. Logs /tmp/bml-delta-integrated-{prove,tidy,compile}.log.
+All root validation processes completed.
+
+Next bounded work: Widgets implements optional old-schema error-rerender
+presentation forwarding against the corrected current-source handoff, without
+new auth/save/hooks/routes. Sol audits a pure native-altlogin raw hook-input
+builder; Themes checks documentation consistency with accepted mapper,
+characterization, and delta contracts. Public altlogin activation, external
+interface decisions, and previously held platform work remain excluded.
+
 ## Public anonymous range integrated; stale retained tests being corrected
 
 Sol40df8aef8fa709e4be6d0d385aac4844f7cafcaf final HTTP697 CLEAR, with prior
