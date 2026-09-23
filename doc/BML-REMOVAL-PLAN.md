@@ -5,6 +5,26 @@ Authorized implementation progress and validation are tracked in
 [BML-PROGRESS.md](BML-PROGRESS.md). Access filters, the root image dialog, and its preview iframe
 have since migrated; the shared widget request-state prerequisite is complete.
 
+## Current retirement gates (2026-09-23)
+
+The inventory below remains the original review baseline. At foreman commit
+13f4ea792, ten tracked `.bml` files remain: seven pages/endpoints and three
+configuration files (two under `ext/dw-nonfree`). Accepted native routes do not
+by themselves permit deleting a file whose excluded requests still fall through.
+
+| Remaining area | Current native coverage and deletion gate |
+| --- | --- |
+| `update.bml` | Ordinary authenticated GET/POST, transforms, terminal and readonly GET slices are active. Authenticated share is callable-clear with public activation in review. Anonymous owner POST and GET renderers are callable-only; preserve failed-auth/protocol continuation before public composition. Alternate-login and remaining excluded form/action combinations still need explicit parity. |
+| `editjournal.bml` | Native no-item picker, personal and same-poster community editor routes, and manager property-only POST are active. Other-poster manager GET retains delete/delete-as-spam controls; unsupported actions and excluded contexts still require BML. Do not infer manager deletion/reporting approval from property-only acceptance. |
+| `imgupload.bml`, `tools/endpoints/draft.bml` | Native editor replacements are accepted; retained entry JavaScript still uses these compatibility surfaces. Retire only after their last legacy editor caller is removed or migrated. |
+| Three `inbox/*.bml` files | Previously recorded platform-held message/inbox work remains held. Existing bounded fixes are not full retirement approval. |
+| Three `_config*.bml` files and parser/runtime | Remove after remaining pages and request adapters are retired. Preserve inherited/nonfree licensing boundaries. |
+| Journal request adapters and external hooks | `DW::Controller::Journal` still constructs BML request adapters. Deployment contracts for `s2_head_content_extra`, `data_handler:*`, and other recorded external interfaces remain pending; do not silently change their ABI. |
+
+The live immutable review queue, local integration evidence, and explicit held
+boundaries are maintained at the top of `BML-HANDOFF.md` and in `BML-PROGRESS.md`.
+No push, deployment, or production cutover is included in this work.
+
 ## Findings and scope
 
 The tracked tree contains **16 BML page files (5,034 lines), 3 BML configuration
