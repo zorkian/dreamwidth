@@ -1,4 +1,4 @@
-// Browser acceptance for the callable same-poster community legacy edit resolver.
+// Browser acceptance for the public same-poster community legacy edit dispatch.
 // Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -211,7 +211,7 @@ async function submit(page, selector) {
         if (process.env.SAME_POSTER_COMMUNITY_EDIT_INTENTIONAL_FAIL) throw new Error('intentional same-poster community edit cleanup probe');
         assert.deepEqual(errors, [], 'browser flow has no JavaScript errors');
         assert.deepEqual(failures, [], 'browser flow has no failed resources');
-        console.log('PASS: retained same-poster community edit form uses the callable native POST resolver');
+        console.log('PASS: retained same-poster community edit form uses the public native POST dispatch');
     } finally {
         try { if (browser) await browser.close(); }
         finally {
