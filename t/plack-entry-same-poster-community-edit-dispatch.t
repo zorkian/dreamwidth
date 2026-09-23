@@ -47,12 +47,20 @@ DW::Cache->request->remove( 'rel', $comm->userid . '-' . $poster->userid . '-A' 
 $manager->join_community( $comm, 1, 1 );
 LJ::set_rel( $comm->userid, $manager->userid, 'A' );
 DW::Cache->request->remove( 'rel', $comm->userid . '-' . $manager->userid . '-A' );
-my $session = LJ::Session->create( $poster, nolog => 1 );
+my $other_poster = temp_user();
+$other_poster->update_self( { status => 'A' } );
+my $session         = LJ::Session->create( $poster,  nolog => 1 );
+my $manager_session = LJ::Session->create( $manager, nolog => 1 );
 my $cookie =
       'ljmastersession='
     . $session->master_cookie_string
     . '; ljloggedin='
     . $session->loggedin_cookie_string;
+my $manager_cookie =
+      'ljmastersession='
+    . $manager_session->master_cookie_string
+    . '; ljloggedin='
+    . $manager_session->loggedin_cookie_string;
 local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'samePosterDispatch';
 my ( $personal_calls, $community_calls, @dispatch_order ) = ( 0, 0 );
 my $personal  = \&DW::Controller::Entry::legacy_owned_edit_handler;
@@ -67,9 +75,9 @@ test_psgi $app, sub {
     my $send    = shift;
     my $request = sub { my ($req) = @_; $req->header( Cookie => $cookie ); return $send->($req) };
     my $retained_get = sub {
-        my ($path) = @_;
+        my ( $path, $request_cookie ) = @_;
         my $req = GET $path;
-        $req->header( Cookie => $cookie );
+        $req->header( Cookie => $request_cookie || $cookie );
         return LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/editjournal',
             sub { $send->($req) } );
     };
@@ -219,6 +227,33 @@ test_psgi $app, sub {
         is( fresh( $comm, $declined->ditemid )->subject_raw,
             'declined old', "$case->[0] leaves target unchanged" );
     }
+    my $managed = $other_poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'managed old',
+        body     => 'managed body',
+        security => 'public'
+    );
+    my $managed_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $managed->ditemid;
+    $res  = $retained_get->( $managed_path, $manager_cookie );
+    $form = form_from( $res->content );
+    ok( $form, 'manager harvests retained other-poster form' );
+    for my $action (qw(delete deletespam savemaintainer)) {
+        ok( $form->find_input("action:$action"), "manager retained form exposes $action" );
+    }
+    $form->value( lj_form_auth => 'invalid-manager-routing-token' );
+    $post = clicked( $form, 'action:deletespam' );
+    $post->header( Cookie  => $manager_cookie );
+    $post->header( Referer => "http://localhost$managed_path" );
+    $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
+    $res            = $send->($post);
+    unlike( $res->content, qr/id="js-post-entry"/,
+        'invalid manager delete-spam remains BML-owned' );
+    is_deeply( \@dispatch_order, [qw(personal community)],
+        'invalid manager delete-spam reaches both public dispatch candidates' );
+    ok( fresh( $comm, $managed->ditemid )->valid,
+        'invalid manager routing assertion does not mutate entry' );
+
     my $personal_entry = $poster->t_post_fake_entry(
         subject  => 'personal old',
         body     => 'personal body',
