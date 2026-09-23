@@ -69,7 +69,17 @@ users persists). Nothing external was touched.
   6ebcdd7fd, e936b6375, 71becd05e, 1bb4e6916, af8c91423, eba9d0a84. Root
   allowlist 10 files 136 PASS; tidy/compile logs
   /tmp/bml-t6t7w9w10-integrated-*.log.
-- KNOWN RED on root (found by widgets during W10, outside every allowlist):
+- W11 language test repair f8ef51f45 bml-opus-review CLEAR; integrated on
+  root (both language tests green again; root green on every checked suite).
+  Correction of that commit's rationale: native entry-form errors DO render.
+  _render_new_form sets errors (Entry.pm:323, :1022 for edit), DW::Template
+  copies them into sections.errors (Template.pm:115) and schemes/global.tt:93-96
+  renders each alert; reviewer proved both an empty-body and an invalid-token
+  POST to /entry/new re-render the form with exactly one alert. The
+  LatestInbox substitution is correct because DW::Widget::LatestInbox is the
+  last production caller of LJ::error_list (the property the old subtest
+  characterized), not because form errors were unrendered.
+- (historical) KNOWN RED on root (found by widgets during W10, outside every allowlist):
   t/web-message-language.t subtests 1 and 6 (pre-W5 errorbar markup; deleted
   LJ::entry_form) and t/web-stdmaxlength-language.t subtest 3
   (LJ::entry_form). Neither is in CI's list, but root is not green until W11

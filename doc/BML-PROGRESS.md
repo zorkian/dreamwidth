@@ -2484,3 +2484,6 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
 - T6/T7 (protocol + PageStats ABI-preserving), W9 doc, W10 help_icon fix
   integrated as94ef43cee..eba9d0a84 (all Opus CLEAR). Two language tests remain
   red on root pending W11.
+- W11 language test repair integrated (Opus CLEAR); root green on all checked
+  suites. Reviewer CI screen: 86/86 CI files run PASS, four fixture-write suites
+  passed on the F2 allowlist.
