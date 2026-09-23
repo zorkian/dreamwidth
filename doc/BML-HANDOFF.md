@@ -13,7 +13,9 @@ all foreman validation sessions are complete.
 Current immutable review queue: update GET rendererc5 +72f6116e0 +76d27b19f
 (57 real-template/mapping assertions, full tidy/compile worker PASS), and owned
 edit GETcce03c7bf (89 focused/286 adjacent, tidy1124/compile1607 PASS).
-Neither GET package is integrated yet. Sol is reviewing those exact ranges.
+Update GET rendererc5/72f/76d is now independently clear and integrated as
+98f202d14/bc52393ca/b8dbb3758. Foreman4files228 PASS in
+/tmp/bml-update-get-render-integrated.log. Owned GETcce remains under review.
 Widgets continues a callable-only ordinary authenticated update GET wrapper
 around76d, preserving guard/hook/default ordering and altlogin/share/readonly
 fallback. Themes continues browser-only owned GET acceptance atopcce, with

@@ -1977,3 +1977,14 @@ as invocation-error, not counted as evidence. The comment-context cherry-pick
 conflict retained the existing owned-edit dispatcher unchanged. Public legacy
 showform/moreopts/preview/transforms/spellcheck now use reviewed native rerenders.
 Ordinary GET and excluded contexts still use retained BML. No push/deploy.
+
+### Callable update GET rendering accepted
+
+- Sol finalc5..76d CLEAR: retained preformat OR restored in72f; supported rich
+  precedence unchanged. Actual localized hook callback/ref/count, real escaped
+  fields, exact action/query, date/journal/editor and fresh draft/preference
+  preservation pass57/57 independently. No public GET route claim.
+- Integrated98f202d14/bc52393ca/b8dbb3758. Foreman renderer/new-rerender/native
+  parity/public activation4files228 PASS in /tmp/bml-update-get-render-integrated.log.
+- Owned GETcce03c7bf remains under independent review. Widgets continues the
+  callable update GET wrapper; Themes continues callable owned GET browser proof.
