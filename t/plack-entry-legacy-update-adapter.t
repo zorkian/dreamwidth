@@ -704,7 +704,9 @@ my $transform_uri =
 my $transform_form;
 test_psgi $legacy_app, sub {
     my $send = shift;
-    my $res  = $send->( GET $transform_uri, Cookie => $cookie );
+    my $res;
+    LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/update',
+        sub { $res = $send->( GET $transform_uri, Cookie => $cookie ); } );
     is( $res->code, 200, 'transform baseline renders retained form' );
     $transform_form = update_form( $res->content );
 };

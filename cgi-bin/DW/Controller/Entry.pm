@@ -94,7 +94,12 @@ DW::Routing->register_string( '/entry/new', \&_new_handler_userspace, user => 1 
 # retained actions into a router 405 instead of preserving their old behavior.
 # DW::Routing strips the legacy .bml suffix before lookup, covering both URLs.
 DW::Routing->register_string(
-    '/update', sub { return legacy_update_handler( include_transforms => 1 ) },
+    '/update',
+    sub {
+        my $r = DW::Request->get;
+        return legacy_update_get_handler() if $r && $r->method eq 'GET';
+        return legacy_update_handler( include_transforms => 1 );
+    },
     app          => 1,
     no_redirects => 1
 );
