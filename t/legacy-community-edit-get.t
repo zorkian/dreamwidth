@@ -16,6 +16,7 @@ use DW::Request;
 use DW::Request::Plack;
 use Plack::Middleware::DW::RequestWrapper;
 use LJ::Session;
+use LJ::Userpic;
 use LJ::Test qw(temp_user temp_comm);
 
 my $native_app = do "$ENV{LJHOME}/app.psgi";
@@ -48,6 +49,14 @@ my $own = $manager->t_post_fake_comm_entry(
 $own->set_prop( current_location => 'community native location' );
 $own->set_prop( current_music    => 'community native music' );
 $own->set_prop( editor           => 'html_raw0' );
+my $pic = LJ::Userpic->create( $manager,
+    data => file_contents("$ENV{LJHOME}/t/data/userpics/good.jpg"), );
+ok( $pic, 'disposable manager userpic is created' ) or BAIL_OUT('missing userpic');
+$pic->set_keywords('community-native-pic');
+my $pic_mapid = $manager->get_mapid_from_keyword( 'community-native-pic', create => 1 );
+LJ::set_logprop( $comm, $own->jitemid, { picture_mapid => $pic_mapid } );
+LJ::Entry::reset_singletons();
+$own = LJ::Entry->new( $comm, ditemid => $own->ditemid );
 
 my $other = $poster->t_post_fake_comm_entry(
     $comm,
@@ -92,6 +101,15 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
         return $r->res;
     }
 );
+
+sub file_contents {
+    my ($path) = @_;
+    open my $fh, '<', $path or die "open $path: $!";
+    binmode $fh;
+    local $/;
+    my $contents = <$fh>;
+    return \$contents;
+}
 
 sub parsed_form {
     my ( $content, $input ) = @_;
@@ -182,7 +200,8 @@ sub native_request {
         is( $same_poster_form->value('event'),   'own body',    'ordinary form retains body' );
 
         for my $field (
-            qw(security editor current_location current_music entrytime_date entrytime_time))
+            qw(security taglist editor current_location current_music prop_picture_keyword entrytime_date entrytime_time)
+            )
         {
             is(
                 $same_poster_form->value($field),
@@ -190,6 +209,14 @@ sub native_request {
                 "same-poster form matches direct native $field"
             );
         }
+        is( $same_poster_form->value('prop_picture_keyword'),
+            'community-native-pic', 'ordinary form retains userpic' );
+        my @direct_custom_bits = map { $_->value }
+            grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $direct_form->inputs;
+        my @legacy_custom_bits = map { $_->value }
+            grep { ( $_->name || '' ) eq 'custom_bit' && $_->value } $same_poster_form->inputs;
+        is_deeply( \@legacy_custom_bits, \@direct_custom_bits,
+            'community custom-bit controls match direct native form' );
         ok(
             !$same_poster_form->find_input('action:savemaintainer'),
             'ordinary edit lacks the maintainer action'
@@ -242,6 +269,19 @@ sub native_request {
         ok( parsed_form( $beta_manager->content, 'action:savemaintainer' ),
             'beta manager stays property-only' );
         $in_beta = 0;
+
+        my $anonymous =
+            $send->( GET '/editjournal?usejournal=' . $comm->user . '&itemid=' . $own->ditemid );
+        is( $anonymous->code, 299,
+            'unauthenticated request falls through between eligible renders' );
+        my $after_anonymous = $request->(
+            $manager, GET '/editjournal?usejournal=' . $comm->user . '&itemid=' . $own->ditemid
+        );
+        is( $after_anonymous->code, 200, 'eligible same-poster render follows anonymous fallback' );
+        ok(
+            parsed_form( $after_anonymous->content, 'subject' ),
+            'anonymous fallback leaks no request context'
+        );
 
         my $repeated = $request->(
             $manager,
