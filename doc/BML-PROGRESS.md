@@ -2202,3 +2202,11 @@ and worker seven-suite 246 PASS; Sol review pending. Callable community resolver
 124473f0 is independently queued and its test-only browser acceptance continues.
 Anonymous GET rendering source audit is preserved separately; authentication and
 public schema/route decisions are not implemented or inferred from that audit.
+
+### Public invalid-target terminal accepted
+
+Sol combined24fddcb82 CLEAR, integratedf7f159f6c. Foreman seven suites246 PASS
+and real browser PASS with no owned helpers. Desktop/390 captures saved and
+narrow output visually checked. Exact legacy title/message and first-guard
+ordering are preserved. Remaining-consumer inventory is documented; callable
+anonymous rendering and community POST browser work continue separately.

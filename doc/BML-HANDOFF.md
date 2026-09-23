@@ -1,3 +1,20 @@
+## Public invalid-target terminal accepted
+
+Sol exact combined tip 24fddcb8244b1b790278f6ad1e12b222d37a3d79 CLEAR;
+integrated as f7f159f6c. Foreman seven-suite regression: 246 PASS
+(/tmp/bml-invalid-terminal-integrated.log). Real browser normal PASS
+(/tmp/bml-invalid-terminal-browser.log), owned helper check empty. Desktop and
+390px captures preserved under update-invalid-terminal; narrow title/body fits
+and retains the exact legacy message. Sol also proved named failure cleanup.
+Root sessions 47782 and 12814 are complete.
+
+Remaining native-consumer audit is BML-REMAINING-NATIVE-CONSUMERS.md: no ordinary
+independent conversion remains outside active editor work and held interfaces.
+Themes now implements only the callable anonymous renderer from the separate
+source audit, with no public route or authentication changes. Widgets continues
+callable community browser acceptance; Sol reviews resolver 124473f0. No BML
+retirement, publishing, deployment or held-interface change is authorized here.
+
 ## Pending invalid-target and community resolver review
 
 Canonical invalid-target public tip is 24fddcb8244b1b790278f6ad1e12b222d37a3d79,
