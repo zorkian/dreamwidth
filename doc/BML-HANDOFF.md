@@ -61,23 +61,18 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: community/moderated7c plus e54 test correction independently clear,
-   integrated bdfe83dcd/ad7debbef. Public update activation82a496e03 is independently clear
-   and integrated8ba94e59d; foreman combined5files522 PASS. Callable-only transforms07f/5cc/98a are held on Sol findings: checker token
-   ordering, ordinary absent-versus-empty GET defaults, and overly broad
-   transform/xpost mapping. Worker fixes these plus finite acceptance; public
-   include_transforms remains off. No hook ABI changes authorized.
-2. Widgets: callable edit browser0a/cfe/b79 independently clear and integrated
-   42ab08b25/6a26ab7a8/30b7d90f4; foreman exact-assets replay passed, captures
-   preserved by3ecfc9438. Ordinary personal dispatcher38bdc5111 and actual public
-   browser239e355bc are committed/queued. Worker audits ordinary authenticated
-   update GET prefill/render contract while reviews finish. Preserve picker and
-   unsupported BML fallback.
-3. Sol: cleared update activation82a and callable browser b79; reviews owned
-   dispatcher38bd then public browser239e. Transform source corrections through
-   b80/6bd await remaining finite test rows and recheck. Community7c/e54
-   independently clear. Transform audit preserved by fc5cfe09b. Held inbox and
-   external Journal deployment decisions remain unchanged.
+1. Themenav: callable transforms throughdc1814ca9 independently clear and
+   integratedda02bde4c..776789fba. Public transform activation is separate WIP;
+   worker111 actual-route assertions pass, remaining checks/commit/review pending.
+2. Widgets: owned personal dispatcher38bd/58b/028e and public browser239e clear,
+   integrated5ea5858fc/31d322889/dad4bc220/06735ba3a. Foreman901 HTTP + real public
+   browser PASS, captures e575e2a76. Worker implements unregistered authenticated
+   update GET renderer/tests, preserving GET/hook/prefill and unchanged prefs.
+   Editor mapping follows accepted retry semantics (BML-UPDATE-GET-EDITORS.md),
+   not a new product approval gate. GET renderer source exists; tests continue.
+3. Sol: all integrated ranges above clear. Read-only ordinary owned edit GET
+   handoff in progress while awaiting immutable transform activation/GET renderer.
+   Held inbox and external Journal deployment decisions remain unchanged.
 
 Current combined-tree matrix/native edit4files221 PASS; earlier callable/legacy/
 native6files462 and actual edit HTTP3files159 PASS. Full tidy1119 and compile1607
@@ -87,8 +82,13 @@ legacy-update-adapter evidence folder. All root test sessions are complete.
 Latest root code93fab and75e674910 are independently clear, evidence5a390efd4.
 Community combined5files629 PASS and full tidy1119/compile1607 PASS in
 /tmp/bml-community-{integrated,tidy,compile}.log. Root sessions complete.
-All integrations remain local. Accepted /update POSTs now use the native
-adapter; GET and unsupported requests still fall through to BML. No BML editor
+Latest combined-tree validation:6files901 HTTP PASS, public edit browser PASS,
+tidy1123 and compile1607 PASS in /tmp/bml-editor-public-*.log and
+/tmp/bml-owned-edit-public-integrated.log. All root sessions complete; no helper
+or server remains. Callable transforms7files517 PASS in
+/tmp/bml-update-transforms-integrated.log.
+All integrations remain local. Accepted /update and personal owned edit POSTs
+now use native adapters; GET and unsupported requests still fall through to BML. No BML editor
 page is deleted, and nothing has been pushed or deployed.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,

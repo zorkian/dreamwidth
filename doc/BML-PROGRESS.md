@@ -1928,3 +1928,26 @@ checks, after widgets Terra completes customization1/4.
 - Public dispatcher38bd and overlay-free browser239e remain under review.
   Transform fixesa6/b80 and token tests6bd are not integrated yet; remaining
   exact fallback assertions and independent fixed-range recheck are pending.
+
+
+### Callable transforms and public owned edits integrated
+
+- Sol finaldc1814ca9 callable transform range CLEAR:396 + public default-off43
+  + tidy1116 PASS; reviewer397 proves actual account checkbox fallback.
+  Integratedda02bde4c..776789fba, keeping public include_transforms off. Foreman
+  decoder/normalizer/formdata/rerender/spellcheck/adapter7files517 PASS in
+  /tmp/bml-update-transforms-integrated.log.
+- Sol028e5c666 dispatcher permanent matrix CLEAR:162 twice and tidy1120 PASS.
+  Hidden POST itemid explicitly invokes native helper1; beta/readonly/authas
+  fallback is nonvacuous, with readonly limited to its method-guard fixture.
+  Integrated38bd/58b/028e as5ea5858fc/31d322889/dad4bc220. Public browser239e
+  clear normal/intentional cleanup, integrated06735ba3a without route overlay.
+- Foreman combined6files901 PASS, exact real public owned-edit browser PASS,
+  full tidy1123/compile1607 PASS. Logs /tmp/bml-editor-public-{integrated,tidy,
+  compile}.log and /tmp/bml-owned-edit-public-integrated.log; no fixture/server
+  remains. Desktop/narrow evidence preserved e575e2a76. All root sessions closed.
+- Next: public transform activation (worker111 passing, not yet reviewed),
+  callable authenticated GET renderer with original prefill/hook/draft contract,
+  then remaining GET/unsupported paths. Editor mapping uses already accepted
+  retry semantics per BML-UPDATE-GET-EDITORS.md; no invented product gate.
+  All integrations local, no push/deploy or BML editor deletion.
