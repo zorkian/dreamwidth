@@ -1751,3 +1751,22 @@ checks, after widgets Terra completes customization1/4.
   7550febd5 atop bdc. Both are queued for independent review. Canonical backend
   values remain separate from raw retry controls. Worker continues ordinary
   owned save/delete callable adapter without public registration.
+
+
+### Owned-edit prerequisites integrated after independent rechecks
+
+- Rerender bdc plus755 raw date/time correction independently clear, integrated
+  cef5672e6 and83765695c. Original invalid-year probe now passes18; committed
+  rerender22 proves invalid date/time text and unchanged fresh entries. Foreman
+  shared mapper/new retry/native edit combined5files102 PASS in
+  /tmp/bml-owned-edit-rerender-integrated.log.
+- Opt-in edit success015 independently clear, integrateda272189a0. Exact raw
+  callback/master/session actor, composite ID/deleted flag, delete extras order,
+  suspended notice, failed-save and native defaults are preserved. Sol direct
+  sentinel6 PASS proves draft and editor preferences unchanged. Foreman combined
+  edit/crosspost/new-housekeeping/hooks5files176 PASS in
+  /tmp/bml-owned-edit-success-integrated.log.
+- Full foreman tidy1114 and compile1607 PASS in
+  /tmp/bml-owned-edit-{tidy,compile}.log. No root test process remains active.
+  Public route registration remains unchanged; callable update correction and
+  ordinary-owned edit adapter continue in worker branches.

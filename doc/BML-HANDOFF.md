@@ -66,18 +66,19 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
    and missing post-attempt hook on empty-body failure. Narrow correction is
    prioritized; browser harness WIP is preserved. No public route registration.
 2. Widgets: mechanical edit renderer ed03 independently clear and integrated
-   5bead7879, foreman52 PASS. Rerender bdc invalid-date fix7550febd5 and separate
-   edit-success seams015f36746 are queued for Sol. Worker continues a separate
+   5bead7879, foreman52 PASS. Rerender bdc+755 is clear and integrated cef5672e6/83765695c;
+   edit-success015 is clear and integrated a272189a0. Worker continues a separate
    callable ordinary-owned save/delete adapter with test-only routing; unsupported
    maintainer/spam-delete/community actions remain outside this slice.
-3. Sol: completed held findings for752; now rechecks bdc..755 raw invalid date/time
-   retention, then015 edit-success compatibility against the preserved audit.
+3. Sol: completed held findings for752; cleared bdc..755 and015; now audits the next bounded community/moderated
+   update slice while immutable adapter corrections mature.
    All reviews use immutable commits. Held inbox and external Journal deployment
    interfaces remain excluded.
 
-Final current combined-tree callbacks91 PASS, tidy1112 PASS, compile1607 PASS.
-Logs /tmp/bml-legacy-callbacks-integrated.log and
-/tmp/bml-legacy-adapters-{tidy,compile}.log in foreman container. No foreman test
+Current combined-tree rerender102 and edit-success176 PASS, tidy1114 PASS,
+compile1607 PASS. Logs /tmp/bml-owned-edit-rerender-integrated.log,
+/tmp/bml-owned-edit-success-integrated.log and
+/tmp/bml-owned-edit-{tidy,compile}.log in foreman container. No foreman test
 process remains running at this ledger update. All integrations are local only.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
