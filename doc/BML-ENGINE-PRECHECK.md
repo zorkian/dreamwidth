@@ -11,11 +11,11 @@ production code is changed by this document or its tests.
 | # | Behaviour | Test |
 |---|---|---|
 | 1a | An unknown URL gets the router's own 404 (`app.psgi`'s `_render_error_document`), not a bare BML "Not Found" | `t/plack-no-bml-fallback.t` |
-| 1b | `/_config.bml` and `/_config-local.bml` (base and `ext/dw-nonfree` overlay) stay 403, regardless of which overlay directory serves them | `t/plack-no-bml-fallback.t` |
+| 1b | `/_config.bml` and `/_config-local.bml` (base and `ext/dw-nonfree` overlay) are never served with a 200, and their directives never leak into the response body -- asserted engine-independently, since the exact status is 403 today and would be a plain 404 after E3 | `t/plack-no-bml-fallback.t` |
 | 1c | A `.bml` suffix on a native page (`/inbox/index.bml`, `/update.bml`) strips via `DW::Routing::get_call_opts` and reaches the exact same handler as the bare path | `t/plack-no-bml-fallback.t` |
 | 1d | `/update` GET still 302s to `/entry/new`, carrying query args, with or without the `.bml` suffix | `t/plack-no-bml-fallback.t` |
 | 2a | Every currently selectable `DW::SiteScheme` (`->available`) `supports_tt` | `t/site-scheme-native.t` |
-| 2b | `tt_runner` is the only scheme anywhere in-tree with `engine => 'bml'` | `t/site-scheme-native.t` |
+| 2b | No currently selectable `DW::SiteScheme` has `engine => 'bml'` -- asserted only over `->available`, not by naming the internal `tt_runner` scheme, so this keeps holding whether or not E3 also removes `tt_runner` itself | `t/site-scheme-native.t` |
 | 2c | `DW::Template->render_string` for a native page never calls `BML::ml` or `DW::BML::render` | `t/site-scheme-native.t` |
 | 3a | No `*.bml.text` file exists anywhere under `htdocs/` or `ext/` any more | `t/lang-bml-file-branch.t` |
 | 3b | `LJ::Lang::get_text`'s `.bml.` `from_files` branch is not dead code: 14 live call sites still ask for a `.bml.` key (see §4 below) | `t/lang-bml-file-branch.t` |
@@ -45,42 +45,52 @@ reaching that code; `find htdocs ext -iname '*.bml'` returns only those three).
 `DW::BML::RequestAdapter` is already split into its own file,
 `cgi-bin/DW/BML/RequestAdapter.pm` (its header says so explicitly: "Split out
 of DW::BML so callers that only need the adapter don't have to load the whole
-BML rendering engine"), and is `use`d directly by `LJ::Protocol.pm` and
-`DW::Controller::Journal.pm` without touching `DW::BML.pm` at all. E3 deleting
-`DW::BML.pm` does not need to touch `RequestAdapter.pm`.
+BML rendering engine"). `LJ::Protocol.pm` and `DW::Controller::Journal.pm`
+`use DW::BML::RequestAdapter;` directly for it; neither imports `DW::BML.pm`
+itself any more (`LJ::Protocol.pm`'s own `use DW::BML;` -- once needed for
+`sendmessage`'s held `BML::set_language('en')` call -- was dropped once E1
+replaced that call with a native `LJ::Lang::set_request_context` call). E3
+deleting `DW::BML.pm` does not need to touch `RequestAdapter.pm`.
 
 The rest of `DW::BML.pm` (the module actually being deleted) still has real
 readers beyond the adapter:
 
-- `app.psgi` calls `DW::BML->resolve_path` and `DW::BML->render` directly --
-  this *is* the fallback chain §1 characterizes. E3 needs to either delete
-  this fallback block entirely (per §1's tests, an unknown URL already 404s
-  correctly without it -- the only paths that currently reach `render()`
-  successfully are the two forbidden `_config*.bml` files, which 403; nothing
-  currently depends on `render()` actually rendering content) or replace it.
-- `LJ::PageStats.pm` calls `BML::get_request()` (a glob sub `DW::BML.pm`
-  installs, not a class method) -- a real functional dependency, not just a
-  `use` for side effects. `LJ::PageStats.pm:179`'s own comment already notes
-  `DW::BML::RequestAdapter->new` never sets `_filename`, i.e. this file already
-  knows it's operating against the held `PageStats` hook ABI (see
-  `doc/BML-PROTOCOL-PAGESTATS.md`) and has code specifically compensating for
-  the adapter's shape.
-- `LJ::Web.pm` calls `BML::get_method()` (in `did_post`) and
-  `BML::get_client_header('Referer')` (in `check_referer`'s fallback) -- also
-  glob subs, also a real functional dependency, not just a `use` for loading.
-- `LJ::S2.pm` has `use DW::BML;` but no other file-level call to a `BML::*`
-  glob sub; its own comment says it loads the shims "that still-BML-dependent
-  code elsewhere may call," i.e. this looks like an eager-load carried along
-  for other consumers rather than a hard dependency of `LJ::S2.pm` itself.
+- `app.psgi:26` (`use DW::BML;`) and `:157-167` (`DW::BML->resolve_path` /
+  `DW::BML->render`) -- this *is* the fallback chain §1 characterizes, and is
+  the one remaining real executing dependency on the engine module itself.
+  E3 needs to either delete this fallback block entirely (per §1's tests, an
+  unknown URL already 404s correctly without it -- the only paths that
+  currently reach `render()` successfully are the two forbidden `_config*.bml`
+  files, which 403; nothing currently depends on `render()` actually
+  rendering content) or replace it.
+- `cgi-bin/ljlib.pl:496`: `BML::reset_cookies() if defined &BML::reset_cookies;`
+  -- already guarded, so it degrades to a silent no-op the moment
+  `DW::BML.pm` (which installs `BML::reset_cookies`) stops being loaded. Not a
+  blocker; listed because it is the only *other* place outside `app.psgi`
+  that still calls a `BML::*` glob sub at all in a reachable path.
+- `LJ::PageStats.pm`'s `get_request` and `LJ::Web.pm`'s `did_post`/
+  `check_referer` used to call `BML::get_request()`/`BML::get_method()`/
+  `BML::get_client_header()` respectively; **E2 already converted all three**
+  to return their no-request fallback values directly (`undef`, `''`, `''`)
+  instead of round-tripping through BML, since that is what those BML calls
+  always reduced to outside a request anyway (`DW::BML.pm` itself falls back
+  to `DW::Request`/returns `undef` for the same cases). Neither file has a
+  reachable `BML::*` call left. `LJ::PageStats.pm:179`'s own comment still
+  separately notes `DW::BML::RequestAdapter->new` never sets `_filename`,
+  i.e. this file still knows it's operating against the held `PageStats`
+  hook ABI (see `doc/BML-PROTOCOL-PAGESTATS.md`) -- that adapter-shape
+  awareness is unrelated to the `get_request` conversion and stays.
+- `LJ::S2.pm` had `use DW::BML;` with no other file-level call to a `BML::*`
+  glob sub (an eager-load carried along for other consumers, not a hard
+  dependency of `LJ::S2.pm` itself); E2 dropped that unused import too.
 
-So `BML::get_request`, `BML::get_method`, and `BML::get_client_header` are the
-three glob subs E3 needs native equivalents for (or converted call sites for)
-before `DW::BML.pm` can go -- distinct from, and in addition to, the four
-already-held Apache-request-shaped-adapter call sites tracked elsewhere
-(`LJ::Protocol.pm`'s `DISABLE_PROTOCOL`, `DW::Controller::Journal.pm`'s
-`data_handler:*`, `LJ::S2.pm`'s `s2_head_content_extra`, `LJ::PageStats.pm`'s
-`filename`), which only need the adapter and are already unaffected by this
-split.
+So after E2, `app.psgi` and the guarded `ljlib.pl:496` call are the only
+executing (non-adapter) dependencies left on `DW::BML.pm`'s glob shims --
+distinct from, and in addition to, the four already-held Apache-request-
+shaped-adapter call sites tracked elsewhere (`LJ::Protocol.pm`'s
+`DISABLE_PROTOCOL`, `DW::Controller::Journal.pm`'s `data_handler:*`,
+`LJ::S2.pm`'s `s2_head_content_extra`, `LJ::PageStats.pm`'s `filename`),
+which only need the adapter and are unaffected by any of this.
 
 ### `cgi-bin/lj-bml-blocks.pl`
 
@@ -102,6 +112,13 @@ processing for any BML page under that scope, which again requires a live
 its `ml_getter` hook is the same `\&LJ::Lang::get_text` function natives
 already use directly (§1 of `doc/BML-TRANSLATION-SHIM.md`), so nothing loses
 translation coverage by this hook going away.
+
+`LJ::Global::BMLInit.pm:105` (`eval "use LJ::Local::BMLInit;"; die $@ if $@ &&
+$! != ENOENT;`) is a deploy gate: it silently loads a site-local hook module
+if one is deployed, and this repository can't see whether any deploy actually
+has one. If a production deploy has its own `LJ::Local::BMLInit.pm`
+registering additional BML hooks, deleting `LJ::Global::BMLInit.pm` drops
+that too -- worth flagging to whoever operates that deploy before E3 ships.
 
 ### `cgi-bin/bml/scheme/*.look` (`global.look`, `tt_runner.look`)
 
@@ -180,20 +197,47 @@ historical records of already-completed migrations and do not need editing.
 
 - The adapter split (`DW::BML::RequestAdapter.pm`) is already done; E3 does
   not need to extract it.
-- Three real glob-sub dependencies block deleting `DW::BML.pm` outright:
-  `BML::get_request` (`LJ::PageStats.pm`), `BML::get_method` and
-  `BML::get_client_header` (`LJ::Web.pm`). These need native replacements or
-  converted call sites first.
+- E2 already converted `LJ::PageStats.pm` and `LJ::Web.pm` off `BML::*`
+  entirely (and dropped `LJ::S2.pm`'s now-unused `use DW::BML;`). Post-E2, the
+  only executing (non-adapter) dependency on `DW::BML.pm`'s glob shims is
+  `app.psgi` itself (`:26`, `:157-167`) plus the already-guarded
+  `BML::reset_cookies() if defined &BML::reset_cookies;` in
+  `cgi-bin/ljlib.pl:496`, which degrades to a no-op on its own once
+  `DW::BML.pm` stops being loaded. E3 only has `app.psgi`'s fallback block
+  left to deal with.
 - Everything else this document traced under `Apache::BML.pm`
-  (`lj-bml-blocks.pl`, `LJ::Global::BMLInit.pm`, both `.look` files,
-  `Apache::BML::set_scheme`'s `tt_runner` branch, `BML::decide_language`) is
-  already unreachable in production today, independent of E3 -- there is no
-  remaining `.bml` page whose render would ever exercise them. Deleting them
-  carries no behavior-preservation risk that this document's tests don't
-  already cover.
-- `LJ::Lang::get_text`'s `.bml.` `from_files` branch is the one exception:
-  it is live, has 14 callers, and needs an explicit decision (rename the keys,
-  or keep DB-only resolution) before it can go.
+  (`lj-bml-blocks.pl`, `LJ::Global::BMLInit.pm` and the `LJ::Local::BMLInit`
+  deploy gate it loads, both `.look` files, `Apache::BML::set_scheme`'s
+  `tt_runner` branch, `BML::decide_language`) is already unreachable in
+  production today, independent of E3 -- there is no remaining `.bml` page
+  whose render would ever exercise them. Deleting them carries no
+  behavior-preservation risk that this document's tests don't already cover
+  (a site with its own `LJ::Local::BMLInit.pm` deploy customization is the
+  one case this repo can't see; flag it to whoever operates that deploy).
+- `DW::Template::render_template_misc`'s `scope eq 'bml'` branch (`DW/
+  Template.pm:276-292`, already marked `FIXME(dre): Remove this method when
+  BML is completely dead`) is dead the same way: its only gate,
+  `LJ::User::Styles::display_journal_deleted`'s `$opts{bml}`, has no caller
+  that ever passes it (grepped all three callers, `LJ/User/Styles.pm:847`,
+  `DW/Controller/Profile.pm:121`, `DW/Controller/Memories.pm:100`; the two
+  that pass options use `journal_opts`, not `bml`).
+- `t/admin-faq-modtime.t:66,100` and `t/native-faq-language.t:177,215` assert
+  `$Apache::BML::base_recent_mod` is untouched by native FAQ rendering --
+  proving non-interference with a process-global that stops meaning anything
+  once `Apache::BML.pm` is gone. Vacuous after E3, not wrong; safe to drop
+  those specific assertions (the rest of each test is unaffected).
+- `bin/hide_dir_content.sh` is not an engine file despite the name: it
+  touches empty `index.html` (its own comment says ".bml", which is stale and
+  unrelated to this document) in a few `htdocs/` subdirectories to suppress
+  directory listings. No BML dependency; nothing to do here for E3.
+- `bin/upgrading/texttool.pl`'s `deadphrases` command matches DB rows by key
+  string only; it has no special-casing for the `.bml.` regex branch and
+  does not need it kept for dead-key pruning to keep working.
+- `LJ::Lang::get_text`'s `.bml.` `from_files` branch is the one exception
+  that is not already dead: it is live, has 14 callers, and needs an
+  explicit decision (rename the keys, or keep DB-only resolution) before it
+  can go. (W14 relocates all 14 keys and flips `t/lang-bml-file-branch.t`
+  accordingly.)
 - `t/plack-bml.t` should be deleted as part of E3, once its fallback-chain
   coverage is confirmed redundant with `t/plack-no-bml-fallback.t` (it already
   is, per this document).

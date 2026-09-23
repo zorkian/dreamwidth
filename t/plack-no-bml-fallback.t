@@ -52,12 +52,20 @@ test_psgi $app, sub {
         # htdocs/_config.bml and ext/dw-nonfree/htdocs/_config-local.bml are
         # both reachable through LJ::get_all_directories('htdocs')'s overlay
         # search, at the URLs below (the overlay extends the search path, not
-        # the URL namespace -- there is no literal /ext/ URL prefix).
+        # the URL namespace -- there is no literal /ext/ URL prefix). Asserted
+        # as "not 200 and no leaked directive" rather than the current literal
+        # 403, so this holds whether the request is rejected by DW::BML::
+        # render's _config check (today) or simply falls through to the
+        # router's 404 once the engine is gone (after E3) -- either way, the
+        # file's contents must never reach the response.
         for my $path (qw(/_config.bml /_config-local.bml)) {
             my $res = $cb->( GET $path );
-            is( $res->code, 403, "$path is 403" );
-            is( $res->content, 'Forbidden',
-                "$path body is DW::BML::render's literal _config Forbidden body" );
+            isnt( $res->code, 200, "$path is never served with a 200" );
+            unlike(
+                $res->content,
+                qr/LookRoot|ExtraConfig|DefaultScheme/,
+                "$path response body leaks none of the file's directives"
+            );
         }
     };
 

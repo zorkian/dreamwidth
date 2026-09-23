@@ -60,6 +60,12 @@ sub run_wrapped {
 subtest 'RequestWrapper establishes DEFAULT_LANG and the native getter as the starting context' =>
     sub {
     local $LJ::DEFAULT_LANG = 'en_DW';
+
+    # Pinned distinct from DEFAULT_LANG: RequestWrapper falls back to
+    # $LJ::LANGS[0] only when DEFAULT_LANG is unset, so if the two ever
+    # matched in a given environment's config, this assertion couldn't tell
+    # which one RequestWrapper actually read.
+    local @LJ::LANGS = ('en');
     my ( $context, $ml_result );
     run_wrapped(
         sub {
@@ -69,7 +75,7 @@ subtest 'RequestWrapper establishes DEFAULT_LANG and the native getter as the st
     );
     ok( $context, 'a request context exists once RequestWrapper has run' );
     is( $context->{lang}, 'en_DW',
-        'starting lang is $LJ::DEFAULT_LANG, with no cookie/header input' );
+        'starting lang is $LJ::DEFAULT_LANG, not $LJ::LANGS[0] or a cookie/header' );
     is( $context->{getter}, \&LJ::Lang::get_text,
         'starting getter is exactly \&LJ::Lang::get_text (by reference)' );
     is(
@@ -83,7 +89,7 @@ subtest
     'ml keeps resolving a .tt key correctly once a later stage renegotiates to a different language'
     => sub {
     local $LJ::DEFAULT_LANG = 'en';
-    my ( $before, $after, $direct );
+    my ( $before, $context_after, $after, $direct );
     run_wrapped(
         sub {
             $before = LJ::Lang::ml('/entry/preview.tt.title');
@@ -92,8 +98,9 @@ subtest
             # handling does later in a real request: renegotiate lang without
             # touching the getter RequestWrapper installed.
             LJ::Lang::set_request_context( lang => 'en_DW' );
-            $after  = LJ::Lang::ml('/entry/preview.tt.title');
-            $direct = LJ::Lang::get_text( 'en_DW', '/entry/preview.tt.title' );
+            $context_after = LJ::Lang::request_context();
+            $after         = LJ::Lang::ml('/entry/preview.tt.title');
+            $direct        = LJ::Lang::get_text( 'en_DW', '/entry/preview.tt.title' );
         }
     );
     is(
@@ -101,6 +108,16 @@ subtest
         LJ::Lang::get_text( 'en', '/entry/preview.tt.title' ),
         'before renegotiation, ml() resolves at the starting (en) language'
     );
+
+    # en and en_DW happen to render identical text here (en_DW falls back to
+    # English via childrenlatest), so $after/$direct/$before alone couldn't
+    # tell a real renegotiation from a no-op -- assert directly on the
+    # context object instead.
+    is( $context_after->{lang},
+        'en_DW', 'the renegotiation actually changed the context lang to en_DW' );
+    is( $context_after->{getter},
+        \&LJ::Lang::get_text,
+        'the renegotiation left the RequestWrapper-installed getter untouched' );
     is( $after, $direct,
         'after renegotiation, ml() resolves the same .tt key through the en_DW-language getter call'
     );

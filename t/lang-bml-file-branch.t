@@ -27,6 +27,9 @@
 # something E3 introduces. This test locks in that observed (broken)
 # behaviour so a regression it didn't cause isn't pinned on E3, not because
 # the behaviour is correct.
+#
+# W14 relocates all 14 keys to native homes and flips this file's second
+# subtest to assert real text with no missing-string banner instead.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
