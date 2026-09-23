@@ -23,7 +23,6 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use Plack::Builder;
 
-use DW::BML;
 use DW::Controller::Journal;
 use DW::Request::Plack;
 use DW::Routing;
@@ -116,7 +115,7 @@ sub _handle_request {
     # a controller redirect, return it directly — it already has cookies/headers set.
     return $ret if ref $ret;
 
-    # If routing returned OK (0), default status to 200; otherwise try journals, then BML
+    # If routing returned OK (0), default status to 200; otherwise try journal routing
     if ( defined $ret && $ret == 0 ) {
         $r->status(200) unless $r->status;
     }
@@ -154,17 +153,8 @@ sub _handle_request {
             $r->status($ret);
         }
         else {
-            # Routing didn't handle it — try BML file resolution as fallback
-            my ( $redirect_url, $bml_uri, $bml_file ) = DW::BML->resolve_path($uri);
-            if ($redirect_url) {
-                return $r->redirect($redirect_url);
-            }
-            elsif ($bml_file) {
-                DW::BML->render( $bml_file, $bml_uri );
-            }
-            else {
-                $r->status(404) unless $r->status;
-            }
+            # Routing didn't handle it, and no journal user is in scope.
+            $r->status(404) unless $r->status;
         }
     }
 
