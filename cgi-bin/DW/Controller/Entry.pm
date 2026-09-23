@@ -700,6 +700,74 @@ sub legacy_update_get_render {
     );
 }
 
+# Callable-only retained /update GET wrapper. A future route adapter owns
+# public registration; excluded contexts return undef so retained BML continues
+# to own its authentication, share-fetch, and warning behavior.
+sub legacy_update_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+
+    # Retained %GET is a flat hash: repeated values are NUL-joined. Convert
+    # once before every retained guard and pass that exact reference to hooks.
+    my $get = DW::Entry::Legacy::legacy_post_hash( $r->get_args );
+
+    # This is the retained page's first GET guard, before remote lookup or the
+    # update_fields hook. Let BML continue to render its existing error.
+    return undef if $get->{usejournal} && !LJ::load_user( $get->{usejournal} );
+
+    my $remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($remote);
+
+    # Retained /update redirects beta users before identity/can-post checks.
+    if ( LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' ) ) {
+        return $r->redirect( LJ::create_url( '/entry/new', cur_args => $get, keep_args => 1 ) );
+    }
+
+    # Preserve retained BML's own error pages for these contexts.
+    return undef if $remote->identity || !$remote->can_post;
+
+    # The first callable package deliberately excludes the retained alternate
+    # login UI and remote share fetch path.
+    return undef if $get->{altlogin} || $get->{share};
+
+    # Retained readonly output carries its own warning; do not replace it with
+    # a form that silently loses that behavior.
+    return undef if $remote->readonly;
+
+    # Retained update captures these form values before update_fields runs.
+    # Keep that snapshot even if the hook mutates its original flat GET ref.
+    my $prefill = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
+    my $hook    = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
+
+    # Target and crosspost fields are intentionally read after the hook, just
+    # as retained update resolves its remaining mutable GET fields afterward.
+    my $usejournal = LJ::canonical_username( $get->{usejournal} || '' );
+    my %crosspost  = map {
+        my $acctid = $_->acctid;
+        $acctid => ( $get->{"prop_xpost_$acctid"} || $_->xpostbydefault );
+    } DW::External::Account->get_external_accounts($remote);
+
+    my $now = DateTime->now;
+    if ( my $timezone = $remote->prop('timezone') ) {
+        my $tz = eval { DateTime::TimeZone->new( name => $timezone ) };
+        $now = eval { DateTime->from_epoch( epoch => time(), time_zone => $tz ) } if $tz;
+    }
+
+    return legacy_update_get_render(
+        remote        => $remote,
+        get           => $prefill,
+        update_fields => $hook,
+        legacy_editor => $remote->new_entry_editor,
+        rte_supported => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime      => $now->strftime('%F %R'),
+        usejournal    => $usejournal,
+        crosspost     => \%crosspost,
+        action_url    => LJ::create_url( '/entry/new', keep_query_string => 1 ),
+    );
+}
+
 # Render a retained legacy new-entry error or transform response through the
 # shared native form. This is deliberately not a route or save adapter: callers
 # retain authorization and action decisions, and provide the already-prepared
