@@ -159,12 +159,55 @@ async function closeChild(child, done, label) {
             await page.screenshot({path: `${output}/retained-${width}.png`, fullPage: true});
         }
 
-        const before = await state('before invalid attempt');
+        const before = await state('before wrong-password attempt');
         assert.equal(before.draft, 'anonymous browser draft sentinel', 'fixture seeds a nonempty draft');
         assert.deepEqual(before.draft_properties, {subject: 'anonymous browser frozen subject'},
             'fixture seeds frozen draft properties');
         assert.equal(before.displaydate, 1, 'fixture seeds displaydate on before the off/absent invalid attempt');
+
+        const wrongPassword = 'wrong-anonymous-browser-password';
+        const wrongSubject = 'Anonymous browser wrong-password subject';
+        const wrongBody = 'Anonymous browser wrong-password body';
         await page.setViewport({width: 1280, height: 844});
+        await page.goto(legacyURL, {waitUntil: 'networkidle0', timeout: 60000});
+        await page.$eval('#updateForm #altlogin_username', (input, value) => { input.value = value; }, startup.user);
+        await page.$eval('#updateForm #altlogin_password', (input, value) => { input.value = value; }, wrongPassword);
+        await page.$eval('#updateForm [name=subject]', (input, value) => { input.value = value; }, wrongSubject);
+        await page.waitForFunction(
+            () => window.FCKeditorAPI && window.FCKeditorAPI.GetInstance('draft'),
+            {timeout: 60000},
+        );
+        await page.evaluate(value => window.FCKeditorAPI.GetInstance('draft').SetHTML(value), wrongBody);
+        await Promise.all([
+            page.waitForNavigation({waitUntil: 'networkidle0', timeout: 60000}),
+            clickVisible(page, '#updateForm [name="action:update"]'),
+        ]);
+        assert.ok(await page.$('#js-post-entry'), 'wrong password renders the native retry form');
+        assert.equal(await page.$eval('#js-post-entry', form => {
+            const action = new URL(form.action); return action.pathname + action.search;
+        }), '/entry/new', 'wrong-password retry uses the canonical new-entry action');
+        const wrongErrors = await page.$$eval('.alert-box.alert', alerts => alerts.map(alert => alert.textContent.trim()));
+        assert.equal(wrongErrors.filter(error => /Error logging on:\s+Invalid password/.test(error)).length, 1,
+            'wrong-password retry renders one meaningful localized protocol error');
+        assert.equal(await page.$eval('[name=subject]', input => input.value), wrongSubject,
+            'wrong-password retry retains the submitted subject');
+        assert.equal(await page.$eval('[name=event]', input => input.value), wrongBody,
+            'wrong-password retry retains the submitted body');
+        assert.equal(await page.$eval('input[name=username][type=text]', input => input.value), startup.user,
+            'wrong-password retry retains the visible username');
+        assert.ok(await page.$$eval('input[name=password]', inputs =>
+            inputs.length >= 2 && inputs.every(input => input.value === ''),
+        ), 'wrong-password retry blanks every password control');
+        assert.equal(await page.content().then(content => content.includes(wrongPassword)), false,
+            'wrong-password retry does not return the submitted password');
+        await page.screenshot({path: `${output}/wrong-password-retry-1280.png`, fullPage: true});
+        await page.setViewport({width: 390, height: 844});
+        await page.screenshot({path: `${output}/wrong-password-retry-390.png`, fullPage: true});
+        await page.setViewport({width: 1280, height: 844});
+        const afterWrongPassword = await state('after wrong-password attempt');
+        assert.deepEqual(afterWrongPassword, before,
+            'wrong-password retry leaves entries and nonblank draft/editor/displaydate state unchanged');
+
         await page.goto(legacyURL, {waitUntil: 'networkidle0', timeout: 60000});
         await page.$eval('#updateForm #altlogin_username', (input, value) => { input.value = value; }, startup.user);
         await page.$eval('#updateForm #altlogin_password', (input, value) => { input.value = value; }, startup.password);
