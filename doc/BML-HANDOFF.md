@@ -58,6 +58,16 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- W12 characterization e286a4730 CLEAR (its comment-only sibling 6b17dfe6c
+  and E1 2d3205dc7 held solely on comments narrating history; fix pending).
+  E1 equivalence is verified post-F2: DW::BML's set_language also wrote a
+  'langpref' request note nothing reads, and would take HOOK-ml_getter only
+  when Apache::BML::is_initialized(). Reviewer nuance to keep on record:
+  is_initialized() is \$Apache::BML::cur_req truthiness, which
+  DW::BML::render set and never cleared, so pre-F2 a native sendmessage after
+  any BML render in the same worker could have picked up that page's getter;
+  post-F2 render() 403s the _config files before initialize_cur_req, so the
+  native getter => undef form is exact.
 - T8 adapter module extraction range 1420764ba + fix 9159a2e2f
   bml-opus-review FINAL CLEAR; integrated on root as f72d595d5, 3f31b017a.
   DW::BML::RequestAdapter now lives in cgi-bin/DW/BML/RequestAdapter.pm and
