@@ -8,6 +8,8 @@ use Test::More;
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use DW::Request;
 use DW::Request::Plack;
+use HTTP::Request::Common qw(GET);
+use Plack::Test;
 use LJ::Lang;
 use LJ::Test qw(temp_user);
 use LJ::Web;
@@ -62,25 +64,52 @@ subtest 'actual JournalTitles save uses request maxlength boundary with fresh pe
     $fresh = LJ::load_user( $u->user, 'force' );
     is( length( $fresh->prop('journaltitle') ), 100, 'listed-language save stores 100 characters' );
 };
+
+# LJ::entry_form (deleted by F2, formerly the caller exercised here) is gone;
+# the native /entry/new page carries the same LJ::std_max_length-driven
+# maxlength on its "current_music"/"current_location" fields (the module-
+# currents panel, views/entry/module-currents.tt:51,62 -- limits.current_length
+# is LJ::std_max_length, cgi-bin/DW/Controller/Entry.pm:741; the subject
+# field's own maxlength, views/entry/form.tt:184, is the fixed
+# LJ::CMAX_SUBJECT constant, not language-dependent, so it isn't part of this
+# characterization). RequestWrapper.pm sets the per-request language from
+# $LJ::DEFAULT_LANG for every real request, so drive it the same way
+# 'no request uses configured native default fallback' above does, per
+# request, rather than calling LJ::Lang::set_request_context directly (a
+# real test_psgi request re-establishes that context itself on entry).
 subtest 'actual entry form renders the native maxlength on current fields' => sub {
     my $u = temp_user();
     $u->update_self( { status => 'A' } );
-    lang('ru');
-    local *BML::ml      = sub { return $_[0] };
-    local *LJ::Lang::ml = sub { return $_[0] };
-    my ( $head, $onload ) = ( '', '' );
-    my $html = LJ::entry_form(
-        { remote => $u, mode => 'update', auth => '', event => '', richtext_default => 0 },
-        \$head, \$onload, {} );
-    like(
-        $html,
-qr/name="prop_current_location"[^>]*maxlength="100"|maxlength="100"[^>]*name="prop_current_location"/,
-        'entry form current location reflects listed-language maxlength'
-    );
-    like(
-        $html,
-qr/name="prop_current_music"[^>]*maxlength="100"|maxlength="100"[^>]*name="prop_current_music"/,
-        'entry form current music reflects listed-language maxlength'
-    );
+    my $session = LJ::Session->create( $u, nolog => 1 );
+    my $cookie =
+          'ljmastersession='
+        . $session->master_cookie_string
+        . '; ljloggedin='
+        . $session->loggedin_cookie_string;
+
+    my $app = do "$ENV{LJHOME}/app.psgi";
+    die $@ unless ref $app eq 'CODE';
+
+    for my $case ( [ 'en', 80 ], [ 'ru', 100 ] ) {
+        my ( $case_lang, $expect ) = @$case;
+        local $LJ::DEFAULT_LANG = $case_lang;
+        test_psgi $app, sub {
+            my $cb  = shift;
+            my $req = GET 'http://localhost/entry/new';
+            $req->header( Cookie => $cookie );
+            my $res = $cb->($req);
+            is( $res->code, 200, "/entry/new renders under '$case_lang'" );
+            like(
+                $res->content,
+qr/name="current_location"[^>]*maxlength="$expect"|maxlength="$expect"[^>]*name="current_location"/,
+                "entry form current_location reflects '$case_lang' maxlength ($expect)"
+            );
+            like(
+                $res->content,
+qr/name="current_music"[^>]*maxlength="$expect"|maxlength="$expect"[^>]*name="current_music"/,
+                "entry form current_music reflects '$case_lang' maxlength ($expect)"
+            );
+        };
+    }
 };
 done_testing;

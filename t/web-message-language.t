@@ -10,6 +10,7 @@ BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use DW::Request;
 use DW::Request::Plack;
+use DW::Widget::LatestInbox;
 use LJ::Lang;
 use LJ::Test qw(temp_user);
 use LJ::Web;
@@ -44,7 +45,7 @@ sub native_context {
     );
 }
 
-subtest 'native request getter preserves exact BML wrappers and error objects' => sub {
+subtest 'native request getter preserves exact div markup and error objects' => sub {
     my @calls;
     request();
     native_context( 'A', \@calls );
@@ -52,20 +53,20 @@ subtest 'native request getter preserves exact BML wrappers and error objects' =
     my $errors = LJ::error_list('first error');
     like(
         $errors,
-        qr/\A<\?errorbar <strong>A:error\.procrequest<\/strong><ul>/,
-        'error list retains its BML wrapper while using the request-native full key'
+        qr/\A<div class="errorbar"><strong>A:error\.procrequest<\/strong><ul>/,
+        'error list retains its errorbar div while using the request-native full key'
     );
-    like( $errors, qr/first error/,           'error object/list body remains unchanged' );
-    like( $errors, qr/ <\/ul> errorbar\?>\z/, 'error list retains its closing BML wrapper' );
+    like( $errors, qr/first error/,     'error object/list body remains unchanged' );
+    like( $errors, qr/<\/ul><\/div>\z/, 'error list retains its closing errorbar div' );
 
     my $warnings = LJ::warning_list('first warning');
     like(
         $warnings,
-        qr/\A<\?warningbar <strong>A:label\.warning<\/strong><ul>/,
-        'warning list retains its BML wrapper while using the request-native full key'
+        qr/\A<div class="warningbar"><strong>A:label\.warning<\/strong><ul>/,
+        'warning list retains its warningbar div while using the request-native full key'
     );
     like( $warnings, qr/<li>first warning<\/li>/, 'warning list body remains unchanged' );
-    like( $warnings, qr/ <\/ul> warningbar\?>\z/, 'warning list retains its closing BML wrapper' );
+    like( $warnings, qr/<\/ul><\/div>\z/, 'warning list retains its closing warningbar div' );
 
     is_deeply(
         \@calls,
@@ -132,25 +133,28 @@ subtest 'debug preserves full global keys without a getter' => sub {
     );
 };
 
-subtest 'actual entry_form reaches the native error heading once' => sub {
+# LJ::Web::entry_form (deleted by F2, formerly the caller exercised here) is
+# gone; DW::Widget::LatestInbox is the current production caller of
+# LJ::error_list (LJ::Web.pm has no other real caller left besides the BML
+# engine's own global.look:81, which is out of scope for native language
+# coverage). Force its "could not retrieve inbox" branch to exercise the
+# same LJ::error_list -> error.procrequest heading lookup this file
+# characterizes, preserving the same isolation property the old subtest
+# proved (the heading key reaches the request getter exactly once).
+subtest 'actual DW::Widget::LatestInbox error path reaches the native error heading once' => sub {
     my $user = temp_user();
     $user->update_self( { status => 'A' } );
     my @calls;
     request();
-    native_context( 'FORM', \@calls );
+    native_context( 'INBOX', \@calls );
+    LJ::set_remote($user);
     no warnings 'redefine';
-    local *BML::ml = sub { return $_[0] };
-    my ( $head, $onload ) = ( '', '' );
-    my $html = LJ::entry_form(
-        { remote => $user, mode => 'update', auth => '', event => '', richtext_default => 0 },
-        \$head, \$onload, { entry => 'entry form error marker' },
-    );
-    like( $html, qr/FORM:error\.procrequest/,
-        'entry_form renders the native request-local error heading' );
-    is( scalar( () = $html =~ /entry form error marker/g ),
-        1, 'entry_form retains the supplied entry error exactly once' );
+    local *LJ::User::notification_inbox = sub { return undef; };
+    my $html = DW::Widget::LatestInbox->render;
+    like( $html, qr/INBOX:error\.procrequest/,
+        'LatestInbox renders the native request-local error heading' );
     is( scalar( grep { $_ eq 'error.procrequest' } @calls ),
-        1, 'entry_form invokes the migrated heading key exactly once' );
+        1, 'LatestInbox invokes the migrated heading key exactly once' );
 };
 
 done_testing;
