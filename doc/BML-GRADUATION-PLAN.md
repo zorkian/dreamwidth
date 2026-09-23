@@ -125,8 +125,30 @@ files. CI-equivalent suites are green on root under the allowlist discipline.
 Remaining in flight: T8 (adapter module extraction; fix for the non-web shim
 load regression), W12 (sendmessage language characterization, test-only).
 
-Concrete decisions still needed from the user (everything else proceeds
-without them):
+Direction confirmed by the user after this status: the sendmessage language
+replacement and the BML engine retirement (hook ABIs still receive a
+`DW::BML::RequestAdapter`) are already authorized as behaviour-preserving
+local steps once equivalence tests and independent review pass; they are not
+additional decision gates. The transitional POST carry-over and the obsolete
+worker branches stay as they are. Production config and `ext/local` checks
+remain deployment gates; no push or deploy.
+
+## Engine retirement sequence (authorized; bounded, reviewed)
+
+| # | Owner | Package | Gate |
+|---|---|---|---|
+| E1 | widgets | Replace `Protocol.pm:563` `BML::set_language('en')` with `LJ::Lang::set_request_context(lang => 'en')`, proven equivalent by W12's characterization test in-request and ljlib-only | W12 reviewed |
+| E2 | themenav | Remove the last non-engine `BML::*` callers: RequestWrapper `BML::set_language` shim (native request language is set by `LJ::Lang::set_request_context` per T4; prove with `t/ml.t`, `t/native-*-language.t`, `t/plack-bml.t` replacement), `LJ::Web` no-request fallbacks (`Web.pm:391/:564`), PageStats `BML::get_request` (filename stays undef); drop the `use DW::BML` lines added by T8 where no caller remains | E1 reviewed, T8 integrated |
+| E3 | themenav | Delete the engine: `cgi-bin/Apache/BML.pm`, `cgi-bin/DW/BML.pm` (adapter module stays), `cgi-bin/lj-bml-blocks.pl`, `cgi-bin/LJ/Global/BMLInit.pm` (move any hook it registers that a native path still needs, e.g. `ml_getter` for `LJ::Lang`, into native startup first with tests), `cgi-bin/bml/scheme/*.look`, `htdocs/_config.bml`, `ext/dw-nonfree/htdocs/_config*.bml`, the app.psgi BML fallback, `t/plack-bml.t`; `DW::SiteScheme` `tt_runner` engine entry; update `doc/PLACK.md`, `BML-REMOVAL-PLAN.md`, `BML-MIGRATION.md` | E2 reviewed |
+| E4 | foreman | Final docs and evidence record; deploy-gate checklist | E3 integrated |
+
+Held externally (deployment gates, unchanged): production `%LJ::BETA_FEATURES`
+for `updatepage`/`inbox`, `ext/local` hooks and `LJ::Local::BMLInit`,
+`%LJ::AJAX_URI_MAP`, `%LJ::HELPURL`.
+
+Status record kept for history:
+
+Items as they stood before the user's confirmation:
 
 1. **Sendmessage forced English** (`cgi-bin/LJ/Protocol.pm:563`
    `BML::set_language('en')`): T4 shows it only forwards to
