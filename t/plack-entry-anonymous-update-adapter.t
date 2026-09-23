@@ -294,32 +294,21 @@ test_psgi $adapter, sub {
         'successful login protocol message is rendered as a native warning'
     );
 
-    my $login_error_user = temp_user();
-    $login_error_user->update_self( { status => 'A' } );
-    $login_error_user->set_password('login-error-password');
-    my $login_error = post_from_retained(
-        user     => $login_error_user->user,
-        password => 'login-error-password',
-        subject  => 'Login error subject',
-        event    => 'Login error body',
+    my $login_failure = post_from_retained(
+        user     => $owner->user,
+        password => 'anonymous-adapter-password',
+        subject  => 'Protocol login failure subject',
+        event    => 'must not persist',
         security => 'private',
     );
     $login_override = { success => 'FAIL', errmsg => 'Anonymous login error marker' };
     @order          = ();
-    my $login_error_res = $request->($login_error);
+    my $login_failure_res = $request->($login_failure);
     $login_override = undef;
-    like(
-        $login_error_res->content,
-        qr/Error logging in:.*Anonymous login error marker/s,
-        'login protocol failure returns the retained-style native login error'
-    );
-    is_deeply(
-        \@order,
-        [qw(login decode save spam)],
-        'login protocol failure still makes the retained post attempt and spam check'
-    );
-    is( user_state( $login_error_user->id )->{autoformat},
-        0, 'login error does not run success-only anonymous housekeeping' );
+    like( $login_failure_res->content,
+        qr/DECLINED/, 'protocol login failure declines to retained BML before native decode' );
+    is_deeply( \@order, ['login'],
+        'protocol login failure performs no decoder, save attempt, or post hooks' );
 
     my $before_empty = entry_count($owner);
     my $empty        = post_from_retained(
@@ -424,6 +413,20 @@ test_psgi $adapter, sub {
     is_deeply( user_state($owner_id), $decline_state,
         'declined requests leave anonymous draft/editor and formatting state unchanged' );
 
+    my $invalid_get_target = post_from_retained(
+        user     => $owner->user,
+        password => 'anonymous-adapter-password',
+        subject  => 'Invalid initial GET target',
+        event    => 'must not persist',
+        security => 'private',
+    );
+    $invalid_get_target->uri->query_form( usejournal => 'not-the-owner' );
+    @order = ();
+    my $invalid_get_target_res = $request->($invalid_get_target);
+    like( $invalid_get_target_res->content,
+        qr/DECLINED/, 'initial GET usejournal target declines before anonymous auth' );
+    is_deeply( \@order, [], 'initial GET target performs no login/decode/save/hook work' );
+
     my $missing = remove_form_field(
         post_from_retained(
             user     => $owner->user,
@@ -523,5 +526,43 @@ test_psgi $adapter, sub {
     is( entry_count($other), 2,
         'implicit ordinary retained update posts exactly one additional entry' );
 };
+
+# The legacy attempt context survives a response-suppressed post attempt so
+# its explicit no-crosspost master and anonymous remote still control queueing.
+# This guards the distinction between attempt timing and success rendering.
+{
+    my $save_new_entry = \&DW::Entry::_save_new_entry;
+    no warnings 'redefine';
+    local *DW::Entry::_save_new_entry = sub {
+        return {
+            itemid => 999,
+            anum   => 0,
+            url    => $owner->journal_base . '999.html',
+        };
+    };
+    local *DW::Template::render_template = sub { return 0; };
+
+    my $before_scheduler = $scheduler_calls;
+    DW::Controller::Entry::_do_post(
+        {
+            subject         => 'Suppressed legacy success subject',
+            event           => 'Suppressed legacy success body',
+            security        => 'private',
+            props           => {},
+            crosspost_entry => 1,
+        },
+        { noauth => 1,      u       => $owner },
+        { poster => $owner, journal => $owner },
+        legacy_success => {
+            request          => { mode => 'postevent' },
+            poster           => $owner,
+            remote           => undef,
+            crosspost_master => 0,
+        },
+        legacy_suppress_success => 1,
+    );
+    is( $scheduler_calls, $before_scheduler,
+        'suppressed legacy attempt retains explicit no-crosspost queue behavior' );
+}
 
 done_testing;

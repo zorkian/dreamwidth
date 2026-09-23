@@ -774,7 +774,7 @@ sub legacy_anonymous_update_handler {
     return undef if grep { /^action:(?!update$)/ && $legacy_post->{$_} } keys %$legacy_post;
     return undef unless defined $legacy_post->{user}     && length $legacy_post->{user};
     return undef unless defined $legacy_post->{password} && length $legacy_post->{password};
-    return undef if $legacy_post->{usejournal};
+    return undef if $legacy_post->{usejournal} || $legacy_get->{usejournal};
     return undef if $legacy_get->{altlogin} || $legacy_post->{chal} || $legacy_post->{response};
     return undef
         if $legacy_post->{transform} || $legacy_post->{showform} || $legacy_post->{moreoptsbtn};
@@ -802,12 +802,12 @@ sub legacy_anonymous_update_handler {
     my %login_res;
     LJ::do_request( \%login_req, \%login_res, \%flags );
 
-    my $errors   = DW::FormErrors->new;
+    # Failed protocol login retains BML's error path. This callable slice owns
+    # only successful-password owner posts, so it must decline before decode.
+    return undef unless ( $login_res{success} || '' ) eq 'OK';
+
     my $warnings = DW::FormErrors->new;
-    if ( ( $login_res{success} || '' ) ne 'OK' ) {
-        $errors->add( undef, '/entry/form.tt.error.login', { error => $login_res{errmsg} || '' }, );
-    }
-    elsif ( $login_res{message} ) {
+    if ( $login_res{message} ) {
         $warnings->add_string( undef, LJ::auto_linkify( LJ::ehtml( $login_res{message} ) ), );
     }
 
@@ -836,9 +836,9 @@ sub legacy_anonymous_update_handler {
             switched_rte_on  => $legacy_post->{switched_rte_on},
             crosspost_master => 0
         },
-        legacy_suppress_success => $errors->exist,
     );
-    return $post_res{render} if ( $post_res{status} || '' ) eq 'ok' && !$errors->exist;
+    return $post_res{render} if ( $post_res{status} || '' ) eq 'ok';
+    my $errors = DW::FormErrors->new;
     $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
     return legacy_new_rerender(
         $prepared,
