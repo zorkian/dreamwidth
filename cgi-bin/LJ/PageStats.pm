@@ -170,8 +170,14 @@ sub get_conf {
 sub filename {
     my ($self) = @_;
     my $r = $self->get_request;
+    return undef unless $r;
 
+    # DW::BML::RequestAdapter->new never sets _filename (DW::Request has no
+    # filesystem-path concept to synthesize one from), so this is undef for
+    # every request reached under Plack; do not invent one from the URI.
     my $filename = $r->filename;
+    return undef unless defined $filename;
+
     $filename =~ s!$LJ::HOME/(?:ssldocs|htdocs)!!;
 
     return $filename;
