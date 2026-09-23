@@ -1813,3 +1813,34 @@ checks, after widgets Terra completes customization1/4.
   diagnoses native retry editor initialization from exact runtime state. No
   browser pass or route activation is claimed; disposable processes are checked
   before reruns rather than launching duplicates.
+
+
+### Actual error retry and update browser acceptance clear
+
+- Foreman completed the unfinished HTTP matrix in93fab0e2d, independently clear
+  by Sol: actual encoded form pairs remove every action control and submit_value;
+  distinct submitted subject/body, zero decode/spam hooks, fresh security/body/
+  subject/unrelated checks make no-action/unknown/missing/invalid cases nonvacuous.
+  Exact POST alias URIs are now asserted. The test uses original editevent seed.
+- Real invalid-date POST exposed a production duplicate alert: helper added the
+  same backend error to errors and warnings.93fab removes the warning copy and
+  guards absent success status. Actual Foundation HTTP proves one visible error,
+  raw invalid date/subject/body/security, modern retry/query and no persistence.
+  Direct helper asserts one error object/no warning instead of depending on its
+  partial request's warning markup. Foreman4files221 PASS; Sol HTTP138/helper26/
+  rerender22/selector6/edit-success16 all PASS.81 worker increment is superseded,
+  not integrated as accepted evidence.
+- Update browser192 independently clear and integrated75e674910. Foreman exact
+  static build and real normal browser pass in /tmp/bml-update-adapter-*.log;
+  no helper/server remains. Sol normal and named intentional exit1 cleanup pass.
+  Source old draft/native entry-body FCK names and rendered form action are
+  asserted. Initial404 was stale built combined JS assets; rebuilding
+  build/static/max/js resolved it without production changes or mode bypass.
+- Inspected foreman captures preserved by5a390efd4 in
+  doc/bml-evidence/2026-09-23/legacy-update-adapter. Full tidy1119 and compile1607
+  PASS in /tmp/bml-editor-acceptance-{tidy,compile}.log; root sessions completed.
+- Widgets0a3513ca1 browser save/delete is retained-BML baseline only (port8080,
+  no native route). Not accepted as native migration evidence. Worker now has
+  clear93 prerequisite and must add isolated test-only native route plus retry.
+  Themes continues authorized community/moderated update extension. No public
+  route activation, BML deletion, push or deployment yet.

@@ -61,26 +61,27 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: owner-only callable update752+26c independently clear and integrated
-   13cba88f7/c116f5b44. Browser test-only routing remains active WIP: real old form
-   success and failed-native retry, FCK readiness, disposable cleanup/captures.
-   Complete that before separate community/moderation extension following
-   BML-UPDATE-COMMUNITY-INTEGRATION.md. No public route registration.
-2. Widgets: rerender bdc+755 and success015 are integrated and clear. Callable
-   owned-edit helperbeb+771 is clear and integrated5af39e827/88e2c2cc8; raw decoded
-   hook reference corrected. Actual middleware tests757/8d are held: empty same-name submit selection
-   omitted security and changed private to public. Worker must fix truthy visible
-   control selection, remove submit_value rewrite, assert fresh security, then
-   complete denial/retry cases. Helper stub tests alone are insufficient.
-3. Sol: independently cleared current callable corrections and completed bounded
-   community/moderation source handoff. Latest757/8d test finding is routed; ready for immutable corrections and browser.
-   Held inbox and pending external Journal interfaces remain excluded.
+1. Themenav: owner update752+26c and browser192 independently clear, integrated
+   13cba88f7/c116f5b44 and75e674910. Foreman normal browser/build passed and captures
+   are preserved. Active separate community/moderated extension per
+   BML-UPDATE-COMMUNITY-INTEGRATION.md; worker278 assertions passed, broader
+   checks/commit pending. No public routes yet.
+2. Widgets: owned helper and actual HTTP matrix93fab independently clear. Foreman
+   completed the omitted invalid-date/no-action work; worker81 is superseded.
+   Active native owned-edit browser acceptance:0a3513ca1 only exercised old BML
+   at8080, so worker must add isolated native test server and retry flow. Clear93
+   supplied for cherry-pick; preserve test/fixture WIP and separate worktree.
+3. Sol: cleared93 final matrix/duplicate-error fix and192 update browser. Ready
+   for immutable community extension and actual native edit-browser packages.
+   Held inbox and external Journal deployment decisions remain unchanged.
 
-Current combined-tree callable/retained/native6files462 PASS, tidy1116 PASS,
-compile1607 PASS. Logs /tmp/bml-callable-adapters-integrated.log and
-/tmp/bml-callable-adapters-{tidy,compile}.log in foreman container. Earlier shared
-rerender102 and edit-success176 also passed. No root test process is active.
-All integrations remain local, with no public old-route cutover.
+Current combined-tree matrix/native edit4files221 PASS; earlier callable/legacy/
+native6files462 and actual edit HTTP3files159 PASS. Full tidy1119 and compile1607
+PASS in /tmp/bml-editor-acceptance-{tidy,compile}.log. Foreman update browser PASS
+in /tmp/bml-update-adapter-browser.log after exact static build; captures under
+legacy-update-adapter evidence folder. All root test sessions are complete.
+Latest root code93fab and75e674910 are independently clear, evidence5a390efd4.
+All integrations remain local; public old routes have not been cut over.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
