@@ -2304,3 +2304,17 @@ are preserved under manager-property-public. Dispatch tries personal, same-poste
 community, then property-only manager, stopping on each defined result. Manager GET
 and delete/report surfaces remain retained; no valid reporting or deletion action
 was included in this package.
+
+## Callable share integration and remaining anonymous composition gate
+
+- Sol cleared d7784f3f8 + dd049ba45 callable share source/HTTP/browser. Integrated
+  locally as689cb2725/45bf590ce, with formatting-only800f8d52a under narrow review.
+- Foreman four focused suites178 PASS, exact assets and real browser PASS; owned
+  server/fixture exited. Desktop/narrow evidence: update-share-callable directory.
+  Full formatting/compile session43129 remains in progress at this checkpoint.
+- Public share remains separate. Anonymous callable browser fixture diagnosis
+  found incorrect property storage reads and inactive raw-date controls; fixes
+  remain worker-owned and uncommitted. Accepted anonymous HTTP is not reopened.
+- Public anonymous audit679c7ad8e documents duplicate failed-login/rate side effects
+  from naive fallback. Retained sequence characterization is next, test-only.
+  Alternate-login rendering boundary audit preserved14da59427, no activation.

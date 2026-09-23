@@ -1,3 +1,30 @@
+## Callable share integrated; anonymous browser remains active
+
+Sol d7784f3f8 + dd049ba45 CLEAR for callable source, HTTP42+52 and browser
+normal/named failure with cleanup. Root integrated as689cb2725,45bf590ce;
+formatting-only bbb0a2970 integrated as800f8d52a, narrow Sol comparison pending.
+Foreman focused four-suite178 PASS (/tmp/bml-share-integrated-prove.log), exact
+static build and browser PASS (/tmp/bml-share-build.log,/tmp/bml-share-browser.log).
+Owned share server/fixture check empty. Captures preserved in update-share-callable.
+Full tidy/compile running session43129; do not duplicate. Public share not activated.
+Sol now audits the finite public share placement/matrix without external fetches.
+
+Anonymous callable HTTP remains accepted through c778. Widgets browser WIP reached
+native correction, then a displaydate assertion failed. Foreman identified wrong
+fixture SQL (userprop/name versus actual property storage); use the property API
+with fresh reads and assert seeded nonempty drafts/displaydate before nonmutation.
+Earlier invalid-date browser probe had date_diff=0, so retained decoder correctly
+ignored raw invalid date; actual settime/date_diff=1 is now used. No production
+regression established. Finish normal, named failure, clean EOF and owned-process
+cleanup before immutable browser review. Do not launch duplicate active runs.
+
+Anonymous public composition stays gated: source audit679c7ad8e documents that
+naive callable auth then BML fallback adds a fourth failed-login check and rate
+side effects. Themes is writing test-only retained sequence characterization,
+not implementing public auth. Altlogin source-only audit is preserved14da59427;
+credential/target schema and failed-auth paths remain separate activation gates.
+Held inbox/platform and deployment hook work remain held; no publishing.
+
 ## Public manager property activation integrated and validated
 
 Sol423+09 CLEAR178 with independently cleared plain-app browser. Integrated as
