@@ -1,3 +1,14 @@
+## Render-only alternate-login retry integrated
+
+Sol ce4a7d63c57546e8c19e40a7430034e86f3d78f5 CLEAR; root cee270600.
+Only optional presentation forwarding changed. Root four adjacent suites PASS,
+127 assertions; full tidy1177 and compile1607 PASS. Logs in root container:
+/tmp/bml-altlogin-rerender-integrated.log and corresponding -tidy/-compile logs.
+No root validation process remains. Browser prerequisite is still WIP: seeded
+restore confirmation must be observed before awaiting navigation, fresh state
+proved while open, and deliberate dismissal kept outside nonmutation claim.
+No public activation or credential submission is authorized by this seam.
+
 ## Active bounded alternate-login prerequisites
 
 Root through 001ea640f remains clean and validated as recorded below.
