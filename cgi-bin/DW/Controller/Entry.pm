@@ -1057,6 +1057,7 @@ sub _do_post {
     my ( $form_req, $flags, $auth, %opts ) = @_;
 
     my $res = DW::Entry::_save_new_entry( $form_req, $flags, $auth );
+    _legacy_post_spam_check( $opts{legacy_success}, $auth->{poster} );
     return %$res if $res->{errors};
 
     # post succeeded, time to do some housecleaning
@@ -1343,6 +1344,15 @@ sub _do_edit {
 }
 
 # remember value of properties, to use the next time the user makes a post
+
+# Retained update performs this after the protocol post attempt, including an
+# unsuccessful attempt. Native handlers retain their existing pre-save check.
+sub _legacy_post_spam_check {
+    my ( $legacy, $poster ) = @_;
+    return unless $legacy && exists $legacy->{request};
+
+    LJ::Hooks::run_hooks( 'spam_check', $poster, $legacy->{request}, 'entry' );
+}
 
 # Legacy wrappers pass the old, flat decoder request explicitly. Do not derive
 # it from the normalized request: deployment hooks may depend on fields that the
