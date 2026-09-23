@@ -219,14 +219,24 @@ test_psgi $app, sub {
         )
     {
         my $path = '/update.bml';
-        my $res  = $request->( GET $path );
-        my $form = update_form( $res->content, $path );
+
+        # Failures must not accidentally exercise the old successful-post
+        # housekeeping.  Seed values that a formatting/plain-editor POST would
+        # visibly overwrite, and force-read this case's baseline.
+        my $failure_owner = LJ::load_userid( $owner_id, 1 );
+        $failure_owner->set_prop( entry_editor            => 'rich' );
+        $failure_owner->set_prop( disable_auto_formatting => 1 );
+        my $failure_state_before = fresh_user_state($owner_id);
+        my $res                  = $request->( GET $path );
+        my $form                 = update_form( $res->content, $path );
         ok( $form, "$case->{label} starts from the retained anonymous form" ) or next;
         $form->action( 'http://localhost' . $path );
-        $form->value( user     => $owner->user );
-        $form->value( password => $case->{password} );
-        $form->value( subject  => $case->{subject} );
-        $form->value( event    => $case->{body} );
+        $form->value( user             => $owner->user );
+        $form->value( password         => $case->{password} );
+        $form->value( subject          => $case->{subject} );
+        $form->value( event            => $case->{body} );
+        $form->value( event_format     => undef ) if $form->find_input('event_format');
+        $form->value( richtext_default => undef ) if $form->find_input('richtext_default');
 
         my $before = entry_count($owner_id);
         my $post   = $form->click('action:update');
@@ -238,8 +248,9 @@ test_psgi $app, sub {
         like( $res->content, $case->{want_error},
             "$case->{label} has a meaningful error response" );
         is( entry_count($owner_id), $before, "$case->{label} creates no entry" );
-        is_deeply( fresh_user_state($owner_id),
-            $state_before, "$case->{label} leaves draft/editor and formatting state unchanged" );
+        is_deeply( fresh_user_state($owner_id), $failure_state_before,
+"$case->{label} leaves draft/editor and formatting state unchanged despite plain formatting input"
+        );
 
         my $retry = update_form( $res->content, $path );
         ok( $retry, "$case->{label} rerenders the retained anonymous form" );
