@@ -1523,9 +1523,10 @@ sub legacy_owned_edit_rerender {
 }
 
 # Dispatch the ordinary owned-entry subset of a retained editjournal POST. It
-# deliberately receives the already-authorized entry from a future route
-# wrapper: maintainer, community, and spam-delete requests fall through before
-# decoding or mutating anything.
+# deliberately receives an already-authorized entry from a future route wrapper.
+# Personal ownership is the default; an explicit same-poster community opt-in
+# may use the same mutation seam. Maintainer, non-opted-in community, and
+# spam-delete requests fall through before decoding or mutating anything.
 sub legacy_owned_edit_post {
     my (%opts) = @_;
 
@@ -1535,7 +1536,10 @@ sub legacy_owned_edit_post {
     my $post    = $opts{post};
     my $get     = $opts{get} || {};
     return unless $entry && $remote && $journal && $post;
-    return unless $journal->equals($remote) && $entry->poster->equals($remote);
+    return unless $entry->poster->equals($remote);
+    return
+        unless $journal->equals($remote)
+        || ( $opts{same_poster_community} && $journal->is_comm );
 
     my $action = DW::Entry::Legacy::legacy_edit_action($post);
     return unless $action && ( $action eq 'save' || $action eq 'delete' );
@@ -1552,7 +1556,9 @@ sub legacy_owned_edit_post {
         $journal->log_event(
             'delete_entry',
             {
-                remote       => $remote,
+                remote => $opts{same_poster_community}
+                ? ( $opts{session_remote} || $remote )
+                : $remote,
                 actiontarget => $entry->ditemid,
                 method       => 'web',
             }
