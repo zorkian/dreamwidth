@@ -446,6 +446,9 @@ if ($community_form) {
     $community_form->value( security              => 'public' );
     $community_form->value( prop_current_location => 'Adapter community location' );
     $community_form->value( switched_rte_on       => 1 );
+    ok( $community_form->find_input('prop_xpost_check'),
+        'retained community form exposes its crosspost master checkbox' );
+    $community_form->value( prop_xpost_check => 1 );
     my ( $decoded, $spam, $success );
     my $run_hooks = \&LJ::Hooks::run_hooks;
     my $run_hook  = \&LJ::Hooks::run_hook;
@@ -534,6 +537,27 @@ if ($community_form) {
     }
 }
 
+my $other_community = temp_comm();
+LJ::set_rel( $other_community, $owner, 'P' );
+ok( $owner->can_post_to($other_community), 'owner can post to second disposable community' );
+my $differing_form = retained_form( $community_path, 'differing POST community target' );
+if ($differing_form) {
+    $differing_form->value( subject    => 'Adapter differing target subject' );
+    $differing_form->value( event      => 'Adapter differing target body' );
+    $differing_form->value( security   => 'public' );
+    $differing_form->value( usejournal => $other_community->user );
+    my ( $first_before, $second_before ) =
+        ( entry_count($community), entry_count($other_community) );
+    adapter_post( $differing_form, $community_path, 'differing POST community target' );
+    is( entry_count($community), $first_before,
+        'nonempty submitted target does not use the differing GET community' );
+    is(
+        entry_count($other_community),
+        $second_before + 1,
+        'nonempty submitted target beats the differing GET community'
+    );
+}
+
 # POST owns target selection: an explicit empty field and an absent field both
 # select the owner, regardless of a community-valued query string.
 for my $case ( [ explicit_empty => '' ], [ absent => undef ], ) {
@@ -545,7 +569,7 @@ for my $case ( [ explicit_empty => '' ], [ absent => undef ], ) {
         $form->value( usejournal => $target );
     }
     else {
-        $form->find_input('usejournal')->value(undef);
+        $form->find_input('usejournal')->disabled(1);
     }
     my $before_owner     = entry_count($owner);
     my $before_community = entry_count($community);
