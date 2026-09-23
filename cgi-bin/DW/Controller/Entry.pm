@@ -749,6 +749,8 @@ sub _render_new_form {
 
     $vars->{action} =
         { url => $render_opts->{action_url} // LJ::create_url( undef, keep_args => 1 ), };
+    $vars->{title_override} = $render_opts->{title_override}
+        if exists $render_opts->{title_override};
 
     $vars->{js_for_rte} = LJ::rte_js_vars();
     $vars->{sitevalues} = to_json( \@sitevalues );
@@ -809,7 +811,8 @@ sub legacy_update_get_render {
         subject => exists $hook->{subject} ? $hook->{subject} : $get->{subject},
         event   => exists $hook->{event}   ? $hook->{event}   : $get->{event},
         taglist => exists $hook->{tags}    ? $hook->{tags}    : $get->{prop_taglist},
-        editor => $rich ? 'rte0' : $preformatted ? 'html_raw0' : 'html_casual1',
+        username => $opts{username},
+        editor   => $rich ? 'rte0' : $preformatted ? 'html_raw0' : 'html_casual1',
     };
     my $vars = _init(
         {
@@ -821,10 +824,16 @@ sub legacy_update_get_render {
         }
     );
     return _render_new_form(
-        $vars, $formdata, $get, $remote,
+        $vars,
+        $formdata,
+        $get, $remote,
         $opts{errors}   || DW::FormErrors->new,
         $opts{warnings} || DW::FormErrors->new,
-        undef, { action_url => $opts{action_url} || '/entry/new' }
+        undef,
+        {
+            action_url     => $opts{action_url} || '/entry/new',
+            title_override => $opts{title_override},
+        }
     );
 }
 
@@ -908,6 +917,43 @@ sub legacy_update_readonly_get_handler {
         crosspost     => \%crosspost,
         warnings      => $warnings,
         action_url    => $opts{action_url} || '/entry/new',
+    );
+}
+
+# Render-only anonymous retained /update GET seam. Its caller must choose an
+# action URL before any public route can use this native credential schema.
+sub legacy_update_anonymous_get_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->method eq 'GET';
+    my $remote = exists $opts{remote} ? $opts{remote} : LJ::get_remote();
+    return undef if $remote;
+    die 'missing anonymous legacy update action URL' unless exists $opts{action_url};
+
+    my $get = $opts{get} || DW::Entry::Legacy::legacy_post_hash( $r->get_args );
+
+    # Retained update snapshots prefill before this hook mutates its original
+    # flat GET reference. Repeated GET values therefore stay NUL-joined.
+    my $prefill = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
+    my $hook    = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
+    my $now     = DateTime->now;
+
+    return legacy_update_get_render(
+        remote        => undef,
+        get           => $prefill,
+        update_fields => $hook,
+        legacy_editor => $LJ::DEFAULT_EDITOR || '',
+        rte_supported => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime      => $opts{datetime} || $now->strftime('%F %R'),
+        usejournal    => LJ::canonical_username( $get->{usejournal} || '' ),
+
+        # Retained update reads this login prefill after update_fields; unlike
+        # subject/event/tags it deliberately observes the hook's mutable GET ref.
+        username       => $get->{user},
+        crosspost      => {},
+        action_url     => $opts{action_url},
+        title_override => LJ::Lang::ml('/update.bml.title2'),
     );
 }
 
