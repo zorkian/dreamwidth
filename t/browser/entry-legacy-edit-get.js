@@ -176,6 +176,10 @@ function waitForPort() {
         ]);
 
         const before = await state();
+        assert.equal(before.draft_body, 'Callable GET draft sentinel', 'fresh draft body starts seeded');
+        assert.deepEqual(before.draft_props,
+            {subject: 'Callable GET draft subject', taglist: 'callable-get-tag'},
+            'fresh draft properties start seeded');
         await capture(1280, 'callable-get');
         await capture(390, 'callable-get');
         const afterGET = await state();

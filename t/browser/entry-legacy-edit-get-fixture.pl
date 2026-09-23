@@ -35,14 +35,15 @@ sub state {
     my $target_fresh = LJ::Entry->new( $fresh_user, ditemid => $target->ditemid );
     my $other_fresh  = LJ::Entry->new( $fresh_user, ditemid => $other->ditemid );
     my $draft_props  = $fresh_user->prop('draft_properties');
+    my $draft_data = $draft_props ? thaw($draft_props) : {};
     return {
         target_subject  => $target_fresh->subject_raw,
         target_body     => $target_fresh->event_raw,
         target_security => $target_fresh->security,
         target_editor   => $target_fresh->prop('editor') || '',
         other_subject   => $other_fresh->subject_raw,
-        draft_body      => $user->draft_text,
-        draft_props     => $user->prop('draft_properties'),
+        draft_body      => $fresh_user->draft_text,
+        draft_props     => $draft_data,
     };
 }
 
