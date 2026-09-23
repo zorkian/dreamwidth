@@ -527,7 +527,10 @@ sub _init {
     #             my $date_diff = ($opts->{'mode'} eq "edit") ? 1 : 0;
 
     $vars = {
-        remote => $u,
+        remote        => $u,
+        image_alt_faq => LJ::Hooks::run_hook( 'faqlink', 'alttext',
+            LJ::Lang::ml('/imgupload.bml.insertimage.alt.faqlink') )
+            || LJ::Lang::ml('/imgupload.bml.insertimage.alt.faqlink'),
 
         moodtheme => \%moodtheme,
         moods     => \@moodlist,
