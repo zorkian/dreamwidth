@@ -2326,3 +2326,10 @@ was included in this package.
   No native public anonymous composition is enabled.
 - Widgets browser exposed malformed absent-draft JavaScript in retained anonymous
   GET; separate rendering fix/regression requested. Browser acceptance still open.
+
+- Retained anonymous draft JS correction04ffff (Sol CLEAR95/scoped tidy) integrated
+  asbb6b088e3; foreman adjacent163 PASS. No auth/route/save behavior changed.
+- Anonymous browser first normal pass reached after real FCK interaction/fixture
+  corrections; immutable browser and failure/EOF cleanup acceptance still pending.
+- Retained sequence5a2 correction worker108 PASS queued Sol; public share candidate
+  remains worker WIP with initial public78 PASS, no integration claim.

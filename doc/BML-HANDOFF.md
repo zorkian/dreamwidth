@@ -1,3 +1,23 @@
+## Anonymous draft JS integrated; first browser normal pass reached
+
+Sol04ffff315b6d1a99b2d72bb57025636695e9546b CLEAR for retained rendering;
+rootbb6b088e3 integrated. Foreman anonymous adapter+retained baseline163 PASS
+(/tmp/bml-anonymous-draft-js-integrated.log), session83745 complete. It moves one
+escaping map outside remote-only branch; no auth/route/save behavior changes.
+
+Widgets browser normal now exit0 after correcting fixture property reads,
+authoritative date control, active FCK body updates and bounded startup waits.
+Exact owned fixture/server/port check empty. Browser is still WIP: require final
+secret-free state assertions, named failure, clean EOF, tidy/syntax and immutable
+commit before Sol review. No browser gate inferred from first normal pass.
+
+Themes baseline correction5a2bcd8a7b5786881620a490b62ccc8460eaef46 atopbc021
+adds exact failed-stage order/ref and forced-login-error persisted content; worker
+108 PASS, Sol recheck queued. Public share WIP safely restored and worker78 public
+HTTP currently passes; full finite/browser work continues. Sol also owns source-only
+native failed-auth continuation audit; no public anonymous composition authorized
+by that audit and no policy changes. No root validation processes remain active.
+
 ## Share formatting cleared; retained auth baseline in review
 
 Sol bbb0a2970 formatting-only CLEAR; source behavior unchanged, node checks pass.
