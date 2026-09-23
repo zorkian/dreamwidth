@@ -75,10 +75,7 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
     sub {
         my $r      = DW::Request->get;
         my $remote = ( $r->get_args->{which} || '' ) eq 'b' ? $b : $a;
-        my $ret    = DW::Controller::Entry::legacy_update_altlogin_get_handler(
-            remote     => $remote,
-            action_url => '/entry/new?altlogin=1&encoded=a%2Fb&repeated=first&repeated=second',
-        );
+        my $ret = DW::Controller::Entry::legacy_update_altlogin_get_handler( remote => $remote, );
         if ( defined $ret ) {
             $r->status(200);
             return $r->res;
@@ -174,9 +171,21 @@ LJ::Hooks::are_hooks('update_fields');
         is( $a_form->value('editor'),     'rte0',        'remote rich editor remains selected' );
         is(
             $a_form->action,
-            'http://localhost/entry/new?altlogin=1&encoded=a%2Fb&repeated=first&repeated=second',
-            'caller supplies the explicit raw native retry action'
+            'http://localhost/update?altlogin=1',
+            'altlogin form action is normalized without raw credential-like query values'
         );
+        my @updates = grep { ( $_->name || '' ) eq 'action:update' } $a_form->inputs;
+        is( scalar @updates, 2, 'both visible entry submit buttons use the retained action name' );
+        ok( $a_form->find_input('lj_form_auth'), 'legacy-auth form retains native CSRF control' );
+        like( $a_res->content, qr/id=["']js-remote["']/,
+            'legacy-auth presentation retains the authenticated remote marker' );
+        unlike(
+            $a_res->content,
+            qr/id=["']js-post-entry-login["']/,
+            'legacy-auth presentation does not render the ordinary one-time login modal'
+        );
+        unlike( $a_res->content, qr/name=["']username["']/,
+            'legacy-auth presentation does not emit native username controls' );
         is( $hooks,      1,          'altlogin calls update_fields exactly once' );
         is( $repeats[0], "one\0two", 'hook receives NUL-joined flat repeated GET values' );
         is_deeply( state($a), $before_a, 'altlogin render leaves A state unchanged' );

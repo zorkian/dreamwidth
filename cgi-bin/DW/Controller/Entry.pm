@@ -955,6 +955,11 @@ sub _render_new_form {
         if exists $render_opts->{title_override};
     $vars->{legacy_altlogin} = $render_opts->{legacy_altlogin}
         if $render_opts->{legacy_altlogin};
+    $vars->{submit_action_name} =
+        $render_opts->{legacy_altlogin}
+        && ( $render_opts->{submit_action_name} || '' ) eq 'action:update'
+        ? 'action:update'
+        : 'action:post';
 
     $vars->{js_for_rte} = LJ::rte_js_vars();
     $vars->{sitevalues} = to_json( \@sitevalues );
@@ -1035,9 +1040,10 @@ sub legacy_update_get_render {
         $opts{warnings} || DW::FormErrors->new,
         undef,
         {
-            action_url      => $opts{action_url} || '/entry/new',
-            title_override  => $opts{title_override},
-            legacy_altlogin => $opts{legacy_altlogin},
+            action_url         => $opts{action_url} || '/entry/new',
+            title_override     => $opts{title_override},
+            legacy_altlogin    => $opts{legacy_altlogin},
+            submit_action_name => $opts{submit_action_name},
         }
     );
 }
@@ -1050,7 +1056,6 @@ sub legacy_update_altlogin_get_handler {
 
     my $r = DW::Request->get or return undef;
     return undef unless $r->method eq 'GET';
-    return undef unless exists $opts{action_url};
 
     # The retained page's flat GET ABI is preserved exactly once for the
     # update_fields hook.  Every excluded context remains BML-owned.
@@ -1079,17 +1084,18 @@ sub legacy_update_altlogin_get_handler {
     }
 
     return legacy_update_get_render(
-        remote          => $remote,
-        get             => $prefill,
-        update_fields   => $hook,
-        legacy_editor   => $remote->new_entry_editor,
-        rte_supported   => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
-        datetime        => $now->strftime('%F %R'),
-        usejournal      => $usejournal,
-        crosspost       => \%crosspost,
-        action_url      => $opts{action_url},
-        title_override  => LJ::Lang::ml('/update.bml.title2'),
-        legacy_altlogin => { user => $get->{user} // '' },
+        remote             => $remote,
+        get                => $prefill,
+        update_fields      => $hook,
+        legacy_editor      => $remote->new_entry_editor,
+        rte_supported      => LJ::is_enabled( 'rte_support', $r->header_in('User-Agent') ),
+        datetime           => $now->strftime('%F %R'),
+        usejournal         => $usejournal,
+        crosspost          => \%crosspost,
+        action_url         => '/update?altlogin=1',
+        title_override     => LJ::Lang::ml('/update.bml.title2'),
+        legacy_altlogin    => { username => $get->{user} // '' },
+        submit_action_name => 'action:update',
     );
 }
 
