@@ -105,7 +105,7 @@ sub form_post {
 }
 
 sub trace_anonymous_post {
-    my ( $send, $post ) = @_;
+    my ( $send, $post, %opts ) = @_;
     my ( @sequence, @protocol, @refs );
     my $auth_okay  = \&LJ::auth_okay;
     my $do_request = \&LJ::do_request;
@@ -124,6 +124,10 @@ sub trace_anonymous_post {
             my $mode = $request->{mode} || '';
             push @sequence, $mode;
             push @protocol, [ $mode, refaddr($request) ];
+            if ( $opts{force_login_error} && $mode eq 'login' ) {
+                %$response_hash = ( success => 'FAIL', errmsg => 'forced public login error' );
+                return;
+            }
             return $do_request->(@_);
         };
         local *LJ::Hooks::run_hook = sub {
@@ -333,6 +337,90 @@ test_psgi $app, sub {
         ) if $retry;
         is_deeply( fresh_state($wrong_owner_id),
             $before, "$path wrong password leaves fresh owner state unchanged" );
+    }
+
+    for my $case ( [ 'forced login error', 'force_login_error' ], ) {
+        my ( $label, $forced ) = @$case;
+        my $failure_owner = temp_user();
+        $failure_owner->update_self( { status => 'A' } );
+        my $failure_password = 'anonymous-public-' . LJ::rand_chars(24);
+        $failure_owner->set_password($failure_password);
+        $failure_owner->set_draft_text("$label draft sentinel");
+        $failure_owner->set_prop(
+            draft_properties => nfreeze( { subject => "$label frozen subject" } ) );
+        $failure_owner->set_prop( entry_editor => 'always_plain' );
+        $failure_owner->entry_editor2('markdown0');
+        $failure_owner->set_prop( disable_auto_formatting => 1 );
+        $failure_owner->displaydate_check(1);
+        my $before = fresh_state( $failure_owner->id );
+        $authenticated_calls = $anonymous_calls = 0;
+        my $post = form_post(
+            $send, '/update', $failure_owner, $failure_password,
+            subject  => "$label subject",
+            body     => "$label body",
+            security => 'private'
+        );
+        my $trace = trace_anonymous_post( $send, $post, $forced => 1 );
+        my $res   = $trace->{response};
+        is( $authenticated_calls, 1, "$label reaches authenticated handler once" );
+        is( $anonymous_calls,     1, "$label is claimed by anonymous handler once" );
+        is_deeply( [ map { $_->[0] } @{ $trace->{protocol} } ],
+            [qw(login postevent)], "$label performs one login and one postevent" );
+        is_deeply(
+            $trace->{sequence},
+            [qw(update_fields auth login decode postevent spam)],
+            "$label has one claimed failure sequence without repeated authentication"
+        );
+        is(
+            $trace->{protocol}[1][1],
+            $trace->{refs}[1],
+            "$label passes decoded request to postevent"
+        );
+        is( $trace->{refs}[1], $trace->{refs}[2],
+            "$label passes decoded request to spam checking" );
+        like(
+            $res->content,
+            $label eq 'forced login error'
+            ? qr/Error logging on:\s+forced public login error/
+            : qr/forced public postevent error/,
+            "$label renders the meaningful retained protocol error"
+        );
+        unlike( $res->content, qr/id=['"]updateForm['"]/, "$label does not fall back to BML" );
+        my ($retry) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/update' );
+        ok( $retry, "$label renders the native retry form" );
+        is(
+            $retry ? $retry->value('subject') : undef,
+            "$label subject",
+            "$label retains the submitted subject"
+        );
+        is( $retry ? $retry->value('event') : undef,
+            "$label body", "$label retains the submitted body" );
+        is_deeply(
+            [
+                grep { length } map { $_->value // '' }
+                grep { ( $_->name || '' ) eq 'password' } $retry->inputs
+            ],
+            [],
+            "$label blanks every password input"
+        ) if $retry;
+        my $after = fresh_state( $failure_owner->id );
+        is(
+            $after->{count},
+            $before->{count} + 1,
+            "$label retains the observed postevent persistence"
+        );
+        is_deeply(
+            {
+                map { $_ => $after->{$_} }
+                    qw(draft draft_properties editor editor2 formatting displaydate)
+            },
+            {
+                map { $_ => $before->{$_} }
+                    qw(draft draft_properties editor editor2 formatting displaydate)
+            },
+            "$label does not run success housekeeping"
+        );
     }
 
     {
