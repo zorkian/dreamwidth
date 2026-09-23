@@ -1,3 +1,24 @@
+## Final callable altlogin review and next retained characterization
+
+Themes bd7878fb6f22f912563a92514534da4602e9224e is Sol production-clear: actual
+crosspost wrapper/account suppression and visible credentials proved, ordinary
+renderer unchanged,77 focused PASS. Browser no-write gap corrected test-only in
+aa2bb7041559b9620d281278877bcf87df006aab: nonblank draft/frozen properties asserted
+while observed restore dialog remains open, then deliberate dismissal. Sol narrow
+recheck queued after f029 plain-app anonymous replay. No root altlogin integration
+yet. Themes next task is separate retained altlogin POST test-only actor A/B
+characterization, no production/route changes or external effects.
+
+Corrected source-only audit preserved as BML-ALTLOGIN-POST-COMPOSITION.md. Old
+retained schema may use prepare_entry_form; new native TT schema must NOT feed
+that legacy decoder unchanged. Public alternate-login remains a later gate.
+Widgets f029666f94c152430bb8c876c5d72d24b5038a3b fixes exact target payload/denial and
+removes GET overlay; browser label-only a413 follows. Full public HTTP matrix still
+unfinished. Worker now assigned concrete both-alias3auth/order/ref proof plus
+real-session short-circuit, then forced-login-error/exclusion/isolation rows.
+Root full tidy1169 PASS; no active root test session. Source/runtime already
+integrated remains callable-only anonymous and retained alternate-login.
+
 ## Active finite corrections after integrated callable gates
 
 Root is clean through b3a745609 (whitespace-only baseline formatting verified,
