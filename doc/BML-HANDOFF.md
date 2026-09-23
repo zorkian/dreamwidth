@@ -51,28 +51,33 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
   executable retirement integrated38dca7bd7 after independent clear013be9041. Foreman3files173 PASS, build PASS,
   tidy1091/compile1605 PASS, actual popup browser PASS. Before/after captures in
   doc/bml-evidence/2026-09-23/entry-preview-{before,native}.
-- Spellcheck baseline3b367d0c independently bounded-clear, integrated f6a8261d7;
-  foreman15 PASS in /tmp/bml-spellcheck-baseline-integrated.log.
+- Legacy spellcheck characterization through47f62923d independently clear,
+  integrated c6c1f96f9. Conditional stored-RTE initialization and non-RTE control
+  replace the vacuous hidden-field assertion. Foreman combined spellcheck and
+  crossposting91 PASS in /tmp/bml-editor-characterization-final.log.
 - Earlier customization/settings/picker/FCK/native language and ordinary editor
   packages are integrated and reviewed as recorded in BML-PROGRESS.md.
   Seven executable BML pages still remain in the foreman tree at this update.
 
 ## Current bounded queue
 
-1. Themenav: native configured spellcheck implementation on the integrated
-   preview base, per BML-EDITOR-SPELLCHECK-ACCEPTANCE.md and independent plan
-   audit. Ordinary new/edit nonpersisting branch, retained fields and disposable
-   actual RTE browser acceptance; tests stub checker, no external process.
-   Preview retirement is complete; do not repeat that package.
-2. Widgets: expand the already-clear legacy spellcheck baseline to disabled
-   button absence, retained submitted metadata/date/editor controls and the old
-   edit stored-RTE nuance, plus unchanged draft state. Test-only separate branch;
-   see BML-EDITOR-SPELLCHECK-ACCEPTANCE.md. No external checker process.
-3. Sol: crossposting characterization9e6614a3 is bounded-clear and integrated
-   d6aa5dbb7; foreman crosspost/spellcheck combined65 PASS. Review remaining spellcheck
-   proofs and immutable native implementation next. No external delivery.
-   Native spellcheck implementation is active on the integrated
-   preview base; /tmp/spellcheck-native-plan.md is in Themenav's checkout host.
+1. Themenav: native spellcheck d920ae962 plus isolated browser fixture dde8aa7c3
+   and production correction c95084daa await final independent review. Correction
+   recognizes unavailable spellcheck as a nonpersisting action, retains submitted
+   community context and its permission/readonly checks, and uses lexical action
+   state. Worker38 HTTP assertions pass. Browser fixture independently clear with
+   in-process stub and owned loopback server; final production replay/captures and
+   full checks are active. No external checker or production configuration change.
+2. Widgets: legacy URL-image insertion characterization through3998819c17 has
+   normal browser pass; final intentional-failure cleanup evidence is active.
+   The legacy popup leaves a dangling resize handler after close, documented in
+   BML-IMAGE-INSERT-ACCEPTANCE.md; separate fresh viewport lifecycles preserve the
+   useful baseline without suppressing errors. Native plain-editor parity follows
+   a reviewed shared editor base. No actual media upload feature is involved.
+3. Sol: prioritize c95084daa recheck, then immutable image baseline. In parallel
+   between implementation reviews, prepare a read-only map of ordinary legacy
+   update/editjournal POST schema into shared native handlers. Keep held work and
+   deployment interfaces excluded. Preview and draft gates remain closed.
 
 ## Working method and evidence
 

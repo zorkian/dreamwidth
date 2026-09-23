@@ -1533,3 +1533,19 @@ checks, after widgets Terra completes customization1/4.
   BML-IMAGE-INSERT-ACCEPTANCE.md. Existing imgupload performs URL insertion,
   not uploads; modern plain-editor parity is the bounded next package. Actual
   media upload APIs and external deployment interfaces remain outside scope.
+
+### Legacy spellcheck proof complete; native corrections in review
+
+- Integrated independently clear legacy characterization through47f62923d as
+  c6c1f96f9. Stored-RTE proof observes conditional useRichText initialization with
+  a non-RTE control, rather than the unconditional hidden zero value. Foreman
+  spellcheck/crosspost combined91 PASS, /tmp/bml-editor-characterization-final.log.
+- Sol found three native d920 issues: unavailable checker action could reach save,
+  submitted community context was lost, and action state used a writable POST
+  sentinel. Terra correction c95084daa passes38 and is under independent recheck;
+  no native spellcheck range is integrated yet. Isolated browser fixture dde8aa7c3
+  independently passes normal/failure cleanup; final production replay is active.
+- Legacy image insertion baseline through3998819c17 passes normal browser with
+  visible desktop/narrow popup captures. Final failure cleanup remains in progress.
+  Pre-existing dangling resize handler after popup close is explicitly recorded;
+  no production change or page-error suppression was used for characterization.
