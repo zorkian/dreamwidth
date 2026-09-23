@@ -58,6 +58,16 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- Pre-existing upstream bug surfaced by W13: 14 call sites in six files still
+  request .bml-scoped keys (/manage/profile/index.bml.*, /poll/create.bml.*,
+  /manage/settings/index.bml.title.anon, /manage/tags.bml.title2,
+  /manage/circle/edit.bml.*) whose .text files were deleted on upstream main
+  by earlier conversions; production serves them from the DB, dev renders
+  missing-string. W14 (widgets) relocates them to native homes with
+  deadphrases entries. W13 pre-characterization tests + doc under review;
+  E3 (engine deletion) in progress with the reviewer's independent pre-audit
+  folded in (BMLInit hooks are engine-internal BML::register_hook entries with
+  no native reader; LJ::Lang .bml branches drop only after W14).
 - E1b dead altlogin strings 75fa62d88 CLEAR, integrated as 7ffc2a503. E2 last
   non-engine BML::* callers range 6caa073dd, e05bbf721, 559849bec, e753ad33e
   CLEAR, integrated as c26ae6e9e, 4d14a311b, c75677acc, 6ecdb242c. Foreman
