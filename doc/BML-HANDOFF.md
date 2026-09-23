@@ -1,3 +1,23 @@
+## Final manager routing proof queued
+
+Sol423 production/HTTP168/plain-app browser normal+named cleanup are clear; two
+finite public rows held. Test-only09d8797351395f09dff89f85436cbf1b0911a87e adds
+actor-self target and real noncoincident B-community composite under A, all inert
+invalid-token savemaintainer with zero writes/fresh state. Worker178 PASS; Sol
+narrow final recheck queued. No manager integration yet.
+
+Themes preserved share WIP in a named stash to make09, then resumes callable share
+implementation. Widgets anonymous browser remains uncommitted; first visible-submit
+issue passed, now diagnosing retained response and owned test-port cleanup. Scope
+credentials to actual #updateForm rather than header controls; do not log passwords
+or duplicate a live run. Accepted anonymous HTTP/production already integrated.
+
+Sol also has bounded source-only anonymous public composition audit queued at
+/tmp/bml-anonymous-public-post-composition.md: handler order and possible duplicate
+auth_okay side effects after failed callable auth followed by BML. No authentication
+execution, public activation or new policy is authorized by that audit itself.
+Root has no active validation process; all accepted integration checks are complete.
+
 ## Integrated anonymous callable checks complete
 
 Foreman formatting1160 and compile1607 PASS after anonymous callable integration;
