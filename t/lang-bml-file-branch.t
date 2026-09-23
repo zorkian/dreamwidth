@@ -1,63 +1,33 @@
 #!/usr/bin/perl
-# Characterizes LJ::Lang::get_text's '.bml.' from_files branch
-# (LJ/Lang.pm ~617-623) ahead of E3's engine deletion: is it still reachable
-# by any live caller, and what does it produce today.
-#
-# git ls-files '*.bml.text' returns nothing (confirmed on the host; worktree
-# git metadata does not always resolve inside the devcontainer, so this test
-# scans the working tree directly instead) -- every backing file the branch
-# could read from htdocs/*.bml.text[.local] is gone. But the branch is not
-# dead code: grepping cgi-bin/, views/, and ext/ for '.bml.' key literals
-# (excluding deadphrases.dat and ext/dw-nonfree/bin/upgrading/deadphrases-local.dat,
-# and excluding plain code comments) finds 14 live call sites across 6 files
-# still asking LJ::Lang::ml()/->ml() for a '/....bml.something' key:
-#   cgi-bin/LJ/Setting/Gender.pm            (4: gender.female/male/other/unspecified)
-#   cgi-bin/LJ/Setting/BirthdayDisplay.pm   (4: show.birthday.nothing/day/year/full)
-#   cgi-bin/DW/Controller/Entry.pm:1674     (1: /poll/create.bml.error.accttype2)
-#   views/manage/index.tt                   (4: title, title.anon, tags.title2, circle/edit.title2)
-#   views/manage/circle/index.tt:20         (1: /manage/circle/edit.bml.title3)
-#   views/delcomment.tt:34                  (1: /manage/settings/index.bml.title.anon, same key as
-#                                                one of manage/index.tt's four)
-#
-# On a dev server, get_text's dev-server branch (IS_DEV_SERVER && general
-# domain && source language) calls from_files() UNCONDITIONALLY rather than
-# as a fallback, and from_files() finds none of these files, so every one of
-# these 14 keys currently renders as a literal "[missing string ...]" banner
-# rather than real text on any dev server -- independent of E3 and not
-# something E3 introduces. This test locks in that observed (broken)
-# behaviour so a regression it didn't cause isn't pinned on E3, not because
-# the behaviour is correct.
-#
-# W14 relocates all 14 keys to native homes and flips this file's second
-# subtest to assert real text with no missing-string banner instead.
+# The 14 keys this file's earlier revision found still asking
+# LJ::Lang::get_text's '.bml.' from_files branch for a key backed by a
+# deleted *.bml.text file (every one rendered as a missing-string banner on a
+# dev server) are now relocated to native homes:
+#   cgi-bin/LJ/Setting/Gender.pm            -> setting.gender.option.*
+#   cgi-bin/LJ/Setting/BirthdayDisplay.pm   -> setting.birthdaydisplay.option.*
+#   cgi-bin/DW/Controller/Entry.pm:1674     -> poll.error.accttype
+#   views/manage/index.tt                   -> views/manage/index.tt.text
+#   views/manage/circle/index.tt:20         -> views/manage/circle/index.tt.text
+#   views/delcomment.tt:34                  -> views/delcomment.tt.text
+# This asserts every former site now renders real text with no missing-string
+# banner, and that no '.bml.' key literal remains anywhere outside
+# deadphrases.dat.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
 use File::Find;
+use HTTP::Request::Common;
+use Plack::Test;
 use Test::More;
 
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Lang;
+use LJ::Session;
+use LJ::Setting::BirthdayDisplay;
+use LJ::Setting::Gender;
+use LJ::Test qw(temp_user);
 
-plan skip_all => 'requires a development server (get_text\'s file-read branch is dev-only)'
-    unless $LJ::IS_DEV_SERVER;
-
-my @live_bml_keys = (
-    '/manage/profile/index.bml.gender.female',
-    '/manage/profile/index.bml.gender.male',
-    '/manage/profile/index.bml.gender.other',
-    '/manage/profile/index.bml.gender.unspecified',
-    '/manage/profile/index.bml.show.birthday.nothing',
-    '/manage/profile/index.bml.show.birthday.day',
-    '/manage/profile/index.bml.show.birthday.year',
-    '/manage/profile/index.bml.show.birthday.full',
-    '/poll/create.bml.error.accttype2',
-    '/manage/profile/index.bml.title',
-    '/manage/settings/index.bml.title.anon',
-    '/manage/tags.bml.title2',
-    '/manage/circle/edit.bml.title2',
-    '/manage/circle/edit.bml.title3',
-);
+plan skip_all => 'requires a development server' unless $LJ::IS_DEV_SERVER;
 
 subtest 'the from_files branch has no backing files left to read' => sub {
     my @text_files;
@@ -74,11 +44,117 @@ subtest 'the from_files branch has no backing files left to read' => sub {
     is_deeply( \@text_files, [], 'no remaining *.bml.text files under htdocs/ or ext/' );
 };
 
-subtest 'every live .bml. key currently renders as a missing-string banner' => sub {
-    for my $key (@live_bml_keys) {
-        ok( LJ::Lang::is_missing_string( LJ::Lang::ml($key) ),
-            "$key currently resolves to a missing-string banner on a dev server" );
+subtest 'the poll error key resolves to real text' => sub {
+    my $text = LJ::Lang::ml('poll.error.accttype');
+    ok( !LJ::Lang::is_missing_string($text), 'poll.error.accttype is not a missing-string banner' );
+    is(
+        $text,
+        "Your account type doesn't allow you to create polls.",
+        'poll.error.accttype resolves to its relocated English text'
+    );
+};
+
+subtest 'LJ::Setting::Gender and LJ::Setting::BirthdayDisplay render real option text' => sub {
+
+    # Neither class has a live caller anywhere in the tree (grepped
+    # cgi-bin/+views/: only their own package declarations match) -- no
+    # settings page currently renders them, so this calls their own as_html
+    # directly rather than rendering a page that doesn't exist.
+    my $u = temp_user();
+    $u->update_self( { status => 'A', gender => 'F' } );
+
+    my $gender_html = LJ::Setting::Gender->as_html( $u, {} );
+    ok( !LJ::Lang::is_missing_string($gender_html), 'Gender as_html has no missing-string banner' );
+    for my $option ( qw(Female Male Other), 'Rather not say' ) {
+        like( $gender_html, qr/\Q$option\E/, "Gender as_html renders '$option'" );
     }
+
+    my $birthday_html = LJ::Setting::BirthdayDisplay->as_html( $u, {} );
+    ok(
+        !LJ::Lang::is_missing_string($birthday_html),
+        'BirthdayDisplay as_html has no missing-string banner'
+    );
+    for my $option (
+        'Do not display',
+        'Display only the month and day',
+        'Display only the year',
+        'Display month, day, and year'
+        )
+    {
+        like( $birthday_html, qr/\Q$option\E/, "BirthdayDisplay as_html renders '$option'" );
+    }
+};
+
+my $app = do "$ENV{LJHOME}/app.psgi";
+die $@ unless ref $app eq 'CODE';
+
+my $u = temp_user();
+$u->update_self( { status => 'A' } );
+my $session = LJ::Session->create( $u, nolog => 1 );
+my $cookie =
+      'ljmastersession='
+    . $session->master_cookie_string
+    . '; ljloggedin='
+    . $session->loggedin_cookie_string;
+
+test_psgi $app, sub {
+    my $send = shift;
+    my $cb   = sub { my $req = shift; $req->header( Cookie => $cookie ); return $send->($req); };
+
+    subtest '/manage/ renders real text for all four relocated keys' => sub {
+        my $res = $cb->( GET '/manage/' );
+        is( $res->code, 200, '/manage/ renders' );
+        like( $res->content, qr/Edit Profile/,     'relocated profile title renders' );
+        like( $res->content, qr/Account Settings/, 'relocated settings title renders' );
+        like( $res->content, qr/Manage Tags/,      'relocated tags title renders' );
+        like( $res->content, qr/Manage Circle/,    'relocated circle edit title renders' );
+    };
+
+    subtest '/manage/circle/ renders real text for its relocated key' => sub {
+        my $res = $cb->( GET '/manage/circle/' );
+        is( $res->code, 200, '/manage/circle/ renders' );
+        like( $res->content, qr/Manage Circle/, 'relocated circle edit title (title3) renders' );
+    };
+
+    subtest 'a delcomment page renders real text for its relocated key' => sub {
+        my $poster = temp_user();
+        $poster->update_self( { status => 'A' } );
+        my $entry   = $u->t_post_fake_entry;
+        my $comment = $entry->t_enter_comment( u => $poster );
+
+        my $res = $cb->( GET '/delcomment?journal=' . $u->user . '&id=' . $comment->dtalkid );
+        is( $res->code, 200, '/delcomment renders' );
+        like(
+            $res->content,
+            qr/Account Settings/,
+            'relocated settings-link text renders in the changeoptions notice'
+        );
+    };
+};
+
+subtest 'no .bml. key literal remains in cgi-bin/views/ext outside deadphrases' => sub {
+    my @offenders;
+    find(
+        {
+            wanted => sub {
+                return unless -f $_ && /\.(?:pm|tt)$/;
+                return if $File::Find::name =~ m{/t/lang-bml-file-branch\.t$};
+                return if $File::Find::name =~ m{/deadphrases(?:-local)?\.dat$};
+                open my $fh, '<', $_ or return;
+                while ( my $line = <$fh> ) {
+                    next if $line =~ /^\s*#/;
+                    push @offenders, "$File::Find::name:$.: $line"
+                        if $line =~ /\.bml\.[a-zA-Z_]/;
+                }
+            },
+            no_chdir => 1,
+        },
+        "$ENV{LJHOME}/cgi-bin",
+        "$ENV{LJHOME}/views",
+        "$ENV{LJHOME}/ext",
+    );
+    is_deeply( \@offenders, [], 'no .bml. key literal remains outside deadphrases' )
+        or diag(@offenders);
 };
 
 done_testing;
