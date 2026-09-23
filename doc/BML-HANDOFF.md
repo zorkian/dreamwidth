@@ -58,6 +58,19 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- E1b dead altlogin strings 75fa62d88 CLEAR, integrated as 7ffc2a503. E2 last
+  non-engine BML::* callers range 6caa073dd, e05bbf721, 559849bec, e753ad33e
+  CLEAR, integrated as c26ae6e9e, 4d14a311b, c75677acc, 6ecdb242c. Foreman
+  commits in the same integration: dcfb2bffb (Protocol.pm engine import and
+  history comment dropped, reviewed CLEAR), 15714a059 (t/bml-shims-loaded.t
+  inverted: ljlib.pl alone must NOT load DW::BML, Apache::BML or BMLInit while
+  the standalone adapter still loads), 7b8bd2170 (sendmessage test's
+  no-request subtest uses the native call). State: no executing BML::* call
+  remains outside the engine files and app.psgi's own import; the web path
+  still loads the engine only for the fallback that E3 deletes. Root 19-file
+  allowlist 245 PASS; tidy/compile logs /tmp/bml-e2-integrated-*.log.
+  E3 (engine deletion, themenav) and W13 (E3 pre-characterization tests,
+  widgets) in progress.
 - W12 + E1 range 6b17dfe6c, e286a4730, 2d3205dc7, 94eaab56f bml-opus-review
   CLEAR; integrated on root as b0bc29d0f, 8102da94e, ae2d00875, 49ea6739e.
   sendmessage now calls LJ::Lang::set_request_context(lang => 'en', getter =>

@@ -2487,3 +2487,7 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
 - W11 language test repair integrated (Opus CLEAR); root green on all checked
   suites. Reviewer CI screen: 86/86 CI files run PASS, four fixture-write suites
   passed on the F2 allowlist.
+- E1 (sendmessage native language), E1b, E2 (last non-engine BML callers) and T8
+  (standalone request adapter) integrated through7b8bd2170 (all Opus CLEAR).
+  ljlib-only processes no longer load the BML engine. E3 engine deletion in
+  progress.
