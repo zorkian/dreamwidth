@@ -298,13 +298,23 @@ sub build_altlogin_legacy_raw_post {
         unless blessed($post) && $post->isa('Hash::MultiValue');
     die 'canonical result must be a hash reference' unless ref $canonical eq 'HASH';
 
+    # The retained raw shape can express friends mask one or a custom mask
+    # composed of numbered bits one through sixty. Do not silently reshape an
+    # unrepresentable canonical mask before a future caller has had a chance to
+    # decline it without side effects.
+    return undef unless _altlogin_raw_security_representable($canonical);
+
+    # Native date/time strings have no lossless retained raw equivalent unless
+    # they use the exact component syntax. Explicit empty values are therefore
+    # unsupported here as well; absent values remain absent.
+    return undef unless _altlogin_raw_datetime_representable($post);
+
     my $raw = _altlogin_legacy_raw_snapshot($post);
 
     # Canonical security is authoritative. usemask=1 is ambiguous between the
     # native access selector and malformed custom bit zero; retain friends so a
     # retained decoder reproduces the same mask without inventing bit zero.
-    delete $raw->{custom_bit};
-    delete @{$raw}{ map { "custom_bit_$_" } 1 .. 60 };
+    delete @{$raw}{ grep { /^(?:custom_bit|crosspost|prop_xpost)(?:_|$)/ } keys %$raw };
     my $security = $canonical->{security} || 'public';
     if ( $security eq 'private' ) {
         $raw->{security} = 'private';
@@ -340,7 +350,7 @@ sub build_altlogin_legacy_raw_post {
             none       => 'none',
             discretion => 'concepts',
             restricted => 'explicit',
-        }->{$restriction};
+        }->{$restriction} // $restriction;
     }
     _altlogin_move_raw_field( $raw, 'age_restriction_reason', 'prop_adult_content_reason' );
 
@@ -360,12 +370,36 @@ sub build_altlogin_legacy_raw_post {
     }
     $raw->{date_diff_nojs} = 1 if $raw->{nojs};
 
-    # Native editor and crosspost names have no retained raw equivalent in the
-    # altlogin presentation. Preserve any unrelated extension field untouched.
+    # Native editor has no retained raw equivalent in this presentation.
+    # Reserved custom/crosspost namespaces were removed before synthesis.
     delete $raw->{editor};
-    delete @{$raw}{ grep { /^crosspost(?:_|$)/ } keys %$raw };
 
     return $raw;
+}
+
+sub _altlogin_raw_security_representable {
+    my ($canonical) = @_;
+    return 1 unless ( $canonical->{security} || 'public' ) eq 'usemask';
+
+    my $allowmask = $canonical->{allowmask} || 0;
+    return 1 if $allowmask == 1;
+
+    my $represented = 0;
+    for my $bit ( 1 .. 60 ) {
+        $represented |= 1 << $bit if $allowmask & ( 1 << $bit );
+    }
+    return $represented == $allowmask;
+}
+
+sub _altlogin_raw_datetime_representable {
+    my ($post) = @_;
+    return 0
+        if exists $post->{entrytime_date}
+        && $post->{entrytime_date} !~ /\A\d{4}-\d{2}-\d{2}\z/;
+    return 0
+        if exists $post->{entrytime_time}
+        && $post->{entrytime_time} !~ /\A\d{2}:\d{2}\z/;
+    return 1;
 }
 
 sub _altlogin_legacy_raw_snapshot {

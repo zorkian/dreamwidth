@@ -44,7 +44,6 @@ subtest 'builder maps a real-shaped native form without executing processing' =>
         custom_bit             => 60,
         custom_bit             => 1,
         custom_bit             => '001',
-        custom_bit             => 'bogus',
         taglist                => ' raw tag ',
         prop_picture_keyword   => 'icon',
         current_mood           => 42,
@@ -198,6 +197,86 @@ subtest 'canonical security determines retained raw security without a second bi
         'ambiguous canonical mask one uses documented friends classification' );
     ok( !( grep { $raw->{"custom_bit_$_"} } 1 .. 60 ),
         'ambiguous classification synthesizes no unsupported retained bit zero' );
+};
+
+subtest 'unsupported masks and date syntax return undef without shaping input' => sub {
+    my $mixed_bit_zero = Hash::MultiValue->new(
+        'action:update' => 'Update',
+        security        => 'custom',
+        custom_bit      => 0,
+        custom_bit      => 1
+    );
+    my $mixed_canonical = canonical_for($mixed_bit_zero);
+    is( $mixed_canonical->{allowmask}, 3, 'native parser creates mixed bit-zero canonical mask' );
+    my $mixed_before = dclone( DW::Entry::Legacy::legacy_post_hash($mixed_bit_zero) );
+    is( build( $mixed_bit_zero, $mixed_canonical ),
+        undef, 'mixed bit-zero mask has no retained raw representation' );
+    is_deeply( DW::Entry::Legacy::legacy_post_hash($mixed_bit_zero),
+        $mixed_before, 'unsupported mask leaves native input unchanged' );
+
+    my $outside = Hash::MultiValue->new( 'action:update' => 'Update', security => 'custom' );
+    is( build( $outside, { security => 'usemask', allowmask => 1 << 61, props => {} } ),
+        undef, 'out-of-range canonical bit has no retained raw representation' );
+
+    for my $case (
+        [ 'invalid date text',   Hash::MultiValue->new( entrytime_date => 'not-a-year-02-03' ) ],
+        [ 'invalid time text',   Hash::MultiValue->new( entrytime_time => 'not-hour:not-minute' ) ],
+        [ 'explicit empty date', Hash::MultiValue->new( entrytime_date => '' ) ],
+        [ 'explicit empty time', Hash::MultiValue->new( entrytime_time => '' ) ],
+        )
+    {
+        my ( $label, $post ) = @$case;
+        my $before           = dclone( DW::Entry::Legacy::legacy_post_hash($post) );
+        my $canonical        = { security => 'public', props => { native_keep => 'value' } };
+        my $canonical_before = dclone($canonical);
+        is( build( $post, $canonical ),
+            undef, "$label is explicitly unsupported rather than silently split" );
+        is_deeply( DW::Entry::Legacy::legacy_post_hash($post),
+            $before, "$label leaves native input unchanged" );
+        is_deeply( $canonical, $canonical_before, "$label leaves canonical input unchanged" );
+    }
+};
+
+subtest 'reserved namespaces are cleared and adult raw values remain observational' => sub {
+    my $post = Hash::MultiValue->new(
+        security          => 'custom',
+        custom_bit        => 0,
+        custom_bit        => '01',
+        custom_bit        => 61,
+        custom_bit_0      => 1,
+        custom_bit_01     => 1,
+        custom_bit_61     => 1,
+        crosspost_entry   => 1,
+        crosspost         => 9,
+        prop_xpost_check  => 1,
+        prop_xpost_9      => 9,
+        extension_control => 'kept',
+    );
+    my $raw = build( $post, { security => 'usemask', allowmask => 1 << 1, props => {} } );
+    is( $raw->{security},     'custom', 'representable canonical custom mask selects custom' );
+    is( $raw->{custom_bit_1}, 1,        'canonical bit one is synthesized' );
+    my @injected_reserved = qw(custom_bit custom_bit_0 custom_bit_01 custom_bit_61
+        crosspost_entry crosspost prop_xpost_check prop_xpost_9);
+    ok( !( grep { exists $raw->{$_} } @injected_reserved ),
+        'injected reserved custom and crosspost names are cleared before canonical bit synthesis' );
+    is( $raw->{extension_control},
+        'kept', 'unrelated extension control survives namespace cleanup' );
+
+    for my $case (
+        [ 'recognized alias',       'discretion',      'concepts' ],
+        [ 'empty raw value',        '',                '' ],
+        [ 'unrecognized raw value', 'extension-value', 'extension-value' ],
+        )
+    {
+        my ( $label, $value, $expected ) = @$case;
+        my $adult = build(
+            Hash::MultiValue->new( age_restriction => $value, age_restriction_reason => '' ),
+            { security => 'public', props => { adult_content => 'canonical normalized' } },
+        );
+        is( $adult->{prop_adult_content},
+            $expected, "$label adult value remains a retained raw observation" );
+        is( $adult->{prop_adult_content_reason}, '', "$label empty adult reason remains present" );
+    }
 };
 
 subtest 'date observation and raw empties do not alter canonical date ownership' => sub {
