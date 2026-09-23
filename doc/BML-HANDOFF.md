@@ -2,6 +2,21 @@
 
 ## Active continuation: 2026-09-22
 
+Latest queue, 2026-09-23 (supersedes historical queues below): accepted root
+`a426524be` includes moderated-post characterization `3862f9eba` and native
+language names `b29e99f50`, both independently clear. Foreman combined143,
+full tidy1089 and compile1605 pass. Delete characterization is already integrated.
+
+Draft correction `6616ce8c4` atop `4c1bb999e` awaits Sol recheck of both untouched
+decline and delayed-clear input. No draft candidate is integrated. Preview
+production/browser through `d1fc00e58` is independently bounded clear; HTTP
+followup `45df8b99d` awaits review and Themenav is completing exact formatting
+and native two-poll/embed controls evidence. Legacy BML preview remains present.
+Widgets now audits ordinary crossposting with delivery stubbed; Themenav next
+has test-only configured spellcheck characterization from the finite contract.
+Preserve all three existing sessions, pending external Journal hook question,
+held restrictions, and local-only commits.
+
 Latest continuation at 2026-09-23: root integrated test-only legacy update
 `b1f8b13cc`, owned delete `440faea99`, legacy edit `53357f450`, and query followup
 `4d72caddd`; all are independently clear. Foreman related tests pass87,51,136

@@ -1381,3 +1381,18 @@ checks, after widgets Terra completes customization1/4.
   incorrect placeholder scope: the decoder uses global entryform.subject.hint2,
   with one remaining BML::ml call. Corrections and meaningful locale/style tests
   are assigned. Browser baseline/final remains a separate finite package.
+
+### Current immutable draft and preview review queue
+
+- Draft `4c1bb999e` fixed delayed-clear input but independently failed untouched
+  decline by recreating draft properties. Correction `6616ce8c4` compares pending
+  events with the initial snapshot; worker reports both browser suites passing.
+  Sol recheck is pending; the entire candidate range stays unintegrated.
+- Preview source and popup browser through `d1fc00e58` are independently bounded
+  clear. Followup `45df8b99d` strengthens exact userpic, context, access, style and
+  final nonmutation assertions. Exact formatting and native two-poll/embed
+  controls remain assigned, and no preview BML deletion is accepted yet.
+- Configured spellcheck finite contract is recorded at `a426524be`; its test-only
+  legacy characterization is next for Themenav after preview evidence. Widgets
+  has a separate ordinary crossposting audit, with all delivery stubbed.
+- Existing deployment-hook question and held restrictions remain unchanged.
