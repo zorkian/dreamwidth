@@ -173,7 +173,13 @@ my @order;
 my ( $decode_post_ref, $decode_request_ref, $spam_request_ref, $success_request_ref );
 my ( $decode_post,     $decoded_request,    $spam_request,     $save_request );
 my @login_requests;
+my @continuation_sequence;
+my $postevent_request_ref;
+my @update_field_refs;
+my @update_field_values;
+my $auth_calls = 0;
 my $login_override;
+my $postevent_override;
 my $scheduler_calls = 0;
 my $run_hooks       = \&LJ::Hooks::run_hooks;
 my $run_hook        = \&LJ::Hooks::run_hook;
@@ -184,13 +190,15 @@ no warnings 'redefine';
 local *LJ::Hooks::run_hooks = sub {
     my ( $name, @args ) = @_;
     if ( $name eq 'decode_entry_form' ) {
-        push @order, 'decode';
+        push @order,                 'decode';
+        push @continuation_sequence, 'decode';
         ( $decode_post_ref, $decode_request_ref ) = map { refaddr($_) } @args;
         $decode_post     = { %{ $args[0] } };
         $decoded_request = { %{ $args[1] } };
     }
     elsif ( $name eq 'spam_check' ) {
-        push @order, 'spam';
+        push @order,                 'spam';
+        push @continuation_sequence, 'spam';
         $spam_request_ref = refaddr( $args[1] );
         $spam_request     = { %{ $args[1] } };
     }
@@ -201,7 +209,12 @@ local *LJ::Hooks::run_hooks = sub {
 };
 local *LJ::Hooks::run_hook = sub {
     my ( $name, @args ) = @_;
-    if ( $name eq 'after_entry_post_extra_html' ) {
+    if ( $name eq 'update_fields' ) {
+        push @continuation_sequence, 'update_fields';
+        push @update_field_refs,     refaddr( $args[0] );
+        push @update_field_values, { %{ $args[0] } };
+    }
+    elsif ( $name eq 'after_entry_post_extra_html' ) {
         push @order, 'success';
         my %args = @args;
         $success_request_ref = refaddr( $args{request} ) if $args{request};
@@ -211,10 +224,20 @@ local *LJ::Hooks::run_hook = sub {
 local *LJ::do_request = sub {
     my ( $request, $response, $flags ) = @_;
     if ( ( $request->{mode} || '' ) eq 'login' ) {
-        push @order, 'login';
+        push @order,                 'login';
+        push @continuation_sequence, 'login';
         push @login_requests, { %$request, flags => {%$flags} };
         if ($login_override) {
             %$response = %$login_override;
+            return 1;
+        }
+    }
+    if ( ( $request->{mode} || '' ) eq 'postevent' ) {
+        push @order,                 'postevent';
+        push @continuation_sequence, 'postevent';
+        $postevent_request_ref = refaddr($request);
+        if ($postevent_override) {
+            %$response = %$postevent_override;
             return 1;
         }
     }
@@ -231,6 +254,12 @@ local *LJ::Protocol::do_request = sub {
 local *LJ::Protocol::schedule_xposts = sub {
     ++$scheduler_calls;
     return ( [], [] );
+};
+my $auth_okay = \&LJ::auth_okay;
+local *LJ::auth_okay = sub {
+    ++$auth_calls;
+    push @continuation_sequence, 'auth';
+    return $auth_okay->(@_);
 };
 
 test_psgi $adapter, sub {
@@ -291,8 +320,10 @@ test_psgi $adapter, sub {
     is( $decoded_request->{mode}, 'postevent',       'decoded request retains postevent seed' );
     is( $decoded_request->{ver},  $LJ::PROTOCOL_VER, 'decoded request retains protocol version' );
     is( $decoded_request->{user}, $owner->user, 'decoded request retains submitted user seed' );
-    is( $decoded_request->{password},
-        'anonymous-adapter-password', 'decoded request retains password seed' );
+    ok(
+        defined $decoded_request->{password} && length $decoded_request->{password},
+        'decoded request retains a nonempty password seed without exposing it in diagnostics'
+    );
     is( $decoded_request->{usejournal}, '', 'decoded request retains empty owner usejournal seed' );
     is( $save_request->{tz},    'guess', 'save request retains guessed timezone seed' );
     is( $save_request->{xpost}, '0',     'save request retains disabled crosspost seed' );
@@ -369,21 +400,114 @@ test_psgi $adapter, sub {
         'successful login protocol message is rendered as a native warning'
     );
 
-    my $login_failure = post_from_retained(
+    my $before_login_failure        = entry_count($owner);
+    my $login_failure_state         = user_state($owner_id);
+    my $before_login_failure_xposts = $scheduler_calls;
+    my $login_failure               = post_from_retained(
         user     => $owner->user,
         password => 'anonymous-adapter-password',
         subject  => 'Protocol login failure subject',
         event    => 'must not persist',
         security => 'private',
     );
-    $login_override = { success => 'FAIL', errmsg => 'Anonymous login error marker' };
-    @order          = ();
+    $login_override        = { success => 'FAIL', errmsg => 'Anonymous <login> error marker' };
+    @order                 = ();
+    @continuation_sequence = ();
+    @update_field_refs     = ();
+    @update_field_values   = ();
+    $postevent_request_ref = undef;
+    $auth_calls            = 0;
     my $login_failure_res = $request->($login_failure);
     $login_override = undef;
-    like( $login_failure_res->content,
-        qr/DECLINED/, 'protocol login failure declines to retained BML before native decode' );
-    is_deeply( \@order, ['login'],
-        'protocol login failure performs no decoder, save attempt, or post hooks' );
+    like(
+        $login_failure_res->content,
+        qr/Error logging on:\s+Anonymous &lt;login&gt; error marker/,
+        'protocol login failure renders the localized prefix plus escaped protocol error text'
+    );
+    is_deeply( \@order, [qw(login decode postevent save spam)],
+'protocol login failure performs one flat decode/postevent/spam attempt without success hooks'
+    );
+    is(
+        entry_count($owner),
+        $before_login_failure + 1,
+'protocol login failure may persist its retained postevent attempt without native success processing'
+    );
+    like(
+        $login_failure_res->content,
+        qr/Anonymous &lt;login&gt; error marker/,
+        'protocol login failure keeps the escaped protocol error text visible'
+    );
+    unlike(
+        $login_failure_res->content,
+        qr/Anonymous <login> error marker/,
+        'protocol login failure does not render protocol HTML as markup'
+    );
+    is( scalar @update_field_refs,
+        1, 'protocol login failure invokes update_fields exactly once before authentication' );
+    is( $auth_calls, 1,
+        'successful first authentication is not repeated after the login protocol error' );
+    is_deeply( user_state($owner_id), $login_failure_state,
+        'protocol login failure skips native success housekeeping state writes' );
+    is( $scheduler_calls, $before_login_failure_xposts,
+        'protocol login failure schedules no crossposts' );
+    is_deeply( \@continuation_sequence, [qw(update_fields auth login decode postevent spam)],
+        'forced login error keeps the retained claimed-error sequence without a second auth check'
+    );
+    LJ::Entry::reset_singletons();
+    my $login_failure_entry = LJ::Entry->new( $owner, jitemid => $before_login_failure + 1 );
+    is(
+        $login_failure_entry->subject_raw,
+        'Protocol login failure subject',
+        'forced login error preserves its flat postevent subject exactly once'
+    );
+    is(
+        $login_failure_entry->event_raw,
+        'must not persist',
+        'forced login error preserves its flat postevent body exactly once'
+    );
+    is( $login_failure_entry->security,
+        'private', 'forced login error preserves its flat postevent security exactly once' );
+    is( $decode_request_ref, $postevent_request_ref,
+        'forced login error sends the decoder flat request to protocol postevent' );
+    is( $postevent_request_ref, $spam_request_ref,
+        'forced login error sends the same flat request to spam checking' );
+
+    my $before_postevent_error = entry_count($owner);
+    my $postevent_error_state  = user_state($owner_id);
+    my $postevent_error        = post_from_retained(
+        user     => $owner->user,
+        password => 'anonymous-adapter-password',
+        subject  => 'Suppressed postevent error subject',
+        event    => 'must not persist on protocol error',
+        security => 'private',
+    );
+    $login_override     = { success => 'FAIL', errmsg => 'Earlier login failure' };
+    $postevent_override = { success => 'FAIL', errmsg => 'Later postevent failure' };
+    @order              = ();
+    @continuation_sequence = ();
+    $auth_calls            = 0;
+    my $postevent_error_res = $request->($postevent_error);
+    $login_override     = undef;
+    $postevent_override = undef;
+    like(
+        $postevent_error_res->content,
+        qr/Error logging on:\s+Earlier login failure/,
+        'the earlier protocol login error remains visible when postevent also fails'
+    );
+    unlike(
+        $postevent_error_res->content,
+        qr/Later postevent failure/,
+        'a later postevent error does not replace the retained login error'
+    );
+    is( entry_count($owner), $before_postevent_error,
+        'forced postevent error after login error creates no entry' );
+    is_deeply( user_state($owner_id), $postevent_error_state,
+        'forced postevent error after login error writes no success housekeeping state' );
+    is_deeply(
+        \@continuation_sequence,
+        [qw(update_fields auth login decode postevent spam)],
+        'login and postevent errors still take one claimed flat attempt and spam check'
+    );
 
     my $before_empty = entry_count($owner);
     my $empty        = post_from_retained(
@@ -466,7 +590,6 @@ test_psgi $adapter, sub {
     my $decline_state  = user_state($owner_id);
     for my $case (
         [ 'empty password',         { password            => '' } ],
-        [ 'wrong password',         { password            => 'wrong-password' } ],
         [ 'community target',       { usejournal          => 'not-the-owner' } ],
         [ 'preview transform',      { 'action:preview'    => 'Preview' } ],
         [ 'spellcheck transform',   { 'action:spellcheck' => 'Spellcheck' } ],
@@ -484,10 +607,13 @@ test_psgi $adapter, sub {
             security => 'private',
             %$changes,
         );
-        @order = ();
+        @order                 = ();
+        @continuation_sequence = ();
         my $res = $request->($post);
         like( $res->content, qr/DECLINED/, "$label declines before native handling" );
         is_deeply( \@order, [], "$label performs no login/decode/save/hook work" );
+        is_deeply( \@continuation_sequence, [],
+            "$label performs no update_fields or authentication work" );
     }
     is( entry_count($owner), $decline_before,
         'all declined requests leave owner entries unchanged' );
@@ -502,11 +628,14 @@ test_psgi $adapter, sub {
         security => 'private',
     );
     $invalid_get_target->uri->query_form( usejournal => 'not-the-owner' );
-    @order = ();
+    @order                 = ();
+    @continuation_sequence = ();
     my $invalid_get_target_res = $request->($invalid_get_target);
     like( $invalid_get_target_res->content,
         qr/DECLINED/, 'initial GET usejournal target declines before anonymous auth' );
     is_deeply( \@order, [], 'initial GET target performs no login/decode/save/hook work' );
+    is_deeply( \@continuation_sequence, [],
+        'initial GET target performs no update_fields or authentication work' );
 
     my $missing = remove_form_field(
         post_from_retained(
@@ -518,10 +647,13 @@ test_psgi $adapter, sub {
         ),
         'password',
     );
-    @order = ();
+    @order                 = ();
+    @continuation_sequence = ();
     my $missing_res = $request->($missing);
     like( $missing_res->content, qr/DECLINED/, 'missing password declines before native handling' );
     is_deeply( \@order, [], 'missing password performs no login/decode/save/hook work' );
+    is_deeply( \@continuation_sequence, [],
+        'missing password performs no update_fields or authentication work' );
 
     {
         my $session_post = post_from_retained(
@@ -532,11 +664,14 @@ test_psgi $adapter, sub {
             security => 'private',
         );
         local *LJ::get_remote = sub { return $owner; };
-        @order = ();
+        @order                 = ();
+        @continuation_sequence = ();
         my $session_res = $request->($session_post);
         like( $session_res->content, qr/DECLINED/,
             'session remote request declines to retained BML' );
         is_deeply( \@order, [], 'session remote request performs no adapter work' );
+        is_deeply( \@continuation_sequence, [],
+            'session remote request performs no update_fields or authentication work' );
     }
 
     {
@@ -552,10 +687,13 @@ test_psgi $adapter, sub {
             return 1 if $_[0]->id == $owner_id;
             return $readonly->(@_);
         };
-        @order = ();
+        @order                 = ();
+        @continuation_sequence = ();
         my $readonly_res = $request->($readonly_post);
         like( $readonly_res->content, qr/DECLINED/, 'readonly owner declines before decoder' );
         is_deeply( \@order, [], 'readonly owner performs no login/decode/save/hook work' );
+        is_deeply( \@continuation_sequence, [],
+            'readonly owner performs no update_fields or authentication work' );
     }
 
     my $wrong = post_from_retained(
@@ -565,11 +703,40 @@ test_psgi $adapter, sub {
         event    => 'must not persist',
         security => 'private',
     );
-    @order = ();
+    $wrong->uri->query('legacy_hint=one&legacy_hint=two');
+    @order                 = ();
+    @continuation_sequence = ();
+    @update_field_refs     = ();
+    @update_field_values   = ();
+    $postevent_request_ref = undef;
+    $auth_calls            = 0;
     my $wrong_res = $request->($wrong);
-    like( $wrong_res->content, qr/DECLINED/,
-        'wrong password declines before decoder and rendering' );
-    is_deeply( \@order, [], 'wrong password has no protocol/decode/save/hook leakage' );
+    like(
+        $wrong_res->content,
+        qr/Error logging on:\s+Invalid password/,
+        'wrong password renders the localized prefix plus retained protocol error'
+    );
+    is_deeply(
+        \@order,
+        [qw(login decode postevent save spam)],
+        'wrong password performs one login, decode, flat postevent attempt, and spam hook'
+    );
+    unlike( $wrong_res->content, qr/wrong-password/,
+        'wrong password retry does not retain the submitted credential' );
+    is( scalar @update_field_refs,
+        1, 'wrong password invokes update_fields once before the password attempts' );
+    is( $update_field_values[0]{legacy_hint},
+        "one\0two", 'update_fields receives the original NUL-joined flat legacy GET values' );
+    is( $auth_calls, 3, 'wrong password follows the retained three-authentication sequence' );
+    is_deeply(
+        \@continuation_sequence,
+        [qw(update_fields auth login auth decode postevent auth spam)],
+        'wrong password follows the complete retained cross-stage sequence'
+    );
+    is( $decode_request_ref, $postevent_request_ref,
+        "wrong password sends the decoder's exact flat request to protocol postevent" );
+    is( $postevent_request_ref, $spam_request_ref,
+        'wrong password sends the same flat protocol request to spam checking' );
     is_deeply( user_state($other_id), $other_before,
         'wrong password does not alter the second user draft/editor preferences' );
 

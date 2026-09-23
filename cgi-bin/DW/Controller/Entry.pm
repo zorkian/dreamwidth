@@ -781,19 +781,22 @@ sub legacy_anonymous_update_handler {
         if $legacy_post->{transform} || $legacy_post->{showform} || $legacy_post->{moreoptsbtn};
     return undef if $legacy_post->{'action:preview'} || $legacy_post->{'action:spellcheck'};
 
+    # Finish structural ownership before the first password check: every
+    # post-auth outcome below is native-owned and must not fall through to BML.
+    my $candidate = LJ::load_user( $legacy_post->{user} );
+    return undef
+        unless $candidate
+        && $candidate->is_individual
+        && $candidate->can_post
+        && !$candidate->readonly;
+
+    # Retained update exposes this exact flat GET reference before auth.
+    LJ::Hooks::run_hook( 'update_fields', $legacy_get );
+
     my %auth_post = ( %$legacy_post, username => $legacy_post->{user} );
     my %flags;
     my %auth = _auth( \%flags, \%auth_post, undef );
-    return undef unless $auth{poster} && $auth{journal} && $auth{poster}->equals( $auth{journal} );
-    return undef unless $auth{poster}->can_post;
 
-    # Retained update stops before its decoder when the resolved owner journal
-    # is read-only. Let BML retain that warning and its legacy response shape.
-    return undef if $auth{journal}->readonly;
-
-    # Anonymous retained posting has no form-auth token, but it still performs
-    # the protocol login handshake before decoding/posting. Keep its old seed
-    # and flags separate from the hook-visible post request below.
     my %login_req = (
         mode          => 'login',
         ver           => $LJ::PROTOCOL_VER,
@@ -802,10 +805,6 @@ sub legacy_anonymous_update_handler {
     );
     my %login_res;
     LJ::do_request( \%login_req, \%login_res, \%flags );
-
-    # Failed protocol login retains BML's error path. This callable slice owns
-    # only successful-password owner posts, so it must decline before decode.
-    return undef unless ( $login_res{success} || '' ) eq 'OK';
 
     my $warnings = DW::FormErrors->new;
     if ( $login_res{message} ) {
@@ -824,23 +823,40 @@ sub legacy_anonymous_update_handler {
         },
         $post
     );
-    my %post_res = _do_post(
-        $prepared->{canonical},
-        \%flags,
-        { poster => $auth{poster}, journal => $auth{journal} },
-        warnings       => $warnings,
-        legacy_success => {
-            request          => $prepared->{request},
-            poster           => $auth{poster},
-            remote           => undef,
-            event_format     => $legacy_post->{event_format},
-            switched_rte_on  => $legacy_post->{switched_rte_on},
-            crosspost_master => 0
-        },
-    );
-    return $post_res{render} if ( $post_res{status} || '' ) eq 'ok';
+
+    if ( $auth{poster} && ( $login_res{success} || '' ) eq 'OK' ) {
+        my %post_res = _do_post(
+            $prepared->{canonical},
+            \%flags,
+            { poster => $auth{poster}, journal => $auth{journal} },
+            warnings       => $warnings,
+            legacy_success => {
+                request          => $prepared->{request},
+                poster           => $auth{poster},
+                remote           => undef,
+                event_format     => $legacy_post->{event_format},
+                switched_rte_on  => $legacy_post->{switched_rte_on},
+                crosspost_master => 0
+            },
+        );
+        return $post_res{render} if ( $post_res{status} || '' ) eq 'ok';
+        my $errors = DW::FormErrors->new;
+        $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+        return legacy_new_rerender(
+            $prepared,
+            remote             => undef,
+            anonymous_username => $legacy_post->{user},
+            errors             => $errors,
+            warnings           => $warnings,
+        );
+    }
+
+    # Retained wrong-password and protocol-login-error paths still perform one
+    # flat postevent attempt and one spam hook, but never run success handling.
+    _legacy_flat_post_attempt( $prepared->{request}, \%flags, $candidate );
     my $errors = DW::FormErrors->new;
-    $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+    $errors->add_string( undef,
+        LJ::Lang::ml('/update.bml.error.login') . ' ' . LJ::ehtml( $login_res{errmsg} || '' ) );
     return legacy_new_rerender(
         $prepared,
         remote             => undef,
@@ -2276,6 +2292,17 @@ sub _do_post {
     }
 
     return ( status => "ok", render => $render_ret );
+}
+
+# Retained compatibility paths sometimes need the original flat protocol
+# request attempted after a prior login error.  This deliberately excludes
+# _do_post's normal success housekeeping and rendering.
+sub _legacy_flat_post_attempt {
+    my ( $request, $flags, $poster ) = @_;
+    my %response;
+    LJ::do_request( $request, \%response, $flags );
+    LJ::Hooks::run_hooks( 'spam_check', $poster, $request, 'entry' );
+    return \%response;
 }
 
 sub _do_edit {
