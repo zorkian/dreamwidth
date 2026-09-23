@@ -744,13 +744,12 @@ sub legacy_update_get_handler {
     my $prefill = { map { $_ => $get->{$_} } qw(subject event prop_taglist) };
     my $hook    = LJ::Hooks::run_hook( 'update_fields', $get ) || {};
 
-    # Target and crosspost fields are intentionally read after the hook, just
-    # as retained update resolves its remaining mutable GET fields afterward.
+    # Target is intentionally read after the hook, just as retained update
+    # resolves its remaining mutable GET fields afterward. Ordinary GET always
+    # uses account defaults; retained prop_xpost values apply only to spellcheck.
     my $usejournal = LJ::canonical_username( $get->{usejournal} || '' );
-    my %crosspost  = map {
-        my $acctid = $_->acctid;
-        $acctid => ( $get->{"prop_xpost_$acctid"} || $_->xpostbydefault );
-    } DW::External::Account->get_external_accounts($remote);
+    my %crosspost  = map { $_->acctid => $_->xpostbydefault }
+        DW::External::Account->get_external_accounts($remote);
 
     my $now = DateTime->now;
     if ( my $timezone = $remote->prop('timezone') ) {

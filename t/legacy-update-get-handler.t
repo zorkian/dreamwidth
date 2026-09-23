@@ -175,9 +175,16 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
             'native action preserves raw encoded and repeated GET query'
         );
         like( $res->content, qr/saved draft subject/, 'saved draft restore data is emitted' );
-        my @selected_crosspost = $form->value('crosspost');
-        is_deeply( \@selected_crosspost, ['41'],
-            'only default account stays selected despite contradictory GET' );
+        like(
+            $res->content,
+            qr/<input(?=[^>]*\bname="crosspost")(?=[^>]*\bvalue="41")(?=[^>]*\bchecked)[^>]*>/,
+            'default crosspost account is checked despite contradictory GET'
+        );
+        unlike(
+            $res->content,
+            qr/<input(?=[^>]*\bname="crosspost")(?=[^>]*\bvalue="42")(?=[^>]*\bchecked)[^>]*>/,
+            'nondefault crosspost account remains unchecked despite contradictory GET'
+        );
         my $mutation = $request->(
             GET '/__test_update_get?mutation=1&subject=before&event=before&prop_taglist=before' );
         is( $mutation->code, 200, 'hook mutation GET still renders native form' );
