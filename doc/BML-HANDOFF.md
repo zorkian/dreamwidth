@@ -1,3 +1,29 @@
+## Active finite corrections after integrated callable gates
+
+Root is clean through b3a745609 (whitespace-only baseline formatting verified,
+scoped check PASS). Integrated callable browser and baseline results below stand.
+
+Widgets public anonymous candidate fd76fb5a42a3bdde049b7c9cba52a64a8f667752 is
+Sol source/core-clear only (69 assertions); full matrix remains held for exact
+three-auth order/ref, forced-login-error, authenticated-first, exclusions and
+isolation. Foreman additionally routed actual latest-entry ID instead of count,
+and meaningful target fallback instead of accepting a BML exception. Current
+real-form target fixture may append duplicate usejournal; diagnose encoded pairs.
+Browser27a8364da42a738ce50987456eaeba48119f9872 still harvests retained GET through
+an overlay; production POST is exercised but plain-app gate requires removing
+that unnecessary GET overlay and replay. Partial test followup7eef9ceeb is not
+full acceptance. Worker actively correcting; no root public activation.
+
+Themes callable altlogin through ec706 remains held. Sol confirmed remote
+Crosspost UI regression. WIP skipped account enumeration but initially left the
+module/setup panel and asserted nonexistent entryform-crosspost ID. Foreman
+routed actual crosspost-component/data-collapse wrapper and configured-control
+absence, ordinary positive control, and opt-in module suppression without user
+panel mutation. Visible credentials were fixed by moving the opt-in branch out
+of hidden js-only ancestor; normal browser passes, final immutable correction and
+normal/named/EOF/no-write evidence still required. Sol is reviewing public browser
+while waiting. Preserve deployment/inbox/reporting holds; no external effects.
+
 ## Callable failure browser and retained altlogin baseline integrated
 
 Sol7d4df528747d4b9fe268fb33387bb8484a4c9dad CLEAR; root906fd65f4. Foreman

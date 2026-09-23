@@ -2372,3 +2372,5 @@ was included in this package.
 Preserved final anonymous public activation matrix after accepted native failure continuation. Browser7d4 awaits independent review; altlogin baseline explicitly distinguishes updateForm credentials from shared logout returnto reflection. Callable altlogin390 geometry remains under correction.
 
 Cleared and integrated anonymous callable failure browser7d4 as906fd65f4: own normal replay PASS, cleanup empty, wrong-password390 capture visually usable. Integrated retained altlogin baseline through7144 asf04f3877d; own adjacent pair129 PASS. Public anonymous and callable altlogin candidates remain separate pending their finite acceptance.
+
+Public anonymous source fd76 independently bounded-clear, matrix/browser fidelity still held. Altlogin callable held for crosspost module suppression and exact panel assertions plus final browser correction; root remains at accepted callable-only behavior.
