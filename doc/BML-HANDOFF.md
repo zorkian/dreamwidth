@@ -61,23 +61,22 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: normalizer integrated7d3a8eb70; foreman59 PASS. Retry mapper
-   final correctione3deb7485 awaits Sol: literal custom_bit_1..60 keys only,
-   ignoring zero-padded keys as well as0/61. Selector451081d7f independently
-   clear after explicit maintainer eligibility; not integrated yet. Next pure
-   preparation helper preserves the original flat decoder request reference
-   separately from canonical props, so legacy success hooks retain their ABI.
-2. Widgets: image throughba199 independently clear, integrated59ebe781c;
-   foreman56 focused/build/browser/tidy1105/compile1607 PASS with captures.
-   Housekeeping0e88+3e876 is under review, not accepted. Foreman found callback
-   credentials named in the wrong order and session-remote eligibility missing;
-   corrections are active. Separate success-hook rendering work is preserved.
-3. Sol: mappere3deb recheck, housekeeping correction review, then root hook
-   characterization8a55d0170. Selector451 is clear. Root ordinary/moderated hook
-   baseline149 PASS proves same decoder request reference, flat props, output,
-   old moderated undef arguments, and native no-hook control. No live routes
-   have changed in these helper packages. Held inbox work and external Journal
-   deployment interfaces remain excluded.
+1. Themenav: mapper final e3deb independently clear, integrated374e45d80;
+   selector451 independently clear, integratedde05d97bb. Combined helper/old
+   HTTP191 PASS. Preparation27026 independently clear, integrated182cad0d7;
+   combined5 helper suites23 top-level PASS. Active next: legacy error/transform
+   rerender helper using shared native renderer, explicit modern retry action
+   and retained controls/query. No public route registration or saves yet.
+2. Widgets: image integrated59ebe781c, fully clear. Housekeeping original final
+   427e4109b (0e88/3e876/0aaf/427) is awaiting Sol recheck of credentials, remote
+   identity and raw master GET fallback; not integrated. Separate success-render
+   hook implementation is active on branch carrying equivalent018b/38a fixes.
+3. Sol: housekeeping427, then immutable success-hook/rerender code as ready.
+   Root actual hook baseline8a55 independently clear149 PASS. Root mechanical
+   rendererbe407 independently clear85 HTTP PASS. Root test-only hook timing
+   b762072f0 awaits review75 PASS: old callback observes already-persisted entry
+   and retains original flat request reference. Held inbox work and external
+   Journal deployment interfaces remain excluded.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS

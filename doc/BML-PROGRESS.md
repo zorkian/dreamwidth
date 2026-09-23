@@ -1653,3 +1653,25 @@ checks, after widgets Terra completes customization1/4.
   review queued; no production hook change. Preparation must retain the original
   flat request reference shared by decoder/success hooks, alongside separate
   canonical data. Existing deployment interfaces are preserved, not retired.
+
+
+### Native retry and rendering prerequisites integrated
+
+- Final mapper e3deb independently clears invalid0/61 and padded01/001/060 while
+  retaining exact1/60; integrated374e45d80. Selector451 independently clear and
+  integratedde05d97bb. Foreman helpers plus actual old update/edit191 PASS in
+  /tmp/bml-legacy-helper-integrated.log.
+- Preparation27026 independently clear, integrated182cad0d7. Original decoder
+  seed/ref/flat fields remain intact; canonical top-level and props hashes are
+  separate. Existing in-place normalizer behavior remains. Combined5 helper
+  suites23 top-level PASS in /tmp/bml-legacy-preparation-integrated.log.
+- Root rendering extractionbe407 independently clear: exactly7 inserted lines,
+  unchanged tail and seven explicit former lexical inputs. Foreman and Sol85
+  affected HTTP assertions PASS. Combined-tree tidy1107 and compile1607 PASS
+  before subsequent preparation test addition, logs /tmp/bml-editor-helpers-*.log.
+- Actual old success-hook baseline8a55 independently clear149 PASS. Follow-up
+  b762 timing test75 PASS awaits independent review: legacy check observes saved
+  entry before success rendering and shares original flat decoder request.
+- No old posting/edit route was changed by these helper packages. Housekeeping
+  final427 remains in independent review; success-hook and rerender adapters
+  continue in isolated worker branches. No publication or deployment.
