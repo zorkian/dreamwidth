@@ -243,8 +243,7 @@ test_psgi $app, sub {
     }
     $form->value( lj_form_auth => 'invalid-manager-routing-token' );
     my $report_calls = 0;
-    my $mark_as_spam = \&LJ::mark_entry_as_spam;
-    local *LJ::mark_entry_as_spam = sub { ++$report_calls; return $mark_as_spam->(@_) };
+    local *LJ::mark_entry_as_spam = sub { ++$report_calls; return 0 };
     $post = clicked( $form, 'action:deletespam' );
     $post->header( Cookie  => $manager_cookie );
     $post->header( Referer => "http://localhost$managed_path" );
@@ -478,6 +477,7 @@ test_psgi $app, sub {
         $form = form_from( $res->content );
         ok( $form, "$case->[0] harvests intended community form" );
         $form->action( 'http://localhost' . $case->[1] );
+        $form->value( usejournal    => $case->[2][1] );
         $form->value( date_ymd_yyyy => 'not-a-year' );
         $form->value( subject       => "$case->[0] changed" );
         $form->value( event         => "$case->[0] changed body" );
@@ -492,11 +492,18 @@ test_psgi $app, sub {
         like( $res->content, qr{id="js-post-entry"},
             "$case->[0] returns native nonpersisting retry" );
         like( $res->content, qr/not-a-year/, "$case->[0] retains raw invalid date" );
-        like(
-            $res->content,
-            qr{/entry/\Q@{[$comm->user]}\E/\Q@{[$precedence->ditemid]}\E/edit},
-            "$case->[0] retry targets the chosen community entry"
-        );
+        my ($retry_form) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
+            HTML::Form->parse( $res->content, 'http://localhost/entry/new' );
+        ok( $retry_form, "$case->[0] parses the native retry form" );
+
+        if ($retry_form) {
+            my $retry_uri = URI->new( $retry_form->action );
+            is(
+                $retry_uri->path,
+                '/entry/' . $comm->user . '/' . $precedence->ditemid . '/edit',
+                "$case->[0] retry targets the exact chosen community entry"
+            );
+        }
         is(
             fresh( $comm, $precedence->ditemid )->subject_raw,
             'precedence old',
