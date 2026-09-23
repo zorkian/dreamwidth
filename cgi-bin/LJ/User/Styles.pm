@@ -37,11 +37,7 @@ sub display_journal_deleted {
     $r->status(404);
 
     my $extra = {};
-    if ( $opts{bml} ) {
-        $extra->{scope}      = 'bml';
-        $extra->{scope_data} = $opts{bml};
-    }
-    elsif ( $opts{journal_opts} ) {
+    if ( $opts{journal_opts} ) {
         $extra->{scope}      = 'journal';
         $extra->{scope_data} = $opts{journal_opts};
     }
