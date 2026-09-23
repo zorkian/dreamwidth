@@ -1,3 +1,29 @@
+## Callable community browser accepted and integrated
+
+Sol86165dd08 + lifecycle6157821d CLEAR; integrated936b31e35/7b05844c5.
+Foreman exact browser PASS (/tmp/bml-community-callable-browser.log), no owned
+helpers; desktop/narrow captures saved under community-edit-post-callable.
+390px retry visually inspected: one useful error, preserved content/community,
+visible controls and no horizontal clipping. Full integrated tidy1151 and
+compile1607 PASS (/tmp/bml-anonymous-community-{tidy,compile}.log).
+Root sessions17588/31729 complete; no active root test process.
+
+Widgets public core1d6d23fe4 and partial matrix98c86b19f remain UNINTEGRATED.
+Next concrete rows: itemless/no resolver; missing-invalid tokens with fresh
+nonmutation; invalid/zero/repeated IDs; then readonly/beta/spellcheck/precedence.
+Sol can source-review immutable dispatcher now, full gate remains pending.
+
+Automatic approval review rejected a proposed valid retained deletespam test:
+"The test submits the real `deletespam` action through the public route, which
+could trigger moderation/reporting side effects; the claimed nonmutation is not
+established and the request does not authorize performing that operation."
+The valid action was outside assigned routing-only scope and was not executed.
+Worker corrected to intentionally invalid CSRF; no report was sent. Do not retry
+valid manager/reporting actions or bypass this rejection. Unaffected work continues.
+
+Themes anonymous browser remains WIP after normal/startup-failure validation;
+await immutable SHA and independent review. Public anonymous schema/auth unchanged.
+
 ## Anonymous callable integrated; browser lifecycle recheck queued
 
 Sol d8f79ac078e963629b30b787b9de464f0d55eb25 CLEAR, integrated 9e05a87a8.

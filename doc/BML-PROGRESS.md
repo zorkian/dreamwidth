@@ -2224,3 +2224,10 @@ Sol d8f79ac07 CLEAR; integrated9e05a87a8. Foreman five adjacent suites213 PASS.
 Optional native title/username rendering preserves legacy hook timing, escaped
 prefill, blank password, editor defaults and sequential isolation. No public
 anonymous route or authentication/POST changes. Browser acceptance is separate.
+
+### Callable community browser acceptance complete
+
+Sol861+615 CLEAR, integrated936b31e35/7b05844c5. EOF lifecycle correction rejects
+pending reads if the fixture exits before data. Foreman normal browser PASS, no
+helpers; desktop/narrow captures preserved and390px retry inspected. Integrated
+full tidy1151/compile1607 PASS. Public community POST matrix remains separate.
