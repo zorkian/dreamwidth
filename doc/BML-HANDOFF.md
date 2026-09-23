@@ -50,6 +50,14 @@ users persists). Nothing external was touched.
   (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
   Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
   s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- T6 protocol/PageStats audit 0655e31a0 + correction c8d7b8dcd, T7 range
+  b6a244508 + 127d54c3c (PageStats filename undef-safe; explicit
+  DISABLE_PROTOCOL adapter, ABI unchanged), W9 doc 7e2fbd54d + fix 71b7782bc,
+  and W10 d17872bc6 (help_icon delegates to help_icon_html; dead bad_input
+  removed) all bml-opus-review CLEAR; integrated on root as 94ef43cee,
+  6ebcdd7fd, e936b6375, 71becd05e, 1bb4e6916, af8c91423, eba9d0a84. Root
+  allowlist 10 files 136 PASS; tidy/compile logs
+  /tmp/bml-t6t7w9w10-integrated-*.log.
 - KNOWN RED on root (found by widgets during W10, outside every allowlist):
   t/web-message-language.t subtests 1 and 6 (pre-W5 errorbar markup; deleted
   LJ::entry_form) and t/web-stdmaxlength-language.t subtest 3

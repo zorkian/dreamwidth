@@ -2481,3 +2481,6 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   page remains except the engine _config files. Root allowlist23files911 PASS.
 - W8 journal request decoupling, T4 translation-shim audit and T5 cleanup
   integrated asff87e378b..505d6a219 (all Opus CLEAR). Root12files306 PASS.
+- T6/T7 (protocol + PageStats ABI-preserving), W9 doc, W10 help_icon fix
+  integrated as94ef43cee..eba9d0a84 (all Opus CLEAR). Two language tests remain
+  red on root pending W11.
