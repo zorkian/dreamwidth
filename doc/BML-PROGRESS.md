@@ -2409,3 +2409,12 @@ are isolated, trusted timezone deletion is preserved, and crosspost is suppresse
 Root5pure suites20top-level PASS, tidy1174 and compile1607 PASS. No authentication,
 hook invocation, save, or public interface change. Separate retained mutation
 characterization37e6 remains under review.
+
+## Retained decode-hook mutation characterization (2026-09-23)
+
+Sol37e6 CLEAR integratedd5f8a157e. Root mapper/preparation/normalizer3files10
+top-level PASS; scoped tidy PASS. Tests establish late raw-first-argument changes
+stay raw while decoded-request arbitrary property/top-level changes, additions
+and deletions reach canonical data. Original flat identity, separate canonical
+props and HMV preservation remain proved. Test-only; no hook synchronization,
+authentication, save, route, or public behavior change.
