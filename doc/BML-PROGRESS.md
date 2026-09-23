@@ -1999,3 +1999,13 @@ public routes5files454 PASS, tidy1125 and compile1607 PASS in
 Owned GET browser normal/intentional runs pass in worker; final commit/review
 pending. Update callable wrapper remains WIP; foreman routed strict method,
 flat hook ABI, native redirect and retained prefill/hook ordering corrections.
+
+### Owned GET browser accepted and captured
+
+Sol ee8..03362 CLEAR: corrected fixture reads fresh draft body and thawed
+properties, exact seeded fields plus before/after GET equality; normal browser
+PASS, named intentional exit1, no helper/server. Integratedc7ad9abb9/7e3f9dc51.
+Foreman normal replay PASS and anchored process check empty; captures preserved
+under legacy-owned-edit-get, log /tmp/bml-owned-get-browser-integrated.log.
+Public GET activation waits for the passing retained-schema fixture prerequisite.
+Update callable wrappera349/7aa remains under final review; browser work active.

@@ -1,3 +1,22 @@
+## Latest GET acceptance and pending wrapper
+
+Owned GET browser ee8/03362 independently clear and integrated as
+c7ad9abb9/7e3f9dc51. Foreman actual browser PASS in
+/tmp/bml-owned-get-browser-integrated.log; no helper/server remains. Captures
+are in doc/bml-evidence/2026-09-23/legacy-owned-edit-get. Root test sessions
+complete. Production GET routing remains unchanged.
+
+Pending review: callable update GET wrappera3491e46 + correction7aa50a729
+(44 worker assertions, full tidy/compile pass). Foreman and Sol held the first
+candidate for303 vs retained302 and query-selected vs default-only crosspost;
+7aa is under final recheck. Widgets continues browser-only update GET acceptance
+on bml-terra-update-get-browser-20260923; its first run failed and diagnosis is
+active. Themes is implementing the test-only retained-form GET/production POST
+fixture prerequisite per BML-OWNED-GET-ACTIVATION-TESTS.md, then narrow public
+owned GET activation as a separate commit. Browser03362 prerequisite is clear.
+Sol also completed BML-COMMUNITY-EDIT-GET.md read-only audit. Held inbox and
+external Journal deployment-hook questions remain unchanged.
+
 ## Latest continuation: public transforms integrated
 
 Public transform activation565eb2cff is independently clear (111 public +396
