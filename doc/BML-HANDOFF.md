@@ -65,6 +65,16 @@ below this line predate the resume.
   /betafeatures renders missing-string titles. Non-blocking: spam-errors test
   still writes a local userlog row via log_event('ban_set'); stub folded into
   W4.
+- W4 entry string relocation range 178c11b39 + e70c01ff2 bml-opus-review
+  FINAL CLEAR; integrated on root as 706e720fa (conflict in
+  t/plack-inbox-spam-errors.t resolved to W4's file, byte-identical to
+  178c11b39's, which carries W3's set_rel stub plus the log_event recorder)
+  and 17c82a952. Native entry code no longer reads /update.bml.*,
+  /editjournal.bml.* or /imgupload.bml.* keys; /preview/entry.bml scope stays
+  inside legacy_preview_handler until F2. Root seven suites 353 PASS; logs
+  /tmp/bml-entry-strings-integrated-*.log. Reviewer's first W4 review caught
+  a W4-introduced picker regression (four editjournal.tt keys missing) that
+  the worker had reported as pre-existing; fixed and covered.
 - T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
   (community custom-security carry-over fell back to public; logged-out or
   not-editable /editjournal carry-over lost the body) plus the condition that

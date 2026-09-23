@@ -2467,3 +2467,5 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
 - W3 inbox legacy removal integrated asf5c142e72 (Opus CLEAR): inbox .bml pages,
   widgets, esn_inbox.js, inbox.css deleted; compile now1603. Deploy gate: drop the
   'inbox' beta from production config.
+- W4 entry string relocation integrated as706e720fa/17c82a952 (Opus FINAL CLEAR);
+  native entry pages read no retiring .bml.text scope. Root7files353 PASS.
