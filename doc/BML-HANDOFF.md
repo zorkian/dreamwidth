@@ -1,3 +1,19 @@
+## Public share source integrated; combined test correction pending
+
+Sol fa1767d51bdf087dc50e8caf756ec11224723e02 CLEAR source/160/browser and
+cleanup. Integrated root94a035428, but foreman broader six-suite run305 has three
+stale assertions: legacy-update-get-handler expects share decline/no factory (stub
+dies now called), terminal suite expects share BML form. Routed narrow test-only
+followup to Themes, preserving altlogin WIP. Do not claim combined green until fix.
+Log /tmp/bml-share-public-integrated.log; session91533 complete. Root public browser
+replay started separately; no production mismatch identified in these failures.
+
+Altlogin retained GET baseline919e8eb37f999d7cc73fe0a0a9dfddd5a3e2940d worker61
+PASS, queued Sol. Themes callable-only altlogin rendering successor assigned per
+preserved audit, but stale share-suite correction has priority. No public altlogin
+or credential submission/schema activation. Widgets anonymous continuation active;
+foreman caught login-prefix substitution mismatch and routed exact concatenation.
+
 ## Anonymous callable integration validation complete
 
 Foreman browser session29015 PASS (/tmp/bml-anonymous-callable-browser.log),
