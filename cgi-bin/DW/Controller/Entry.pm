@@ -89,6 +89,16 @@ DW::Routing->register_regex( '^/entry/(?:(.+)/)?(\d+)/edit$', \&edit_handler, ap
 
 DW::Routing->register_string( '/entry/new', \&_new_handler_userspace, user => 1 );
 
+# Keep this all-method route so a handler undef result reaches the retained BML
+# resolver.  Restricting registration to POST would turn GET and unsupported
+# retained actions into a router 405 instead of preserving their old behavior.
+# DW::Routing strips the legacy .bml suffix before lookup, covering both URLs.
+DW::Routing->register_string(
+    '/update', sub { return legacy_update_handler() },
+    app          => 1,
+    no_redirects => 1
+);
+
 # redirect to app-space
 sub _user_to_app_role {
     my ($path) = @_;
@@ -283,9 +293,16 @@ sub legacy_update_handler {
     my $legacy_get  = DW::Entry::Legacy::legacy_post_hash($get);
     my $remote      = $opts{remote} || LJ::get_remote();
 
+    # Keep retained update's pre-decode guards in front of the hook-bearing
+    # decoder. A non-text POST, invalid requested journal, or non-posting
+    # identity must retain its BML response and cannot enter this subset.
+    return undef unless LJ::text_in($legacy_post);
+    return undef if $legacy_get->{usejournal} && !LJ::load_user( $legacy_get->{usejournal} );
+
     # This adapter only covers an authenticated retained post. Everything else
     # must continue to the retained BML implementation.
     return undef unless LJ::isu($remote);
+    return undef if $remote->identity || !$remote->can_post;
     return undef
         if $legacy_get->{altlogin}
         || $legacy_post->{transform}
