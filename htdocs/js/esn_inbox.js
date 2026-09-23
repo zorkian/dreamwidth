@@ -3,6 +3,14 @@ var ESN_Inbox = {
     "selected_qids": []
 };
 
+// Read the CSRF token from the hidden field the shared LJ::Widget wrapper
+// renders on every widget instance. Every mutating /__rpc_esn_inbox mode
+// requires it; get_unread_items alone does not.
+ESN_Inbox.authToken = function () {
+    var input = document.querySelector("input[name=lj_form_auth]");
+    return input ? input.value : "";
+};
+
 document.addEventListener("DOMContentLoaded", function (evt) {
   for (var i=0; i<folders.length; i++) {
       var folder = folders[i];
@@ -142,7 +150,8 @@ ESN_Inbox.toggleExpand = function (button, state) {
 ESN_Inbox.saveDefaultExpanded = function (expanded) {
     var postData = {
         "action": "set_default_expand_prop",
-        "default_expand": (expanded ? "Y" : "N")
+        "default_expand": (expanded ? "Y" : "N"),
+        "lj_form_auth": ESN_Inbox.authToken()
     };
 
     var opts = {
@@ -267,7 +276,8 @@ ESN_Inbox.updateItems = function (action, evt, folder, qid, cur_folder, itemid, 
         "qids": qids,
         "folder": folder,
         "cur_folder": cur_folder,
-        "itemid" : itemid || 0
+        "itemid" : itemid || 0,
+        "lj_form_auth": ESN_Inbox.authToken()
     };
 
     var opts = {

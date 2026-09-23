@@ -309,6 +309,11 @@ sub esn_inbox_handler {
     my $action = $post->{action};
     return DW::RPC->err("No action specified") unless $action;
 
+    # get_unread_items is a read-only nav-count poll with no CSRF-relevant
+    # side effect; every other mode here mutates inbox state.
+    return DW::RPC->err( LJ::Lang::ml('/inbox/index.tt.error.invalidform') )
+        unless $action eq 'get_unread_items' || LJ::check_form_auth( $post->{lj_form_auth} );
+
     my $success = 0;
     my %ret;
 

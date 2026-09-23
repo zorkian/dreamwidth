@@ -33,6 +33,17 @@ DW::Routing->register_rpc( 'inbox_actions', \&action_handler, format => 'json' )
 
 my $PAGE_LIMIT = 15;
 
+# Take a supplied filter but default it to 'all' unless it is a real,
+# callable NotificationInbox view method. This is the only validation that
+# makes items_by_view's method-name lookup below safe to call.
+sub _validated_view {
+    my ($view) = @_;
+    $view = undef if $view              && $view =~ /\W/;
+    $view = undef if $view eq 'archive' && !LJ::is_enabled('esn_archive');
+    $view = undef if $view              && !LJ::NotificationInbox->can("${view}_items");
+    return $view || 'all';
+}
+
 sub index_handler {
     my ( $ok, $rv ) = controller( form_auth => 1 );
     return $rv unless $ok;
@@ -50,12 +61,7 @@ sub index_handler {
     my $inbox = $remote->notification_inbox
         or return error_ml( "$scope.error.couldnt_retrieve_inbox", { user => $remote->{user} } );
 
-    # Take a supplied filter but default it to undef unless it is valid
-    my $view = $GET->{view} || $POST->{view} || undef;
-    $view = undef if $view              && $view =~ /\W/;
-    $view = undef if $view eq 'archive' && !LJ::is_enabled('esn_archive');
-    $view = undef if $view              && !LJ::NotificationInbox->can("${view}_items");
-    $view ||= 'all';
+    my $view = _validated_view( $GET->{view} || $POST->{view} );
 
     my $itemid = $view eq "singleentry" ? int( $POST->{itemid} || $GET->{itemid} || 0 ) : 0;
     my $expand = $GET->{expand};
@@ -295,7 +301,7 @@ sub action_handler {
     my $args      = $r->json;
     my $action    = $args->{action};
     my $ids       = $args->{'ids'};
-    my $view      = $args->{view} || 'all';
+    my $view      = _validated_view( $args->{view} );
     my $page      = $args->{page} || 1;
     my $itemid    = $args->{itemid} || 0;
     my $remote    = $rv->{remote};
@@ -418,7 +424,8 @@ sub items_by_view {
             @all_items = $inbox->singleentry_items($itemid);
         }
         else {
-            @all_items = eval "\$inbox->${view}_items";
+            my $method = $inbox->can("${view}_items");
+            @all_items = $method ? $inbox->$method() : ();
         }
     }
     else {
@@ -439,13 +446,21 @@ sub compose_handler {
     my $remote = $rv->{remote};
     my $errors = DW::FormErrors->new;
 
+    my $scope = '/inbox/compose.tt';
+
+    return $r->msg_redirect( LJ::Lang::ml("$scope.messaging.disabled"),
+        $r->ERROR, "$LJ::SITEROOT/inbox" )
+        unless LJ::is_enabled('user_messaging');
+
+    # Legacy (htdocs/inbox/compose.bml) required a validated sender before
+    # allowing composition; this was dropped in the native port.
     return $r->msg_redirect(
         LJ::Lang::ml(
             'protocol.not_validated', { sitename => $LJ::SITENAMESHORT, siteroot => $LJ::SITEROOT }
         ),
         $r->ERROR,
         "$LJ::SITEROOT/inbox"
-    ) unless LJ::is_enabled('user_messaging');
+    ) unless $remote->is_validated;
 
     return $r->msg_redirect( LJ::Lang::ml('.suspended.cannot.send'), $r->ERROR,
         "$LJ::SITEROOT/inbox" )
@@ -460,8 +475,7 @@ sub compose_handler {
     my $msg_parent  = '';    # Hidden msg field containing id of parent message
     my $msg_limit     = $remote->count_usermessage_length;
     my $subject_limit = 255;
-    my $force = 0;                     # flag for if user wants to force an empty PM
-    my $scope = '/inbox/compose.tt';
+    my $force = 0;           # flag for if user wants to force an empty PM
 
     # Submitted message
     if ( $r->did_post ) {
@@ -656,21 +670,23 @@ sub compose_handler {
     my $cc_msg_option = $remote->cc_msg;
 
     my $vars = {
-        errors        => $errors,
-        msg_to        => ( $POST->{msg_to} || $GET->{'user'} || undef ),
-        msg_body      => $msg_body,
-        msg_subject   => $msg_subject,
-        msg_parent    => $msg_parent,
-        reply_u       => $reply_u,
-        reply_to      => $reply_to,
-        autocomplete  => \@flist,
-        cc_msg_option => $cc_msg_option,
-        disabled_to   => $disabled_to,
-        folder_html   => render_folders($remote),
-        commafy       => \&LJ::commafy,
-        remote        => $remote,
-        msg_limit     => $msg_limit,
-        force         => $force
+        errors          => $errors,
+        msg_to          => ( $POST->{msg_to} || $GET->{'user'} || undef ),
+        msg_body        => $msg_body,
+        msg_subject     => $msg_subject,
+        msg_parent      => $msg_parent,
+        reply_u         => $reply_u,
+        reply_to        => $reply_to,
+        autocomplete    => \@flist,
+        cc_msg_option   => $cc_msg_option,
+        disabled_to     => $disabled_to,
+        folder_html     => render_folders($remote),
+        commafy         => \&LJ::commafy,
+        remote          => $remote,
+        msg_limit       => $msg_limit,
+        subject_limit   => $subject_limit,
+        current_icon_kw => $POST->{prop_picture_keyword},
+        force           => $force
     };
 
     return DW::Template->render_template( 'inbox/compose.tt', $vars );

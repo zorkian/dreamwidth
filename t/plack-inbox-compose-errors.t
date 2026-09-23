@@ -6,7 +6,18 @@ use Test::More;
 use HTTP::Request::Common;
 use Plack::Test;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use HTML::Form;
 use LJ::Test qw(temp_user);
+use LJ::Userpic;
+
+sub file_contents {
+    my ($path) = @_;
+    open my $fh, '<', $path or die "open $path: $!";
+    binmode $fh;
+    local $/;
+    my $contents = <$fh>;
+    return \$contents;
+}
 
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
@@ -98,5 +109,77 @@ test_psgi $app, sub {
         unlike( $res->content, qr/Message Sent/i, 'bad CSRF does not report success' );
         is( $called, 0, 'bad CSRF has no delivery effect' );
     }
+
+    # The controller never passed subject_limit to the template, so the
+    # rendered subject field had no client-side length limit at all.
+    my $subject_form =
+        ( HTML::Form->parse( $get->content, 'http://localhost/inbox/new/compose' ) )[0];
+    ok( $subject_form, 'compose form parses for the subject-limit check' );
+    is( $subject_form->find_input('msg_subject')->{maxlength},
+        255,
+        'rendered subject field carries the same 255 limit the controller enforces server-side' );
+
+    # On an error re-render, the previously chosen icon was not reselected
+    # because current_icon_kw was never passed to the template.
+    my $icon = LJ::Userpic->create( $sender,
+        data => file_contents("$ENV{LJHOME}/t/data/userpics/good.jpg") );
+    ok( $icon, 'disposable sender userpic is created' ) or BAIL_OUT('cannot exercise icon control');
+    $icon->set_keywords('compose-icon-marker');
+
+    $recipient->set_prop( 'opt_usermsg', 'N' );    # force the same rerender-on-error path
+    my $icon_res = $cb->(
+        POST '/inbox/new/compose',
+        Content => [ @base, prop_picture_keyword => 'compose-icon-marker', lj_form_auth => $token ]
+    );
+    is( $icon_res->code, 200, 'icon-reselect error case rerenders compose' );
+    my $icon_form =
+        ( HTML::Form->parse( $icon_res->content, 'http://localhost/inbox/new/compose' ) )[0];
+    ok( $icon_form, 'compose form parses for the icon-reselect check' );
+    is( $icon_form->value('prop_picture_keyword'),
+        'compose-icon-marker', 'error re-render reselects the icon the user had actually chosen' );
 };
+
+# Legacy (htdocs/inbox/compose.bml) required a validated sender; the native
+# port only checked the user_messaging feature flag.
+test_psgi $app, sub {
+    my $send        = shift;
+    my $unvalidated = temp_user();
+    $unvalidated->update_self( { status => 'N' } );
+    my $u_session = LJ::Session->create( $unvalidated, nolog => 1 );
+    my $u_cookie =
+          'ljmastersession='
+        . $u_session->master_cookie_string
+        . '; ljloggedin='
+        . $u_session->loggedin_cookie_string;
+    my $u_cb = sub { my $req = shift; $req->header( Cookie => $u_cookie ); return $send->($req); };
+
+    my $get = $u_cb->( GET '/inbox/new/compose' );
+    is( $get->code, 303, 'unvalidated sender is redirected away from compose' );
+    like( $get->header('Location') || '',
+        qr{/inbox$}, 'unvalidated sender is redirected to the inbox' );
+
+    # index_handler has no validation gate, so it is a valid source for a
+    # real CSRF token tied to this same unvalidated session.
+    my $index_get = $u_cb->( GET '/inbox/new' );
+    my $u_token   = form_token( $index_get->content );
+    ok( $u_token, 'unvalidated sender can still obtain a real CSRF token elsewhere' );
+
+    my $called = 0;
+    no warnings 'redefine';
+    local *LJ::Message::send =
+        sub { $called++; die 'delivery must not run for an unvalidated sender' };
+    my $post = $u_cb->(
+        POST '/inbox/new/compose',
+        Content => [
+            mode         => 'send',
+            msg_to       => $recipient->user,
+            msg_subject  => 'Should never send',
+            msg_body     => 'Should never send',
+            lj_form_auth => $u_token,
+        ]
+    );
+    is( $post->code, 303, 'unvalidated sender POST is also redirected before composing' );
+    is( $called,     0,   'unvalidated sender has no delivery effect' );
+};
+
 done_testing;
