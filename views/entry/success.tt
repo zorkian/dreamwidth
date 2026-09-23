@@ -67,5 +67,8 @@ the same terms as Perl itself.  For a copy of the license, please reference
     [%- FOREACH link IN links -%]
         <li><a href="[% link.url %]">[% link.ml_string | ml %]</a></li>
     [%- END -%]
+    [%- legacy_extra_options -%]
 </ul>
 [%- END -%]
+
+[%- legacy_extra_html -%]

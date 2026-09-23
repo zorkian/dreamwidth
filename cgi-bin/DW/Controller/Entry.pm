@@ -1019,6 +1019,8 @@ sub _do_post {
             'entry/success.tt',
             {
                 moderated_message => $res->{message},
+                legacy_extra_html =>
+                    _legacy_success_extra_html( $opts{legacy_success}, undef, undef ),
             }
         );
     }
@@ -1100,6 +1102,13 @@ sub _do_post {
             crosspost_callback => $opts{legacy_crosspost_callback},
         );
 
+        my $legacy_extra_options =
+            defined $res->{itemid}
+            ? _legacy_success_extra_options( $opts{legacy_success}, $journal, $itemlink )
+            : '';
+        my $legacy_extra_html =
+            _legacy_success_extra_html( $opts{legacy_success}, $journal, $itemlink );
+
         # set sticky
         if ( $form_req->{sticky_entry} && $u->can_manage($journal) ) {
             my $added_sticky = $journal->sticky_entry_new($ditemid);
@@ -1116,7 +1125,9 @@ sub _do_post {
                 links        => \@links,
                 links_header => ".links",
                 entry_url    => $itemlink,
-                extradata => _get_extradata( $form_req, $journal ),
+                legacy_extra_options => $legacy_extra_options,
+                legacy_extra_html    => $legacy_extra_html,
+                extradata            => _get_extradata( $form_req, $journal ),
             }
         );
     }
@@ -1268,6 +1279,33 @@ sub _do_edit {
 }
 
 # remember value of properties, to use the next time the user makes a post
+
+# Legacy wrappers pass the old, flat decoder request explicitly. Do not derive
+# it from the normalized request: deployment hooks may depend on fields that the
+# native save pipeline intentionally does not retain.
+sub _legacy_success_extra_options {
+    my ( $legacy, $user, $itemlink ) = @_;
+    return '' unless $legacy && exists $legacy->{request};
+
+    my @results = LJ::Hooks::run_hooks(
+        'after_entry_post_extra_options',
+        user     => $user,
+        itemlink => $itemlink,
+    );
+    return join '', map { $_->[0] // '' } @results;
+}
+
+sub _legacy_success_extra_html {
+    my ( $legacy, $user, $itemlink ) = @_;
+    return '' unless $legacy && exists $legacy->{request};
+
+    return LJ::Hooks::run_hook(
+        'after_entry_post_extra_html',
+        user     => $user,
+        itemlink => $itemlink,
+        request  => $legacy->{request},
+    ) // '';
+}
 
 # The legacy update form keeps its raw crosspost fields outside the normalized
 # form request.  Preserve its POST-first, GET-fallback contract at the scheduler
