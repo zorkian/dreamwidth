@@ -136,3 +136,11 @@ or replace its output with a renamed API. A fixture hook should prove ordinary
 and moderated arguments and visible output without external code. This is a
 wrapper implementation requirement, not an approval to change a deployment
 hook or the separately pending Journal hook interfaces.
+
+The retained update page invokes `spam_check` after its protocol post attempt
+and before the two success-render hooks; the ordinary native handler invokes
+its existing check before `_do_post`. Do not silently move the legacy call to
+that native position as part of sharing code. The actual old-form test observes
+an already-persisted entry during this hook and the same flat request reference
+as decoding. Preserve each route's established timing and exactly-once call;
+this observation does not propose changing the native path or hook policy.

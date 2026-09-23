@@ -93,15 +93,26 @@ test_psgi $app, sub {
         my $post = $form->click('action:update');
         $post->uri( 'http://localhost' . $path );
         $post->header( Referer => 'http://localhost' . $path );
-        my ( @success_hooks, $decoded_request );
+        my ( @success_hooks, $decoded_request, @hook_order, $spam_request, $spam_count );
         my $run_hooks = \&LJ::Hooks::run_hooks;
         my $run_hook  = \&LJ::Hooks::run_hook;
         {
             no warnings 'redefine';
             local *LJ::Hooks::run_hooks = sub {
                 my ( $name, @args ) = @_;
-                $decoded_request = $args[1] if $name eq 'decode_entry_form';
+                if ( $name eq 'decode_entry_form' ) {
+                    $decoded_request = $args[1];
+                    push @hook_order, 'decode';
+                }
+                if ( $name eq 'spam_check' ) {
+                    $spam_request = $args[1];
+                    push @hook_order, 'spam';
+                    ($spam_count) =
+                        $owner->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?',
+                        undef, $owner_id );
+                }
                 if ( $name eq 'after_entry_post_extra_options' ) {
+                    push @hook_order, 'options';
                     push @success_hooks, [ $name, {@args} ];
                     return ['<li>Legacy hook option marker</li>'];
                 }
@@ -110,6 +121,7 @@ test_psgi $app, sub {
             local *LJ::Hooks::run_hook = sub {
                 my ( $name, @args ) = @_;
                 if ( $name eq 'after_entry_post_extra_html' ) {
+                    push @hook_order, 'html';
                     push @success_hooks, [ $name, {@args} ];
                     return '<p>Legacy hook HTML marker</p>';
                 }
@@ -117,6 +129,21 @@ test_psgi $app, sub {
             };
             $res = $request->($post);
         }
+        is_deeply(
+            \@hook_order,
+            [qw(decode spam options html)],
+            "$path retains legacy decoder and post-attempt hook order"
+        );
+        is(
+            $spam_count,
+            $before_count + 1,
+            "$path legacy spam hook observes the already-saved entry"
+        );
+        is(
+            refaddr($spam_request),
+            refaddr($decoded_request),
+            "$path spam hook receives the original flat decoder request"
+        );
         is_deeply(
             [ map { $_->[0] } @success_hooks ],
             [qw(after_entry_post_extra_options after_entry_post_extra_html)],
