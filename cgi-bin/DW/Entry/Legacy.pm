@@ -558,6 +558,44 @@ sub _legacy_request_value_changed {
     return nfreeze($left) ne nfreeze($right);
 }
 
+# Compose the generic retained hook delta for a future native altlogin save
+# attempt. This does not invoke a hook or select an editor policy: a legacy
+# formatting-only mutation is returned as an explicit unresolved conflict.
+sub compose_altlogin_hook_delta {
+    my (%opts)    = @_;
+    my $canonical = $opts{canonical};
+    my $before    = $opts{before};
+    my $after     = $opts{after};
+    die 'canonical and hook snapshots must be hash references'
+        unless ref $canonical eq 'HASH' && ref $before eq 'HASH' && ref $after eq 'HASH';
+
+    # dclone both snapshots independently: a caller may retain these objects
+    # for raw/spam/success compatibility, while generic delta comparison needs
+    # an immutable before/after pair.
+    my $before_snapshot = dclone($before);
+    my $after_snapshot  = dclone($after);
+    my $retry           = dclone($canonical);
+    my $attempt = apply_legacy_request_delta( $canonical, $before_snapshot, $after_snapshot );
+
+    # Compare effective property namespaces, not just literal prop_* fields.
+    # This honors the same props-then-flat-prop precedence as the generic delta.
+    my $before_props = _legacy_request_delta_properties($before_snapshot);
+    my $after_props  = _legacy_request_delta_properties($after_snapshot);
+    my %changed = map { $_ => _legacy_request_value_changed( $before_props, $after_props, $_ ) }
+        ( keys %$before_props, keys %$after_props );
+    my @format = map { "prop_$_" }
+        grep { $changed{$_} } qw(opt_preformatted used_rte);
+    my $editor_changed = $changed{editor};
+
+    return {
+        canonical_for_attempt => $attempt,
+        canonical_for_retry   => $retry,
+        before_snapshot       => $before_snapshot,
+        after_snapshot        => $after_snapshot,
+        editor_conflict       => @format && !$editor_changed ? { keys => \@format } : undef,
+    };
+}
+
 # Decode once while retaining the original flat request for legacy success
 # hooks.  The canonical copy can independently feed the native retry mapper.
 sub prepare_entry_form {
