@@ -10,8 +10,9 @@ have since migrated; the shared widget request-state prerequisite is complete.
 **Policy note (2026-09-23):** the gates in this table were written for full
 legacy parity. Per [BML-DIRECTION.md](BML-DIRECTION.md) the goal is now to
 graduate existing native/beta replacements and retire the legacy surfaces,
-accepting or explicitly closing feature gaps chosen by the user. Treat the
-parity wording below as historical until the decision report is reviewed.
+accepting or explicitly closing feature gaps chosen by the user. The user
+reviewed the decision report and authorized the graduation; see
+[BML-GRADUATION-PLAN.md](BML-GRADUATION-PLAN.md). The parity wording below is historical.
 
 The inventory below remains the original review baseline. At foreman commit
 13f4ea792, ten tracked `.bml` files remain: seven pages/endpoints and three

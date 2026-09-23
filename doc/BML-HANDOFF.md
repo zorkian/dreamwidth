@@ -1,14 +1,11 @@
-## ACTIVE POLICY: graduate replacements; analysis only (2026-09-23)
+## ACTIVE: beta graduation implementation authorized (2026-09-23)
 
-User decision recorded in [BML-DIRECTION.md](BML-DIRECTION.md). Where a
-newer/beta replacement exists (entry/update, inbox, others), graduate it and
-retire the old BML surface instead of recreating every legacy feature. This
-supersedes the full legacy-parity requirements and retirement gates written
-below and in the other BML-*.md audits. Authorization is analysis and
-documentation only: no implementation, integration, route activation, rollback
-or deletion until the user reviews the decision report
-([BML-BETA-GRADUATION-DECISION.md](BML-BETA-GRADUATION-DECISION.md)) and
-chooses a path. Preserve all branches, commits, WIP and evidence.
+User authorization recorded at the top of [BML-DIRECTION.md](BML-DIRECTION.md)
+after review of [BML-BETA-GRADUATION-DECISION.md](BML-BETA-GRADUATION-DECISION.md).
+Build under [BML-GRADUATION-PLAN.md](BML-GRADUATION-PLAN.md): graduate native
+entry and inbox, close essential gaps, redirect legacy URLs, remove obsolete
+adapters by reviewed forward commits. Legacy parity gates below are historical.
+No push, deployment, real moderation side effects, or bypass of held gates.
 
 ## RESUMED by explicit user directive (2026-09-23)
 
