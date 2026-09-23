@@ -863,4 +863,18 @@ for my $action ( [ showform => 1 ], [ moreoptsbtn => 1 ], [ 'action:preview' => 
     is_deeply(thaw(LJ::load_userid($owner_id,1)->prop('draft_properties')),$ordinary_before_props,"$field retains full draft properties");
 }
 
+
+
+# Explicit token regressions: spellcheck must never invoke a checker before
+# the reviewed token/referer guard accepts the retained form submission.
+for my $token_case ( [ missing => undef ], [ invalid => 'not-a-token' ] ) {
+    my ($label,$token)=@$token_case; my $checked=0;
+    my @fields=('action:spellcheck'=>'Spell Check',subject=>'token subject',event=>'token body',security=>'public');
+    push @fields,(lj_form_auth=>$token) if defined $token;
+    my $req=POST('/update',\@fields); $req->header(Referer=>'http://localhost/update');
+    my $res; { local $LJ::SPELLER='stub'; no warnings 'redefine'; local *LJ::SpellCheck::check_html=sub {++$checked; return 'bad';}; test_psgi $adapter_app,sub{$res=shift->($req);}; }
+    is($checked,0,"$label spellcheck token never invokes checker");
+    like($res->content,qr/(?:Invalid form submission|invalid form)/i,"$label spellcheck token visibly errors");
+}
+
 done_testing;
