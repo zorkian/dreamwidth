@@ -14,6 +14,11 @@
 # part of this distribution.
 
 use strict;
+
+# Loads the BML::* shims that sendmessage's BML::set_language('en') below
+# still calls; ljlib-only (non-web) processes have nothing else that pulls
+# this in.
+use DW::BML;
 use DW::BML::RequestAdapter;
 use DW::Request;
 no warnings 'uninitialized';

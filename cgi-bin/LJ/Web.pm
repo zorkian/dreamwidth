@@ -23,6 +23,10 @@ use Digest::SHA1;
 
 use DW::AccountSwitcher;
 use DW::Auth::Challenge;
+
+# Loads the BML::* shims that did_post()/check_referer() below still call;
+# ljlib-only (non-web) processes have nothing else that pulls this in.
+use DW::BML;
 use DW::External::Site;
 use DW::Entry::Legacy;
 use DW::Request;

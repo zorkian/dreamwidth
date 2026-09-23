@@ -13,6 +13,10 @@
 
 package LJ::PageStats;
 use strict;
+
+# Loads the BML::* shims that get_request() below still calls; ljlib-only
+# (non-web) processes have nothing else that pulls this in.
+use DW::BML;
 use DW::SiteScheme;
 
 my $all_modules;
