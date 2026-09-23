@@ -1,3 +1,19 @@
+## Altlogin shared-template correction and review sequencing
+
+Foreman found67a submit_action_name was set only by the new renderer although
+entry/form.tt is shared by edit rendering. Worker ec7064c831ff26c236c3132b48956c98b616b802
+restores action:post fallback for both buttons and asserts both parsed edit
+controls; independent review pending. Callable browser390 geometry remains WIP.
+Baseline14f9942b3 still needs parsed input/returnto assertions rather than a
+regex extraction with empty fallback and a whole-body presence label; correction
+routed. No altlogin integration yet.
+
+Sol model was accidentally changed by a rate-limit menu consuming a queued
+prompt; no review result was accepted from that interval. Restored through the
+actual model selector, verified gpt-5.6-sol medium, and explicitly restarted
+independent7d4 review. Widgets retains Terra and is preparing the local public
+anonymous candidate on its separate branch; no foreman activation.
+
 ## Current review queue and exact altlogin baseline disposition
 
 Callable continuation3197 is integrated and validated at ca854f263. New test-only
