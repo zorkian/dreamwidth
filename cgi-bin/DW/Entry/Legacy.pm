@@ -337,22 +337,13 @@ sub apply_legacy_request_delta {
     # nested reference mutated in place before this helper observes either
     # snapshot cannot be reconstructed as a delta.
 
-    # Existing decoded_to_canonical treats props as a copied hash. Deep cloning
-    # here additionally keeps a returned delta result from aliasing any source
-    # or after-snapshot nested extension value.
+    # Deep cloning keeps the returned delta result from aliasing any source or
+    # after-snapshot nested extension value.
     my $updated = dclone($canonical);
-    $updated->{props} ||= {};
+    $updated->{props} = {} unless ref $updated->{props} eq 'HASH';
 
     my %names   = map { $_ => 1 } ( keys %$before, keys %$after );
     my @changed = grep { _legacy_request_value_changed( $before, $after, $_ ) } keys %names;
-
-    # decoded_to_canonical establishes the props hash before it flattens
-    # top-level prop_* keys. Preserve that deterministic order when a hook
-    # replaces props and changes a prop_* key in the same call.
-    my $props_changed = grep { $_ eq 'props' } @changed;
-    if ($props_changed) {
-        $updated->{props} = _legacy_request_delta_props_value( $after->{props} );
-    }
 
     for my $name ( sort grep { $_ ne 'props' && ( $_ !~ /^prop_(.+)$/ || $_ =~ /^prop_xpost_/ ) }
         @changed )
@@ -365,38 +356,40 @@ sub apply_legacy_request_delta {
         }
     }
 
-    # When props itself changed, decoded_to_canonical would initialize it from
-    # the after snapshot and then flatten every retained prop_* key, including
-    # keys whose scalar value did not change. Otherwise only changed prop_*
-    # keys need applying to the existing canonical props.
-    my @prop_names =
-        $props_changed
-        ? grep { /^prop_(.+)$/ && !/^prop_xpost_/ } keys %$after
-        : grep { /^prop_(.+)$/ && !/^prop_xpost_/ } @changed;
-    for my $name ( sort @prop_names ) {
-        $name =~ /^prop_(.+)$/;
-        my $prop = $1;
-        if ( exists $after->{$name} ) {
-            $updated->{props}{$prop} = _legacy_request_delta_clone_value( $after->{$name} );
+    # Normalize each flat snapshot the same way decoded_to_canonical handles
+    # props: establish props first, then let retained prop_* fields override
+    # it. Apply only the observed property-level delta to canonical props, so
+    # native-only properties not represented in either hook snapshot survive.
+    my $before_props = _legacy_request_delta_properties($before);
+    my $after_props  = _legacy_request_delta_properties($after);
+    my %prop_names   = map { $_ => 1 } ( keys %$before_props, keys %$after_props );
+    for my $name ( sort keys %prop_names ) {
+        next unless _legacy_request_value_changed( $before_props, $after_props, $name );
+        if ( exists $after_props->{$name} ) {
+            $updated->{props}{$name} = _legacy_request_delta_clone_value( $after_props->{$name} );
         }
         else {
-            delete $updated->{props}{$prop};
+            delete $updated->{props}{$name};
         }
-        delete $updated->{$name};
     }
 
     return $updated;
 }
 
+sub _legacy_request_delta_properties {
+    my ($snapshot) = @_;
+    my $properties = ref $snapshot->{props} eq 'HASH' ? { %{ $snapshot->{props} } } : {};
+    for my $name ( sort keys %$snapshot ) {
+        next unless $name =~ /^prop_(.+)$/;
+        next if $name =~ /^prop_xpost_/;
+        $properties->{$1} = $snapshot->{$name};
+    }
+    return $properties;
+}
+
 sub _legacy_request_delta_clone_value {
     my ($value) = @_;
     return ref $value ? dclone($value) : $value;
-}
-
-sub _legacy_request_delta_props_value {
-    my ($props) = @_;
-    return {} unless ref $props eq 'HASH';
-    return dclone($props);
 }
 
 sub _legacy_request_value_changed {

@@ -102,41 +102,47 @@ subtest 'flat request additions changes and deletions update an independent cano
     is_deeply( $after->{prop_added}, 'hook property', 'after snapshot remains unchanged' );
 };
 
-subtest 'props replacement is applied before every retained prop namespace value' => sub {
+subtest 'normalized property deltas preserve native props and prop namespace precedence' => sub {
     my $source = canonical();
-    my $before = {
-        props            => { replacement => 'before', unchanged => 'before props' },
-        prop_replacement => 'before prop',
-        prop_unchanged   => 'before prop value',
-    };
-    my $after = {
-        props            => { replacement => 'after', unchanged => 'after props' },
-        prop_replacement => 'after prop',
-        prop_unchanged   => 'before prop value',
-    };
+    $source->{props}{x}               = 'old';
+    $source->{props}{observed_delete} = 'old';
+    my $before = { props => { x => 'old', observed_delete => 'old' } };
+    my $after  = { props => { x => 'new' } };
 
     my $updated = DW::Entry::Legacy::apply_legacy_request_delta( $source, $before, $after );
-    is_deeply(
-        $updated->{props},
-        { replacement => 'after prop', unchanged => 'before prop value' },
-'decoded_to_canonical ordering reapplies unchanged top-level prop values after props replacement'
-    );
+    is( $updated->{props}{x}, 'new', 'changed observed property propagates' );
+    ok( !exists $updated->{props}{observed_delete}, 'deleted observed property is removed' );
+    is( $updated->{props}{editor}, 'markdown0', 'unobserved native editor survives props delta' );
+    is( $updated->{props}{native_keep},
+        'native value', 'unobserved native property survives props delta' );
     isnt(
         refaddr( $updated->{props} ),
         refaddr( $after->{props} ),
-        'props replacement is copied rather than aliased to after snapshot'
+        'normalized property output is copied rather than aliased to after snapshot'
     );
+
+    my $collision_source = canonical();
+    $collision_source->{props}{x} = 'old';
+    my $collision = DW::Entry::Legacy::apply_legacy_request_delta(
+        $collision_source,
+        { props => { x => 'old' }, prop_x => 'old' },
+        { props => { x => 'new' }, prop_x => 'old' },
+    );
+    is( $collision->{props}{x}, 'old',
+        'flat prop_x precedence is normalized before comparison even when its scalar is unchanged'
+    );
+    is( $collision->{props}{native_keep}, 'native value', 'collision keeps native-only property' );
 
     my $undef_props = DW::Entry::Legacy::apply_legacy_request_delta(
         canonical(),
         { props => { discarded => 'before' }, prop_only => 'before value' },
         { props => undef,                     prop_only => 'after value' },
     );
-    is_deeply(
-        $undef_props->{props},
-        { only => 'after value' },
-        'non-hash props follows decoded_to_canonical empty-hash behavior before prop flattening'
-    );
+    is( $undef_props->{props}{only}, 'after value',
+        'non-hash props still permits flat prop delta' );
+    ok( !exists $undef_props->{props}{discarded}, 'non-hash props deletes observed property' );
+    is( $undef_props->{props}{native_keep},
+        'native value', 'non-hash props preserves native-only value' );
 };
 
 subtest 'deeply independent nested snapshots produce an isolated result' => sub {
