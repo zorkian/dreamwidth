@@ -541,6 +541,97 @@ sub legacy_same_poster_community_edit_handler {
     return error_ml('error.invalidform');
 }
 
+# Callable-only compatibility seam for retained editjournal's other-poster
+# community manager properties. It intentionally owns no public route: all
+# contexts other than the exact savemaintainer action fall through to BML.
+sub legacy_manager_property_post_handler {
+    my (%opts) = @_;
+
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->did_post && $r->method eq 'POST';
+
+    my $post        = $r->post_args;
+    my $legacy_post = DW::Entry::Legacy::legacy_post_hash($post);
+    my $action = DW::Entry::Legacy::legacy_edit_action( $legacy_post, maintainer_enabled => 1, );
+    return undef unless $action && $action eq 'savemaintainer';
+
+    my $get        = $r->get_args;
+    my $legacy_get = DW::Entry::Legacy::legacy_post_hash($get);
+    my $ditemid    = $legacy_get->{itemid} || $legacy_post->{itemid};
+    return undef unless defined $ditemid && $ditemid =~ /\A[1-9][0-9]*\z/;
+
+    # Retained editjournal distinguishes the session identity used for entry
+    # visibility/form auth from the effective authas actor used for management.
+    my $session_remote = $opts{remote} || LJ::get_remote();
+    return undef unless LJ::isu($session_remote);
+    my $authas = $legacy_get->{authas} || $session_remote->user;
+    my $actor  = LJ::get_authas_user($authas);
+    return undef unless LJ::isu($actor) && $actor->is_individual;
+
+    # Preserve retained truthy GET, POST, then journal precedence. A target
+    # equal to the effective actor is personal context and belongs to BML.
+    my $usejournal =
+           $legacy_get->{usejournal}
+        || $legacy_post->{usejournal}
+        || $legacy_get->{journal};
+    return undef unless $usejournal;
+    return undef if $usejournal eq $actor->user;
+    my $journal = LJ::load_user($usejournal);
+    return undef unless LJ::isu($journal) && $journal->is_comm;
+
+    my $anum   = $ditemid % 256;
+    my $itemid = $ditemid >> 8;
+    my $entry  = LJ::Entry->new( $journal, ditemid => $ditemid );
+    return undef unless $entry && $entry->valid && $entry->ditemid == $ditemid;
+    return undef unless $entry->visible_to($session_remote);
+
+    my %events;
+    LJ::do_request(
+        {
+            mode       => 'getevents',
+            selecttype => 'one',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $actor->user,
+            usejournal => $journal->user,
+            itemid     => $itemid,
+        },
+        \%events,
+        {
+            noauth       => 1,
+            u            => $actor,
+            ignorecanuse => 1,
+        }
+    );
+    return undef unless ( $events{success} || '' ) eq 'OK';
+    return undef unless $events{events_count} && $events{events_1_anum} == $anum;
+
+    # This is property-only management of somebody else's community entry.
+    return undef if $entry->poster->equals($actor);
+    return undef unless $actor->can_manage($journal);
+
+    # Retained disabled_spamdelete gates savemaintainer. In particular, a
+    # spam-report sysban declines before the token check or any property write.
+    return undef if LJ::sysban_check( 'spamreport', $journal->user );
+
+    # Do not add a readonly check here: retained editjournal has already
+    # disabled ordinary save for this context, so its readonly block is skipped
+    # before this action. Tightening that behavior is a separate policy change.
+    return error_ml('error.invalidform') unless LJ::check_form_auth( $legacy_post->{lj_form_auth} );
+
+    my %props;
+    for my $name (
+        qw(adult_content_maintainer_reason adult_content_maintainer opt_nocomments_maintainer))
+    {
+        next unless LJ::get_prop( 'log', $name );
+        $props{$name} = $legacy_post->{"prop_$name"};
+    }
+    LJ::set_logprop( $journal, $itemid, \%props );
+
+    $r->status(302);
+    $r->header_out( Location => $entry->url );
+    return $r->OK;
+}
+
 # Callable compatibility seam for retained /update POSTs. Alternate login and
 # every action outside the classified retained subset remain in BML.
 sub legacy_update_handler {
