@@ -2164,3 +2164,16 @@ community entry. Fresh unrelated content/security/props survive; original flat
 seed/ref and decode -> delete log -> spam check -> protocol order are asserted,
 with deletion extras and zero report/crosspost calls. Foreman30 PASS and focused
 tidy PASS. This supplies test-only baseline evidence, not native manager rollout.
+
+### Callable readonly form and native Web headings accepted
+
+Sol readonlye30/b7/843 CLEAR; integrated0fa540eb3/95fc0245e/b5e3183d1. Foreman
+126 adjacent assertions and actual browser PASS, helpers absent;390px warning and
+rich editor visibly usable, captures preserved. Target-after-hook proof uses a
+distinct community and exact selected control, not the default owner. No public
+readonly activation yet.
+
+Sol Web headingsc861 CLEAR; integrated5b8aa3ccd. error_list/warning_list headings
+use native language; bad_input, legacy wrappers and supplied markup remain
+unchanged. Foreman three helper suites12 top-level tests PASS. Full combined
+tidy1143 and compile1607 PASS. No held interface, deployment or publishing change.

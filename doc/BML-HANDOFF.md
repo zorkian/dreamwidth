@@ -1,3 +1,19 @@
+## Readonly callable and Web headings accepted
+
+Sol readonlye30/b7/843 CLEAR; integrated0fa540eb3/95fc0245e/b5e3183d1. Corrected
+post-hook distinct community target, pre-hook prefill, original hook ref, warning
+help markup and fresh draft/editor preservation are accepted. Foreman three
+suites126 PASS; actual callable browser PASS/nohelpers;390px warning/form visually
+usable, captures under update-readonly-callable. Public activation remains WIP.
+
+Sol Web headingsc8611ed75 CLEAR; integrated5b8aa3ccd. Only two global heading
+lookups plus explicit dependency change; wrappers and supplied content unchanged.
+Foreman three helper suites12 top-level tests PASS. Full integrated tidy1143 and
+compile1607 PASS (/tmp/bml-readonly-web-{tidy,compile}.log). Root sessions74841,
+54412,9183,31944 all complete. Widgets next callable community same-poster POST
+helper keeps personal defaults; no routing, manager/reporting or BML retry after
+attempt. Audit plus this explicit native-retry boundary saved in doc.
+
 ## Ordinary manager-delete baseline integrated
 
 Sol6ade9d30be64d79680bc6632ccefcbcc96aabbea CLEAR; integrated6c70d09ef. Foreman
