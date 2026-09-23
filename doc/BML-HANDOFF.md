@@ -1,3 +1,15 @@
+## Integrated anonymous callable checks complete
+
+Foreman formatting1160 and compile1607 PASS after anonymous callable integration;
+logs /tmp/bml-anonymous-callable-{tidy,compile}.log, session28024 complete. Combined
+focused614 remains green. Root has no active validation or browser process.
+
+Sol public manager423 HTTP168 and normal/named browser runs passed with cleanup;
+awaiting final finite review disposition. Widgets callable anonymous browser is
+still uncommitted and being diagnosed; no browser acceptance claim. Themes is now
+on callable authenticated share rendering implementation, tests must run in its
+container (one host compile was invalid environment evidence, not a code failure).
+
 ## Anonymous callable integrated; public manager under review
 
 Sol finalc778a624c814c4eac438ac158c3563fe1c68a7ba CLEAR93 including nonvacuous

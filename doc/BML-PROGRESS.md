@@ -2291,3 +2291,6 @@ Sol finalc778 CLEAR93; integratedb79ea4bf2..d2b7cc6ba. Foreman five-suite regres
 slice, preserves legacy hook/housekeeping contracts, and sends accepted save errors
 to native retry. Shared _do_post is unchanged. Browser and public activation remain
 separate gates; failed credentials and excluded contexts remain retained BML-owned.
+
+Anonymous callable integrated formatting1160 and compile1607 also passed; browser
+and public activation remain separate, with no new public anonymous route.
