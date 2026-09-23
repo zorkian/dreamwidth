@@ -156,8 +156,8 @@ my $share_fetches     = 0;
             'invalid target GET does not render native form' );
         like(
             $invalid->content,
-            qr/(?:invalid|does not exist|journal)/i,
-            'invalid target GET keeps the retained BML error representation'
+            qr/Invalid usejournal argument/,
+            'invalid target GET keeps the exact retained BML error message'
         );
 
         my $anonymous = $send->( GET '/update' );
