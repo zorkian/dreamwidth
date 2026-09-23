@@ -58,7 +58,15 @@ users persists). Nothing external was touched.
   shaping, not moderation; all four passed on the F2 allowlist. No stale
   code reference to deleted symbols remains in t/ apart from the two known
   red language tests (W11) and two stale comments in t/plack-entry-strings.t.
-- T8 adapter module extraction 1420764ba HELD: dropping 'use DW::BML' from
+- T8 adapter module extraction range 1420764ba + fix 9159a2e2f
+  bml-opus-review FINAL CLEAR; integrated on root as f72d595d5, 3f31b017a.
+  DW::BML::RequestAdapter now lives in cgi-bin/DW/BML/RequestAdapter.pm and
+  loads without the engine; 'use DW::BML' kept in PageStats, Protocol, Web and
+  S2 for the remaining BML::* shim calls (the explicit conversion list for
+  E2/E1). W12 sendmessage characterization (test-only) and E1 (native
+  replacement with getter => undef, equivalence proven by revert) queued for
+  review; E2 (last non-engine shim callers) assigned to themenav.
+- (historical) T8 adapter module extraction 1420764ba HELD: dropping 'use DW::BML' from
   LJ::S2 unloaded the BML::* shims from ljlib-only processes (PageStats,
   Protocol sendmessage, LJ::Web fallbacks); fix in progress.
 - T6 protocol/PageStats audit 0655e31a0 + correction c8d7b8dcd, T7 range
