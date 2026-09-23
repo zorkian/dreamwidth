@@ -1,3 +1,18 @@
+## Anonymous callable integrated; browser lifecycle recheck queued
+
+Sol d8f79ac078e963629b30b787b9de464f0d55eb25 CLEAR, integrated 9e05a87a8.
+Foreman five adjacent suites: 213 PASS (/tmp/bml-anonymous-callable-integrated.log),
+session72840 complete. Shared native renderer has optional title/username input;
+no public anonymous route or authentication/POST change. Native schema remains
+a later gate. Themes now adds render-only browser acceptance without submission.
+
+Community browser861 remains held for clean fixture EOF waiting forever. Narrow
+fix6157821d159b21c341987e1fb0a831ee5c3d2064 is queued Sol: pending/future reads
+reject EOF, with normal/early-clean/named-failure worker proofs. Widgets resumed
+separate public core1d6d23fe4463c76a7d41bd7a2d83971ee9ea537e to finish matrix
+rows4/5 and ordered dispatch markers, then plain-app browser followup. Public
+community POST is NOT integrated. Root has no running tests/browser processes.
+
 ## Active worker checkpoint
 
 Callable community browser commit 86165dd0898489a13dce47c33f7428ee90022cbb

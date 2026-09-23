@@ -2217,3 +2217,10 @@ Sol124473f0 CLEAR; integratedce765e52b. Foreman four suites265 PASS and shared
 full tidy1148/compile1607 PASS. Explicit same-poster community resolver retains
 pre-decoder exclusions and shared native retry after attempted mutation. Public
 dispatch remains unchanged; browser and finite activation matrix are separate.
+
+### Callable anonymous rendering accepted
+
+Sol d8f79ac07 CLEAR; integrated9e05a87a8. Foreman five adjacent suites213 PASS.
+Optional native title/username rendering preserves legacy hook timing, escaped
+prefill, blank password, editor defaults and sequential isolation. No public
+anonymous route or authentication/POST changes. Browser acceptance is separate.
