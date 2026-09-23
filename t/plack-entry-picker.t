@@ -238,6 +238,24 @@ test_psgi $app, sub {
             is( $query{usejournal}, $comm->user, 'entry form preserves community context' );
         }
     }
+    for my $suffix ( '', '.bml' ) {
+        my $raw =
+              'usejournal='
+            . $comm->user
+            . '&itemid='
+            . $own_entry->ditemid
+            . '&encoded=a%2Fb%26c&repeated=one&repeated=two';
+        my $same = $cb->( GET '/editjournal' . $suffix . '?' . $raw );
+        is( $same->code, 200, "same-poster $suffix GET uses public native rendering" );
+        my ($form) = grep { $_->find_input('subject') } picker_forms( $same->content );
+        ok( $form, "same-poster $suffix GET returns native edit form" );
+        like(
+            $form->action,
+qr{^http://localhost/entry/\Q@{[$comm->user]}\E/\Q@{[$own_entry->ditemid]}\E/edit\?\Q$raw\E$},
+            "same-poster $suffix form preserves canonical raw action"
+        ) if $form;
+    }
+
     my $res = $cb->(
         POST '/editjournal?usejournal=' . $comm->user,
         Content => [
