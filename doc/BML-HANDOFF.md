@@ -1,3 +1,17 @@
+## Retained anonymous password baseline accepted
+
+Sol207..2cb742c854a9442d9562aef8ed4b8b99b22c3789 CLEAR; integratede14dda093
+throughfbe73790b. Foreman baseline+anonymous GET128 PASS
+(/tmp/bml-anonymous-baseline-integrated.log), session52317 done. Exact errors,
+retained inputs, blank password, divergent failure sentinels and success formatting
+changes are now characterized. Test-only; no public anonymous route/auth change.
+
+Widgets implements anonymous retry prerequisite (keep native username, select
+visible duplicate input in tests) then successful-password callable owner slice.
+Themes manager property adapter focused254/compile1607 passed, immutable handoff
+pending. Root has no active test/browser sessions and no pending implementation
+edits. Public community POST remains fully accepted and integrated.
+
 ## Public same-poster community POST integrated and validated
 
 Sol finaled191efce6294be8edfa2a80e6b38a356426c5e3 HTTP123 CLEAR, with previously

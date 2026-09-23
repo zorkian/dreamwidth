@@ -2247,3 +2247,10 @@ Desktop/390 captures preserved under community-edit-post-public, narrow retry
 visually checked and helper cleanup empty. Both aliases now try personal then
 same-poster community adapters before retained BML; accepted failures stay on
 native retry. Manager/reporting and other excluded contexts remain retained.
+
+### Anonymous retained POST baseline accepted
+
+Sol207..2cb CLEAR, integratede14dda093..fbe73790b. Foreman baseline and anonymous
+GET128 PASS. Ordinary password form persistence, exact failure responses/input
+retention, blank passwords, poster formatting changes and remote-only state
+preservation are now nonvacuously characterized. No native POST route is activated.

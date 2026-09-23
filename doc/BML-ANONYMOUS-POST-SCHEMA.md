@@ -210,3 +210,20 @@ Already useful, but not anonymous POST authorization coverage:
 
 No current test in this inventory proves an anonymous retained `/update` POST can be
 safely authenticated, posted, or receive a response through native `/entry/new`.
+
+## Retained password-form baseline now accepted
+
+The test-only range207f80f50..2cb742c85 is independently reviewed and integrated.
+`t/plack-anonymous-update-post-baseline.t` uses actual retained forms for both
+aliases, disposable accounts and no Cookie header. Correct password posts persist
+exact entry content and private/friends security. Success changes the poster's
+`disable_auto_formatting` from submitted `event_format`; draft/frozen draft
+properties and both editor preferences stay unchanged without a session remote.
+
+Wrong/empty password and empty body assert the exact retained messages, preserved
+user/subject/body, blank password and no new entry. Distinct rich/format-on state
+before each plain/format-off failure makes preservation assertions meaningful.
+Only outbound scheduling is stubbed and its call count stays zero. The production
+route object is unchanged. Foreman baseline plus anonymous GET:128 assertions PASS.
+This closes the ordinary retained password-form baseline, not native anonymous
+authentication, failed-attempt hook parity, community posting or public activation.
