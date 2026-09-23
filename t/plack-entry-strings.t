@@ -15,7 +15,6 @@ use Test::More;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use DW::Controller::Entry;
-use DW::Template;
 use LJ::Session;
 use LJ::Test qw(temp_comm temp_user);
 
@@ -165,28 +164,6 @@ test_psgi $app, sub {
         'relocated /entry/preview.tt.entry.preview_warn_text resolves to its exact English text'
     );
 }
-
-# --- The no-JS altlogin credential branch of views/entry/login.tt (its
-# .username/.password strings, relocated from /update.bml.*) has no live
-# caller; render the template directly and pin its relocated text, without
-# claiming any live route exercises it. ---
-{
-    my $html = DW::Template->template_string( 'entry/login.tt',
-        { legacy_altlogin => { username => 'relocationtestuser' }, remote => $u } );
-    no_missing_string( $html, 'entry/login.tt (direct render, legacy_altlogin branch)' );
-    like( $html, qr/Account name:/, 'relocated .username text renders in the altlogin branch' );
-    like( $html, qr/Password:/,     'relocated .password text renders in the altlogin branch' );
-}
-
-# --- widget.userpicselector.link.view_thumbnails (relocated from
-# /update.bml.* to the global bin/upgrading/en.dat scope) has no live
-# caller; the assertion only pins its relocated text, not a claim that
-# anything currently reads it. ---
-is(
-    LJ::Lang::ml('widget.userpicselector.link.view_thumbnails'),
-    'View Thumbnails',
-    'relocated widget.userpicselector.link.view_thumbnails resolves to its exact English text'
-);
 
 # --- Static scan: no native file (cgi-bin/DW, views, cgi-bin/LJ/Widget)
 # references /update.bml., /editjournal.bml., /imgupload.bml., or

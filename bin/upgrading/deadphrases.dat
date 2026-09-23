@@ -4855,3 +4855,8 @@ general /beta.tt.betafeature.updatepage.cantadd
 general /beta.tt.betafeature.updatepage.off
 general /beta.tt.betafeature.updatepage.on
 general /beta.tt.betafeature.updatepage.title
+
+general /entry/login.tt.password
+general /entry/login.tt.username
+
+general widget.userpicselector.link.view_thumbnails

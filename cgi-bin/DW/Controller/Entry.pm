@@ -353,11 +353,8 @@ sub _render_new_form {
         { url => $render_opts->{action_url} // LJ::create_url( undef, keep_args => 1 ), };
     $vars->{title_override} = $render_opts->{title_override}
         if exists $render_opts->{title_override};
-    $vars->{legacy_altlogin} = $render_opts->{legacy_altlogin}
-        if $render_opts->{legacy_altlogin};
     $vars->{submit_action_name} =
-        $render_opts->{legacy_altlogin}
-        && ( $render_opts->{submit_action_name} || '' ) eq 'action:update'
+        ( $render_opts->{submit_action_name} || '' ) eq 'action:update'
         ? 'action:update'
         : 'action:post';
 
@@ -491,7 +488,6 @@ sub legacy_new_rerender {
             datetime             => $datetime,
             trust_datetime_value => !exists $canonical->{tz},
             crosspost            => \%crosspost,
-            suppress_crosspost   => $opts{suppress_crosspost},
         }
     );
 
@@ -508,7 +504,6 @@ sub legacy_new_rerender {
         $opts{spellcheck_requested},
         {
             action_url         => $action_url,
-            legacy_altlogin    => $opts{legacy_altlogin},
             submit_action_name => $opts{submit_action_name},
         },
     );
@@ -597,12 +592,7 @@ sub _init {
         @journallist = ( $u, $u->posting_access_list )
             unless $usejournal;
 
-        # The retained alternate-login presentation never exposes crossposting.
-        # Keep its render-only compatibility seam from enumerating accounts.
-        my @accounts =
-            $form_opts->{suppress_crosspost}
-            ? ()
-            : DW::External::Account->get_external_accounts($u);
+        my @accounts = DW::External::Account->get_external_accounts($u);
         if ( scalar @accounts ) {
             foreach my $acct (@accounts) {
                 my $id = $acct->acctid;

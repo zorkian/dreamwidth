@@ -136,10 +136,6 @@ postFormInitData.strings = {
 
     [%- dw.form_auth -%]
 
-    [%- IF legacy_altlogin -%]
-        [%- dw.scoped_include( "entry/login.tt" ) -%]
-    [%- END -%]
-
     <div class="current-entry row"><div class="columns"><!-- Start main column sub & entry -->
 
         [%- IF remote -%]
@@ -341,7 +337,6 @@ postFormInitData.strings = {
 
     [%- BLOCK components forCommunity = 0 %]
         [% FOREACH component = items %]
-        [%- NEXT IF legacy_altlogin && component == "crosspost" -%]
         [%- IF forCommunity -%]<div class='columns medium-6 large-4 [% IF loop.count == items.size %]end[% END %]'>[%- END -%]
 
         <div class='panel component [% component %]-component[% UNLESS forCommunity || panels.show.$component -%] inactive-component[%- END -%]'
@@ -392,7 +387,7 @@ postFormInitData.strings = {
     <div class="row components js-only">
         <div class="columns">
             [%- dw.scoped_include( "entry/module-access.tt" ) %]
-            [%- UNLESS legacy_altlogin || remote -%]
+            [%- UNLESS remote -%]
                 [%- dw.scoped_include( "entry/login.tt" ) -%]
             [%- END -%]
         </div>
