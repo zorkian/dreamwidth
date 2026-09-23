@@ -32,7 +32,7 @@ my %sitescheme_data = (
     'gradation-horizontal' => { parent => 'common', title    => "Gradation Horizontal" },
     'gradation-vertical'   => { parent => 'common', title    => "Gradation Vertical" },
     lynx                   => { parent => 'common', title    => "Lynx (light mode)" },
-    global                 => { engine => 'current' },
+    global                 => {},
 );
 
 my $data_loaded = 0;
@@ -81,7 +81,7 @@ sub engine {
 }
 
 sub supports_tt {
-    return $_[0]->engine eq 'tt' || $_[0]->engine eq 'current';
+    return $_[0]->engine eq 'tt';
 }
 
 =head2 C<< DW::SiteScheme->inheritance( $scheme ) >>
