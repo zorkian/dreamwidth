@@ -1505,3 +1505,17 @@ checks, after widgets Terra completes customization1/4.
   proofs; Themenav finishes preview bare-response correction; Sol reviews exact
   fixes and native spellcheck plan. No deployment-hook approval or held-work
   authorization was inferred from recovery.
+
+### Preview executable retired; seven pages remain
+
+- Sol cleared method/retirement range through013be9041, integrated38dca7bd7.
+  GET returns the exact bare native-localized requirepost body, HEAD retains
+  matching representation headers with no body, and both legacy aliases work.
+  Only executable preview/entry.bml is removed; translation companion remains.
+- Foreman focused22 PASS in /tmp/bml-preview-retirement-integrated.log and
+  exact actual popup browser PASS after restart, host
+  /tmp/bml-preview-retired-browser.log. Fixture helper absent after completion.
+- Native spellcheck implementation is active in Themenav. Expanded legacy
+  baseline2c6 passes28 but Sol identified incomplete original finite assertions:
+  exact returned body/backdate/RTE, full draft properties, disabled edit control.
+  Widgets owns that narrow correction;2c6 is not accepted/integrated yet.

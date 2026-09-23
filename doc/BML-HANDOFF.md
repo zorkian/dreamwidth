@@ -47,34 +47,31 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
   Foreman sequential parity and preview browser suites both exit0, build and
   scoped helper tidy pass, helpers absent. Final ledger commit 2b164e4ee exists.
   Do not reopen the old 4c/6616 findings from stale recovery messages.
-- Preview shared renderer integrated as abc509db6, but executable file remains
-  pending method correction below. Foreman3files173 PASS, build PASS,
+- Preview shared renderer integrated as abc509db6; method compatibility and
+  executable retirement integrated38dca7bd7 after independent clear013be9041. Foreman3files173 PASS, build PASS,
   tidy1091/compile1605 PASS, actual popup browser PASS. Before/after captures in
   doc/bml-evidence/2026-09-23/entry-preview-{before,native}.
 - Spellcheck baseline3b367d0c independently bounded-clear, integrated f6a8261d7;
   foreman15 PASS in /tmp/bml-spellcheck-baseline-integrated.log.
 - Earlier customization/settings/picker/FCK/native language and ordinary editor
   packages are integrated and reviewed as recorded in BML-PROGRESS.md.
-  Eight executable BML pages still remain in the foreman tree at this update.
+  Seven executable BML pages still remain in the foreman tree at this update.
 
 ## Current bounded queue
 
-1. Themenav: preview GET/HEAD compatibility and executable retirement on branch
-   bml-terra-preview-method-retirement-20260923. Commits a6277d378 +4091af883
-   are NOT integrated. Sol found error_ml incorrectly wraps the old bare
-   bml.requirepost response in a full Error page. Worker is returning native
-   localized text directly, asserting exact GET body and matching empty HEAD
-   representation for both aliases. Retain entry.bml.text and index.html.
-   Prior actual popup replay and focused tests pass; await narrow corrected SHA
-   and Sol recheck before integrating removal.
+1. Themenav: native configured spellcheck implementation on the integrated
+   preview base, per BML-EDITOR-SPELLCHECK-ACCEPTANCE.md and independent plan
+   audit. Ordinary new/edit nonpersisting branch, retained fields and disposable
+   actual RTE browser acceptance; tests stub checker, no external process.
+   Preview retirement is complete; do not repeat that package.
 2. Widgets: expand the already-clear legacy spellcheck baseline to disabled
    button absence, retained submitted metadata/date/editor controls and the old
    edit stored-RTE nuance, plus unchanged draft state. Test-only separate branch;
    see BML-EDITOR-SPELLCHECK-ACCEPTANCE.md. No external checker process.
 3. Sol: crossposting characterization9e6614a3 is bounded-clear and integrated
-   d6aa5dbb7; foreman crosspost/spellcheck combined65 PASS. Review preview
-   correction and remaining spellcheck proofs next. No external delivery.
-   Native spellcheck implementation is subsequent bounded work on integrated
+   d6aa5dbb7; foreman crosspost/spellcheck combined65 PASS. Review remaining spellcheck
+   proofs and immutable native implementation next. No external delivery.
+   Native spellcheck implementation is active on the integrated
    preview base; /tmp/spellcheck-native-plan.md is in Themenav's checkout host.
 
 ## Working method and evidence
