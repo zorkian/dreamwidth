@@ -2294,3 +2294,13 @@ separate gates; failed credentials and excluded contexts remain retained BML-own
 
 Anonymous callable integrated formatting1160 and compile1607 also passed; browser
 and public activation remain separate, with no new public anonymous route.
+
+### Public manager property POST accepted
+
+Sol423+09 finite actual-app178 and plain-app browser CLEAR; integrated8d2be92c5
+and88a819e17. Foreman adjacent five suites692 PASS, public browser PASS with empty
+owned-process check, formatting1161 and compile1607 PASS. Desktop/narrow captures
+are preserved under manager-property-public. Dispatch tries personal, same-poster
+community, then property-only manager, stopping on each defined result. Manager GET
+and delete/report surfaces remain retained; no valid reporting or deletion action
+was included in this package.

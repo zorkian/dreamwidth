@@ -1,3 +1,25 @@
+## Public manager property activation integrated and validated
+
+Sol423+09 CLEAR178 with independently cleared plain-app browser. Integrated as
+root8d2be92c5 and88a819e17. Foreman five-suite regression692 PASS
+(/tmp/bml-manager-public-integrated.log), session3905 complete. Plain-app browser
+PASS (/tmp/bml-manager-property-public-browser.log), session25624 complete;
+owned runner/fixture/server check empty. Desktop/narrow captures preserved under
+manager-property-public; GET remains the retained BML baseline unchanged. Full
+formatting1161 and compile1607 PASS (/tmp/bml-manager-public-{tidy,compile}.log),
+session24833 complete. No root validation sessions remain active.
+
+Themes callable authenticated share d7784f3f8244a7d0a3a0171cfd83194b94679f44
+is queued Sol after source-only anonymous composition audit. Worker42 direct plus
+52 adjacent and compile1607 passed. Themes builds callable stub-only browser;
+no real URL fetch or public share activation.
+
+Widgets anonymous callable browser WIP remains held. Repeated browser response
+assertion and owned Starman server leak are under diagnosis with test-only claimed/
+declined headers and redacted field metadata. Foreman found clean-EOF pending-read
+hang in new harness and routed the already-accepted terminal/awaited cleanup fix.
+Do not infer browser acceptance from accepted anonymous HTTP/production.
+
 ## Final manager routing proof queued
 
 Sol423 production/HTTP168/plain-app browser normal+named cleanup are clear; two
