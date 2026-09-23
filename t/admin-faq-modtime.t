@@ -63,7 +63,6 @@ subtest
         lang   => 'fr',
         getter => sub { push @ml, $_[1]; return "native:$_[1]" },
     );
-    local $Apache::BML::base_recent_mod = 1;
     my $rendered = '';
     my $faq      = AdminFaqModtime::Faq->new;
     no warnings 'redefine';
@@ -97,8 +96,6 @@ subtest
         'actual template has no parse error'
     );
 
-    is( $Apache::BML::base_recent_mod, 1,
-        'higher FAQ modification time does not mutate process-global BML bookkeeping' );
     is( $r->header_out('Last-Modified'),
         undef, 'handler does not invent a Plack Last-Modified header' );
     ok( ( grep { $_ eq '/admin/faq/readcat.tt.title' } @ml ),

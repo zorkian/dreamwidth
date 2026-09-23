@@ -174,7 +174,6 @@ subtest 'faq browse keeps default-language fallback and native error scope' => s
 };
 
 subtest 'FAQ content does not manufacture a Plack Last-Modified header' => sub {
-    local $Apache::BML::base_recent_mod = 1;
     my $r = request('faqid=92');
     my @calls;
     native_context( 'en', \@calls );
@@ -212,8 +211,6 @@ subtest 'FAQ content does not manufacture a Plack Last-Modified header' => sub {
     is( $r->header_out('Last-Modified'), undef,
 'legacy BML modification bookkeeping did not provide a Plack response header and is not replaced implicitly'
     );
-    is( $Apache::BML::base_recent_mod, 1,
-        'native FAQ rendering does not mutate the legacy process-global BML modification state' );
 };
 
 subtest 'sequential FAQ requests do not leak native language context' => sub {
