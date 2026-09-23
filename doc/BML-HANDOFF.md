@@ -1,3 +1,22 @@
+## Public browser clear; finite HTTP and anonymous baseline reviews continue
+
+Sol independently cleared public community browser9790446adebcf991c869befd6473c601f8eff035:
+normal production POST replay, named failure, clean EOF, cleanup and narrow capture
+all passed. Public dispatcher remains unintegrated until finite HTTP corrections
+close. d1bd0f2c106712f65d19bddddee732c75953d9bf omits the missing token and formats
+the browser server. Remaining proofs: observable selected target, valid-token
+actor/community readonly guards, exact beta redirect, meaningful token rejection,
+and a zero-call reporting stub on the invalid-token-only manager row. No valid
+manager reporting action may be executed; the earlier automatic rejection stands.
+
+Anonymous retained POST baseline207f80f509cf3039315dafda8e5ab96660053d28 is queued
+Sol: worker51 focused/tidy1154/compile1607 passed. It is test-only, disposable,
+password-based, no Cookie header; no native anonymous activation. Foreman flagged
+broad error matching and separate editor preference coverage for review. Themes
+has moved to the bounded callable-only manager property package described in
+BML-MANAGER-PROPERTY-POST.md, excluding routes/delete/report and external hooks.
+Widgets continues all remaining HTTP corrections; Sol reviews immutable ranges.
+
 ## Public community final matrix recheck pending
 
 Final candidate HTTP1be4ae912b2167573f5117edfa3b9d0f5c65eeef (99 worker tests)
