@@ -129,8 +129,10 @@ test_psgi $app, sub {
     $form->value( date_ymd_dd           => 3 );
     $form->value( hour                  => '04' );
     $form->value( min                   => '05' );
-    $form->value( opt_backdated         => 1 ) if $form->find_input('opt_backdated');
-    $form->value( switched_rte_on       => 1 ) if $form->find_input('switched_rte_on');
+    ok( $form->find_input('prop_opt_backdated'),
+        'legacy spellcheck form renders its backdating control' );
+    $form->value( prop_opt_backdated => 1 );
+    $form->value( switched_rte_on    => 1 ) if $form->find_input('switched_rte_on');
     ok( $owner->set_draft_text('Spellcheck draft body'),
         'seeded draft remains outside spellcheck' );
     $owner->set_prop( 'draft_properties', nfreeze( { subject => 'Spellcheck draft subject' } ) );
@@ -160,6 +162,9 @@ test_psgi $app, sub {
     is( $retry->value('security'),       'private',  'spellcheck retains submitted security' );
     is( $retry->value('entrytime_date'), '2024-2-3', 'spellcheck retains submitted date' );
     is( $retry->value('entrytime_time'), '04:05',    'spellcheck retains submitted time' );
+    ok( $retry->find_input('entrytime_outoforder'),
+        'native spellcheck retry renders its backdating control' );
+    is( $retry->value('entrytime_outoforder'), 1, 'spellcheck retains submitted backdating' );
     my $fresh_owner = LJ::load_userid( $owner_id, 1 );
     is(
         $fresh_owner->draft_text,
