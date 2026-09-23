@@ -17,6 +17,7 @@ package DW::Entry::Legacy;
 use strict;
 use warnings;
 
+use DW::Entry;
 use DW::Mood;
 use Hash::MultiValue;
 use LJ::HTMLControls;
@@ -180,6 +181,109 @@ sub legacy_post_hash {
         }
     );
     return \%legacy;
+}
+
+# Build the two data shapes needed by a future native alternate-login POST
+# adapter without invoking the retained decoder or any hook.  The native form
+# is deliberately not a legacy-schema form: canonical data is for _save_new_entry,
+# while legacy_request is only the separately retained hook/protocol snapshot.
+sub prepare_altlogin_native_form {
+    my ( $post, %opts ) = @_;
+
+    return { action => undef, native_post => $post }
+        unless blessed($post) && $post->isa('Hash::MultiValue');
+
+    my @actions;
+    $post->each(
+        sub {
+            my ( $name, $value ) = @_;
+            push @actions, $name if $name =~ /^action:/ && defined $value && length $value;
+        }
+    );
+    return { action => undef, native_post => $post }
+        unless @actions && !grep { $_ ne 'action:update' } @actions;
+
+    my %canonical = %{ $opts{canonical_seed} || {} };
+    $canonical{props} = { %{ $canonical{props} } }
+        if ref $canonical{props} eq 'HASH';
+
+    # The future protocol snapshot has an explicit retained seed.  Carry only
+    # its timezone into canonical parsing so a trusted native date can delete
+    # it before either representation reaches a save path.
+    if ( !exists $canonical{tz} && exists $opts{legacy_seed}{tz} ) {
+        $canonical{tz} = $opts{legacy_seed}{tz};
+    }
+    DW::Entry::_form_to_backend( 0, \%canonical, $post );
+
+    # This presentation never has a crosspost UI.  Do not turn injected
+    # crosspost fields into a native selection or legacy callback state.
+    $canonical{crosspost_entry} = 0;
+    delete $canonical{crosspost};
+
+    my %legacy = %{ $opts{legacy_seed} || {} };
+    for my $name (
+        qw(subject event security allowmask year mon day hour min slug
+        update_displaydate sticky_entry sticky_select)
+        )
+    {
+        if ( exists $canonical{$name} ) {
+            $legacy{$name} = $canonical{$name};
+        }
+        else {
+            delete $legacy{$name};
+        }
+    }
+
+    # A trusted native date deletes tz from canonical data.  The hook snapshot
+    # must mirror that deletion rather than restoring the caller's seed value.
+    if ( exists $canonical{tz} ) {
+        $legacy{tz} = $canonical{tz};
+    }
+    else {
+        delete $legacy{tz};
+    }
+
+    my %props_to_legacy = (
+        taglist              => 'prop_taglist',
+        picture_keyword      => 'prop_picture_keyword',
+        current_moodid       => 'prop_current_moodid',
+        current_mood         => 'prop_current_mood',
+        current_music        => 'prop_current_music',
+        current_location     => 'prop_current_location',
+        opt_backdated        => 'prop_opt_backdated',
+        opt_screening        => 'prop_opt_screening',
+        opt_nocomments       => 'prop_opt_nocomments',
+        opt_noemail          => 'prop_opt_noemail',
+        adult_content        => 'prop_adult_content',
+        adult_content_reason => 'prop_adult_content_reason',
+        admin_post           => 'prop_admin_post',
+    );
+    my $props = $canonical{props} || {};
+    for my $native ( keys %props_to_legacy ) {
+        my $legacy_name = $props_to_legacy{$native};
+        if ( exists $props->{$native} ) {
+            $legacy{$legacy_name} = $props->{$native};
+        }
+        else {
+            delete $legacy{$legacy_name};
+        }
+    }
+
+    # editor and opt_preformatted stay native canonical state.  Raw legacy RTE
+    # flags are a separately reviewed housekeeping concern, not a mapper default.
+    delete @legacy{
+        qw(prop_editor prop_opt_preformatted prop_used_rte
+            event_format richtext_default switched_rte_on)
+    };
+    $legacy{xpost} = 0;
+
+    return {
+        action         => 'update',
+        credential     => { username => $post->{user}, password => $post->{password} },
+        canonical      => \%canonical,
+        legacy_request => \%legacy,
+        native_post    => $post,
+    };
 }
 
 # Convert the decoder's legacy-shaped request to the canonical native entry
