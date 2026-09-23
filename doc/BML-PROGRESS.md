@@ -2439,3 +2439,10 @@ reviewer re-proved both c717 residuals; Themes corrected them in770db2b2d with
 regression tests proved to fail at base. Range d19ba22d5..770db2b2d integrated as
 96c253a44..e473de049. Root pure5files21 PASS, tidy1178 and compile1607 PASS. Still
 an unused pure helper: no hook, auth, save, route or public change.
+
+## Alternate-login rerender browser acceptance integrated (2026-09-23)
+
+Opus CLEAR of4a1d9d121+7c9499af5 integrated ase8068aa3c/2dba301fa. One review
+finding (UTC expected date) corrected and proved under a non-UTC zone. Root browser
+replay PASS with clean cleanup, build PASS, tidy1180, compile1607; captures preserved
+under update-altlogin-rerender. Test-only; no public activation or credential submit.

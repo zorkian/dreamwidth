@@ -7,6 +7,22 @@ bml-opus-review) in the same worktrees, branches and containers; the mapping is
 in the checkpoint's resume record. All other held boundaries remain. Entries
 below this line predate the resume.
 
+## Browser-only alternate-login rerender accepted (2026-09-23)
+
+bml-opus-review CLEAR of Widgets range 4a1d9d121c0b654b4952e2e6da50c2994b5367a3
++ 7c9499af59409290c6a963ec3222bbeafe87e169 atop ce4a7d63c (browser acceptance of
+the integrated cee270600 seam only; not public activation). Integrated on root
+as e8068aa3c and 2dba301fa: three test files only. The reviewer's one finding,
+expected date computed in UTC instead of browser-local, was corrected in 7c9 and
+proved under Etc/UTC and Pacific/Kiritimati. Root normal replay PASS with owned
+fixture/server exit and port18156 free; static build PASS; tidy1180 and
+compile1607 PASS. Logs in container 8d7783a043d8:
+/tmp/bml-altlogin-rerender-browser-integrated{,-build,-tidy,-compile}.log.
+Desktop/narrow captures inspected and preserved in
+doc/bml-evidence/2026-09-23/update-altlogin-rerender. Nothing submits
+credentials or saves an entry; the expected sprintf warning for the deliberate
+invalid year is fixture noise, not a defect.
+
 ## Unused raw-hook builder integrated (resume, 2026-09-23)
 
 bml-opus-review CLEAR of Themes correction
