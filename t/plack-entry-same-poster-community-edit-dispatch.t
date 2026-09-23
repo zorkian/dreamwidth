@@ -14,6 +14,7 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use DW::Controller::Entry;
 use LJ::Entry;
 use LJ::Session;
+use LJ::SpellCheck;
 use LJ::Test qw(temp_comm temp_user);
 
 plan skip_all => 'Community dispatch integration requires a development server'
@@ -369,6 +370,103 @@ test_psgi $app, sub {
             $guard->();
         }
     }
+
+    local $LJ::SPELLER = 'local-community-stub';
+    my @checked;
+    my $check_html = \&LJ::SpellCheck::check_html;
+    local *LJ::SpellCheck::check_html =
+        sub { push @checked, ${ $_[1] }; return '<em>community suggestion</em>' };
+    my $spell = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'spell old',
+        body     => 'spell stored body',
+        security => 'public'
+    );
+    my $spell_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $spell->ditemid;
+    $res  = $retained_get->($spell_path);
+    $form = form_from( $res->content );
+    ok(
+        $form && $form->find_input('action:spellcheck'),
+        'configured retained community form exposes spellcheck'
+    );
+    $form->action( 'http://localhost' . $spell_path );
+    $form->value( subject => 'spell submitted subject' );
+    $form->value( event   => 'misspell community body' );
+    $post = clicked( $form, 'action:spellcheck' );
+    $post->header( Cookie  => $cookie );
+    $post->header( Referer => "http://localhost$spell_path" );
+    $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
+    $res            = $send->($post);
+    is_deeply( \@dispatch_order, [qw(personal community)],
+        'spellcheck declines through both edit resolvers' );
+    like( $res->content, qr/community suggestion/, 'retained spellcheck renders local suggestion' );
+    is( $checked[-1], 'misspell community body', 'local checker receives submitted body' );
+    is(
+        fresh( $comm, $spell->ditemid )->event_raw,
+        'spell stored body',
+        'spellcheck leaves stored community body unchanged'
+    );
+
+    my $precedence = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'precedence old',
+        body     => 'precedence body',
+        security => 'public'
+    );
+    for my $case (
+        [
+            'GET usejournal wins over POST',
+            '/editjournal?usejournal=' . $comm->user . '&itemid=' . $precedence->ditemid,
+            [ usejournal => 'not-a-journal' ]
+        ],
+        [
+            'POST usejournal wins over GET journal',
+            '/editjournal?journal=not-a-journal&itemid=' . $precedence->ditemid,
+            [ usejournal => $comm->user ]
+        ],
+        )
+    {
+        $post = POST $case->[1],
+            [ itemid => $precedence->ditemid, @{ $case->[2] }, 'action:unsupported' => '1' ];
+        $post->header( Cookie  => $cookie );
+        $post->header( Referer => 'http://localhost' . $case->[1] );
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($post);
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$case->[0] reaches community context before retained fallback" );
+        is(
+            fresh( $comm, $precedence->ditemid )->subject_raw,
+            'precedence old',
+            "$case->[0] does not mutate target"
+        );
+    }
+    my $collapse = $poster->t_post_fake_entry(
+        subject  => 'collapse old',
+        body     => 'collapse body',
+        security => 'private'
+    );
+    my $collapse_path =
+        '/editjournal?usejournal=' . $poster->user . '&itemid=' . $collapse->ditemid;
+    $res  = $retained_get->($collapse_path);
+    $form = form_from( $res->content );
+    ok( $form, 'same-user collapse harvests personal retained form' );
+    $form->action( 'http://localhost' . $collapse_path );
+    $form->value( subject => 'collapse changed' );
+    $post = clicked( $form, 'action:save' );
+    $post->header( Cookie  => $cookie );
+    $post->header( Referer => "http://localhost$collapse_path" );
+    $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
+    $res            = $send->($post);
+    is_deeply( \@dispatch_order, ['personal'],
+        'same-user usejournal collapse remains on personal path' );
+    is(
+        fresh( $poster, $collapse->ditemid )->subject_raw,
+        'collapse changed',
+        'same-user collapse persists personal save'
+    );
 
     my $personal_entry = $poster->t_post_fake_entry(
         subject  => 'personal old',
