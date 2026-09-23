@@ -1,3 +1,14 @@
+## Priority public community activation correction
+
+Foreman found native maintainer.tt omits retained manager delete controls; the
+picker regression explicitly proves action:delete plus savemaintainer. Public
+community activation is now SAME-POSTER ONLY. Other-poster manager GET must stay
+BML until separate action-surface parity. Do not weaken the picker test to accept
+lost delete UI. Widgets instructed to preserve callable manager/browser and adapt
+public candidate; Sol asked to source-confirm boundary. No POST/deletespam change.
+Sol686 browser otherwise clear pending checkbox assertionc4ee4deea recheck.
+Terminal renderer e16cdedeb queued review; its public classification WIP separate.
+
 ## Latest public update GET integration
 
 Sol a0d94015a/ad63eb656/3e2af975d CLEAR, integrated53f82843f/7963b513d/9177ba357.

@@ -108,3 +108,19 @@ Use disposable real-session users, two communities, and fresh entry reads.
 
 The parsed action can be checked without submitting it; POST save/delete and
 maintainer mutation remain separate reviewed gates.
+
+## Public activation boundary discovered during integration
+
+The callable property-only manager renderer is accepted, but it is not a complete
+replacement for the retained manager page. `t/plack-entry-picker.t` proves that
+other-poster manager GET exposes both `action:delete` and `action:savemaintainer`.
+The native `entry/maintainer.tt` has only property controls and save. Publicly
+activating that renderer would remove a reachable legacy action. Do not weaken
+that picker regression or treat property-only browser parity as full activation
+acceptance.
+
+The next public activation is limited to same-poster community entries. Keep
+other-poster manager GET on BML until a separate action-surface compatibility
+package is implemented and reviewed. Callable manager rendering and its browser
+proof remain valid prerequisites; they do not authorize deletion or spam-delete
+changes. Existing POST dispatch stays unchanged.
