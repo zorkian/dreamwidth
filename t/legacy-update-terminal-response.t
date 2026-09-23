@@ -16,13 +16,16 @@ my @seen;
 my $getter = sub {
     my ( $lang, $key, undef, $args ) = @_;
     return LJ::Lang::get_text( $lang, $key, undef, $args )
-        unless $key =~ m!^(?:Sorry|/update\.bml\.error\.(?:nonusercantpost|cantpost(?:\.title)?))$!;
+        unless $key =~
+m!^(?:Sorry|/update\.bml\.(?:title2|error\.(?:invalidusejournal|nonusercantpost|cantpost(?:\.title)?)))$!;
     push @seen, $key;
     return
-          $key eq 'Sorry'                             ? 'Marker Sorry'
-        : $key eq '/update.bml.error.nonusercantpost' ? "Identity for $args->{sitename}"
-        : $key eq '/update.bml.error.cantpost.title'  ? 'Marker Cannot Post'
-        :                                               'Marker cannot post body';
+          $key eq '/update.bml.title2'                  ? 'Marker Post an Entry'
+        : $key eq '/update.bml.error.invalidusejournal' ? 'Marker invalid journal'
+        : $key eq 'Sorry'                               ? 'Marker Sorry'
+        : $key eq '/update.bml.error.nonusercantpost'   ? "Identity for $args->{sitename}"
+        : $key eq '/update.bml.error.cantpost.title'    ? 'Marker Cannot Post'
+        :                                                 'Marker cannot post body';
 };
 my $app = Plack::Middleware::DW::RequestWrapper->wrap(
     sub {
@@ -38,7 +41,27 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
 {
     local $LJ::SITENAME = 'Site <name>';
     test_psgi $app, sub {
-        my $send     = shift;
+        my $send    = shift;
+        my $invalid = $send->( GET '/__terminal?variant=invalidusejournal' );
+        is( $invalid->code, 200, 'invalid-usejournal terminal response is HTTP 200' );
+        like(
+            $invalid->content,
+            qr/Marker Post an Entry/,
+            'invalid-usejournal retains the legacy update title'
+        );
+        like(
+            $invalid->content,
+            qr/Marker invalid journal/,
+            'invalid-usejournal retains the legacy localized body'
+        );
+        unlike( $invalid->content, qr/js-post-entry|updateForm/,
+            'invalid-usejournal terminal response has no form' );
+        unlike(
+            $invalid->content,
+            qr/missing string/,
+            'invalid-usejournal has no missing translation'
+        );
+
         my $identity = $send->( GET '/__terminal?variant=identity' );
         is( $identity->code, 200, 'identity terminal response is HTTP 200' );
         like( $identity->content, qr/Marker Sorry/, 'identity retains localized Sorry title' );
@@ -80,6 +103,7 @@ my $app = Plack::Middleware::DW::RequestWrapper->wrap(
 is_deeply(
     \@seen,
     [
+        '/update.bml.title2',               '/update.bml.error.invalidusejournal',
         'Sorry',                            '/update.bml.error.nonusercantpost',
         '/update.bml.error.cantpost.title', '/update.bml.error.cantpost.title',
         '/update.bml.error.cantpost'

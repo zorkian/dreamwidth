@@ -760,15 +760,19 @@ sub legacy_update_get_render {
     );
 }
 
-# Render the two retained terminal update responses after a caller has already
-# applied legacy request ordering.  This intentionally does not inspect a
-# request or initialize entry-form state.
+# Render retained terminal update responses after a caller has already applied
+# legacy request ordering. This intentionally does not inspect a request or
+# initialize entry-form state.
 sub legacy_update_terminal_response {
     my ($variant) = @_;
     die 'missing legacy update terminal variant' unless defined $variant;
 
     my ( $title, $message );
-    if ( $variant eq 'identity' ) {
+    if ( $variant eq 'invalidusejournal' ) {
+        $title   = LJ::Lang::ml('/update.bml.title2');
+        $message = LJ::Lang::ml('/update.bml.error.invalidusejournal');
+    }
+    elsif ( $variant eq 'identity' ) {
         $title = LJ::Lang::ml('Sorry');
         $message =
             LJ::Lang::ml( '/update.bml.error.nonusercantpost', { sitename => $LJ::SITENAME } );
