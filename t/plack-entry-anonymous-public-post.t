@@ -339,8 +339,13 @@ test_psgi $app, sub {
             $before, "$path wrong password leaves fresh owner state unchanged" );
     }
 
-    for my $case ( [ 'forced login error', 'force_login_error' ], ) {
-        my ( $label, $forced ) = @$case;
+    for my $case (
+        [ '/update',     'forced login error', 'force_login_error' ],
+        [ '/update.bml', 'forced login error', 'force_login_error' ],
+        )
+    {
+        my ( $path, $label, $forced ) = @$case;
+        $label = "$path $label";
         my $failure_owner = temp_user();
         $failure_owner->update_self( { status => 'A' } );
         my $failure_password = 'anonymous-public-' . LJ::rand_chars(24);
@@ -355,7 +360,7 @@ test_psgi $app, sub {
         my $before = fresh_state( $failure_owner->id );
         $authenticated_calls = $anonymous_calls = 0;
         my $post = form_post(
-            $send, '/update', $failure_owner, $failure_password,
+            $send, $path, $failure_owner, $failure_password,
             subject  => "$label subject",
             body     => "$label body",
             security => 'private'
@@ -380,14 +385,12 @@ test_psgi $app, sub {
             "$label passes decoded request to spam checking" );
         like(
             $res->content,
-            $label eq 'forced login error'
-            ? qr/Error logging on:\s+forced public login error/
-            : qr/forced public postevent error/,
+            qr/Error logging on:\s+forced public login error/,
             "$label renders the meaningful retained protocol error"
         );
         unlike( $res->content, qr/id=['"]updateForm['"]/, "$label does not fall back to BML" );
         my ($retry) = grep { ( $_->attr('id') || '' ) eq 'js-post-entry' }
-            HTML::Form->parse( $res->content, 'http://localhost/update' );
+            HTML::Form->parse( $res->content, "http://localhost$path" );
         ok( $retry, "$label renders the native retry form" );
         is(
             $retry ? $retry->value('subject') : undef,
