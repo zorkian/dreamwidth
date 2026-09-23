@@ -32,13 +32,16 @@ sub fresh { LJ::Entry::reset_singletons(); return LJ::Entry->new( $_[0], ditemid
 our %adapter_entry;
 
 sub adapter_handler {
-    my $r       = DW::Request->get;
-    my $remote  = LJ::get_remote();
-    my $post    = $r->post_args;
-    my $entry   = $adapter_entry{ $r->get_args->{itemid} || 0 };
+    my $r      = DW::Request->get;
+    my $remote = LJ::get_remote();
+    return undef unless $r->did_post;
+    my $post  = $r->post_args;
+    my $entry = $adapter_entry{ $r->get_args->{itemid} || 0 };
+    return undef unless DW::Entry::Legacy::legacy_edit_action($post);
     my $allowed = $entry && $remote && $entry->poster->equals($remote);
     my $token   = LJ::check_form_auth( $post->{lj_form_auth} );
     my $referer = LJ::check_referer( undef, $r->header_in('Referer') );
+
     unless ( $allowed && $token && $referer ) {
         $r->status(403);
         $r->print("adapter request rejected: allowed=$allowed token=$token referer=$referer");
@@ -57,7 +60,7 @@ sub adapter_handler {
     $r->status(400);
     return $r->print('adapter action fell through');
 }
-DW::Routing->register_string( '/__test/legacy-owned-edit', \&adapter_handler, app => 1 );
+DW::Routing->register_string( '/editjournal', \&adapter_handler, app => 1, no_redirects => 1 );
 
 sub visible_click {
     my ( $form, $name ) = @_;
@@ -98,7 +101,7 @@ test_psgi $app, sub {
         ok( $form, "$path supplies its actual retained edit form" ) or next;
         ok( $form->find_input('lj_form_auth'), "$path form supplies its CSRF token" );
         $adapter_entry{ $entry->ditemid } = $entry;
-        $form->action( 'http://localhost/__test/legacy-owned-edit?itemid=' . $entry->ditemid );
+        $form->action( 'http://localhost/editjournal?itemid=' . $entry->ditemid );
         $form->value( subject => "Adapter $suffix changed" );
         $form->value( event   => "Adapter $suffix changed body" );
         my $post = visible_click( $form, 'action:save' );
@@ -133,7 +136,7 @@ test_psgi $app, sub {
         $res                              = $send->($again);
         $form                             = form_from( $res->content );
         $adapter_entry{ $entry->ditemid } = $entry;
-        $form->action( 'http://localhost/__test/legacy-owned-edit?itemid=' . $entry->ditemid );
+        $form->action( 'http://localhost/editjournal?itemid=' . $entry->ditemid );
         my $delete = $form->click('action:delete');
         $delete->content( $delete->content =~ s/submit_value=[^&]*/submit_value=action%3Adelete/r );
         $delete->header( Cookie         => $cookie );
