@@ -290,8 +290,14 @@ test_psgi $app, sub {
     $hidden_form->value( subject => 'Hidden item native save' );
     my $hidden_post = visible_click( $hidden_form, 'action:save' );
     $hidden_post->header( Cookie => $cookie, Referer => 'http://localhost' . $hidden_path );
+    my $hidden_adapter = \&DW::Controller::Entry::legacy_owned_edit_post;
+    my $hidden_calls   = 0;
+    no warnings 'redefine';
+    local *DW::Controller::Entry::legacy_owned_edit_post =
+        sub { $hidden_calls++; return $hidden_adapter->(@_); };
     my $hidden_res = $send->($hidden_post);
     is( $hidden_res->code, 200, 'hidden POST itemid receives the successful production response' );
+    is( $hidden_calls,     1,   'hidden POST itemid invokes the production adapter once' );
     is(
         fresh( $owner, $hidden_entry->ditemid )->subject_raw,
         'Hidden item native save',
@@ -388,16 +394,30 @@ test_psgi $app, sub {
     $authas_get->header( Cookie => $cookie );
     my $authas_res = $send->($authas_get);
     is( $authas_res->code, 200, 'different authas keeps the retained BML response' );
-    unlike(
-        $authas_res->content,
-        qr{href="/entry/Q@{[$owner->user]}E/Q@{[$authas_entry->ditemid]}E/edit"},
-        'different authas does not render native owner success'
-    );
+    my $authas_form_get = GET( '/editjournal?itemid=' . $authas_entry->ditemid );
+    $authas_form_get->header( Cookie => $cookie );
+    my $authas_form = form_from( $send->($authas_form_get)->content );
+    ok( $authas_form, 'different authas POST uses a valid token from the retained owner form' );
+    $authas_form->action( 'http://localhost' . $authas_path );
+    $authas_form->value( subject => 'Different authas must not save' );
+    my $authas_post = visible_click( $authas_form, 'action:save' );
+    $authas_post->header( Cookie => $cookie, Referer => 'http://localhost' . $authas_path );
+    my $authas_adapter = \&DW::Controller::Entry::legacy_owned_edit_post;
+    my $authas_calls   = 0;
+    no warnings 'redefine';
+    local *DW::Controller::Entry::legacy_owned_edit_post =
+        sub { $authas_calls++; return $authas_adapter->(@_); };
+    my $authas_post_res = $send->($authas_post);
+    is( $authas_post_res->code, 200, 'different authas POST keeps the retained denial response' );
+    like( $authas_post_res->content, qr/(?:invalid|error)/i,
+        'different authas POST keeps meaningful denial text' );
+    is( $authas_calls, 0, 'different authas POST does not invoke the production adapter' );
     is(
         fresh( $owner, $authas_entry->ditemid )->subject_raw,
         'Authas fallback original',
-        'different authas fallback leaves the owned entry unchanged'
+        'different authas POST leaves the owned entry unchanged'
     );
+
 };
 
 done_testing;
