@@ -7,8 +7,9 @@ Latest queue, 2026-09-23 (supersedes historical queues below): accepted root
 language names `b29e99f50`, both independently clear. Foreman combined143,
 full tidy1089 and compile1605 pass. Delete characterization is already integrated.
 
-Draft correction `6616ce8c4` atop `4c1bb999e` awaits Sol recheck of both untouched
-decline and delayed-clear input. No draft candidate is integrated. Preview
+Draft correction `6616ce8c4` remains held: Sol reproduces subject loss when
+input occurs during pending clear and blur follows clear completion. Widgets
+is preserving crossposting WIP before correcting this exact timing case. No draft candidate is integrated. Preview
 production/browser through `d1fc00e58` is independently bounded clear; HTTP
 followup `45df8b99d` awaits review and Themenav is completing exact formatting
 and native two-poll/embed controls evidence. Legacy BML preview remains present.

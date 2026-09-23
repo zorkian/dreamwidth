@@ -1409,3 +1409,19 @@ checks, after widgets Terra completes customization1/4.
   renderer newly invokes spam_check for legacy previews. Terra is preserving
   the original native-only invocation and adding a local counter assertion.
   No external hook interface change is authorized or implemented.
+
+### Draft recheck remains held on focused-field timing
+
+- Sol recheck at `6616ce8c4` passed the committed held-clear scenario and
+  untouched decline on rerun (one initial timeout retained as an observation).
+  A separate deterministic timing probe still loses a subject typed during
+  pending clear and blurred only after clear succeeds: the new handler snapshots
+  that typed value before the change event, then suppresses it as unchanged.
+  Probe/log: `/tmp/sol-draft-subject-blur.{js,log}` in the Sol container.
+- Widgets is preserving crossposting characterization WIP at a safe boundary
+  before correcting the draft snapshot/input timing with a permanent regression.
+  No draft candidate has been integrated. Crossposting audit `400fcffce` remains
+  separate, and external delivery is stubbed in its unfinished test fixture.
+- Preview formatting WIP briefly used literal backslash-n inputs; foreman caught
+  the false proof and required real newline/markup assertions before acceptance.
+  The native-only hook-invocation correction is also pending independent review.
