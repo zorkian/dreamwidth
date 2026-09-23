@@ -90,6 +90,17 @@ my $unrelated = $poster->t_post_fake_comm_entry(
     body     => 'Manager property unrelated body',
     security => 'public',
 );
+my $own_comm_entry = $manager->t_post_fake_comm_entry(
+    $comm,
+    subject  => 'Manager property own-poster subject',
+    body     => 'Manager property own-poster body',
+    security => 'public',
+);
+my $personal_entry = $poster->t_post_fake_entry(
+    subject  => 'Manager property personal subject',
+    body     => 'Manager property personal body',
+    security => 'public',
+);
 LJ::set_logprop( $comm, $target->jitemid, { opt_preformatted => 1 } );
 my $target_before    = entry_snapshot( $comm, $target->ditemid );
 my $unrelated_before = entry_snapshot( $comm, $unrelated->ditemid );
@@ -144,12 +155,26 @@ sub submit_form {
     return callable_request( $request, $cookie );
 }
 
+sub direct_manager_request {
+    my ( $path, $cookie, %fields ) = @_;
+    my @content;
+    for my $name ( sort keys %fields ) {
+        push @content, $name => $fields{$name};
+    }
+    my $request = POST $path, Content => \@content;
+    $request->uri( 'http://localhost' . $path );
+    $request->header( Referer => 'http://localhost' . $path );
+    return callable_request( $request, $cookie );
+}
+
 my @writes;
 my @hook_names;
 my @protocol_modes;
 my $set_logprop = \&LJ::set_logprop;
 my $run_hooks   = \&LJ::Hooks::run_hooks;
 my $do_request  = \&LJ::do_request;
+my $mark_spam   = \&LJ::mark_entry_as_spam;
+my @spam_marks;
 
 {
     no warnings 'redefine';
@@ -166,6 +191,10 @@ my $do_request  = \&LJ::do_request;
     local *LJ::do_request = sub {
         push @protocol_modes, $_[0]{mode} if $_[0]{mode};
         return $do_request->(@_);
+    };
+    local *LJ::mark_entry_as_spam = sub {
+        push @spam_marks, [@_];
+        return $mark_spam->(@_);
     };
 
     my $path =
@@ -216,6 +245,77 @@ my $do_request  = \&LJ::do_request;
         0, 'manager action never invokes an edit protocol request' );
     is_deeply( \@hook_names, [], 'manager action invokes no decode, spam, or success hooks' );
 
+    # These requests use a valid token from the rendered retained form but
+    # reach only the callable wrapper.  They lock the original flat target
+    # precedence without executing retained delete/report branches.
+    my $token      = $form->value('lj_form_auth');
+    my $precedence = sub {
+        my ( $label, $path, %fields ) = @_;
+        $fields{'action:savemaintainer'}                = 1;
+        $fields{'lj_form_auth'}                         = $token;
+        $fields{'prop_adult_content_maintainer_reason'} = "precedence $label";
+        my $result = direct_manager_request( $path, $manager_cookie, %fields );
+        is( $result->code, 302, "$label resolves to the callable manager target" );
+        is( $result->header('Location'), $target->url, "$label keeps the target public redirect" );
+        is(
+            entry_snapshot( $comm, $target->ditemid )->{reason_text},
+            "precedence $label",
+            "$label mutates the GET/POST-resolved community target"
+        );
+    };
+    $precedence->(
+        'GET usejournal before POST',
+        '/editjournal?usejournal=' . $comm->user . '&itemid=' . $target->ditemid,
+        usejournal => $manager->user,
+        journal    => $manager->user,
+        itemid     => $target->ditemid,
+    );
+    $precedence->(
+        'POST usejournal before GET journal',
+        '/editjournal?journal=' . $manager->user . '&itemid=' . $target->ditemid,
+        usejournal => $comm->user,
+        itemid     => $target->ditemid,
+    );
+    $precedence->(
+        'GET itemid before POST',
+        '/editjournal?usejournal=' . $comm->user . '&itemid=' . $target->ditemid,
+        itemid => $target->ditemid . '0',
+    );
+    $precedence->(
+        'POST-only target and item',
+        '/editjournal',
+        usejournal => $comm->user,
+        itemid     => $target->ditemid,
+    );
+
+    for my $declined (
+        [
+            'self journal collapses to personal',
+            '/editjournal?usejournal=' . $manager->user . '&itemid=' . $target->ditemid
+        ],
+        [
+            'GET personal journal declines',
+            '/editjournal?journal=' . $poster->user . '&itemid=' . $personal_entry->ditemid
+        ],
+        [
+            'POST noncommunity journal declines', '/editjournal',
+            usejournal => $poster->user,
+            itemid     => $personal_entry->ditemid
+        ],
+        [
+            'other-poster requirement declines own community entry',
+            '/editjournal?usejournal=' . $comm->user . '&itemid=' . $own_comm_entry->ditemid
+        ],
+        )
+    {
+        my ( $label, $path, @values ) = @$declined;
+        my %fields = @values;
+        $fields{'action:savemaintainer'} = 1;
+        $fields{'lj_form_auth'}          = $token;
+        my $result = direct_manager_request( $path, $manager_cookie, %fields );
+        is( $result->code, 299, "$label falls through before any effect" );
+    }
+
     my $clear_path = '/editjournal.bml?usejournal=' . $comm->user . '&itemid=' . $target->ditemid;
     my $clear_form = retained_form( $clear_path, $manager_cookie )
         or BAIL_OUT('missing retained manager clear form');
@@ -227,7 +327,21 @@ my $do_request  = \&LJ::do_request;
     is( $response->code, 302, 'submit_value savemaintainer returns the retained redirect status' );
     is( $response->header('Location'),
         $target->url, 'submit_value savemaintainer keeps the public entry redirect' );
-    is( scalar @writes, 2, 'submit_value savemaintainer writes exactly once more' );
+    is( scalar @writes,
+        6, 'submit_value savemaintainer writes exactly once after precedence requests' );
+    is_deeply(
+        $writes[-1],
+        [
+            $comm->id,
+            $target->jitemid,
+            {
+                adult_content_maintainer_reason => '',
+                adult_content_maintainer        => '',
+                opt_nocomments_maintainer       => 0,
+            }
+        ],
+        'clear forwards the exact three retained raw empty/false values'
+    );
     my $cleared = entry_snapshot( $comm, $target->ditemid );
     is( $cleared->{reason_text}, '', 'empty retained reason clears the property' );
     is( $cleared->{reason},      '', 'empty retained adult override clears the property' );
@@ -239,23 +353,56 @@ my $do_request  = \&LJ::do_request;
         'clear preserves target content, security, and unrelated property exactly'
     );
 
+    my $missing_control = direct_manager_request(
+        $clear_path,
+        $manager_cookie,
+        'action:savemaintainer'              => 1,
+        lj_form_auth                         => $token,
+        itemid                               => $target->ditemid,
+        usejournal                           => $comm->user,
+        prop_adult_content_maintainer_reason => '',
+        prop_adult_content_maintainer        => '',
+    );
+    is( $missing_control->code, 302,
+        'missing manager checkbox control still uses callable success' );
+    is_deeply(
+        $writes[-1],
+        [
+            $comm->id,
+            $target->jitemid,
+            {
+                adult_content_maintainer_reason => '',
+                adult_content_maintainer        => '',
+                opt_nocomments_maintainer       => undef,
+            }
+        ],
+        'missing manager checkbox forwards undef rather than an invented value'
+    );
+    is_deeply( entry_snapshot( $comm, $target->ditemid ),
+        $cleared, 'missing manager checkbox leaves the fresh cleared state exact' );
+
     my $writes_before_failures = scalar @writes;
     for my $action (
         undef,           'action:unknown', 'action:save', 'action:spellcheck',
         'action:delete', 'action:deletespam'
         )
     {
-        my $unsupported = retained_form( $clear_path, $manager_cookie )
-            or BAIL_OUT('missing retained unsupported-action form');
+        my %fields = (
+            itemid       => $target->ditemid,
+            usejournal   => $comm->user,
+            lj_form_auth => $token,
+        );
         if ( defined $action ) {
             if ( $action eq 'action:unknown' ) {
-                $unsupported->value( submit_value => $action );
+                $fields{submit_value} = $action;
             }
             else {
-                $unsupported->value( $action => 1 );
+                # Direct callable-only payload: this never enters retained
+                # BML, so delete/delete-spam cannot execute or report.
+                $fields{$action} = 1;
             }
         }
-        $response = submit_form( $unsupported, $clear_path, $manager_cookie );
+        $response = direct_manager_request( $clear_path, $manager_cookie, %fields );
         is( $response->code, 299,
             ( defined $action ? $action : 'no action' ) . ' falls through before any effect' );
         is( scalar @writes,
@@ -264,6 +411,8 @@ my $do_request  = \&LJ::do_request;
     }
     is( scalar grep( $_ eq 'editevent', @protocol_modes ),
         0, 'unsupported actions never execute an edit protocol request' );
+    is_deeply( \@spam_marks, [],
+        'unsupported delete-spam payload never reaches the report side effect' );
 
     my $missing = POST $clear_path,
         Content => [
