@@ -54,8 +54,7 @@ sub entry_picker_handler {
 
         # A POST here is old-schema content from a stale tab: it must never
         # be saved and never be silently discarded. Decode once and hand the
-        # submitted content to the native form for review, using the same
-        # carry-over notice as the retired /update page.
+        # submitted content to the native form for review.
         require DW::Controller::Entry;
         require DW::Entry::Legacy;
         my $prepared = DW::Entry::Legacy::prepare_entry_form( { tz => 'guess' }, $post );
@@ -65,9 +64,11 @@ sub entry_picker_handler {
             # A logged-out stale tab (session expired) has no editable entry
             # to attach to yet: carry the content into the native posting
             # form with the login modal, exactly like an anonymous /update
-            # POST does.
+            # POST does. Posting from here creates a new entry rather than
+            # updating the original, so this uses an edit-specific notice
+            # rather than /update's generic carry-over one.
             my $warnings = DW::FormErrors->new;
-            $warnings->add( undef, '.notice.legacy_carryover' );
+            $warnings->add( undef, '.notice.legacy_edit_carryover' );
             return DW::Controller::Entry::legacy_new_rerender(
                 $prepared,
                 remote             => undef,

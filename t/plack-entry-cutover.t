@@ -340,6 +340,60 @@ test_psgi $app, sub {
         );
     };
 
+    subtest
+        'a carried-over old-schema "friends" security maps to access with no downgrade notice' =>
+        sub {
+        my $res = $as_owner->(
+            POST '/update',
+            Content => [
+                usejournal    => $comm->user,
+                subject       => 'Comm friends security subject',
+                event         => 'Comm friends security body',
+                security      => 'friends',
+                'action:post' => 'Post',
+            ]
+        );
+        is( $res->code, 200, 'comm+friends carry-over returns the carry-over form' );
+        unlike(
+            $res->content,
+            qr/no equivalent in this community/i,
+            'comm+friends carry-over is not treated as a downgrade'
+        );
+        my $form = entry_form( $res->content );
+        ok( $form, 'comm+friends carry-over entry form parses' )
+            or BAIL_OUT('comm+friends carry-over entry form missing');
+        is( $form->value('security'),
+            'access', 'comm+friends carry-over maps exactly to the community members option' );
+
+        my $entry = $owner->t_post_fake_comm_entry(
+            $comm,
+            subject => 'Comm friends edit subject',
+            body    => 'Comm friends edit body',
+        );
+        my $edit_res = $as_owner->(
+            POST '/editjournal?itemid=' . $entry->ditemid . '&usejournal=' . $comm->user,
+            Content => [
+                usejournal    => $comm->user,
+                subject       => 'Comm friends edit new subject',
+                event         => 'Comm friends edit new body',
+                security      => 'friends',
+                itemid        => $entry->ditemid,
+                'action:save' => 'Save',
+            ]
+        );
+        is( $edit_res->code, 200, 'comm+friends edit carry-over returns the carry-over form' );
+        unlike(
+            $edit_res->content,
+            qr/no equivalent in this community/i,
+            'comm+friends edit carry-over is not treated as a downgrade'
+        );
+        my $edit_form = entry_form( $edit_res->content );
+        ok( $edit_form, 'comm+friends edit carry-over entry form parses' )
+            or BAIL_OUT('comm+friends edit carry-over entry form missing');
+        is( $edit_form->value('security'),
+            'access', 'comm+friends edit carry-over maps exactly to the community members option' );
+        };
+
     subtest 'a logged-out stale edit tab keeps its content and shows the login modal' => sub {
         my $entry = $owner->t_post_fake_entry(
             subject => 'Logged-out edit subject',
@@ -356,8 +410,13 @@ test_psgi $app, sub {
         is( $res->code, 200, 'logged-out stale edit tab POST returns the carry-over form' );
         like(
             $res->content,
+            qr/posting here will create a new entry/i,
+            'logged-out stale edit tab POST renders the edit-specific duplicate-post warning'
+        );
+        unlike(
+            $res->content,
             qr/previous posting page has been retired/i,
-            'logged-out stale edit tab POST renders the carry-over notice'
+            'logged-out stale edit tab POST does not render the generic /update notice'
         );
         like( $res->content, qr/id="js-post-entry-login"/,
             'logged-out carry-over renders the native login modal' );

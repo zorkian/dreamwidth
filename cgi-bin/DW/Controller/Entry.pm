@@ -1393,7 +1393,10 @@ sub legacy_update_get_handler {
 # community's security options (public/access/private only); an unmatched
 # <select> value submits as whichever option renders first (public) if the
 # user does not notice and simply clicks post. Never let that resolve to
-# public: fall back to the most restrictive option and say so explicitly.
+# public. allowmask==1 is the old single default "friends" group, which is
+# exactly the community's "members" option (submitted value "access"); any
+# other allowmask is a true custom group with no equivalent, so fall back to
+# the most restrictive option and say so explicitly.
 sub _legacy_carryover_safe_security {
     my ( $canonical, $journal, $opts ) = @_;
     return $canonical
@@ -1403,6 +1406,13 @@ sub _legacy_carryover_safe_security {
         && $journal->is_community;
 
     $canonical = {%$canonical};
+
+    if ( ( $canonical->{allowmask} || 0 ) == 1 ) {
+        $canonical->{security} = 'access';
+        delete $canonical->{allowmask};
+        return $canonical;
+    }
+
     $canonical->{security} = 'private';
     delete $canonical->{allowmask};
 
