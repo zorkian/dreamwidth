@@ -172,8 +172,12 @@ my $auth_calls;
             unlike(
                 $res->content,
                 qr/encoded(?:&lt;|<)password-marker(?:&gt;|>)/,
-                "$path never reflects password-like GET input"
+                "$path never reflects decoded password-like GET input"
             );
+
+            # Retained BML still includes the raw query in generic returnto links;
+            # the blank control and decoded-marker assertion above characterize
+            # the actual legacy credential surface without claiming otherwise.
             like(
                 $res->content,
                 qr/hook\s+&lt;user&gt;\s+&amp;\s+&quot;quote&quot;/,
@@ -201,6 +205,8 @@ my $auth_calls;
                     qr/onload[^>]*useRichText\(\"draft\"/,
                     'nondefault plain remote editor does not request RTE on load'
                 );
+                is( $form->value('event_format') // '',
+                    '', 'A off auto-formatting remains unselected without a hook override' );
             }
             else {
                 is( $form->value('subject'),      'hook subject', 'override applies hook subject' );
