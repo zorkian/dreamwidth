@@ -8,6 +8,8 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Entry;
 use LJ::Test qw(temp_comm temp_user);
 
+exit 0 if $ENV{SAME_POSTER_COMMUNITY_EDIT_FIXTURE_EARLY_EXIT};
+
 my $poster = temp_user();
 $poster->update_self( { status => 'A' } );
 $poster->set_password( my $password = 'same-poster-' . LJ::rand_chars(12) );

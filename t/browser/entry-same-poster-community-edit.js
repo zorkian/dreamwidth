@@ -51,9 +51,10 @@ function fixtureClient(child) {
     const done = new Promise((resolve, reject) => {
         child.once('error', error => { fail(error); reject(error); });
         child.once('exit', (code, signal) => {
-            const error = code === 0 && !signal ? null
-                : new Error(`fixture exited ${code}/${signal || 'none'}`);
-            if (error) { fail(error); reject(error); } else resolve();
+            const eof = new Error(`fixture EOF: ${code}/${signal || 'none'}`);
+            fail(eof);
+            if (code === 0 && !signal) resolve();
+            else reject(eof);
         });
     });
     child.stdout.on('data', chunk => {
