@@ -2050,3 +2050,12 @@ Foreman public owned GET browser replay PASS with plain app.psgi, distinct nativ
 save, and no remaining fixture/server. Public desktop/390px captures preserved
 alongside prior callable captures. Full tidy1132 and compile1607 PASS in
 /tmp/bml-get-integrated-{tidy,compile}.log. No root validation remains running.
+
+Retained old-form POST checks after public owned GET activation: two additional
+suites241 PASS in /tmp/bml-owned-get-retained-post-integrated.log. Shared fixture
+composition therefore preserves old schema and generated-token requests while
+public GET uses the native editor. Source-only remaining update GET split is
+recorded in BML-UPDATE-GET-REMAINING.md: terminal identity/cannot-post display is
+a small future package; readonly warning-form is separate; anonymous credentials
+must remain BML until their schema/action/authentication transition is reviewed.
+No authorization or deployment interface change is implied by the audit.
