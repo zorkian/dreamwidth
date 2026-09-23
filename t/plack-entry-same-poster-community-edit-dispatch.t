@@ -254,6 +254,83 @@ test_psgi $app, sub {
     ok( fresh( $comm, $managed->ditemid )->valid,
         'invalid manager routing assertion does not mutate entry' );
 
+    for my $case ( [ 'missing token', '' ], [ 'invalid token', 'invalid-community-token' ] ) {
+        my $csrf_target = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject  => "$case->[0] old",
+            body     => "$case->[0] body",
+            security => 'public'
+        );
+        my $csrf_path =
+            '/editjournal?usejournal=' . $comm->user . '&itemid=' . $csrf_target->ditemid;
+        $res  = $retained_get->($csrf_path);
+        $form = form_from( $res->content );
+        ok( $form, "$case->[0] harvests an actual retained community form" );
+        $form->action( 'http://localhost' . $csrf_path );
+        $form->value( subject      => "$case->[0] changed subject" );
+        $form->value( event        => "$case->[0] changed body" );
+        $form->value( lj_form_auth => $case->[1] );
+        my $csrf_post = clicked( $form, 'action:save' );
+        $csrf_post->header( Cookie  => $cookie );
+        $csrf_post->header( Referer => "http://localhost$csrf_path" );
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($csrf_post);
+        unlike( $res->content, qr{id="js-post-entry"}, "$case->[0] remains retained BML denial" );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$case->[0] reaches both dispatch candidates before fallback" );
+        is(
+            fresh( $comm, $csrf_target->ditemid )->subject_raw,
+            "$case->[0] old",
+            "$case->[0] leaves target unchanged"
+        );
+    }
+    my $csrf_target = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'malformed old',
+        body     => 'malformed body',
+        security => 'public'
+    );
+
+    for my $bad (
+        [ '/editjournal?usejournal=' . $comm->user . '&itemid=0',   'zero itemid' ],
+        [ '/editjournal?usejournal=' . $comm->user . '&itemid=abc', 'invalid itemid' ],
+        [
+            '/editjournal?usejournal='
+                . $comm->user
+                . '&itemid='
+                . $csrf_target->ditemid
+                . '&itemid='
+                . $csrf_target->ditemid,
+            'repeated itemid'
+        ],
+        )
+    {
+        $post = POST $bad->[0],
+            [ itemid => $csrf_target->ditemid, 'action:save' => 'Save Changes' ];
+        $post->header( Cookie  => $cookie );
+        $post->header( Referer => 'http://localhost' . $bad->[0] );
+        $personal_calls = $community_calls = 0;
+        @dispatch_order = ();
+        $res            = $send->($post);
+        unlike( $res->content, qr{id="js-post-entry"}, "$bad->[1] remains retained BML-owned" );
+        is_deeply( \@dispatch_order, [qw(personal community)],
+            "$bad->[1] declines before native effects" );
+        is(
+            fresh( $comm, $csrf_target->ditemid )->subject_raw,
+            'malformed old',
+            "$bad->[1] leaves target unchanged"
+        );
+    }
+    $post = POST '/editjournal', [ mode => 'edit', selecttype => 'last' ];
+    $post->header( Cookie  => $cookie );
+    $post->header( Referer => 'http://localhost/editjournal' );
+    $personal_calls = $community_calls = 0;
+    @dispatch_order = ();
+    $res            = $send->($post);
+    is( $res->code, 200, 'itemless picker POST returns its selector result' );
+    is_deeply( \@dispatch_order, [], 'itemless picker POST calls neither edit resolver' );
+
     my $personal_entry = $poster->t_post_fake_entry(
         subject  => 'personal old',
         body     => 'personal body',
