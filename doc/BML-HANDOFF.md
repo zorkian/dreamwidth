@@ -63,16 +63,19 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 1. Themenav: owner update752+26c and browser192 independently clear, integrated
    13cba88f7/c116f5b44 and75e674910. Foreman normal browser/build passed and captures
-   are preserved. Active separate community/moderated extension per
-   BML-UPDATE-COMMUNITY-INTEGRATION.md; worker278 assertions passed, broader
-   checks/commit pending. No public routes yet.
+   are preserved. Community/moderated extension7c806d7a0 is production-clear; worker and Sol278
+   assertions passed. Permanent tests still need truly omitted usejournal, a
+   selected crosspost positive control, and differing POST/GET target proof.
+   Separate URL activation work is underway; no public routes integrated yet.
 2. Widgets: owned helper and actual HTTP matrix93fab independently clear. Foreman
    completed the omitted invalid-date/no-action work; worker81 is superseded.
    Active native owned-edit browser acceptance:0a3513ca1 only exercised old BML
    at8080, so worker must add isolated native test server and retry flow. Clear93
    supplied for cherry-pick; preserve test/fixture WIP and separate worktree.
-3. Sol: cleared93 final matrix/duplicate-error fix and192 update browser. Ready
-   for immutable community extension and actual native edit-browser packages.
+3. Sol: cleared93 final matrix/duplicate-error fix and192 update browser;
+   community7c production clear with the finite test corrections above pending.
+   Read-only next transform/rerender audit while awaiting immutable corrections
+   and actual native edit-browser package.
    Held inbox and external Journal deployment decisions remain unchanged.
 
 Current combined-tree matrix/native edit4files221 PASS; earlier callable/legacy/

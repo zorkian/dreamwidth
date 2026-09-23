@@ -129,8 +129,10 @@ its deployment interface.
   the old local `$ju` and `$itemlink` are unset. The request is the old flat
   protocol-shaped request, not the normalized native `props` hash.
 
-The native `_do_post`/`entry/success.tt` path currently has neither call. Keep
-any compatibility invocation explicitly legacy-only and preserve its arguments,
+At the original audit, the native `_do_post`/`entry/success.tt` path had neither
+call. The reviewed legacy-only implementation is now integrated (0c3bb1722):
+ordinary and moderated real-template tests prove output and exact arguments. Keep
+these compatibility invocations explicitly legacy-only and preserve their arguments,
 ordering and request representation; do not add it to ordinary native requests
 or replace its output with a renamed API. A fixture hook should prove ordinary
 and moderated arguments and visible output without external code. This is a

@@ -1844,3 +1844,21 @@ checks, after widgets Terra completes customization1/4.
   clear93 prerequisite and must add isolated test-only native route plus retry.
   Themes continues authorized community/moderated update extension. No public
   route activation, BML deletion, push or deployment yet.
+
+
+### Community extension reviewed; URL activation remains separate
+
+- Immutable7c806d7a0 production is bounded-clear after Sol278 assertions and
+  strengthened reviewer counterchecks. Permanent test correction remains pending:
+  undef form value emits an empty field, so absence must actually omit usejournal;
+  no-community-crosspost needs a selected master checkbox; differing nonempty
+  POST/GET targets need explicit precedence proof. No production defect found.
+- Themes is correcting those assertions separately from new route activation.
+  Activation must preserve the routing call ABI and old early fallback guards;
+  registering the named-options helper directly would receive a positional route
+  object. GET and unsupported old forms remain BML until their own migration.
+- Native edit browser remains WIP. Foreman found its isolated test server read
+  only GET itemid, while the actual old form submits hidden POST itemid. The
+  apparent successful save therefore fell through to old BML. Worker is fixing
+  the test route and asserting native response markup plus modern retry action.
+  No native browser gate is claimed from the earlier generic success assertion.
