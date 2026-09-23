@@ -1,5 +1,17 @@
 # BML work checkpoint — paused then explicitly RESUMED, 2026-09-23
 
+## ACTIVE POLICY: graduate replacements; analysis only (2026-09-23)
+
+User decision recorded in [BML-DIRECTION.md](BML-DIRECTION.md). Where a
+newer/beta replacement exists (entry/update, inbox, others), graduate it and
+retire the old BML surface instead of recreating every legacy feature. This
+supersedes the full legacy-parity requirements and retirement gates written
+below and in the other BML-*.md audits. Authorization is analysis and
+documentation only: no implementation, integration, route activation, rollback
+or deletion until the user reviews the decision report
+([BML-BETA-GRADUATION-DECISION.md](BML-BETA-GRADUATION-DECISION.md)) and
+chooses a path. Preserve all branches, commits, WIP and evidence.
+
 RESUMED by explicit user directive later on 2026-09-23. The pause text below is
 retained as the archival record of the checkpoint at `331f1f042`; its "do not
 resume" wording is superseded. Held boundaries listed under "Held boundaries"

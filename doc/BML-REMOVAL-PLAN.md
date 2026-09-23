@@ -7,6 +7,12 @@ have since migrated; the shared widget request-state prerequisite is complete.
 
 ## Current retirement gates (2026-09-23)
 
+**Policy note (2026-09-23):** the gates in this table were written for full
+legacy parity. Per [BML-DIRECTION.md](BML-DIRECTION.md) the goal is now to
+graduate existing native/beta replacements and retire the legacy surfaces,
+accepting or explicitly closing feature gaps chosen by the user. Treat the
+parity wording below as historical until the decision report is reviewed.
+
 The inventory below remains the original review baseline. At foreman commit
 13f4ea792, ten tracked `.bml` files remain: seven pages/endpoints and three
 configuration files (two under `ext/dw-nonfree`). Accepted native routes do not

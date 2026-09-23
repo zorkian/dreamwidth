@@ -1,3 +1,15 @@
+## ACTIVE POLICY: graduate replacements; analysis only (2026-09-23)
+
+User decision recorded in [BML-DIRECTION.md](BML-DIRECTION.md). Where a
+newer/beta replacement exists (entry/update, inbox, others), graduate it and
+retire the old BML surface instead of recreating every legacy feature. This
+supersedes the full legacy-parity requirements and retirement gates written
+below and in the other BML-*.md audits. Authorization is analysis and
+documentation only: no implementation, integration, route activation, rollback
+or deletion until the user reviews the decision report
+([BML-BETA-GRADUATION-DECISION.md](BML-BETA-GRADUATION-DECISION.md)) and
+chooses a path. Preserve all branches, commits, WIP and evidence.
+
 ## RESUMED by explicit user directive (2026-09-23)
 
 The pause recorded in [the checkpoint](BML-PAUSED-2026-09-23.md) at `331f1f042`
