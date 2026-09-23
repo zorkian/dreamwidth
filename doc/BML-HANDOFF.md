@@ -63,12 +63,15 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 1. Themenav: community/moderated7c plus e54 test correction independently clear,
    integrated bdfe83dcd/ad7debbef. Public update activation82a496e03 is independently clear
-   and integrated8ba94e59d; foreman combined5files522 PASS. Active separate nonpersisting update transforms
-   package follows BML-UPDATE-TRANSFORMS.md; no hook ABI changes authorized.
-2. Widgets: native owned-edit browser final cfe07cdf2 (baseline0a plus corrected
-   test server/runner) is committed and queued for review; normal and intentional
-   cleanup worker evidence passes. Next bounded ordinary personal owned-edit
-   production dispatch is assigned; preserve picker and unsupported BML fallback.
+   and integrated8ba94e59d; foreman combined5files522 PASS. Callable-only transforms07f/5cc/98a are held on Sol findings: checker token
+   ordering, ordinary absent-versus-empty GET defaults, and overly broad
+   transform/xpost mapping. Worker fixes these plus finite acceptance; public
+   include_transforms remains off. No hook ABI changes authorized.
+2. Widgets: native edit browser cfe had a vacuous unchanged retry assertion;
+   separate b79d7332b distinct-value correction is queued for Sol recheck.
+   Ordinary personal dispatcher38bdc5111 is committed/queued. Worker now tests
+   browser flow against actual public dispatch without the test route overlay.
+   Preserve picker and unsupported BML fallback.
 3. Sol: cleared update activation82a; reviews native edit browser cfe. Community7c/e54
    independently clear. Transform audit preserved by fc5cfe09b. Held inbox and
    external Journal deployment decisions remain unchanged.

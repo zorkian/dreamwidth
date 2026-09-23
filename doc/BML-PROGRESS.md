@@ -1895,3 +1895,22 @@ checks, after widgets Terra completes customization1/4.
   its base now registers the adapter publicly. Ordinary rerender empty-field
   retention differs from transform truthy fallback. Worker is implementing the
   full finite field/hook/nonmutation/isolation matrix before review.
+
+
+### Disabled transform candidate held; edit retry proof correction queued
+
+- Sol callable transforms07f49a1be..98a667bf4 NOT clear despite342 PASS. Three
+  material differences: checker runs before token validation, ordinary absent
+  subject/body/tags lose GET defaults, and transform merges metadata that old
+  transform never carried while empty POST xpost incorrectly suppresses GET.
+  Worker fixes exact baseline maps and guard ordering with permanent assertions.
+  Public include_transforms stays off; no candidate integration claimed.
+- Ordinary custom-security fixture initially lacked a real access group, so
+  all three rerender cases selected public; this was not preview-only evidence.
+  Worker supplies a real owned group before interpreting mapper behavior.
+- cfe browser normal/named failure and independent distinct retry variant PASS,
+  but committed retry reposted unchanged values. Worker b79d7332b corrects it
+  with distinct subject/body/native success/fresh persistence; recheck pending.
+- Ordinary owned dispatcher38bdc5111 is immutable and queued for Sol. Worker
+  progresses separate browser acceptance through actual public app dispatch,
+  keeping the callable browser branch and all prior work preserved.
