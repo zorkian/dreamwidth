@@ -61,20 +61,20 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: two Protocol note writes migrated in178af2896, awaiting independent
-   review. Only clientver and journalid storage changes; getevents external
-   callback adapter stays unchanged. Focused15 and roundtrip10 pass; full protocol
-   and compile validation are active. Next ordinary editor compatibility package
-   will use Sol's finite schema audit.
+1. Themenav: Protocol notes178af2896 independently clear, integratedc2cc22f9c;
+   foreman notes/request/roundtrip51 PASS. Existing protocol.t skips; worker full
+   compile1605 PASS. Now characterizing/extracting exact entry_form_decode into
+   DW::Entry::Legacy with existing LJ forwarding API and decode_entry_form hook
+   unchanged. No route changes in this first bounded package.
 2. Widgets: native plain-editor URL/alt insertion image-only branch frombcd40791e.
    Initial production10e2c0c41 is not accepted: required actual browser fixture and
    new/edit/mode/narrow/cancel/escaping/persistence evidence are in progress, along
    with localization/help/license refinements. The worker must continue beyond
    partial setup and existing unrelated parity tests. No actual uploads involved.
 3. Sol: native spellcheck throughf8bbe2413 is final-clear and integrated19a32d950.
-   Finish ordinary legacy update/editjournal POST-schema audit for a shared native
-   compatibility wrapper; review immutable Protocol notes then image range when
-   ready. Held inbox work and external deployment interfaces remain excluded.
+   Ordinary legacy POST audit is preserved in BML-EDITOR-POST-COMPATIBILITY.md.
+   Review image production while its finite browser proofs are completed, then
+   review immutable decoder extraction when ready. Held inbox work and external deployment interfaces remain excluded.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS

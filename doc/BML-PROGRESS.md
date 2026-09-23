@@ -1568,3 +1568,17 @@ checks, after widgets Terra completes customization1/4.
   browser acceptance and refinements remain unaccepted WIP. Themes Protocol notes
   178af2896 is queued for review, with external getevents callback left unchanged.
   Sol continues finite ordinary legacy POST mapping audit for the next extraction.
+
+### Native Protocol note storage integrated
+
+- Sol clear178af2896 integratedc2cc22f9c: only clientver and journalid note writes
+  now use DW::Request; truthy existing journal note and no-request behavior remain.
+  External DISABLE_PROTOCOL callback, authentication and permission flow unchanged.
+- Independent15 focused,26 request subtests and tidy1097 pass. Worker full compile
+  1605 passes; existing t/protocol.t intentionally skips1..0 and is not counted as
+  exercised coverage. Foreman combined notes/request/roundtrip51 PASS in
+  /tmp/bml-protocol-notes-integrated.log.
+- Sol ordinary old-POST schema audit preserved77db58478 in
+  BML-EDITOR-POST-COMPATIBILITY.md. First decoder extraction characterizes exact
+  old behavior then moves it without route changes, retaining decode_entry_form
+  hook and current LJ API. No external interface retirement is implied.
