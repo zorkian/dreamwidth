@@ -505,11 +505,11 @@ test_psgi $app, sub {
     }
 };
 
-subtest 'picker retains legacy language keys with a request getter' => sub {
+subtest 'picker resolves its relocated language keys with a request getter' => sub {
     no warnings 'redefine';
     local *LJ::Lang::get_text = sub {
         my ( $lang, $code ) = @_;
-        return "picker-legacy-key:$code";
+        return "picker-key:$code";
     };
     test_psgi $app, sub {
         my $send = shift;
@@ -517,17 +517,17 @@ subtest 'picker retains legacy language keys with a request getter' => sub {
         my $res = $cb->( GET '/editjournal' );
         like(
             $res->content,
-            qr/picker-legacy-key:\/editjournal\.bml\.title/,
-            'normal picker render resolves its title through the retained BML key'
+            qr/picker-key:\/editjournal\.tt\.title/,
+            'normal picker render resolves its title through the template key'
         );
         $res = $cb->( GET '/editjournal?usejournal=' . $outsider->user );
         like(
             $res->content,
-            qr/picker-legacy-key:\/editjournal\.bml\.error\.nocomm/,
-            'picker error response resolves through the retained BML error key'
+            qr/picker-key:\/editjournal\.tt\.error\.nocomm/,
+            'picker error response resolves through the template error key'
         );
-        unlike( $res->content, qr/editjournal\.tt\.error\./,
-            'error response never asks the getter for a template filename key' );
+        unlike( $res->content, qr/editjournal\.bml\./,
+            'picker never asks the getter for a retired BML page key' );
     };
 };
 
