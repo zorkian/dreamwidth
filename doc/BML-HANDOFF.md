@@ -61,23 +61,23 @@ Do not launch duplicate browser runs when an exact run/helper remains alive.
 
 ## Current bounded queue
 
-1. Themenav: decoder extraction and canonical normalizer are independently clear,
-   integrated through7d3a8eb70. Foreman decoder/normalizer/crosspost59 PASS in
-   /tmp/bml-legacy-normalizer-integrated.log. Pure native retry mapper through
-   90fec3cdf is queued for Sol; it retains the decoder-normalized subject so the
-   old localized placeholder cannot become saved retry text. Next independent
-   increment is a pure whitelisted legacy edit action selector; no route changes.
-2. Widgets: native image throughba1991d4a is independently clear and integrated
-   as59ebe781c. Foreman56 focused/build/browser/tidy1105/compile1607 PASS; desktop
-   and narrow captures are preserved in image-insert-native and inspected.
-   Housekeeping first slice0e88c454b is committed but not accepted: pipeline
-   failure/moderation and raw crosspost callback tests are still being completed.
-3. Sol: imageba199 is clear. Retry mapper90fec is held: it forwards raw custom
-   bits0/61 ignored by the old decoder. Themes is correcting exact1..60 bounds
-   and adding old-decode/native-retry proof. Pure action selectorc475d14a9 is
-   separately queued for review.
-   Decoder, normalizer, Protocol notes and native spellcheck are already clear.
-   Held inbox work and external deployment interfaces remain excluded.
+1. Themenav: normalizer integrated7d3a8eb70; foreman59 PASS. Retry mapper
+   final correctione3deb7485 awaits Sol: literal custom_bit_1..60 keys only,
+   ignoring zero-padded keys as well as0/61. Selector451081d7f independently
+   clear after explicit maintainer eligibility; not integrated yet. Next pure
+   preparation helper preserves the original flat decoder request reference
+   separately from canonical props, so legacy success hooks retain their ABI.
+2. Widgets: image throughba199 independently clear, integrated59ebe781c;
+   foreman56 focused/build/browser/tidy1105/compile1607 PASS with captures.
+   Housekeeping0e88+3e876 is under review, not accepted. Foreman found callback
+   credentials named in the wrong order and session-remote eligibility missing;
+   corrections are active. Separate success-hook rendering work is preserved.
+3. Sol: mappere3deb recheck, housekeeping correction review, then root hook
+   characterization8a55d0170. Selector451 is clear. Root ordinary/moderated hook
+   baseline149 PASS proves same decoder request reference, flat props, output,
+   old moderated undef arguments, and native no-hook control. No live routes
+   have changed in these helper packages. Held inbox work and external Journal
+   deployment interfaces remain excluded.
 
 Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
 compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS

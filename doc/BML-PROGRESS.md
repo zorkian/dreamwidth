@@ -1633,3 +1633,23 @@ checks, after widgets Terra completes customization1/4.
 - Separate mapper gate remains held at90fec: raw custom_bit_0/61 were ignored by
   old decoding but forwarded to native retry. Narrow exact1..60 correction and
   permanent boundary regression are assigned. No mapper code is integrated yet.
+
+
+### Legacy wrapper prerequisites: finite reviews and hook preservation
+
+- Pure selector451081d7f independently clear: explicit caller-supplied maintainer
+  eligibility restores old disabled-branch fallthrough to spellcheck/delete/save;
+  direct and synthetic submit_value cases pass. Integration awaits mapper range.
+- Mapper5f187 fixed0/61 but numeric bounds still admitted zero-padded01/001/060
+  keys which old decoding ignores. Foreman identified and Sol reproduced these
+  exact-key failures. Final literal-key correctione3deb7485 is in recheck.
+- Housekeeping0e88+3e876 remains unaccepted. Foreman caught invented credential
+  field order in both helper and tests; actual fields are prop_xpost_password_ID,
+  prop_xpost_chal_ID and prop_xpost_resp_ID. Legacy session-remote queue eligibility
+  must also be retained separately from authenticated poster identity. Fixes active.
+- Root source audit3f464bfb2 and test-only8a55d0170 preserve legacy success-hook
+  requirements. Actual ordinary and moderated form suites pass149 assertions,
+  log /tmp/bml-legacy-success-hooks-combined.log, scoped tidy PASS. Independent
+  review queued; no production hook change. Preparation must retain the original
+  flat request reference shared by decoder/success hooks, alongside separate
+  canonical data. Existing deployment interfaces are preserved, not retired.
