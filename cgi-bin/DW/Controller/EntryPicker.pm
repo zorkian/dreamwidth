@@ -42,7 +42,11 @@ sub entry_picker_handler {
             return $rendered if defined $rendered;
             return undef;
         }
-        return DW::Controller::Entry::legacy_owned_edit_handler();
+        my $rendered = DW::Controller::Entry::legacy_owned_edit_handler();
+        return $rendered if defined $rendered;
+        $rendered = DW::Controller::Entry::legacy_same_poster_community_edit_handler();
+        return $rendered if defined $rendered;
+        return undef;
     }
 
     my ( $ok, $rv ) = controller( authas => { type => 'P' } );

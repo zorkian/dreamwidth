@@ -1,0 +1,205 @@
+#!/usr/bin/perl
+# Exercise public same-poster community retained edit POST composition.
+# Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+use strict;
+use warnings;
+use Test::More;
+use HTTP::Request::Common;
+use HTML::Form;
+use Plack::Test;
+use lib "$ENV{LJHOME}/t/lib";
+use LJ::Test::LegacyOwnedEditRoute;
+use lib "$ENV{LJHOME}/cgi-bin";
+BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+use DW::Controller::Entry;
+use LJ::Entry;
+use LJ::Session;
+use LJ::Test qw(temp_comm temp_user);
+
+plan skip_all => 'Community dispatch integration requires a development server'
+    unless $LJ::IS_DEV_SERVER;
+my $app = do "$ENV{LJHOME}/app.psgi";
+die $@ unless ref $app eq 'CODE';
+sub fresh { LJ::Entry::reset_singletons(); return LJ::Entry->new( $_[0], ditemid => $_[1] ) }
+
+sub form_from {
+    return ( grep { ( $_->attr('id') || '' ) eq 'updateForm' }
+            HTML::Form->parse( $_[0], 'http://localhost/editjournal' ) )[0];
+}
+
+sub clicked {
+    my ( $form, $name ) = @_;
+    my ($input) =
+        grep { $_->can('click') && ( $_->name || '' ) eq $name && length( $_->value || '' ) }
+        $form->inputs;
+    die "missing $name" unless $input;
+    return $input->click($form);
+}
+
+my $poster = temp_user();
+$poster->update_self( { status => 'A' } );
+my $manager = temp_user();
+$manager->update_self( { status => 'A' } );
+my $comm = temp_comm();
+$poster->join_community( $comm, 1, 1 );
+LJ::set_rel( $comm->userid, $poster->userid, 'A' );
+DW::Cache->request->remove( 'rel', $comm->userid . '-' . $poster->userid . '-A' );
+$manager->join_community( $comm, 1, 1 );
+LJ::set_rel( $comm->userid, $manager->userid, 'A' );
+DW::Cache->request->remove( 'rel', $comm->userid . '-' . $manager->userid . '-A' );
+my $session = LJ::Session->create( $poster, nolog => 1 );
+my $cookie =
+      'ljmastersession='
+    . $session->master_cookie_string
+    . '; ljloggedin='
+    . $session->loggedin_cookie_string;
+local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = 'samePosterDispatch';
+my ( $personal_calls, $community_calls ) = ( 0, 0 );
+my $personal  = \&DW::Controller::Entry::legacy_owned_edit_handler;
+my $community = \&DW::Controller::Entry::legacy_same_poster_community_edit_handler;
+no warnings 'redefine';
+local *DW::Controller::Entry::legacy_owned_edit_handler =
+    sub { ++$personal_calls; return $personal->(@_) };
+local *DW::Controller::Entry::legacy_same_poster_community_edit_handler =
+    sub { ++$community_calls; return $community->(@_) };
+
+test_psgi $app, sub {
+    my $send    = shift;
+    my $request = sub { my ($req) = @_; $req->header( Cookie => $cookie ); return $send->($req) };
+    my $retained_get = sub {
+        my ($path) = @_;
+        my $req = GET $path;
+        $req->header( Cookie => $cookie );
+        return LJ::Test::LegacyOwnedEditRoute::with_retained_bml_get_route( 'app/editjournal',
+            sub { $send->($req) } );
+    };
+    for my $suffix ( '', '.bml' ) {
+        my $target = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject  => "dispatch$suffix old",
+            body     => "dispatch$suffix body",
+            security => 'friends'
+        );
+        my $other = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject  => "dispatch$suffix other",
+            body     => "dispatch$suffix other body",
+            security => 'public'
+        );
+        my $path = "/editjournal$suffix?usejournal=" . $comm->user . '&itemid=' . $target->ditemid;
+        my $res  = $retained_get->($path);
+        is( $res->code, 200, "$suffix retained GET harvests form" );
+        my $form = form_from( $res->content );
+        ok( $form, "$suffix supplies actual retained form" ) or next;
+        $form->action( 'http://localhost' . $path );
+        $form->value( subject => "dispatch$suffix changed" );
+        $form->value( event   => "dispatch$suffix changed body" );
+        my $post = clicked( $form, 'action:save' );
+        $post->header( Referer => "http://localhost$path" );
+        $post->header( Cookie  => $cookie );
+        $personal_calls = $community_calls = 0;
+        $res            = $send->($post);
+        is( $res->code,       200, "$suffix public save succeeds" );
+        is( $personal_calls,  1,   "$suffix calls personal handler first" );
+        is( $community_calls, 1,   "$suffix calls community handler after personal decline" );
+        like(
+            $res->content,
+            qr{href="/entry/\Q@{[$comm->user]}\E/\Q@{[$target->ditemid]}\E/edit"},
+            "$suffix returns native success"
+        );
+        is(
+            fresh( $comm, $target->ditemid )->subject_raw,
+            "dispatch$suffix changed",
+            "$suffix persists subject"
+        );
+        is(
+            fresh( $comm, $target->ditemid )->event_raw,
+            "dispatch$suffix changed body",
+            "$suffix persists body"
+        );
+        is( fresh( $comm, $target->ditemid )->security,
+            'usemask', "$suffix preserves friends security" );
+        is(
+            fresh( $comm, $other->ditemid )->subject_raw,
+            "dispatch$suffix other",
+            "$suffix preserves unrelated entry"
+        );
+        my $delete = $poster->t_post_fake_comm_entry(
+            $comm,
+            subject  => "dispatch$suffix delete",
+            body     => "dispatch$suffix delete body",
+            security => 'public'
+        );
+        my $delete_path =
+            "/editjournal$suffix?usejournal=" . $comm->user . '&itemid=' . $delete->ditemid;
+        $res  = $retained_get->($delete_path);
+        $form = form_from( $res->content );
+        ok( $form, "$suffix delete harvests retained form" ) or next;
+        $form->action( 'http://localhost' . $delete_path );
+        $post = clicked( $form, 'action:delete' );
+        $post->header( Referer => "http://localhost$delete_path" );
+        $post->header( Cookie  => $cookie );
+        $personal_calls = $community_calls = 0;
+        $res            = $send->($post);
+        is( $personal_calls,  1, "$suffix delete calls personal handler first" );
+        is( $community_calls, 1, "$suffix delete calls community handler after personal decline" );
+        like(
+            $res->content,
+            qr/edited-entry-extra|success/i,
+            "$suffix delete returns native response"
+        );
+        ok( !fresh( $comm, $delete->ditemid )->valid, "$suffix delete removes selected entry" );
+        ok( fresh( $comm, $other->ditemid )->valid, "$suffix delete preserves unrelated entry" );
+    }
+    my $retry = $poster->t_post_fake_comm_entry(
+        $comm,
+        subject  => 'retry old',
+        body     => 'retry body',
+        security => 'public'
+    );
+    my $retry_path = '/editjournal?usejournal=' . $comm->user . '&itemid=' . $retry->ditemid;
+    my $res        = $retained_get->($retry_path);
+    my $form       = form_from( $res->content );
+    ok( $form, 'retry harvests retained form' );
+    $form->action( 'http://localhost' . $retry_path );
+    $form->value( subject       => 'retry changed' );
+    $form->value( event         => 'retry changed' );
+    $form->value( date_ymd_yyyy => 'not-a-year' );
+    my $post = clicked( $form, 'action:save' );
+    $post->header( Referer => "http://localhost$retry_path" );
+    $post->header( Cookie  => $cookie );
+    $personal_calls = $community_calls = 0;
+    $res            = $send->($post);
+    is( $personal_calls,  1, 'invalid attempt calls personal handler first' );
+    is( $community_calls, 1, 'invalid attempt calls community handler' );
+    like( $res->content, qr/id="js-post-entry"/,
+        'invalid attempt returns native retry, never BML fallback' );
+    like( $res->content, qr/not-a-year/, 'native retry retains raw date' );
+    is( fresh( $comm, $retry->ditemid )->subject_raw,
+        'retry old', 'invalid attempt leaves persisted entry unchanged' );
+    my $personal_entry = $poster->t_post_fake_entry(
+        subject  => 'personal old',
+        body     => 'personal body',
+        security => 'private'
+    );
+    my $personal_path = '/editjournal?itemid=' . $personal_entry->ditemid;
+    $res  = $retained_get->($personal_path);
+    $form = form_from( $res->content );
+    ok( $form, 'personal retained form harvests' );
+    $form->action( 'http://localhost' . $personal_path );
+    $form->value( subject => 'personal changed' );
+    $post = clicked( $form, 'action:save' );
+    $post->header( Referer => "http://localhost$personal_path" );
+    $post->header( Cookie  => $cookie );
+    $personal_calls = $community_calls = 0;
+    $res            = $send->($post);
+    is( $personal_calls,  1, 'personal save calls personal handler' );
+    is( $community_calls, 0, 'personal save never calls community handler' );
+    is(
+        fresh( $poster, $personal_entry->ditemid )->subject_raw,
+        'personal changed',
+        'personal save persists through original path'
+    );
+};
+
+done_testing;
