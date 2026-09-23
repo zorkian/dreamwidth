@@ -126,7 +126,7 @@ function waitForPort() {
         const page = await browser.newPage();
         const errors = [];
         const failures = [];
-        page.on('pageerror', error => errors.push(error.stack || error.message));
+        page.on('pageerror', error => errors.push(`${page.url()}: ${error.stack || error.message}`));
         page.on('requestfailed', request => failures.push(`${request.url()}: ${request.failure()?.errorText}`));
         page.on('response', response => {
             if (response.status() >= 400) failures.push(`${response.status()}: ${response.url()}`);
@@ -191,22 +191,10 @@ function waitForPort() {
         for (const width of [1280, 390]) {
             await page.setViewport({width, height: 844, deviceScaleFactor: 1});
             await page.goto(managerURL, {waitUntil: 'networkidle0'});
-            assert.ok(await page.$('.entry-maintainer-form'), `${width}px manager GET renders property-only form`);
-            assert.equal(await page.$('[name=subject]'), null, `${width}px manager form has no subject control`);
-            assert.equal(await page.$('[name=event]'), null, `${width}px manager form has no body control`);
-            assert.equal(await page.$eval('[name=prop_adult_content_maintainer]', element => element.value), data.state.other_override, `${width}px manager form selects override`);
-            assert.equal(await page.$eval('[name=prop_opt_nocomments_maintainer]', element => element.checked), true,
-                `${width}px manager form selects comment override`);
-            assert.equal(await page.$eval('[name=prop_adult_content_maintainer_reason]', element => element.value),
-                data.state.other_reason, `${width}px manager form retains override reason`);
-            assert.equal(await page.$eval('.entry-maintainer-form', form => {
-                const action = new URL(form.action);
-                return action.pathname + action.search;
-            }), `/entry/${data.community}/${data.other_id}/edit?${managerQuery}`,
-            `${width}px manager action preserves canonical raw query`);
-            assert.ok(await visible('[name=prop_adult_content_maintainer_reason]'), `${width}px manager reason is visible`);
-            assert.ok(await page.$eval('.entry-maintainer-form', form => { const r=form.getBoundingClientRect(); return r.left >= -2 && r.right <= innerWidth + 2; }), `${width}px manager form fits viewport`);
-            await page.screenshot({path: `${output}/community-manager-${width}.png`, fullPage: true});
+            assert.ok(await page.$('[name="action:delete"]'), `${width}px manager stays on retained BML delete surface`);
+            assert.ok(await page.$('[name="action:savemaintainer"]'), `${width}px manager retains maintainer action`);
+            assert.ok(await visible('[name="action:delete"]'), `${width}px manager delete action is visible`);
+            await page.screenshot({path: `${output}/community-manager-bml-${width}.png`, fullPage: true});
         }
         const afterGET = await state();
         assert.deepEqual(afterGET, before, 'GET leaves entry and draft state unchanged');

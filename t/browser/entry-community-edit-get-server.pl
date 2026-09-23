@@ -15,16 +15,7 @@ die "usage: $0 PORT\n" unless $port;
 my $app = do "$ENV{LJHOME}/app.psgi";
 die $@ unless ref $app eq 'CODE';
 
-# Test-only composition: production keeps EntryPicker's BML GET fallthrough.
-DW::Routing->register_string(
-    '/editjournal',
-    sub {
-        my $r = DW::Request->get;
-        return undef unless $r && $r->method eq 'GET';
-        return DW::Controller::Entry::legacy_community_edit_get_handler();
-    },
-    app          => 1,
-    no_redirects => 1,
-);
+# Plain application server: public routing owns same-poster community GET activation.
+
 
 Starman::Server->new->run( $app, { port => $port, host => '127.0.0.1', workers => 1 } );
