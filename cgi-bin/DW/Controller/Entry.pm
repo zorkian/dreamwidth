@@ -279,6 +279,70 @@ sub new_handler {
         $spellcheck_requested );
 }
 
+# Dispatch the narrow ordinary-owned retained edit subset after the route
+# composition has preserved picker and BML fallthroughs.  The retained resolver
+# decides the item from GET first and then the hidden POST field; only a
+# same-session, personal-journal owner can cross this boundary.
+sub legacy_owned_edit_handler {
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->did_post;
+
+    my $get     = $r->get_args;
+    my $post    = $r->post_args;
+    my $ditemid = $get->{itemid} || $post->{itemid};
+    return undef unless $ditemid;
+
+    my $remote = LJ::get_remote();
+    return undef unless LJ::isu($remote);
+
+    my $authas = $get->{authas} || $remote->user;
+    my $u      = LJ::get_authas_user($authas);
+    return undef unless LJ::isu($u) && $u->is_individual && $u->equals($remote);
+
+    # Keep retained GET-first, then POST, then journal usejournal selection and
+    # its same-user collapse.
+    # Any remaining target belongs to the community/maintainer BML path.
+    my $usejournal = $get->{usejournal} || $post->{usejournal} || $get->{journal};
+    undef $usejournal if defined $usejournal && $usejournal eq $u->user;
+    return undef if $usejournal;
+
+    my $entry = LJ::Entry->new( $u, ditemid => $ditemid );
+    return undef unless $entry && $entry->valid && $entry->visible_to($remote);
+    return undef unless $entry->poster->equals($remote);
+
+    # Retained editjournal redirects beta owners before action dispatch, and
+    # preserves its read-only rejection and non-owner paths in BML.
+    return undef if LJ::BetaFeatures->user_in_beta( $remote => 'updatepage' );
+    return undef if $u->is_readonly;
+
+    my $action = DW::Entry::Legacy::legacy_edit_action($post);
+    return undef unless $action && ( $action eq 'save' || $action eq 'delete' );
+
+    # Form/referer guards intentionally precede the hook-bearing decoder used
+    # by legacy_owned_edit_post.  Let BML retain its native rejection response.
+    return undef unless LJ::check_form_auth( $post->{lj_form_auth} );
+    return undef unless LJ::check_referer();
+
+    my %result = legacy_owned_edit_post(
+        entry          => $entry,
+        remote         => $remote,
+        journal        => $u,
+        session_remote => $remote,
+        post           => $post,
+        get            => $r->get_args( preserve_case => 1 ),
+        legacy_seed    => {
+            mode       => 'editevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $u->user,
+            usejournal => undef,
+            itemid     => $entry->jitemid,
+            xpost      => '0',
+        },
+    );
+    return $result{render} if exists $result{render};
+    return undef;
+}
+
 # Callable compatibility seam for retained /update POSTs. Route registration,
 # transforms, and alternate login remain deliberately outside this adapter.
 sub legacy_update_handler {

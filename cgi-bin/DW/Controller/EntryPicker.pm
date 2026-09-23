@@ -32,7 +32,10 @@ sub entry_picker_handler {
     my $get  = $r->get_args;
     my $post = $r->post_args;
 
-    return undef if defined $get->{itemid} || defined $post->{itemid};
+    if ( defined $get->{itemid} || defined $post->{itemid} ) {
+        require DW::Controller::Entry;
+        return DW::Controller::Entry::legacy_owned_edit_handler();
+    }
 
     my ( $ok, $rv ) = controller( authas => { type => 'P' } );
     return $rv unless $ok;
