@@ -284,7 +284,8 @@ sub redirect_rename {
     my $renamedto = $u->prop('renamedto')     or return undef;
     my $ru        = LJ::load_user($renamedto) or return undef;
     $uri ||= '';
-    return BML::redirect( $ru->journal_base . $uri );
+    my $r = DW::Request->get or return undef;
+    return $r->redirect( $ru->journal_base . $uri );
 }
 
 # my $sess = $u->session           (returns current session)
@@ -318,7 +319,6 @@ sub _logout_common {
         name   => 'BMLschemepref',
         domain => ".$LJ::DOMAIN",
     );
-    eval { BML::set_scheme(undef); };
 }
 
 ########################################################################
