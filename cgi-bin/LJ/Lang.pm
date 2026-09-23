@@ -826,28 +826,13 @@ sub get_lang_names {
         my $l = LJ::Lang::get_lang($code);
         next unless $l;
 
-        my $item         = "langname.$code";
-        my $namethislang = BML::ml($item);
-        my $namenative   = LJ::Lang::get_text( $l->{'lncode'}, $item );
+        my $item       = "langname.$code";
+        my $namenative = LJ::Lang::get_text( $l->{'lncode'}, $item );
 
         push @list, $code, $namenative;
     }
 
     return \@list;
-}
-
-# FIXME: this isn't used anywhere; just falls through to BML::set_language,
-# which only affects the BML code package in the active process. Keeping this
-# as a stub to assist with the gradual transition to non-BML functions.
-sub set_lang {
-    my $lang = shift;
-
-    my $l = LJ::Lang::get_lang($lang);
-
-    # set language through BML so it will apply immediately
-    BML::set_language( $l->{lncode} );
-
-    return;
 }
 
 # The translation system now supports the ability to add multiple plural forms of the word
