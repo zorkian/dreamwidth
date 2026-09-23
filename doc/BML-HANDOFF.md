@@ -1,3 +1,21 @@
+## Current immutable queue
+
+Unused native alternate-login mapperde55cfe7caec690d48bbfd5b3ed328faf5b677d8
+is with Sol; three subtests/43 assertions, scoped tidy and compile1607 passed
+in Themes container. Foreman mixed-action and shallow seed-props issues were
+corrected before commit. Not integrated pending review. Themes now has a separate
+test-only retained hook mutation characterization assignment: no auth, requests,
+protocol, save, route, or synchronization implementation. Source-only sync audit
+preserved as BML-ALTLOGIN-DECODE-HOOK-SYNC.md; its limitations are design work,
+not a new user approval question or accepted interface narrowing.
+
+Widgets anonymous public tests throughf6bd46d1c pass381 but remain held for
+remaining classifier rows and native-scope auth/decode zero-before-decline proof.
+Exact missing rows were sent: ineligible/readonly, response, preview/spellcheck,
+unknown action, HEAD/nontext; full finite mapping required. Production/browser
+previous bounded reviews remain accepted. Root stays local/clean; no public
+anonymous activation integrated and no root tests running.
+
 ## Active followups after alternate-login integration
 
 Root clean integration through e2d0f408a; no root tests running. Widgets public
