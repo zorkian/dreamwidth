@@ -755,6 +755,100 @@ sub legacy_update_handler {
     );
 }
 
+# Callable-only anonymous retained /update owner-post subset. Public route
+# composition and failed-password compatibility remain with BML.
+sub legacy_anonymous_update_handler {
+    my (%opts) = @_;
+    my $r = DW::Request->get or return undef;
+    return undef unless $r->did_post;
+    return undef if LJ::get_remote();
+
+    my $post        = $r->post_args;
+    my $get         = $r->get_args;
+    my $legacy_post = DW::Entry::Legacy::legacy_post_hash($post);
+    my $legacy_get  = DW::Entry::Legacy::legacy_post_hash($get);
+    return undef unless LJ::text_in($legacy_post);
+
+    # Retained ordinary update does not require an action:update control, but
+    # named transforms remain BML-owned until their own native composition.
+    return undef if grep { /^action:(?!update$)/ && $legacy_post->{$_} } keys %$legacy_post;
+    return undef unless defined $legacy_post->{user}     && length $legacy_post->{user};
+    return undef unless defined $legacy_post->{password} && length $legacy_post->{password};
+    return undef if $legacy_post->{usejournal};
+    return undef if $legacy_get->{altlogin} || $legacy_post->{chal} || $legacy_post->{response};
+    return undef
+        if $legacy_post->{transform} || $legacy_post->{showform} || $legacy_post->{moreoptsbtn};
+    return undef if $legacy_post->{'action:preview'} || $legacy_post->{'action:spellcheck'};
+
+    my %auth_post = ( %$legacy_post, username => $legacy_post->{user} );
+    my %flags;
+    my %auth = _auth( \%flags, \%auth_post, undef );
+    return undef unless $auth{poster} && $auth{journal} && $auth{poster}->equals( $auth{journal} );
+    return undef unless $auth{poster}->can_post;
+
+    # Retained update stops before its decoder when the resolved owner journal
+    # is read-only. Let BML retain that warning and its legacy response shape.
+    return undef if $auth{journal}->readonly;
+
+    # Anonymous retained posting has no form-auth token, but it still performs
+    # the protocol login handshake before decoding/posting. Keep its old seed
+    # and flags separate from the hook-visible post request below.
+    my %login_req = (
+        mode          => 'login',
+        ver           => $LJ::PROTOCOL_VER,
+        clientversion => 'Web/2.0.0',
+        user          => $legacy_post->{user},
+    );
+    my %login_res;
+    LJ::do_request( \%login_req, \%login_res, \%flags );
+
+    my $errors   = DW::FormErrors->new;
+    my $warnings = DW::FormErrors->new;
+    if ( ( $login_res{success} || '' ) ne 'OK' ) {
+        $errors->add( undef, '/entry/form.tt.error.login', { error => $login_res{errmsg} || '' }, );
+    }
+    elsif ( $login_res{message} ) {
+        $warnings->add_string( undef, LJ::auto_linkify( LJ::ehtml( $login_res{message} ) ), );
+    }
+
+    my $prepared = DW::Entry::Legacy::prepare_entry_form(
+        {
+            mode       => 'postevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $legacy_post->{user},
+            password   => $legacy_post->{password},
+            usejournal => '',
+            tz         => 'guess',
+            xpost      => '0'
+        },
+        $post
+    );
+    my %post_res = _do_post(
+        $prepared->{canonical},
+        \%flags,
+        { poster => $auth{poster}, journal => $auth{journal} },
+        warnings       => $warnings,
+        legacy_success => {
+            request          => $prepared->{request},
+            poster           => $auth{poster},
+            remote           => undef,
+            event_format     => $legacy_post->{event_format},
+            switched_rte_on  => $legacy_post->{switched_rte_on},
+            crosspost_master => 0
+        },
+        legacy_suppress_success => $errors->exist,
+    );
+    return $post_res{render} if ( $post_res{status} || '' ) eq 'ok' && !$errors->exist;
+    $errors->add_string( undef, $post_res{errors} ) if $post_res{errors};
+    return legacy_new_rerender(
+        $prepared,
+        remote             => undef,
+        anonymous_username => $legacy_post->{user},
+        errors             => $errors,
+        warnings           => $warnings,
+    );
+}
+
 # Prepare retained nonpersisting actions for the shared native form. The
 # transform hook mutates flat request hashes, while the original request still
 # supplies the encoded/repeated query string for the retry action URL.
@@ -1979,15 +2073,19 @@ sub _get_extradata {
 sub _do_post {
     my ( $form_req, $flags, $auth, %opts ) = @_;
 
-    my $res = DW::Entry::_save_new_entry( $form_req, $flags, $auth );
-    _legacy_post_spam_check( $opts{legacy_success}, $auth->{poster} );
+    my $res            = DW::Entry::_save_new_entry( $form_req, $flags, $auth );
+    my $legacy_attempt = $opts{legacy_success};
+    my $legacy_success =
+        $legacy_attempt && !$opts{legacy_suppress_success} ? $legacy_attempt : undef;
+    _legacy_post_spam_check( $legacy_attempt, $auth->{poster} );
     return %$res if $res->{errors};
 
-    # post succeeded, time to do some housecleaning
-    if ( my $legacy = $opts{legacy_success} ) {
-        _legacy_success_housekeeping( $legacy, $form_req );
+    # A retained login error still attempts the protocol post, but it does not
+    # execute the success-only housekeeping or extension hooks before rerender.
+    if ($legacy_success) {
+        _legacy_success_housekeeping( $legacy_success, $form_req );
     }
-    else {
+    elsif ( !$legacy_attempt ) {
         _persist_props( $auth->{poster}, $form_req, 0 );
         if ( $auth->{poster} ) {
             $auth->{poster}->set_prop( 'entry_draft',      '' );
@@ -2007,8 +2105,7 @@ sub _do_post {
             'entry/success.tt',
             {
                 moderated_message => $res->{message},
-                legacy_extra_html =>
-                    _legacy_success_extra_html( $opts{legacy_success}, undef, undef ),
+                legacy_extra_html => _legacy_success_extra_html( $legacy_success, undef, undef ),
             }
         );
     }
@@ -2074,15 +2171,15 @@ sub _do_post {
         # Legacy update keeps its master checkbox outside normalized form data.
         # Its POST-first, GET-fallback value is passed explicitly by its adapter.
         my $crosspost_form = $form_req;
-        if ( $opts{legacy_success} && exists $opts{legacy_success}{crosspost_master} ) {
+        if ( $legacy_attempt && exists $legacy_attempt->{crosspost_master} ) {
             $crosspost_form =
-                { %$form_req, crosspost_entry => $opts{legacy_success}{crosspost_master} };
+                { %$form_req, crosspost_entry => $legacy_attempt->{crosspost_master} };
         }
 
         # crosspost!
         my @crossposts = _queue_crosspost(
             $crosspost_form,
-            remote             => $opts{legacy_success} ? $opts{legacy_success}{remote} : $u,
+            remote             => $legacy_attempt ? $legacy_attempt->{remote} : $u,
             journal            => $journal,
             deleted            => 0,
             editurl            => $edititemlink,
@@ -2092,10 +2189,9 @@ sub _do_post {
 
         my $legacy_extra_options =
             defined $res->{itemid}
-            ? _legacy_success_extra_options( $opts{legacy_success}, $journal, $itemlink )
+            ? _legacy_success_extra_options( $legacy_success, $journal, $itemlink )
             : '';
-        my $legacy_extra_html =
-            _legacy_success_extra_html( $opts{legacy_success}, $journal, $itemlink );
+        my $legacy_extra_html = _legacy_success_extra_html( $legacy_success, $journal, $itemlink );
 
         # set sticky
         if ( $form_req->{sticky_entry} && $u->can_manage($journal) ) {
