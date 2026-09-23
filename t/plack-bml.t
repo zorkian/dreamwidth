@@ -30,7 +30,7 @@ BEGIN {
     };
 }
 
-plan tests => 13;
+plan tests => 14;
 
 # Keep engine coverage independent of pages as they migrate to controllers.
 my $fixture_dir = tempdir( 'bml-test-XXXXXX', DIR => "$ENV{LJHOME}/htdocs", CLEANUP => 1 );
@@ -119,6 +119,15 @@ test_psgi $app, sub {
     my $res = $cb->( GET "/nonexistent-page-xyz-12345" );
 
     is( $res->code, 404, "Non-existent path returns 404" );
+};
+
+# Test: an unrecognized /__rpc_* URI (the legacy AJAX mapping app.psgi used to
+# special-case) falls through to the router's ordinary 404, not a BML lookup.
+test_psgi $app, sub {
+    my $cb  = shift;
+    my $res = $cb->( GET "/__rpc_this_is_not_a_real_endpoint" );
+
+    is( $res->code, 404, "unknown /__rpc_* URI returns the router's 404" );
 };
 
 # Test 10: Existing controller routes still work (not broken by BML fallback)

@@ -107,15 +107,6 @@ sub _handle_request {
         ? '/journal/embedcontent'
         : $r->path;
 
-    # Handle legacy RPC URIs (/__rpc_delcomment, /__rpc_talkscreen) that
-    # Apache routes via LJ::URI->handle() to BML files
-    if ( my ($rpc) = $uri =~ m!^.*/__rpc_(\w+)$! ) {
-        if ( my $bml_file = $LJ::AJAX_URI_MAP{$rpc} ) {
-            DW::BML->render( "$LJ::HTDOCS/$bml_file", $uri );
-            return;
-        }
-    }
-
     my $ret = DW::Routing->call(
         uri      => $uri,
         username => $env->{'dw.journal_user'},
