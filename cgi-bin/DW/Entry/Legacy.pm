@@ -314,7 +314,7 @@ sub build_altlogin_legacy_raw_post {
     # Canonical security is authoritative. usemask=1 is ambiguous between the
     # native access selector and malformed custom bit zero; retain friends so a
     # retained decoder reproduces the same mask without inventing bit zero.
-    delete @{$raw}{ grep { /^(?:custom_bit|crosspost|prop_xpost)(?:_|$)/ } keys %$raw };
+    delete @{$raw}{ grep { /^(?:custom_bit|crosspost|prop_xpost|xpost)(?:_|$)/ } keys %$raw };
     my $security = $canonical->{security} || 'public';
     if ( $security eq 'private' ) {
         $raw->{security} = 'private';
@@ -393,6 +393,14 @@ sub _altlogin_raw_security_representable {
 
 sub _altlogin_raw_datetime_representable {
     my ($post) = @_;
+
+    # A repeated date/time field has no single scalar value to retain; the
+    # snapshot NUL-joins repeats, so decline before that happens regardless of
+    # whether the repeated values are individually well formed or their order.
+    for my $field (qw(entrytime_date entrytime_time)) {
+        my @values = $post->get_all($field);
+        return 0 if @values > 1;
+    }
     return 0
         if exists $post->{entrytime_date}
         && $post->{entrytime_date} !~ /\A\d{4}-\d{2}-\d{2}\z/;

@@ -223,6 +223,42 @@ subtest 'unsupported masks and date syntax return undef without shaping input' =
         [ 'invalid time text',   Hash::MultiValue->new( entrytime_time => 'not-hour:not-minute' ) ],
         [ 'explicit empty date', Hash::MultiValue->new( entrytime_date => '' ) ],
         [ 'explicit empty time', Hash::MultiValue->new( entrytime_time => '' ) ],
+        [
+            'repeated valid date',
+            Hash::MultiValue->new( entrytime_date => '2026-09-23', entrytime_date => '2026-01-01' )
+        ],
+        [
+            'repeated valid-then-invalid date',
+            Hash::MultiValue->new(
+                entrytime_date => '2026-09-23',
+                entrytime_date => 'not-a-year-02-03'
+            )
+        ],
+        [
+            'repeated invalid-then-valid date',
+            Hash::MultiValue->new(
+                entrytime_date => 'not-a-year-02-03',
+                entrytime_date => '2026-09-23'
+            )
+        ],
+        [
+            'repeated valid time',
+            Hash::MultiValue->new( entrytime_time => '10:11', entrytime_time => '12:13' )
+        ],
+        [
+            'repeated valid-then-invalid time',
+            Hash::MultiValue->new(
+                entrytime_time => '10:11',
+                entrytime_time => 'not-hour:not-minute'
+            )
+        ],
+        [
+            'repeated invalid-then-valid time',
+            Hash::MultiValue->new(
+                entrytime_time => 'not-hour:not-minute',
+                entrytime_time => '10:11'
+            )
+        ],
         )
     {
         my ( $label, $post ) = @$case;
@@ -250,13 +286,14 @@ subtest 'reserved namespaces are cleared and adult raw values remain observation
         crosspost         => 9,
         prop_xpost_check  => 1,
         prop_xpost_9      => 9,
+        xpost             => 1,
         extension_control => 'kept',
     );
     my $raw = build( $post, { security => 'usemask', allowmask => 1 << 1, props => {} } );
     is( $raw->{security},     'custom', 'representable canonical custom mask selects custom' );
     is( $raw->{custom_bit_1}, 1,        'canonical bit one is synthesized' );
     my @injected_reserved = qw(custom_bit custom_bit_0 custom_bit_01 custom_bit_61
-        crosspost_entry crosspost prop_xpost_check prop_xpost_9);
+        crosspost_entry crosspost prop_xpost_check prop_xpost_9 xpost);
     ok( !( grep { exists $raw->{$_} } @injected_reserved ),
         'injected reserved custom and crosspost names are cleared before canonical bit synthesis' );
     is( $raw->{extension_control},
