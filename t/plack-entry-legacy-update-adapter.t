@@ -82,7 +82,10 @@ my $adapter_app = Plack::Middleware::DW::RequestWrapper->wrap(
         push @adapter_paths,    $r->uri;
         push @adapter_altlogin, $r->get_args->{altlogin};
         LJ::set_remote($owner);
-        my $render = DW::Controller::Entry::legacy_update_handler( remote => $owner );
+        my $render = DW::Controller::Entry::legacy_update_handler(
+            remote             => $owner,
+            include_transforms => 1
+        );
         if ( !defined $render ) {
             $r->status(418);
             $r->print('retained BML fallback marker');
@@ -319,6 +322,14 @@ for my $case (
         like( $res->content, qr/id="js-post-entry"/, "$name response uses the shared native form" );
         is( $decode_count, 1, "$name invokes the legacy decoder once" );
         is( $spam_count,   1, "$name invokes post-attempt spam once" );
+    }
+    elsif ( $name =~ /^(?:transform|preview|showform|moreopts)$/ ) {
+        is( $res->code, 200, "$name gets a native nonpersisting rerender" );
+        like( $res->content, qr/id="js-post-entry"/, "$name response uses the shared native form" );
+        unlike( $res->content, qr/retained BML fallback marker/,
+            "$name does not fall back to BML" );
+        is( $decode_count, 0, "$name does not invoke the legacy decoder" );
+        is( $spam_count,   0, "$name does not invoke post-attempt spam" );
     }
     else {
         is( $res->code, 418, "$name remains outside the callable adapter slice" );

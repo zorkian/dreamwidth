@@ -303,16 +303,32 @@ sub legacy_update_handler {
     # must continue to the retained BML implementation.
     return undef unless LJ::isu($remote);
     return undef if $remote->identity || !$remote->can_post;
+    return undef if $legacy_get->{altlogin};
     return undef
-        if $legacy_get->{altlogin}
-        || $legacy_post->{transform}
+        if $legacy_post->{user}
+        && LJ::canonical_username( $legacy_post->{user} ) ne $remote->user;
+
+    # These retained controls are form transforms, not save attempts. Capture
+    # their classification before a transform hook can mutate the flat request.
+    my $transform = $legacy_post->{transform};
+    my $rerender =
+           $transform
         || $legacy_post->{showform}
         || $legacy_post->{moreoptsbtn}
         || $legacy_post->{'action:preview'}
         || $legacy_post->{'action:spellcheck'};
-    return undef
-        if $legacy_post->{user}
-        && LJ::canonical_username( $legacy_post->{user} ) ne $remote->user;
+    if ($rerender) {
+        return undef unless $opts{include_transforms};
+        LJ::Hooks::run_hooks( "transform_update_$transform", $legacy_get, $legacy_post )
+            if $transform;
+        return _legacy_update_rerender(
+            $legacy_post,
+            $legacy_get,
+            $remote,
+            spellcheck_requested => $legacy_post->{'action:spellcheck'} ? 1 : 0,
+            transform => $transform ? 1 : 0,
+        );
+    }
 
     # The retained route rejects token/referer and readonly failures before
     # decode_entry_form.  The decoder is hook-bearing, so this guard must remain
@@ -376,6 +392,48 @@ sub legacy_update_handler {
         remote   => $remote,
         errors   => $errors,
         warnings => $warnings,
+    );
+}
+
+# Prepare retained nonpersisting actions for the shared native form. The
+# transform hook mutates flat request hashes, while the original request still
+# supplies the encoded/repeated query string for the retry action URL.
+sub _legacy_update_rerender {
+    my ( $post, $get, $remote, %opts ) = @_;
+
+    # update.bml uses truthy POST-or-GET fallback only for transforms. Its
+    # ordinary showform/moreopts/preview branches copy every submitted field,
+    # including explicit empty values.
+    my %render = $opts{transform} ? %$get : ();
+    if ( $opts{transform} ) {
+        $render{$_} = $post->{$_} for grep { $post->{$_} } keys %$post;
+        for my $name (qw(event_format richtext_default)) {
+            $render{$name} = $post->{$name} if exists $post->{$name};
+        }
+        $render{$_} = $post->{$_} for grep { /^prop_xpost_/ } keys %$post;
+    }
+    else {
+        %render = %$post;
+    }
+
+    my $prepared = DW::Entry::Legacy::prepare_rerender_entry_form(
+        {
+            mode       => 'postevent',
+            ver        => $LJ::PROTOCOL_VER,
+            user       => $remote->user,
+            password   => $render{password},
+            usejournal => $render{usejournal},
+            tz         => 'guess',
+            xpost      => '0',
+        },
+        \%render
+    );
+
+    return legacy_new_rerender(
+        $prepared,
+        remote               => $remote,
+        get                  => DW::Request->get->get_args,
+        spellcheck_requested => $opts{spellcheck_requested},
     );
 }
 

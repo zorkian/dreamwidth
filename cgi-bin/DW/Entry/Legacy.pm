@@ -25,7 +25,7 @@ use LJ::Lang;
 use Scalar::Util qw(blessed);
 
 sub decode_entry_form {
-    my ( $req, $POST ) = @_;
+    my ( $req, $POST, %opts ) = @_;
 
     # find security
     my $sec   = "public";
@@ -159,7 +159,7 @@ sub decode_entry_form {
     }
 
     # process site-specific options
-    LJ::Hooks::run_hooks( 'decode_entry_form', $POST, $req );
+    LJ::Hooks::run_hooks( 'decode_entry_form', $POST, $req ) unless $opts{skip_decode_hook};
 
     return $req;
 }
@@ -227,6 +227,23 @@ sub prepare_entry_form {
 
     my $legacy_post = legacy_post_hash($post);
     my $decoded     = decode_entry_form( $req, $legacy_post );
+    my $canonical   = decoded_to_canonical( $decoded, $legacy_post );
+
+    return {
+        request   => $decoded,
+        canonical => $canonical,
+        post      => $legacy_post,
+    };
+}
+
+# Build a native rerender payload from a retained form without invoking the
+# external decode hook. Transform/showform/preview branches never called that
+# hook in update.bml, but still use the same local field normalization.
+sub prepare_rerender_entry_form {
+    my ( $req, $post ) = @_;
+
+    my $legacy_post = legacy_post_hash($post);
+    my $decoded     = decode_entry_form( $req, $legacy_post, skip_decode_hook => 1 );
     my $canonical   = decoded_to_canonical( $decoded, $legacy_post );
 
     return {
