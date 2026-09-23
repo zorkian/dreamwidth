@@ -311,15 +311,15 @@ test_psgi $app, sub {
     is( $manager_calls, 1, 'nonmanager manager resolver declines exactly once' );
     unlike( $denied->content, qr/entry-maintainer-form/,
         'nonmanager remains on retained BML surface' );
-    my ($denied_form) = grep { ( $_->attr('id') || '' ) eq 'updateForm' }
+    my ($denied_bml_form) = grep { ( $_->attr('id') || '' ) eq 'updateForm' }
         HTML::Form->parse( $denied->content, 'http://localhost' . $path_for->('') );
-    ok( $denied_form, 'nonmanager receives the retained disabled edit form' );
+    ok( $denied_bml_form, 'nonmanager receives the retained disabled edit form' );
     ok(
-        $denied_form && !$denied_form->find_input('action:savemaintainer'),
+        $denied_bml_form && !$denied_bml_form->find_input('action:savemaintainer'),
         'nonmanager retained form does not expose a manager property action'
     );
     ok(
-        $denied_form && $denied_form->find_input('action:delete')->disabled,
+        $denied_bml_form && $denied_bml_form->find_input('action:delete')->disabled,
         'nonmanager retained delete control is disabled rather than claimed natively'
     );
     is_deeply( state( $comm, $target->ditemid ),
@@ -338,6 +338,24 @@ test_psgi $app, sub {
         security => 'public',
     );
     my $other_before = state( $other_comm, $other_target->ditemid );
+
+    # Per-journal ditemids can coincide. Create a real B entry whose composite
+    # is absent from A before asserting the cross-community mismatch branch.
+    my $mismatch_target;
+    for ( 1 .. 12 ) {
+        my $candidate = $poster->t_post_fake_comm_entry(
+            $other_comm,
+            subject  => "Mismatch candidate $_",
+            body     => 'Mismatch body',
+            security => 'public',
+        );
+        if ( !fresh( $comm, $candidate->ditemid )->valid ) {
+            $mismatch_target = $candidate;
+            last;
+        }
+    }
+    ok( $mismatch_target, 'fixture obtains a B composite absent from A' )
+        or BAIL_OUT('could not construct cross-community mismatch fixture');
     my $post_manager = sub {
         my ( $path, %values ) = @_;
         my $form_path = delete $values{form_path} || $path;
@@ -539,7 +557,17 @@ test_psgi $app, sub {
             'noncommunity target',
             '/editjournal?usejournal=' . $outsider->user . '&itemid=' . $personal_target->ditemid
         ],
+        [
+            'actor self target collapse',
+            '/editjournal?usejournal=' . $manager->user . '&itemid=' . $target->ditemid
+        ],
+        [
+            'community/item mismatch',
+            '/editjournal?usejournal=' . $comm->user . '&itemid=' . $mismatch_target->ditemid
+        ],
     );
+    ok( !fresh( $comm, $mismatch_target->ditemid )->valid,
+        'fixture precondition: mismatch composite does not resolve in selected community' );
     for my $case (@ineligible) {
         my ( $label, $path ) = @$case;
         my $managed_before = state( $comm, $target->ditemid );
