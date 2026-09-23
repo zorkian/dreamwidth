@@ -195,6 +195,8 @@ function waitForPort() {
             assert.equal(await page.$('[name=subject]'), null, `${width}px manager form has no subject control`);
             assert.equal(await page.$('[name=event]'), null, `${width}px manager form has no body control`);
             assert.equal(await page.$eval('[name=prop_adult_content_maintainer]', element => element.value), data.state.other_override, `${width}px manager form selects override`);
+            assert.equal(await page.$eval('[name=prop_opt_nocomments_maintainer]', element => element.checked), true,
+                `${width}px manager form selects comment override`);
             assert.equal(await page.$eval('[name=prop_adult_content_maintainer_reason]', element => element.value),
                 data.state.other_reason, `${width}px manager form retains override reason`);
             assert.equal(await page.$eval('.entry-maintainer-form', form => {
