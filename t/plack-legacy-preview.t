@@ -598,4 +598,35 @@ my ($entries_after_all) =
     $u->selectrow_array( 'SELECT COUNT(*) FROM log2 WHERE journalid=?', undef, $u->id );
 is( $entries_after_all, $before, 'all previews leave the entry count unchanged' );
 
+subtest 'legacy preview retains requirepost GET and HEAD compatibility' => sub {
+    no warnings 'redefine';
+    local *LJ::Lang::get_text = sub { return "preview-method:$_[1]" };
+    test_psgi $app, sub {
+        my $send = shift;
+        for my $path ( '/preview/entry', '/preview/entry.bml' ) {
+            my $get = $send->( GET "http://localhost$path" );
+            is( $get->code, 200, "$path GET retains requirepost status" );
+            is(
+                $get->content,
+                'preview-method:bml.requirepost',
+                "$path GET retains the bare localized requirepost body"
+            );
+            ok( !$get->header('Location'), "$path GET does not redirect" );
+            my $head = $send->( HTTP::Request->new( HEAD => "http://localhost$path" ) );
+            is( $head->code,    200, "$path HEAD retains requirepost status" );
+            is( $head->content, '',  "$path HEAD has no body" );
+            is(
+                $head->header('Content-Type'),
+                $get->header('Content-Type'),
+                "$path HEAD retains representation content type"
+            );
+            is(
+                $head->header('Content-Length'),
+                $get->header('Content-Length'),
+                "$path HEAD retains representation content length"
+            );
+        }
+    };
+};
+
 done_testing;

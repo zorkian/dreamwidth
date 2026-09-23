@@ -68,7 +68,7 @@ DW::Routing->register_string(
 DW::Routing->register_string(
     '/preview/entry', \&legacy_preview_handler,
     app     => 1,
-    methods => { POST => 1 }
+    methods => { GET => 1, HEAD => 1, POST => 1 }
 );
 
 DW::Routing->register_string( '/__rpc_draft', \&draft_rpc_handler, app => 1, format => 'json' );
@@ -1550,7 +1550,14 @@ sub _render_preview {
 # notice in LICENSE-LiveJournal.txt. Keep that attribution with this wrapper
 # while the shared renderer above remains Dreamwidth-native code.
 sub legacy_preview_handler {
-    my $r      = DW::Request->get;
+    my $r = DW::Request->get;
+
+    # The BML page returned this localized text directly, rather than putting it
+    # inside the modern error wrapper.
+    unless ( $r->did_post ) {
+        $r->print( LJ::Lang::ml('bml.requirepost') );
+        return $r->OK;
+    }
     my $remote = LJ::get_remote();
     LJ::set_active_resource_group('foundation');
 
