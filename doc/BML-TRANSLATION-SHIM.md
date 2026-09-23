@@ -15,6 +15,26 @@ the foreman noted "plus a pending doc fix" there that this document has no
 access to (another session's uncommitted work) — treat citations to it as
 current as of `74fb0ab92` only.
 
+**Correction (2026-09-23, this branch's second commit):** the original text
+of §7-§9 below named an "eight out-of-F2-scope `.bml` pages" list
+(`customize/index.bml`, `customize/options.bml`,
+`manage/circle/editfilters.bml`, `manage/settings/index.bml`,
+`imguploadrte.bml`, `imgpreview.bml`, `tools/fck_poll.bml`,
+`stc/fck/editor/dialog/imguploadrte.bml`) as an unverified residual risk.
+That list was carried over from `doc/BML-ENGINE-RETIREMENT.md`'s "Findings
+and scope" section without re-checking it against this document's own audit
+base — none of those eight pages exist at `4a3a24100` (confirmed:
+`git ls-tree -r --name-only 4a3a24100 | grep '\.bml$'` lists only the four
+`.bml` files F2 deletes plus the three `_config*.bml` files); they were
+migrated to native controllers/templates in seven earlier, unrelated commits
+(`c2ed9b0f9`, `50276ed0a`, `d5c4037a8`, `80c1c7c27`, `bcdced59f`,
+`035e27196`, `6dca2d923`), all ancestors of `4a3a24100`. Root HEAD after F2
+(`8d03595e9`) confirms the same: `git ls-tree -r --name-only 8d03595e9 |
+grep '\.bml$'` returns only the three `_config*.bml` files. §7-§9 below are
+corrected in place to reflect this; the practical effect is that the residual
+risk they described is not merely unconfirmed but **moot** — there is no
+other `.bml` page left to carry it.
+
 ## 1. Scope
 
 "Once the journal adapter work lands" (W7-B's proposed conversion of
@@ -150,13 +170,11 @@ cited in the assignment) are present in the loaded module but shadowed.
   my $lang = BML::decide_language();   # real per-request negotiation
   BML::set_language($lang);            # no explicit getter -> falls back to HOOK-ml_getter
   ```
-  Consequence: **`<?_ml?>` resolution for any `.bml` page that still exists
-  after F2** (F2 only deletes the four entry pages; `customize/index.bml`,
-  `customize/options.bml`, `manage/circle/editfilters.bml`,
-  `manage/settings/index.bml`, `imguploadrte.bml`, `imgpreview.bml`,
-  `tools/fck_poll.bml`, and `stc/fck/editor/dialog/imguploadrte.bml` are
-  out of F2's scope and still render through this exact path) **does not
-  depend on `RequestWrapper.pm`'s `BML::set_language` call at all** — it is
+  Consequence: **`<?_ml?>` resolution for any `.bml` page** (at this
+  document's audit base, only the four F2-scoped entry pages and
+  `global.look`/`tt_runner.look`; see the correction above — no other
+  `.bml` page exists in the tree) **does not depend on
+  `RequestWrapper.pm`'s `BML::set_language` call at all** — it is
   self-contained within `Apache::BML.pm`'s own dispatch.
 
 - **Native TT pages** (`DW::Template->render_template`/`render_string`/
@@ -297,7 +315,7 @@ or on this document's translation-shim scope.
 | `BML::get_language` | `DW/BML.pm:221-224` (shadows `Apache/BML.pm:1813-1816`) | `$Apache::BML::cur_req->{lang}` | Global (per-in-progress-page) | Only while a `.bml` page exists |
 | `BML::set_language` | `DW/BML.pm:157-210` (shadows `Apache/BML.pm:1831-1871`) | `$apache_r->notes`, `$Apache::BML::cur_req->{lang}`, **and** `LJ::Lang::set_request_context` (§3), plus redefines `*BML::ml`/`*BML::ML::FETCH` | Global symbol-table mutation, persists across requests in a worker until next call | Needed by: any remaining `.bml` page's per-page dispatch (`Apache/BML.pm:333-335`); `LJ::Protocol.pm:562` (held, §4); `RequestWrapper.pm:56` (safety net, §8) |
 | `BML::ml` / `%BML::ML` | `DW/BML.pm:108-114,150,183-208` | reads `$BML::ML_SCOPE`/`$r->note('ml_scope')`, calls the captured getter | Global closure, request-independent once set | Only production caller (`LJ::Web::entry_form`) deleted by F2 — after F2, no in-tree production caller remains |
-| `<?_ml?>` tag (`_ML` block type) | `Apache/BML.pm:812-824` | `$req->{lang}`, `$req->{env}{HOOK-ml_getter}` | Per-in-progress-page | Yes, for any remaining `.bml` page/look-file (`global.look`, out-of-F2-scope pages) |
+| `<?_ml?>` tag (`_ML` block type) | `Apache/BML.pm:812-824` | `$req->{lang}`, `$req->{env}{HOOK-ml_getter}` | Per-in-progress-page | Only for `global.look`/`tt_runner.look` themselves and the four F2-scoped pages before F2 lands — no other `.bml` page exists at this audit's base (see correction above) |
 | `ml_getter` hook | `LJ/Global/BMLInit.pm:68` | registers `\&LJ::Lang::get_text` once at boot | Global, boot-time, not per-request | Yes, as long as `<?_ml?>` tags exist anywhere |
 | `Apache::BML.pm:333-335` per-page language negotiation | `Apache/BML.pm:329-335` | calls `BML::decide_language()` then `BML::set_language($lang)` | Per-page, inside real dispatch | Yes, as long as any `.bml` page exists; independent of `RequestWrapper.pm` |
 
@@ -320,42 +338,47 @@ same worker inherits whatever the *previous* caller last set it to" —
 exactly the kind of cross-request global-state bug this line currently
 prevents by re-establishing a known-good state every request.
 
-**Once F2 lands**, the only remaining programmatic `BML::ml()`/`%BML::ML`
-caller in production code is gone (`LJ::Web::entry_form`). The line becomes
-pure insurance against:
-1. Any still-existing `.bml` page's own inline Perl (`<?_code?>` blocks, of
-   which `tt_runner.look` has one, §6) calling `BML::ml()`/`%BML::ML`
-   directly rather than via `<?_ml?>` — not found in `global.look` or
-   `tt_runner.look` by this audit, but the other seven out-of-F2-scope
-   `.bml` pages were not individually re-read for this (out of scope: this
-   document is about the shim mechanism, not a page-by-page `BML::ml` grep;
-   the mechanism-level fact is that `Apache::BML.pm:333-335`'s own
-   per-page call already covers any page that *does* call it, once that
-   page's own dispatch starts — so the risk window is specifically "before"
-   dispatch, e.g. code that runs from a hook fired earlier in the request).
+**Once F2 lands** (it has, on root, as of the correction above), the only
+remaining programmatic `BML::ml()`/`%BML::ML` caller in production code is
+gone (`LJ::Web::entry_form`), **and** — per the correction above — there is
+no other `.bml` page left in the tree at all except the three `_config*.bml`
+files, which are configuration data, never rendered as a page
+(`DW::BML`'s own path-traversal/`_config.bml`-access blocking, confirmed
+live by `t/plack-bml.t`'s "Direct access to `_config.bml` returns 403"
+case). That means `Apache::BML.pm:333-335`'s per-page dispatch — the code
+path that made §3's `<?_ml?>`/`ml_getter` analysis independent of this
+line — is itself unreachable for any real request post-F2: there is no
+`.bml` file left for `DW::BML->resolve_path`/`render` (`app.psgi`'s final
+fallback) to find and dispatch to. The two residual risks this document
+originally raised (§7's now-corrected table row) collapse to one:
+
+1. ~~Any still-existing `.bml` page's own inline Perl calling `BML::ml()`~~
+   — moot; no such page exists post-F2 (confirmed above, not merely
+   unverified).
 2. `LJ::Protocol.pm:562` (held, §4), which needs `BML::set_language` to
    remain callable and functioning — removing `RequestWrapper.pm`'s call
-   does not break this caller (it calls `set_language` itself), but does
-   mean the *pre-sendmessage* state of the global closures is whatever the
-   *previous* request left it as, not a freshly-reset default.
+   does not break this caller (it calls `set_language` itself, and does not
+   depend on `Apache::BML::is_initialized()` being true — §4), but does
+   mean the *pre-sendmessage* state of the global `*BML::ml` closure is
+   whatever the *previous* request in that worker last left it as, not a
+   freshly-reset default, between the time this line stops running and the
+   time `LJ::Protocol.pm:562` itself is converted or deleted.
 
 **Smallest safe replacement, not proposed as a change**: since
 `LJ::Lang::set_request_context` (line 55) already does everything native
 code needs, and `BML::set_language`'s only *other* per-request-relevant
-effect is the same `set_request_context` call redundantly (§3), the
-narrowest change that preserves current behavior for every caller
-identified in this audit would be to keep line 56 exactly as-is until no
-`.bml` page can possibly call `BML::ml()`/`%BML::ML` before its own dispatch
-runs and `LJ::Protocol.pm:562` is itself converted (§4) — i.e., this line's
-removal is gated on the same "last `.bml` page deleted" milestone as
-`Apache::BML.pm`/`DW::BML.pm` themselves (`doc/BML-ENGINE-RETIREMENT.md`
-§2's "Legacy engine bootstrap" bucket), not on F2 alone, contra that
-document's own step-2 suggestion (`BML-ENGINE-RETIREMENT.md:124-127`) to
-re-grep and drop it right after F2. This audit's added information over
-that suggestion: the re-grep needs to cover not just `BML::ml`/`%BML::ML`
-*call sites*, but also confirm no remaining `.bml` page's inline Perl could
-reach one before its own per-page `set_language` call executes — a
-narrower, but not zero, residual risk than "no callers exist."
+effect is the same `set_request_context` call redundantly (§3), and — per
+the correction above — no `.bml` page exists post-F2 to depend on the
+per-page dispatch this line is unrelated to anyway, the residual case for
+keeping line 56 is narrower than this document originally stated: it comes
+down to whether `LJ::Protocol.pm:562`'s `BML::set_language('en')` call
+(§4, held) is comfortable inheriting stale global-closure state from a prior
+request in the same worker, rather than a freshly-reset one, in the window
+between "F2 lands" and "`LJ::Protocol.pm:562` is itself converted or
+deleted." `doc/BML-ENGINE-RETIREMENT.md`'s own step-2 suggestion
+(`BML-ENGINE-RETIREMENT.md:124-127`, re-grep and drop the line right after
+F2) is, per this correction, not blocked by any remaining-page concern —
+only by that one held item's own gate.
 
 ### Test plan
 
@@ -378,16 +401,13 @@ which does not exist today.
 Restating and narrowing `doc/BML-ENGINE-RETIREMENT.md`'s gates for this
 shim family specifically, no new gates invented:
 
-- **Not gated on a user decision, but gated on a fact this audit could not
-  fully establish**: whether removing `RequestWrapper.pm:56` is safe depends
-  on confirming no remaining `.bml` page's own inline Perl calls
-  `BML::ml()`/`%BML::ML` before that page's own `Apache::BML.pm:333-335`
-  dispatch runs. This audit confirmed it for `global.look`/`tt_runner.look`
-  only; the eight out-of-F2-scope `.bml` pages (`customize/*`,
-  `manage/circle/editfilters.bml`, `manage/settings/index.bml`,
-  `imguploadrte.bml`, `imgpreview.bml`, `tools/fck_poll.bml`,
-  `stc/fck/editor/dialog/imguploadrte.bml`) were not individually
-  re-audited here.
+- **Resolved by the correction above, not an open gate**: this document
+  originally held open whether some other `.bml` page's inline Perl might
+  call `BML::ml()`/`%BML::ML` before its own dispatch runs. `git ls-tree` at
+  both this audit's base (`4a3a24100`) and post-F2 root (`8d03595e9`)
+  confirms no such page exists — the only `.bml` files in the tree are the
+  three never-rendered `_config*.bml` files. Nothing is gated on this any
+  longer.
 - **Held, user decision required, no change proposed** (unchanged from
   `BML-ENGINE-RETIREMENT.md`): `LJ::Protocol.pm:562`. This audit adds the
   exact mechanism (`LJ::Message::can_send`'s native `LJ::Lang::ml` calls,
@@ -399,12 +419,15 @@ shim family specifically, no new gates invented:
   relies on the `BML::*`-side effects (the `$apache_r->notes->{langpref}`
   write, or the global `*BML::ml` redefinition) rather than only on
   `LJ::Lang::ml`'s language.
-- **Sequencing, not a new gate**: this document's finding in §8 — that
-  `RequestWrapper.pm:56`'s removal is more naturally sequenced with "last
-  `.bml` page deleted" than with F2 alone — is a refinement of
-  `BML-ENGINE-RETIREMENT.md`'s proposed ordered-removal step 2, not a
-  disagreement with its risk assessment (which already named "language
-  selection touches every page" as the reason to re-run the full suite).
+- **Confirms, does not refine, `BML-ENGINE-RETIREMENT.md`'s step 2**: that
+  document's proposed step 2 (`BML-ENGINE-RETIREMENT.md:124-127`) already
+  said to re-grep and drop `RequestWrapper.pm:56` right after F2. This
+  document's correction removes the one reservation an earlier draft of §8
+  had added against that step (the now-resolved "other page" gate above);
+  the only genuinely remaining consideration before making that change is
+  the held `LJ::Protocol.pm:562` item just above, not a page-inventory
+  question. `BML-ENGINE-RETIREMENT.md`'s own risk note (re-run the full
+  suite; "language selection touches every page") still applies.
 - **Out of this document's scope, unchanged**: the journal-adapter
   conversion (W7-B, `DW::BML::RequestAdapter` → plain `DW::Request` for
   `LJ::make_journal`) and its own held items
