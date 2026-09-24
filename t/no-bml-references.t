@@ -5,7 +5,7 @@
 # Calls into the deleted BML:: package compile but die at runtime.
 #
 # Authors:
-#      Claude <claude@qq.is>
+#     Mark Smith <mark@dreamwidth.org>
 #
 # Copyright (c) 2026 by Dreamwidth Studios, LLC.
 #
