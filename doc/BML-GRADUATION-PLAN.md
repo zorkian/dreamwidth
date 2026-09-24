@@ -181,3 +181,46 @@ Items as they stood before the user's confirmation:
 5. **Obsolete worker branches** (hook composition, altlogin characterization,
    draft.bml WIP): preserved and unintegrated per direction; delete later or
    keep as history.
+
+## Closing record (2026-09-24)
+
+Completed on root `bml-astra-foreman-20260922` (local only, nothing pushed):
+E1 (sendmessage native language), E1b, E2 (last non-engine BML callers), T8
+(standalone request adapter), W13 (pre-characterization), W14 (orphaned keys),
+W15 (LJ::Lang .bml branches), E3 (engine deletion, with the root static-file
+allowlist and journal robots.txt fixes), W16 (manage strings, dead setting
+modules), T9 (test hygiene). Remaining: T10 docs/comment sweep (in flight),
+this record (E4). Every package was independently reviewed against an explicit
+test allowlist with inert stubs on moderation paths; root was rechecked by
+patch-id after each integration.
+
+Deploy-gate checklist (must be checked at deploy time; none can be closed
+locally):
+
+1. Production `%LJ::BETA_FEATURES`: expire or remove `updatepage` and `inbox`
+   (their strings are retired in deadphrases; `/betafeatures` would show
+   missing strings otherwise).
+2. `ext/local`: confirm no implementation of `update_fields`,
+   `transform_update_*`, `after_entry_post_extra_options`,
+   `after_entry_post_extra_html`, `entry_deleted_page_extras`,
+   `entryforminfo` (the native entry page never calls them) and no
+   `LJ::Local::BMLInit` (no longer loaded).
+3. `%LJ::AJAX_URI_MAP` must be empty in production config (the fallback is
+   gone; any mapping would now reach the router).
+4. Production `_config-local.bml` is no longer read; any BML-only setting it
+   carried (DefaultLanguage en_DW, DefaultScheme) has native equivalents.
+5. Any production URL that still resolved to a `.bml` file is now a plain 404
+   except the redirected `/update`, `/editjournal`, `/inbox/*` aliases.
+6. Root static files (`/robots.txt`, `/favicon.ico`, `/apple-touch-icon.png`,
+   `/protocol.dat`, `/500-error.html`, `/rte/*`) are now served by an explicit
+   Plack static allowlist; if a CDN or separate static origin fronts Starman,
+   confirm where these are served. Journal-host `/robots.txt` stays with
+   `DW::Controller::Journal`.
+7. `help_icon` now renders wherever `%LJ::HELPURL` is configured.
+8. Translation: renamed keys load from file on first request; run
+   `texttool.pl deadphrases` after deploy to retire the old `/…bml.*` keys.
+
+Preserved, unintegrated worker branches (history only): hook composition
+5d282324c, altlogin characterization a0cfe4f23, draft.bml WIP 68789a565, and
+every other `bml-terra-*`/`bml-sonnet-*` branch listed in the worker
+checkpoints.
