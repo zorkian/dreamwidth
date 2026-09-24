@@ -1,0 +1,12 @@
+{
+  "name": "dreamwidth-s2-javascript-slice1",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "check": "tsc --noEmit && tsc && node dist/tools/selftest.js && node dist/tools/run.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "typescript": "5.8.3"
+  }
+}
