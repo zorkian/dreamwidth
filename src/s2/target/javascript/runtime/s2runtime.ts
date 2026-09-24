@@ -88,7 +88,7 @@ export const runtime = {
     },
 
     stringLength(value: string): number {
-        return Array.from(value).length;
+        return Buffer.byteLength(value, "utf8");
     },
 
     stringSubstr(value: string, start: number, length: number): string {

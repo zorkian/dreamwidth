@@ -31,7 +31,8 @@ The command uses the local `package-lock.json`, checks TypeScript in strict mode
 builds disposable JavaScript, exercises failure paths, compiles the exact nine
 mandatory cases, and compares positive output byte for byte. Each positive
 artifact is compiled twice and must match byte for byte. The negative syntax
-case must fail with a source and line diagnostic and is never executed. Missing
+case must fail with the existing `tests/fail-syntax.s2.err` diagnostic and is
+never executed. Missing
 fixtures, skipped or duplicate cases, empty output, and mismatches fail the run.
 Generated artifacts live in a temporary directory and are removed afterward.
 
@@ -67,10 +68,24 @@ The fixed cases cover printing and interpolation, arithmetic with truncating
 integer division, conditions and S2 truth values for integers, strings, arrays,
 hashes, objects, and typed null objects, ranges and array iteration, array/hash
 literals and property values, class methods and `$super`, linked function and
-property overrides, and Unicode codepoint length and substring. The Unicode
-fixture uses a supplementary character and the Perl oracle's string builtins.
+property overrides, and UTF-8 byte length with character-based substring. The
+Unicode fixture lives in `tests/js-slice1/unicode.s2` and uses a supplementary
+character. Its expected `length`, substring, and `size` output is `6`, `😀`,
+and `6`, each followed by a newline.
 Exact UTF-8 bytes are compared, including whitespace. Output is never sorted or
 normalized.
+
+The Perl oracle reads source as raw bytes, matching the input to the retained
+production compiler. Its minimal `string__length` callback counts bytes, and
+its `string__substr` callback decodes UTF-8, slices characters, then encodes
+UTF-8, matching `cgi-bin/LJ/S2.pm` around `string__substr`. Oracle output is
+already UTF-8 bytes and is written raw. JavaScript compilation decodes the same
+fixture file so generated JS and artifact JSON contain valid Unicode text;
+`s2.runtime.stringLength` counts its UTF-8 bytes and `stringSubstr` slices
+codepoints. The standalone `src/s2/runtests.pl` fixture builtin instead slices
+raw bytes, so its substring result for a supplementary character differs.
+Those slice fixtures are in a subdirectory to preserve that legacy runner's
+unchanged direct-file regression suite.
 
 This is a compatibility foundation for this subset. Hash iteration, broad
 integer limits, all collection operations, complete string builtins, production
