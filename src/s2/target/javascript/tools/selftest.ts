@@ -13,12 +13,12 @@
 //
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Context, Layer } from "../runtime/s2runtime";
 import { boundedRun } from "./bounded";
-import { assertExactOutput, manifest, validateManifest } from "./run";
+import { assertExactOutput, assertExpectedSyntaxFailure, manifest, validateManifest } from "./run";
 
 function main(): void {
     assert.throws(() => validateManifest(manifest.slice(1)), /Nine mandatory/);
@@ -30,6 +30,21 @@ function main(): void {
     assert.throws(() => validateManifest(substituted), /mandatory layer changed/);
     assert.throws(() => assertExactOutput("whitespace", Buffer.from("x\n"), Buffer.from("x")), /mismatch/);
     assert.throws(() => assertExactOutput("missing", Buffer.from("x"), Buffer.alloc(0)), /missing positive output/);
+    const syntaxSource = "tests/fail-syntax.s2";
+    const syntaxExpected = readFileSync(
+        path.resolve(__dirname, "../../../../tests/fail-syntax.s2.err"), "utf8",
+    );
+    const rejectSyntax = (message: string) => assertExpectedSyntaxFailure(
+        "fail-syntax.s2", 255, Buffer.alloc(0), Buffer.from(message), syntaxSource, syntaxExpected,
+    );
+    assert.doesNotThrow(() => rejectSyntax(`${syntaxSource}: ${syntaxExpected}`));
+    assert.throws(() => rejectSyntax(`Cannot read ${syntaxSource}`), /expected retained syntax diagnostic/);
+    assert.throws(() => rejectSyntax(`${syntaxSource}: checker rejected nosuch()`), /expected retained syntax diagnostic/);
+    assert.throws(
+        () => assertExpectedSyntaxFailure("fail-syntax.s2", 255, Buffer.alloc(0),
+            Buffer.from(`${syntaxSource}: ${syntaxExpected}`), syntaxSource, "  "),
+        /expected retained syntax diagnostic/,
+    );
     const sourceLayer = new Layer();
     sourceLayer.source = "tests/diagnostic.s2";
     const context = new Context([sourceLayer], () => {});
