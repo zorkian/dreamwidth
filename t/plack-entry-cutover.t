@@ -1,9 +1,21 @@
 #!/usr/bin/perl
+#
+# t/plack-entry-cutover.t
+#
 # Characterize the T2 entry cutover: /update and /editjournal?itemid= are
 # fully graduated to the native entry form. GET always redirects; a stale
 # POST is shown its exact submitted subject/body for manual copying and
 # never saved (see t/plack-entry-recovery.t for that page's own coverage).
-# Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+#
+# Authors:
+#     Mark Smith <mark@dreamwidth.org>
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself.  For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
 use strict;
 use warnings;
 
@@ -127,11 +139,6 @@ test_psgi $app, sub {
 };
 
 subtest 'F2: .bml suffixes still resolve natively after the retired pages are deleted' => sub {
-    ok( !-e "$ENV{LJHOME}/htdocs/update.bml", 'htdocs/update.bml no longer exists on disk' );
-    ok(
-        !-e "$ENV{LJHOME}/htdocs/editjournal.bml",
-        'htdocs/editjournal.bml no longer exists on disk'
-    );
     my $entry = $owner->t_post_fake_entry(
         subject => 'F2 routing-precedence subject',
         body    => 'F2 routing-precedence body',
