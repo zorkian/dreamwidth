@@ -13,7 +13,7 @@
 //
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { boundedRun } from "./bounded";
@@ -42,8 +42,8 @@ const expectedLayers: Record<string, readonly string[]> = {
     "arrayliterals.s2": ["core:arrayliterals.s2"],
     "super.s2": ["core:super.s2"],
     "fail-syntax.s2": ["core:fail-syntax.s2"],
-    "two-layer": ["core:js-slice1-parent.s2", "layout:js-slice1-child.s2"],
-    "unicode": ["core:js-slice1-unicode.s2"],
+    "two-layer": ["core:js-slice1/parent.s2", "layout:js-slice1/child.s2"],
+    "unicode": ["core:js-slice1/unicode.s2"],
 };
 
 export const manifest: readonly Case[] = [
@@ -57,11 +57,11 @@ export const manifest: readonly Case[] = [
     {
         id: "two-layer",
         layers: [
-            { type: "core", file: "js-slice1-parent.s2" },
-            { type: "layout", file: "js-slice1-child.s2" },
+            { type: "core", file: "js-slice1/parent.s2" },
+            { type: "layout", file: "js-slice1/child.s2" },
         ],
     },
-    { id: "unicode", layers: [{ type: "core", file: "js-slice1-unicode.s2" }] },
+    { id: "unicode", layers: [{ type: "core", file: "js-slice1/unicode.s2" }] },
 ];
 
 export function validateManifest(cases: readonly Case[]): void {
@@ -92,6 +92,22 @@ export function assertExactOutput(id: string, oracle: Buffer, executed: Buffer):
     }
 }
 
+export function assertExpectedSyntaxFailure(
+    id: string,
+    status: number,
+    stdout: Buffer,
+    stderr: Buffer,
+    source: string,
+    expectedDiagnostic: string,
+): void {
+    const expected = expectedDiagnostic.trim();
+    const diagnostic = stderr.toString("utf8");
+    if (status === 0 || stdout.length !== 0 || expected.length === 0 ||
+        !diagnostic.includes(source) || !diagnostic.includes(expected)) {
+        throw new Error(`${id}: expected retained syntax diagnostic, got ${diagnostic}`);
+    }
+}
+
 function main(): void {
     validateManifest(manifest);
     const s2Directory = path.resolve(__dirname, "../../../..");
@@ -108,12 +124,11 @@ function main(): void {
             });
             const compiled = boundedRun("/usr/bin/perl", [bridge, "compile", ...args], s2Directory);
             if (item.negative) {
-                const diagnostic = compiled.stderr.toString("utf8");
-                if (compiled.status === 0 || compiled.stdout.length !== 0 ||
-                    !/line|syntax|parse|error/i.test(diagnostic) ||
-                    !diagnostic.includes(item.layers[0]!.file)) {
-                    throw new Error(`${item.id}: expected useful nonzero compile diagnostic, got ${diagnostic}`);
-                }
+                const source = `tests/${item.layers[0]!.file}`;
+                const expectedDiagnostic = readFileSync(path.join(s2Directory, `${source}.err`), "utf8");
+                assertExpectedSyntaxFailure(
+                    item.id, compiled.status, compiled.stdout, compiled.stderr, source, expectedDiagnostic,
+                );
                 completed.push(item.id);
                 continue;
             }
