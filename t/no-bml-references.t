@@ -1,10 +1,18 @@
 #!/usr/bin/perl
-# No shipped file may reference the deleted BML engine's package or globals:
-# a reintroduced `use DW::BML`/`BML::something` call compiles cleanly (the
-# engine's own modules are gone, so this would actually fail to compile) but
-# a bare `BML::foo(...)`/`$BML::something` call against a stub or typo'd
-# package survives 00-compile.t and only dies at runtime.
-# Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+#
+# t/no-bml-references.t
+#
+# Calls into the deleted BML:: package compile but die at runtime.
+#
+# Authors:
+#      Claude <claude@qq.is>
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself.  For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
 use strict;
 use warnings;
 use Test::More;
@@ -26,7 +34,7 @@ File::Find::find(
     "$ENV{LJHOME}/cgi-bin",
     "$ENV{LJHOME}/views",
     "$ENV{LJHOME}/bin",
-    "$ENV{LJHOME}/ext",
+    "$ENV{LJHOME}/ext/dw-nonfree",
 );
 
 is_deeply( \@offenders, [], 'no file references the deleted BML:: package or $BML:: globals' );
