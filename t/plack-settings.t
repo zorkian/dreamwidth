@@ -243,6 +243,24 @@ test_psgi $app, sub {
     is( $inspect->code, 200, 'privileged notification inspection renders' );
     unlike( $inspect->content, qr/id=['"]settings_form/,
         'privileged inspection exposes no mutation form' );
+
+    # A valid CSRF token isn't tied to the page that issued it, only the
+    # session, so a token from an unrelated page still isolates this
+    # privilege-escalation guard from the generic CSRF guard proven above.
+    my $protected = LJ::load_userid( $owner->id, 1 )
+        ->subscribe( event => 'JournalNewEntry', journalid => 0, method => 'Inbox' );
+    $protected->_deactivate;
+    my $viewer_display = $send->( GET '/manage/settings/?cat=display', Cookie => $viewer_cookie );
+    my ($viewer_form) = settings_form( $viewer_display->content, '/manage/settings/?cat=display' );
+    $send->(
+        POST '/manage/settings/?cat=notifications&user=' . $owner->user,
+        Cookie  => $viewer_cookie,
+        Content => [ lj_form_auth => $viewer_form->value('lj_form_auth'), deleteinactive => 1 ]
+    );
+    ok(
+        grep( { $_->id == $protected->id } LJ::load_userid( $owner->id, 1 )->subscriptions ),
+        'a forged deleteinactive POST from a privileged inspector cannot mutate the owner'
+    );
 };
 
 test_psgi $app, sub {
