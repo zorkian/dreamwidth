@@ -18,7 +18,7 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../../..";
-use Encode qw(encode FB_CROAK);
+use Encode ();
 use JSON::PP;
 use S2;
 use S2::Checker;
@@ -39,7 +39,10 @@ for my $index ( 0 .. $#ARGV ) {
     my ( $type, $path ) = split /:/, $ARGV[$index], 2;
     die "Expected core or layout layer and source path\n"
         unless defined $path && ( $type eq 'core' || $type eq 'layout' );
-    open my $source_file, '<:encoding(UTF-8)', $path or die "Cannot read $path: $!\n";
+    # Production Perl compiles the original source bytes. Decode only for JS
+    # output so JSON contains valid Unicode text for Node to evaluate.
+    my $source_mode = $mode eq 'compile' ? '<:encoding(UTF-8)' : '<:raw';
+    open my $source_file, $source_mode, $path or die "Cannot read $path: $!\n";
     local $/;
     my $source = <$source_file>;
     close $source_file;
@@ -80,12 +83,13 @@ else {
     my $layer_ids = [ 1 .. scalar @ARGV ];
     my $context   = S2::make_context($layer_ids);
     S2::run_code( $context, 'main()' );
-    print encode( 'UTF-8', $output, FB_CROAK );
+    # Oracle output is already UTF-8 bytes, including string__substr below.
+    print $output;
 }
 
 package S2::Builtin;
 
-# Match the small fixture builtin implementations in src/s2/runtests.pl.
+# Color matches the small fixture implementation in src/s2/runtests.pl.
 sub Color__Color {
     my ($value) = @_;
     $value =~ s/^\#//;
@@ -100,10 +104,14 @@ sub Color__Color {
 
 sub string__length {
     my ( $context, $value ) = @_;
+    # cgi-bin/LJ/S2.pm string__length counts source UTF-8 bytes.
     return length($value);
 }
 
 sub string__substr {
     my ( $context, $value, $start, $length ) = @_;
-    return substr( $value, $start, $length );
+    # cgi-bin/LJ/S2.pm string__substr decodes, slices characters, then
+    # encodes the result back to UTF-8 bytes.
+    my $unicode = Encode::decode_utf8($value);
+    return Encode::encode_utf8( substr( $unicode, $start, $length ) );
 }
