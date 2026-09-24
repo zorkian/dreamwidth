@@ -2,20 +2,18 @@
 #
 # t/plack-page-smoke.t
 #
-# A table of real pages that historically leaked a broken BML macro
-# (a literal "<?...?>" tag) or an unresolved translation key into their
-# rendered output once the BML engine was removed: help_icon (a widget,
-# a controller, and the shared subscribe_interface path) and the manage
-# hub's relocated ml keys. LJ::error_list/warning_list render as part of
-# every page's sitewide error bar, so any row here also covers their
-# "<?errorbar?>"/"<?warningbar?>" regression class incidentally. A broken
-# tag or missing-string banner on any row is the regression this file
-# guards against, not a re-derivation of each fix's original assertions.
+# Real pages render with no literal "<?...?>" macro and no unresolved
+# translation key. Covers help_icon (a widget, a controller, and the
+# shared subscribe_interface path), the manage hub's relocated ml keys,
+# and LJ::error_list/warning_list's sitewide error bar (rendered on
+# every page here, so its own "<?errorbar?>"/"<?warningbar?>" class is
+# covered incidentally).
 #
-# Excluded from the missing-string check: tropo.footer.opensource (a
-# pre-existing unresolved key in the site footer shared by every page)
-# and profile.service.icq (a pre-existing unresolved IM-service label on
-# the profile page) -- both predate and are unrelated to this migration.
+# Excluded from the missing-string check: profile.service.icq. It has
+# real DB text (en/en_DW both define it as "ICQ"), but no source .dat
+# file defines the key, so the file-backed on-demand lookup this test
+# harness uses reports it missing; pre-existing and unrelated to this
+# migration.
 #
 # Authors:
 #     Mark Smith <mark@dreamwidth.org>
@@ -33,7 +31,7 @@ use Test::More;
 use HTTP::Request::Common;
 use Plack::Test;
 
-BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
+BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 
 use LJ::Session;
 use LJ::Subscription::Pending;
@@ -87,9 +85,7 @@ test_psgi $app, sub {
         my $res = $send->($req);
         is( $res->code, 200, "$page->{name} ($page->{path}) renders" );
         unlike( $res->content, qr/<\?\w/, "$page->{name} has no broken BML macro tag" );
-        ( my $content_scrubbed = $res->content ) =~
-            s/\Q[missing string tropo.footer.opensource]\E//g;
-        $content_scrubbed =~ s/\Q[missing string profile.service.icq]\E//g;
+        ( my $content_scrubbed = $res->content ) =~ s/\Q[missing string profile.service.icq]\E//g;
         unlike(
             $content_scrubbed,
             qr/\[missing string/,
