@@ -217,7 +217,7 @@ INCLUDE linklist header=dw.ml( '.entries.header' )
 [%- circleitems = [
   {
     href = dw.create_url( '/manage/circle/editfilters', keep_args => [ 'authas' ] )
-    title = dw.ml( '.friends.groups.about' )
+    title = dw.ml( '.circle.groups.about' )
     text = dw.ml( '/manage/circle/editfilters.tt.title2' )
   } ];
 
@@ -254,7 +254,7 @@ INCLUDE linklist header=dw.ml( '.circle.header' )
   },
   {
     href = dw.create_url( '/manage/invites' )
-    title = dw.ml( '.communities.invites.about ' )
+    title = dw.ml( '.communities.invites.about' )
     text = dw.ml( '/manage/invites.tt.title' )
   } ];
 
