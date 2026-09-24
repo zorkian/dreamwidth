@@ -40,7 +40,7 @@ sub args {
 }
 
 sub path_info {
-    return '';    # BML pages don't use path_info in Plack context
+    return '';    # none of the held external hook callers ever populate this
 }
 
 sub hostname {

@@ -115,7 +115,8 @@ sub template_string {
     $opts->{sections}->{errors} = $opts->{errors};
 
     # Keep the request note and native language context in lockstep while a
-    # template is active.  A BML page can render a TT fragment before resuming.
+    # template is active. A template can nest another template_string call
+    # (e.g. dw.scoped_include) before resuming, so save/restore around it.
     my $oldscope           = $r->note('ml_scope');
     my $language_context   = LJ::Lang::request_context();
     my $old_language_scope = $language_context ? $language_context->{scope} : undef;

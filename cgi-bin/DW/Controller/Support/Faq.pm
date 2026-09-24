@@ -194,9 +194,7 @@ sub faqbrowse_handler {
     # get language settings
     my $curlang = $GET->{'lang'} || LJ::Lang::get_effective_lang();
 
-    # This is a Plack controller, so there is no BML request environment from
-    # which to obtain a default language.  The application default is the
-    # equivalent value for a native request.
+    # $LJ::DEFAULT_LANG is the application default language for a native request.
     my $deflang = $LJ::DEFAULT_LANG;
     my $altlang = $curlang ne $deflang;
     my $mll     = LJ::Lang::get_lang($curlang);

@@ -64,3 +64,11 @@ source failure is explained by the corrected mixed-case bug. One earlier worker
 compile segfault remains unexplained; repeated worker and independent Sol and
 foreman compile runs passed. Remaining direct BML consumers still need separate
 migration and acceptance before the engine can be removed.
+
+## Update, 2026-09-24: the engine is removed
+
+The BML rendering engine and the bridge described above are gone (package E3;
+see `doc/BML-ENGINE-RETIREMENT.md`). `t/lang-request-characterization.t` was
+replaced by `t/native-lang-request-context.t`, and `t/plack-bml.t` now asserts
+router-only behavior instead of exercising the engine directly. The rest of
+this document remains an accurate historical record of the transition.

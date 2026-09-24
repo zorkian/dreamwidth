@@ -279,7 +279,7 @@ sub help_icon_html {
 # <LJFUNC>
 # name: LJ::error_list
 # des: Returns an error bar with bulleted list of errors.
-# returns: BML showing errors.
+# returns: HTML showing errors.
 # args: error*
 # des-error: A list of errors
 # </LJFUNC>
@@ -322,7 +322,7 @@ sub error_noremote {
 # <LJFUNC>
 # name: LJ::warning_list
 # des: Returns a warning bar with bulleted list of warnings.
-# returns: BML showing warnings
+# returns: HTML showing warnings
 # args: warnings*
 # des-warnings: A list of warnings
 # </LJFUNC>
@@ -431,7 +431,7 @@ sub page_change_getargs {
 }
 
 =head2 C<< LJ::paging( $listref, $page, $pagesize ) >>
-Drop-in replacement for BML::paging in non-BML context.
+Paginate a list, returning the current page's items plus page-navigation data.
 =cut
 
 sub paging {
@@ -442,8 +442,6 @@ sub paging {
     my %self;
 
     my $newurl = sub {
-
-        # replaces BML::page_newurl
         return LJ::page_change_getargs( page => $_[0] );
     };
 

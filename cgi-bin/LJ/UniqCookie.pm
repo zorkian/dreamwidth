@@ -390,7 +390,7 @@ sub generate_uniq_ident {
 }
 
 ###############################################################################
-# These methods require web context, they deal with BML::get_request() and cookies
+# These methods require web context, they deal with the active request and cookies
 #
 
 sub ensure_cookie_value {

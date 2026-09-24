@@ -7,7 +7,9 @@
 > There is nothing left to migrate. This document is kept as reference for
 > the conversion process and patterns used (§10's worked examples in
 > particular); the how-to steps below describe what those conversions did,
-> not an active workflow.
+> not an active workflow. See `doc/BML-GRADUATION-PLAN.md` for the decision
+> to graduate native/beta replacements and retire the legacy surfaces that
+> made this completion possible.
 
 
 BML ("Block Markup Language") is the 20+-year-old LiveJournal page format that

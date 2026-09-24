@@ -661,8 +661,7 @@ sub make_journal {
         DW::SiteScheme->set_for_request('lynx')
             if $stylearg eq 'light';
 
-        # Render a system-owned S2 style that renders
-        # this content, then passes it to get treated as BML
+        # Render this content through the system-owned "siteviews" S2 style.
         $stylesys = 2;
         $styleid  = "siteviews";
     }

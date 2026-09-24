@@ -82,9 +82,9 @@ sub make_journal {
         return;
     }
 
-    # S2 labels use LJ::Lang::ml directly.  Keep the historical default language
-    # and explicit getter without installing BML's process-global callbacks.  The
-    # native context merges this with any caller-established translation scope.
+    # S2 labels use LJ::Lang::ml directly.  Set the default language and an
+    # explicit getter on the native request context; it merges this with any
+    # caller-established translation scope.
     LJ::Lang::set_request_context(
         lang   => $LJ::DEFAULT_LANG,
         getter => \&LJ::Lang::get_text,
