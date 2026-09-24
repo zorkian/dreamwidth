@@ -2495,3 +2495,11 @@ T2/W2 cutovers in progress. Root inbox5files198 PASS.
   (Opus CLEAR). E3 engine deletion verified except its static-file fix, which is
   being corrected for journal-host robots.txt; W15 and T9 pending review.
   Checkpoint with exact SHAs at the top of BML-HANDOFF.md.
+
+## BML engine removed (2026-09-24)
+
+E3 (engine deletion with the static-file and journal robots.txt fixes), W16
+and T9 integrated through71d2c5039 after independent review. No .bml page,
+text file or engine module remains; DW::BML::RequestAdapter stays for the held
+hook ABIs. Root validation: allowlist41files550 PASS, tidy/compile/build PASS,
+live probes and browser fixtures PASS.

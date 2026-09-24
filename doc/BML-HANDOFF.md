@@ -18,6 +18,25 @@ below this line predate the resume.
 
 ## Graduation progress (2026-09-23)
 
+### CHECKPOINT 2026-09-24 01:30 UTC: BML engine removed from root
+
+Root `bml-astra-foreman-20260922` HEAD `71d2c5039`, clean. Integrated since
+the previous checkpoint, all independently CLEAR: W15 (ec178e6d1), E3 engine
+deletion (f96f0e4fa..dff646611, with static-file fixes 6c27e7215 and
+ced79268d), W16 (11abd8ad3, 8ddedf3a0), T9 (0771f89eb, c9cf38dce,
+e09190398), plus foreman 71d2c5039. No tracked .bml or .bml.text file
+remains; Apache::BML, DW::BML, lj-bml-blocks.pl, BMLInit, the scheme looks
+and the app.psgi fallback are gone; the only BML-named code is
+cgi-bin/DW/BML/RequestAdapter.pm, kept as the held hook/callback ABI
+(s2_head_content_extra, data_handler:*, DISABLE_PROTOCOL third argument).
+Root validation on the E3 tree: 41-file allowlist 550 PASS, tidy/compile/
+build PASS, live probes (root static files served with correct types, journal
+robots.txt routed to DW::Controller::Journal, /_config.bml and /inc 404,
+/update.bml 302) and browser entry-preview.js / entry-draft-parity.js PASS;
+after W16/T9: 14 files 129 PASS. Reviewer root integrity recheck of
+6e5237cb6..71d2c5039 requested. In flight: T10 (themenav, docs/comments sweep
+for stale BML-as-present text). E4 closing record follows.
+
 ### CHECKPOINT 2026-09-23 late evening (session limits near)
 
 Root `bml-astra-foreman-20260922` HEAD `3c679e9ea`, clean. Foreman container
