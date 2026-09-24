@@ -1,0 +1,21 @@
+# js-slice1-child.s2
+#
+# Child layer for the bounded S2 JavaScript linking fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = layout;
+
+set label = "child";
+
+function message() : string {
+    return "child";
+}

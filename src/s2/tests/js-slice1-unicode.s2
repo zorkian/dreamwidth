@@ -1,0 +1,27 @@
+# js-slice1-unicode.s2
+#
+# Supplementary Unicode string fixture for the bounded S2 JavaScript slice.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = core;
+
+class string {
+    function builtin length() : int;
+    function builtin substr(int start, int length) : string;
+}
+
+function main() {
+    var string s = "A😀B";
+    println $s->length();
+    println $s->substr(1, 1);
+    println size $s;
+}
