@@ -1,0 +1,101 @@
+#!/bin/bash
+#
+# bin/dev/tunnel -- expose the local dev server to the public internet over a
+# Cloudflare "quick tunnel", so you can share a working URL or test from a
+# phone. Runs INSIDE the devcontainer (as root).
+#
+# Usage:
+#   bin/dev/tunnel [options]
+#
+# Options:
+#   --port P     local port to expose (default: 8080, the Starman port)
+#   --restart    restart Starman first -- needed after adding/changing a route
+#   -h, --help   this help
+#
+# It prints a https://<random>.trycloudflare.com URL and stays in the
+# foreground forwarding traffic; press Ctrl-C to take the tunnel down. The URL
+# is fresh each run and needs no Cloudflare account or login.
+#
+# This works with no extra config because the dev container builds every URL
+# from the request Host header ($LJ::SITEROOT is empty), so the whole site --
+# including path-based journals like /~user/ -- is served correctly through
+# whatever hostname the tunnel hands out, and all assets are root-relative so
+# there's no mixed content over HTTPS.
+#
+# On first run it installs cloudflared from Cloudflare's signed apt repo; later
+# runs reuse it.
+
+set -eu
+
+PORT=8080
+RESTART=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --port)    PORT="$2"; shift 2 ;;
+        --restart) RESTART=1; shift ;;
+        -h|--help) sed -n '3,26p' "$0"; exit 0 ;;
+        -*)        echo "unknown option: $1" >&2; exit 1 ;;
+        *)         echo "unexpected argument: $1" >&2; exit 1 ;;
+    esac
+done
+
+BASE="http://127.0.0.1:$PORT"
+
+# 1. cloudflared -- signed apt repo, per the packaging policy. First run only.
+if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "[tunnel] installing cloudflared (first run)..." >&2
+    mkdir -p /usr/share/keyrings
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+        -o /usr/share/keyrings/cloudflare-main.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+        >/etc/apt/sources.list.d/cloudflared.list
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cloudflared >/dev/null
+fi
+
+# 2. Starman on the target port (restart on request, else just make sure it's up)
+if [ "$RESTART" = 1 ]; then
+    fuser -k "$PORT/tcp" 2>/dev/null || true
+    sleep 1
+fi
+if ! curl -sf -o /dev/null "$BASE/"; then
+    echo "[tunnel] starting starman on $PORT..." >&2
+    ( cd "$LJHOME" && nohup perl bin/starman --port "$PORT" >/tmp/dw-starman.log 2>&1 & )
+    for _ in $(seq 1 30); do curl -sf -o /dev/null "$BASE/" && break; sleep 1; done
+fi
+if ! curl -sf -o /dev/null "$BASE/"; then
+    echo "[tunnel] error: nothing is responding on $BASE" >&2
+    exit 1
+fi
+
+# 3. Open the quick tunnel. cloudflared prints its own banner with the URL; we
+#    also pull the URL out of its log and re-announce it clearly, then stay in
+#    the foreground forwarding until the user interrupts.
+echo "[tunnel] connecting to Cloudflare (Ctrl-C to stop)..." >&2
+LOG=$(mktemp)
+cloudflared tunnel --no-autoupdate --url "$BASE" >"$LOG" 2>&1 &
+CFPID=$!
+trap 'kill "$CFPID" 2>/dev/null; rm -f "$LOG"' INT TERM EXIT
+
+for _ in $(seq 1 30); do
+    URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$LOG" | head -1 || true)
+    [ -n "$URL" ] && break
+    kill -0 "$CFPID" 2>/dev/null || break
+    sleep 1
+done
+
+if [ -n "${URL:-}" ]; then
+    echo
+    echo "  ===================================================================="
+    echo "   Dev server is now public at:"
+    echo "     $URL"
+    echo "   (forwards to $BASE -- Ctrl-C here to take it down)"
+    echo "  ===================================================================="
+    echo
+else
+    echo "[tunnel] could not detect a tunnel URL; raw cloudflared output:" >&2
+fi
+
+tail -f "$LOG" &
+wait "$CFPID"
