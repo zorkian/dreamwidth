@@ -47,7 +47,13 @@ Pending review / integration, exact SHAs:
   bypasses DW::Controller::Journal's per-journal robots (opt_blockrobots
   journals lose 'Disallow: /'); themenav is fixing with a rule that declines
   when dw.journal_user is set, plus tests; favicon stays static.
-- W15 LJ::Lang .bml branches 32cf431b4 (parent e9d79a38f) under review.
+- W15 LJ::Lang .bml branches 32cf431b4 bml-opus-review CLEAR (deadphrases
+  replica matches texttool, revert-equivalence proven); integrated on root as
+  ec178e6d1; root nine language suites 86 PASS incl. t/lang-names-native.t,
+  tidy and compile PASS after W14 (/tmp/bml-w14-integrated-*.log).
+- E3 robots.txt regression fixed by themenav in 15ab9c051 (coderef path
+  declines /robots.txt when dw.journal_user is set; exact-content tests for
+  blocked/ordinary/www); final E3 verdict pending with the reviewer.
 - T9 post-E3 test hygiene on `bml-sonnet-post-e3-test-hygiene-20260923` at
   e8d1c180b (three commits, built on E3 tip 319a03ca4), not yet reviewed.
 - Reviewer follow-ups noted, not assigned: /manage/ has two pre-existing
