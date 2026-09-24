@@ -40,7 +40,7 @@ sub args {
 }
 
 sub path_info {
-    return '';    # none of the held external hook callers ever populate this
+    return '';    # DW::Request has no separate path_info; always empty
 }
 
 sub hostname {
