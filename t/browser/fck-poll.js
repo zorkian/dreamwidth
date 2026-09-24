@@ -156,12 +156,8 @@ const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
             'only the expected saved-draft restoration confirmation was dismissed');
         await page.close();
 
-        // Regression coverage: an account without poll capability gets the
-        // "You may only create and post polls..." notice instead of the
-        // wizard, with no page error -- LJNoPoll.Execute (fckplugin.js) used
-        // to center that notice on the OLD editor's hardcoded frame id,
-        // which no longer exists in the native editor and threw instead of
-        // showing the notice.
+        // An account without poll capability gets the notice instead of the
+        // wizard, with no page error.
         phase = 'no-poll-capability notice';
         const noPollContext = await browser.createBrowserContext();
         const noPollPage = await noPollContext.newPage();
