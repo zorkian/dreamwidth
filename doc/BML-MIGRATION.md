@@ -1,5 +1,17 @@
 # Migrating BML pages to Template Toolkit
 
+> **Status: complete (2026-09-23).** Every `.bml` page has been converted or
+> deleted, and the BML rendering engine itself (`cgi-bin/DW/BML.pm`,
+> `cgi-bin/Apache/BML.pm`, and their supporting blocks/look files/configs) is
+> removed from the tree (package E3; see `doc/BML-ENGINE-RETIREMENT.md`).
+> There is nothing left to migrate. This document is kept as reference for
+> the conversion process and patterns used (§10's worked examples in
+> particular); the how-to steps below describe what those conversions did,
+> not an active workflow. See `doc/BML-GRADUATION-PLAN.md` for the decision
+> to graduate native/beta replacements and retire the legacy surfaces that
+> made this completion possible.
+
+
 BML ("Block Markup Language") is the 20+-year-old LiveJournal page format that
 mixes Perl, HTML, and translation calls in a single `.bml` file under `htdocs/`.
 It is deprecated. We are steadily converting BML pages to the modern Dreamwidth

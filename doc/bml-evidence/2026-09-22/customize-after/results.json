@@ -1,0 +1,124 @@
+[
+  {
+    "name": "themes",
+    "path": "/customize/?cat=all",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1167",
+      "LJWidget_1168",
+      "LJWidget_1169",
+      "LJWidget_1171",
+      "LJWidget_1170"
+    ]
+  },
+  {
+    "name": "community",
+    "path": "/customize/?authas=t_xcrxbt5pgxuxp",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1172",
+      "LJWidget_1173",
+      "LJWidget_1174",
+      "LJWidget_1176",
+      "LJWidget_1175"
+    ]
+  },
+  {
+    "name": "presentation",
+    "path": "/customize/options?group=presentation",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1177",
+      "LJWidget_1178",
+      "LJWidget_1179",
+      "LJWidget_1181",
+      "LJWidget_1180"
+    ]
+  },
+  {
+    "name": "colors",
+    "path": "/customize/options?group=colors",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1098",
+      "LJWidget_1099",
+      "LJWidget_1100",
+      "LJWidget_1102",
+      "LJWidget_1101"
+    ]
+  },
+  {
+    "name": "fonts",
+    "path": "/customize/options?group=fonts",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1127",
+      "LJWidget_1128",
+      "LJWidget_1129",
+      "LJWidget_1131",
+      "LJWidget_1130"
+    ]
+  },
+  {
+    "name": "images",
+    "path": "/customize/options?group=images",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1182",
+      "LJWidget_1183",
+      "LJWidget_1184",
+      "LJWidget_1186",
+      "LJWidget_1185"
+    ]
+  },
+  {
+    "name": "text",
+    "path": "/customize/options?group=text",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1103",
+      "LJWidget_1104",
+      "LJWidget_1105",
+      "LJWidget_1107",
+      "LJWidget_1108",
+      "LJWidget_1106"
+    ]
+  },
+  {
+    "name": "modules",
+    "path": "/customize/options?group=modules",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1132",
+      "LJWidget_1133",
+      "LJWidget_1134",
+      "LJWidget_1136",
+      "LJWidget_1135"
+    ]
+  },
+  {
+    "name": "customcss",
+    "path": "/customize/options?group=customcss",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1187",
+      "LJWidget_1188",
+      "LJWidget_1189",
+      "LJWidget_1191",
+      "LJWidget_1190"
+    ]
+  },
+  {
+    "name": "display",
+    "path": "/customize/options?group=display",
+    "errors": [],
+    "widgets": [
+      "LJWidget_1109",
+      "LJWidget_1110",
+      "LJWidget_1111",
+      "LJWidget_1113",
+      "LJWidget_1114",
+      "LJWidget_1112"
+    ]
+  }
+]

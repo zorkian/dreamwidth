@@ -70,7 +70,7 @@ pkill starman; bash .devcontainer/start.sh
   theming compiler.
 - Requests flow through `cgi-bin/Plack/Middleware/DW/`, `DW::Routing`,
   `DW::Controller::*`, and `DW::Template`. Template Toolkit views live in
-  `views/`; legacy BML pages live in `htdocs/`. See `doc/PLACK.md`.
+  `views/`; `htdocs/` holds static assets. See `doc/PLACK.md`.
 - In devcontainers, `LJ::Global::Defaults` intentionally sets `$LJ::DOMAIN`,
   `$LJ::SITEROOT`, and related globals to empty strings so URLs use the request
   Host header. Do not override these with `local` in middleware: the override

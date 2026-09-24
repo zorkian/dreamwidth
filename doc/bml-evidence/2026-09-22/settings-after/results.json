@@ -1,0 +1,1619 @@
+[
+  {
+    "name": "anonymous-display",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=display",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__MobileView_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/login",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "user",
+            "type": "text"
+          },
+          {
+            "name": "password",
+            "type": "password"
+          },
+          {
+            "name": "remember_me",
+            "type": "checkbox"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-account",
+    "path": "/manage/settings/?cat=account",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-display",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=display",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "LJ__Setting__TimeZone_timezone",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__TimeFormat_timeformat",
+            "type": "radio"
+          },
+          {
+            "name": "DW__Setting__TimeFormat_timeformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__ImagePlaceholders_imgplaceholders",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__ImagePlaceholders_imgplaceundef",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__EmbedPlaceholders_embedplaceholders",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__CutDisable_cutdisable",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CutInbox_cutinbox",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__EmailFormat_emailformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EmailFormat_emailformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "DW__Setting__JournalEntryStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__JournalIconsStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ViewEntryStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ViewIconsStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ViewJournalStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NCTalkLinks_nctalklinks",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__StyleMine_stylemine",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__DisplayEchi_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__CtxPopup_ctxpopup",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__AdultContent_adultcontent",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__AdultContentReason_reason",
+            "type": "text"
+          },
+          {
+            "name": "LJ__Setting__ViewingAdultContent_viewingadultcontent",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__SafeSearch_safesearch",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid1",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid2",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__MobileView_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__RPAccount_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-notifications",
+    "path": "/manage/settings/?cat=notifications",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=notifications",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "deleteinactive",
+            "type": "submit"
+          },
+          {
+            "name": "deleteinactive",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-mobile",
+    "path": "/manage/settings/?cat=mobile",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=mobile",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__ResetReplyEmail_resetreplyemail",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ApiKeyGenerate_keygen",
+            "type": "checkbox"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-shortcuts",
+    "path": "/manage/settings/?cat=shortcuts",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=shortcuts",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__Shortcuts_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsNext_shortcuts_next",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__ShortcutsNext_shortcuts_nextctrl",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsNext_shortcuts_nextalt",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsNext_shortcuts_nextmeta",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsPrev_shortcuts_prev",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__ShortcutsPrev_shortcuts_prevctrl",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsPrev_shortcuts_prevalt",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsPrev_shortcuts_prevmeta",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouch_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchNext_shortcuts_touch_nextevent",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchNext_shortcuts_touch_nextfinger",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchNext_shortcuts_touch_nextdirection",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchPrev_shortcuts_touch_prevevent",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchPrev_shortcuts_touch_prevfinger",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ShortcutsTouchPrev_shortcuts_touch_prevdirection",
+            "type": "select-one"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-privacy",
+    "path": "/manage/settings/?cat=privacy",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=privacy",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__ContactInfo_contactinfo",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__UserMessaging_usermsg",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__MinSecurity_minsecurity",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__SynLevel_synlevel",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__SearchInclusion_searchinclusion",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__EnableComments_enablecomments",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__CommentScreening_commentscreening",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__CommentIP_commentip",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__RandomPaidGifts_randompaidgifts",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__GlobalSearch_globalsearch",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__AllowSearchBy_allowsearchby",
+            "type": "select-one"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-history",
+    "path": "/manage/settings/?cat=history",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-othersites",
+    "path": "/manage/settings/?cat=othersites",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=othersites",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__XPostAccounts_xpostdisablecomments",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__XPostAccounts_crosspost_footer_append",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__XPostAccounts_crosspost_footer_text",
+            "type": "textarea"
+          },
+          {
+            "name": "DW__Setting__XPostAccounts_crosspost_footer_nocomments",
+            "type": "textarea"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "community-account",
+    "path": "/manage/settings/?authas=t_zlwzbgfiq8ave&cat=account",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "community-community",
+    "path": "/manage/settings/?authas=t_zlwzbgfiq8ave&cat=community",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?authas=t_zlwzbgfiq8ave&cat=community",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__CommunityMembership_communitymembership",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CommunityPostLevel_communitypostlevel",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CommunityPostLevelNew_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__CommunityEntryModeration_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__CommunityJoinLinks_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__CommunityGuidelinesLocation_communityguidelinesloc",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CommunityGuidelinesEntry_communityguidelinesentry",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "community-display",
+    "path": "/manage/settings/?authas=t_zlwzbgfiq8ave&cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?authas=t_zlwzbgfiq8ave&cat=display",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__CutDisable_cutdisable",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__JournalEntryStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__JournalIconsStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__AdultContent_adultcontent",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__AdultContentReason_reason",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid1",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid2",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__RPAccount_val",
+            "type": "checkbox"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "community-privacy",
+    "path": "/manage/settings/?authas=t_zlwzbgfiq8ave&cat=privacy",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?authas=t_zlwzbgfiq8ave&cat=privacy",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "DW__Setting__ContactInfo_contactinfo",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__MinSecurity_minsecurity",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__SynLevel_synlevel",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__SearchInclusion_searchinclusion",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__EnableComments_enablecomments",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__CommentScreening_commentscreening",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__CommentIP_commentip",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__RandomPaidGifts_randompaidgifts",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__GlobalSearch_globalsearch",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CommunityPromo_communitypromo",
+            "type": "checkbox"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "unauthorized",
+    "path": "/manage/settings/?authas=t_z6vkdfv7muw0z&cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "personal-display-mobile",
+    "path": "/manage/settings/?cat=display",
+    "status": 200,
+    "errors": [],
+    "failures": [],
+    "forms": [
+      {
+        "id": "",
+        "method": "get",
+        "action": "/manage/settings/",
+        "fields": [
+          {
+            "name": "authas",
+            "type": "select-one"
+          },
+          {
+            "name": "cat",
+            "type": "hidden"
+          }
+        ]
+      },
+      {
+        "id": "settings_form",
+        "method": "post",
+        "action": "http://127.0.0.1:8080/manage/settings/?cat=display",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "LJ__Setting__TimeZone_timezone",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__TimeFormat_timeformat",
+            "type": "radio"
+          },
+          {
+            "name": "DW__Setting__TimeFormat_timeformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__ImagePlaceholders_imgplaceholders",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__ImagePlaceholders_imgplaceundef",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__EmbedPlaceholders_embedplaceholders",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__CutDisable_cutdisable",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__CutInbox_cutinbox",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__EmailFormat_emailformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EmailFormat_emailformat",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__EntryEditor_entryeditor",
+            "type": "radio"
+          },
+          {
+            "name": "DW__Setting__JournalEntryStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__JournalIconsStyle_style",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__ViewEntryStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ViewIconsStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__ViewJournalStyle_style",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NavStrip_navstrip",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__NCTalkLinks_nctalklinks",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__StyleMine_stylemine",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__DisplayEchi_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__CtxPopup_ctxpopup",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__AdultContent_adultcontent",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__AdultContentReason_reason",
+            "type": "text"
+          },
+          {
+            "name": "LJ__Setting__ViewingAdultContent_viewingadultcontent",
+            "type": "select-one"
+          },
+          {
+            "name": "LJ__Setting__SafeSearch_safesearch",
+            "type": "select-one"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid1",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__StickyEntry_stickyid2",
+            "type": "text"
+          },
+          {
+            "name": "DW__Setting__MobileView_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "DW__Setting__RPAccount_val",
+            "type": "checkbox"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          },
+          {
+            "name": "LJ__Setting__SiteScheme_sitescheme",
+            "type": "radio"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/logout",
+        "fields": [
+          {
+            "name": "lj_form_auth",
+            "type": "hidden"
+          },
+          {
+            "name": "returnto",
+            "type": "hidden"
+          },
+          {
+            "name": "ret",
+            "type": "hidden"
+          },
+          {
+            "name": "logout_one",
+            "type": "submit"
+          }
+        ]
+      },
+      {
+        "id": "",
+        "method": "post",
+        "action": "/multisearch",
+        "fields": [
+          {
+            "name": "q",
+            "type": "search"
+          },
+          {
+            "name": "type",
+            "type": "select-one"
+          }
+        ]
+      }
+    ]
+  }
+]

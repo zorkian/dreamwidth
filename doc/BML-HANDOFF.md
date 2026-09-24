@@ -1,0 +1,1914 @@
+## ACTIVE: beta graduation implementation authorized (2026-09-23)
+
+User authorization recorded at the top of [BML-DIRECTION.md](BML-DIRECTION.md)
+after review of [BML-BETA-GRADUATION-DECISION.md](BML-BETA-GRADUATION-DECISION.md).
+Build under [BML-GRADUATION-PLAN.md](BML-GRADUATION-PLAN.md): graduate native
+entry and inbox, close essential gaps, redirect legacy URLs, remove obsolete
+adapters by reviewed forward commits. Legacy parity gates below are historical.
+No push, deployment, real moderation side effects, or bypass of held gates.
+
+## RESUMED by explicit user directive (2026-09-23)
+
+The pause recorded in [the checkpoint](BML-PAUSED-2026-09-23.md) at `331f1f042`
+was lifted by the user the same day. Work continues from that checkpoint with a
+Claude team (bml-fable-foreman, bml-sonnet-widgets, bml-sonnet-themenav,
+bml-opus-review) in the same worktrees, branches and containers; the mapping is
+in the checkpoint's resume record. All other held boundaries remain. Entries
+below this line predate the resume.
+
+## Graduation progress (2026-09-23)
+
+### FINAL 2026-09-24: graduation packages complete on root
+
+Root `bml-astra-foreman-20260922` HEAD `2885eefc3`, clean. T10 docs/comment
+sweep 9455f59ce + 2519397d0 (bml-opus-review CLEAR) integrated as 69a30da68,
+2885eefc3; compile 1584 and tidy 1112 PASS. No further graduation package is
+in flight; all three worker sessions are idle with refreshed checkpoints
+(BML-THEMENAV-CHECKPOINT.md, BML-WIDGETS-CHECKPOINT.md,
+BML-REVIEW-CHECKPOINT.md, untracked in their worktrees). Foreman container
+8d7783a043d8 dev Starman is running root-era code; reviewer container's dev
+Starman is on 15ab9c051 (E3 fix) code. Nothing pushed, merged remotely or
+deployed. Next steps are the user's: review the closing record and
+deploy-gate checklist in BML-GRADUATION-PLAN.md, then decide on PR shaping
+for the 660-commit local branch.
+
+### CHECKPOINT 2026-09-24 01:30 UTC: BML engine removed from root
+
+Root `bml-astra-foreman-20260922` HEAD `71d2c5039`, clean. Integrated since
+the previous checkpoint, all independently CLEAR: W15 (ec178e6d1), E3 engine
+deletion (f96f0e4fa..dff646611, with static-file fixes 6c27e7215 and
+ced79268d), W16 (11abd8ad3, 8ddedf3a0), T9 (0771f89eb, c9cf38dce,
+e09190398), plus foreman 71d2c5039. No tracked .bml or .bml.text file
+remains; Apache::BML, DW::BML, lj-bml-blocks.pl, BMLInit, the scheme looks
+and the app.psgi fallback are gone; the only BML-named code is
+cgi-bin/DW/BML/RequestAdapter.pm, kept as the held hook/callback ABI
+(s2_head_content_extra, data_handler:*, DISABLE_PROTOCOL third argument).
+Root validation on the E3 tree: 41-file allowlist 550 PASS, tidy/compile/
+build PASS, live probes (root static files served with correct types, journal
+robots.txt routed to DW::Controller::Journal, /_config.bml and /inc 404,
+/update.bml 302) and browser entry-preview.js / entry-draft-parity.js PASS;
+after W16/T9: 14 files 129 PASS. Reviewer root integrity recheck of
+6e5237cb6..71d2c5039 requested. In flight: T10 (themenav, docs/comments sweep
+for stale BML-as-present text). E4 closing record follows.
+
+### CHECKPOINT 2026-09-23 late evening (session limits near)
+
+Root `bml-astra-foreman-20260922` HEAD `3c679e9ea`, clean. Foreman container
+8d7783a043d8 dev Starman is running a scratch (engine-less) tree from the E3
+dry-run; restart it on root before any browser evidence. Scratch branch
+`foreman-e3-dryrun` (root + W13 + E3 minus aeb94fb1b) may be deleted.
+
+Integrated on root since the previous record (all independently CLEAR):
+W13 range 52ac113bd + c6d55e4b4 + 3f3d93312 (71006eef8, e6e1c2d38,
+39f54715d); W14 65ac9a47d + e9d79a38f (33a8d3bce, 30e24933e; the
+deadphrases.dat conflict resolved as the union and deduplicated in
+3c679e9ea). Root validation after W14: 11 files 138 PASS
+(lang-bml-file-branch, plack-entry-strings, ml, settings, plack-settings-return,
+settings-confirm-message, profile-userlink-lookups, lang-names-native,
+plack-no-bml-fallback, site-scheme-native, lang-native-request-context);
+full tidy/compile not yet rerun after W14.
+
+Pending review / integration, exact SHAs:
+- E3 engine deletion on `bml-sonnet-bml-engine-removal-20260923` at
+  fa75b9d82: E3-specific commits b7194027e, 468c24e90, 8c0f7ece5, 2b485b47c,
+  977f6de16, 894ea9b10, 464bcbe92, 35970d102, 5b01dc0d9, 7360940f5,
+  fe0de20a1, 4e0ba0c20, 319a03ca4 are reviewer-verified; SKIP at integration
+  f8281d435 (=dcfb2bffb), 341d21c59 (=E1), 6fe4118a5 (=7b8bd2170),
+  633581ffb (=W13 tests), aeb94fb1b (superseded by the W13 fix); keep root's
+  t/bml-shims-loaded.t over 977f6de16's version. Static fix fa75b9d82 HELD:
+  its path-only Static rule serves the site robots.txt on journal hosts and
+  bypasses DW::Controller::Journal's per-journal robots (opt_blockrobots
+  journals lose 'Disallow: /'); themenav is fixing with a rule that declines
+  when dw.journal_user is set, plus tests; favicon stays static.
+- W15 LJ::Lang .bml branches 32cf431b4 bml-opus-review CLEAR (deadphrases
+  replica matches texttool, revert-equivalence proven); integrated on root as
+  ec178e6d1; root nine language suites 86 PASS incl. t/lang-names-native.t,
+  tidy and compile PASS after W14 (/tmp/bml-w14-integrated-*.log).
+- E3 robots.txt regression fixed by themenav in 15ab9c051 (coderef path
+  declines /robots.txt when dw.journal_user is set; exact-content tests for
+  blocked/ordinary/www); final E3 verdict pending with the reviewer.
+- T9 post-E3 test hygiene on `bml-sonnet-post-e3-test-hygiene-20260923` at
+  e8d1c180b (three commits, built on E3 tip 319a03ca4), not yet reviewed.
+- Reviewer follow-ups noted, not assigned: /manage/ has two pre-existing
+  missing .tt keys ('/manage/index.tt.communities.invites.about ' with a
+  trailing space, '/manage/index.tt.friends.groups.about'); LJ::Setting::Gender
+  and LJ::Setting::BirthdayDisplay are dead modules (delete with their eight
+  setting.*.option strings).
+
+Integration order when resuming: E3 (verified set, in branch order) + its
+corrected static fix, then W15 (rebased or cherry-picked; its lineage lacks
+E2 so t/lang-names-native.t only fails there), then T9 (rebase onto E3),
+then full tidy/compile/build, live probes incl. journal-host robots.txt and
+favicon, browser entry-preview.js and entry-draft-parity.js, root integrity
+recheck by the reviewer, then E4 docs (final graduation record, deploy-gate
+checklist: production BETA_FEATURES updatepage/inbox, ext/local hooks and
+LJ::Local::BMLInit, AJAX_URI_MAP, HELPURL, CDN/static origin for the six root
+files, deployed _config-local.bml no longer read, prod .bml URLs now 404).
+
+Standing rules unchanged: allowlists per review, inert recorders for any
+moderation/report/ban/log path, no push/deploy, DW-only header for new
+files, comments describe present constraints only, obsolete worker branches
+preserved.
+
+**Test-execution boundary (user rule, restated 2026-09-23 after two reviewer
+disclosures):** moderation, report, ban, suspension and other admin-mutation
+paths stay inert in every test or probe we write or run: stub them as
+recorders and assert call counts, never row or state changes, even for local
+disposable fixtures. Every review or validation assignment carries an explicit
+allowlist of test files; no broad console/sysban/moderation globs. Before
+executing any existing suite outside the allowlist, inspect its side-effect
+paths first. Do not attempt cleanup of past local mutations through further
+admin mutations. Reviewer disclosures on record: two local spamreports rows
+(T1 probe and 6648 test run) and the W5 sweep that executed console-ban,
+console-suspend, console-sysban, console-syndelete, console-suspenduserpic,
+console-expungeuserpic and plack-sysban on temp fixtures in container
+904e68156988 (sysban table empty afterwards; suspension/ban status on temp
+users persists). Nothing external was touched.
+
+- W5 ordinary BML runtime callers, range f32511bad..a0db3a691 (six commits atop
+  db46632da) bml-opus-review CLEAR; integrated on root as 5f4e27909, cef93957e,
+  99c8717b4, cb0a1a6f0, 42e556589, db4b029c1 (clean picks). Reviewer claim
+  correction: <?errorbar?>/<?warningbar?> WERE registered for BML pages in
+  cgi-bin/bml/scheme/global.look:45/53 and <?needlogin?> DID redirect inside
+  BML pages; the change is a real fix only in native contexts (literal tags
+  visible in DW::Widget::LatestInbox and the anonymous poll vote RPC) and
+  changes retained-BML error markup from blockquote/hr to a div, accepted.
+  check_form_auth's DW::Request fallback cannot weaken CSRF (explicit args
+  short-circuit). Root validation (allowlist only, no moderation suites):
+  14 files 432 PASS incl. t/plack-bml-runtime-callers.t; tidy/compile logs
+  /tmp/bml-runtime-callers-integrated-*.log.
+- W7-B journal adapter characterization 74fb0ab92 + doc fix 810c4c3da
+  bml-opus-review CLEAR; integrated on root as 7db93986c, 372669ac9
+  (t/journal-request-adapter.t + doc/BML-JOURNAL-ADAPTER.md). Finding: the
+  Journal.pm:317 adapter is also the object LJ::S2.pm:2468 hands to the held
+  s2_head_content_extra hook, so the swap is only safe in a decoupled form.
+- CI green check on root 3342a072f (reviewer, allowlist discipline): the 90
+  files CI runs were screened for side effects; 86 ran and passed, tidyall
+  clean; four (entry-maintainer, entry-picker, entry-moderated-post,
+  entry-spellcheck) skipped only for fixture writes (community statusvis
+  toggle, posting-access set_rel 'P'), which the foreman rules as fixture
+  shaping, not moderation; all four passed on the F2 allowlist. No stale
+  code reference to deleted symbols remains in t/ apart from the two known
+  red language tests (W11) and two stale comments in t/plack-entry-strings.t.
+- E3 engine deletion (themenav, 14 E3-specific commits b7194027e..319a03ca4)
+  HELD by bml-opus-review on one proven regression: app.psgi's BML fallback
+  was also the only server of root-level static files (/robots.txt,
+  /favicon.ico, /apple-touch-icon.png, /protocol.dat, /500-error.html, /rte/*)
+  because Plack::Middleware::Static covers only img/stc/js; fix in progress
+  (native allowlisted static rule with correct content types across htdocs
+  overlays, tests, deploy note; blanket serving stays removed because it
+  exposed /inc, /doc placeholders and scss sources). Everything else in E3
+  verified; root's t/bml-shims-loaded.t is kept over E3's; E3's aeb94fb1b is
+  dropped in favour of the W13 fix. Foreman dry-run of W13 + E3 on a scratch
+  branch: 36-file allowlist 395 PASS, tidy1111, compile1588, build PASS, live
+  probes (/, /login.bml 200; /_config*.bml and unknown URLs 404;
+  /update.bml redirect) and entry-draft-parity.js PASS; not fast-forwarded.
+- W13 range 52ac113bd + c6d55e4b4 + 3f3d93312 CLEAR (pre-characterization
+  tests engine-independent). W14 (14 orphaned keys relocated, texts recovered
+  from the deleting commits' parents) under review; worker notes
+  LJ::Setting::Gender and LJ::Setting::BirthdayDisplay have no live caller
+  (optional cleanup, not a graduation decision).
+- Pre-existing upstream bug surfaced by W13: 14 call sites in six files still
+  request .bml-scoped keys (/manage/profile/index.bml.*, /poll/create.bml.*,
+  /manage/settings/index.bml.title.anon, /manage/tags.bml.title2,
+  /manage/circle/edit.bml.*) whose .text files were deleted on upstream main
+  by earlier conversions; production serves them from the DB, dev renders
+  missing-string. W14 (widgets) relocates them to native homes with
+  deadphrases entries. W13 pre-characterization tests + doc under review;
+  E3 (engine deletion) in progress with the reviewer's independent pre-audit
+  folded in (BMLInit hooks are engine-internal BML::register_hook entries with
+  no native reader; LJ::Lang .bml branches drop only after W14).
+- E1b dead altlogin strings 75fa62d88 CLEAR, integrated as 7ffc2a503. E2 last
+  non-engine BML::* callers range 6caa073dd, e05bbf721, 559849bec, e753ad33e
+  CLEAR, integrated as c26ae6e9e, 4d14a311b, c75677acc, 6ecdb242c. Foreman
+  commits in the same integration: dcfb2bffb (Protocol.pm engine import and
+  history comment dropped, reviewed CLEAR), 15714a059 (t/bml-shims-loaded.t
+  inverted: ljlib.pl alone must NOT load DW::BML, Apache::BML or BMLInit while
+  the standalone adapter still loads), 7b8bd2170 (sendmessage test's
+  no-request subtest uses the native call). State: no executing BML::* call
+  remains outside the engine files and app.psgi's own import; the web path
+  still loads the engine only for the fallback that E3 deletes. Root 19-file
+  allowlist 245 PASS; tidy/compile logs /tmp/bml-e2-integrated-*.log.
+  E3 (engine deletion, themenav) and W13 (E3 pre-characterization tests,
+  widgets) in progress.
+- W12 + E1 range 6b17dfe6c, e286a4730, 2d3205dc7, 94eaab56f bml-opus-review
+  CLEAR; integrated on root as b0bc29d0f, 8102da94e, ae2d00875, 49ea6739e.
+  sendmessage now calls LJ::Lang::set_request_context(lang => 'en', getter =>
+  undef) (E1); no BML::* call remains in LJ::Protocol, so its 'use DW::BML'
+  is dropped by a foreman follow-up. Root nine suites 82 PASS; tidy/compile
+  logs /tmp/bml-e1-integrated-*.log.
+- (historical) W12 characterization e286a4730 CLEAR (its comment-only sibling 6b17dfe6c
+  and E1 2d3205dc7 held solely on comments narrating history; fix pending).
+  E1 equivalence is verified post-F2: DW::BML's set_language also wrote a
+  'langpref' request note nothing reads, and would take HOOK-ml_getter only
+  when Apache::BML::is_initialized(). Reviewer nuance to keep on record:
+  is_initialized() is \$Apache::BML::cur_req truthiness, which
+  DW::BML::render set and never cleared, so pre-F2 a native sendmessage after
+  any BML render in the same worker could have picked up that page's getter;
+  post-F2 render() 403s the _config files before initialize_cur_req, so the
+  native getter => undef form is exact.
+- T8 adapter module extraction range 1420764ba + fix 9159a2e2f
+  bml-opus-review FINAL CLEAR; integrated on root as f72d595d5, 3f31b017a.
+  DW::BML::RequestAdapter now lives in cgi-bin/DW/BML/RequestAdapter.pm and
+  loads without the engine; 'use DW::BML' kept in PageStats, Protocol, Web and
+  S2 for the remaining BML::* shim calls (the explicit conversion list for
+  E2/E1). W12 sendmessage characterization (test-only) and E1 (native
+  replacement with getter => undef, equivalence proven by revert) queued for
+  review; E2 (last non-engine shim callers) assigned to themenav.
+- (historical) T8 adapter module extraction 1420764ba HELD: dropping 'use DW::BML' from
+  LJ::S2 unloaded the BML::* shims from ljlib-only processes (PageStats,
+  Protocol sendmessage, LJ::Web fallbacks); fix in progress.
+- T6 protocol/PageStats audit 0655e31a0 + correction c8d7b8dcd, T7 range
+  b6a244508 + 127d54c3c (PageStats filename undef-safe; explicit
+  DISABLE_PROTOCOL adapter, ABI unchanged), W9 doc 7e2fbd54d + fix 71b7782bc,
+  and W10 d17872bc6 (help_icon delegates to help_icon_html; dead bad_input
+  removed) all bml-opus-review CLEAR; integrated on root as 94ef43cee,
+  6ebcdd7fd, e936b6375, 71becd05e, 1bb4e6916, af8c91423, eba9d0a84. Root
+  allowlist 10 files 136 PASS; tidy/compile logs
+  /tmp/bml-t6t7w9w10-integrated-*.log.
+- W11 language test repair f8ef51f45 bml-opus-review CLEAR; integrated on
+  root (both language tests green again; root green on every checked suite).
+  Correction of that commit's rationale: native entry-form errors DO render.
+  _render_new_form sets errors (Entry.pm:323, :1022 for edit), DW::Template
+  copies them into sections.errors (Template.pm:115) and schemes/global.tt:93-96
+  renders each alert; reviewer proved both an empty-body and an invalid-token
+  POST to /entry/new re-render the form with exactly one alert. The
+  LatestInbox substitution is correct because DW::Widget::LatestInbox is the
+  last production caller of LJ::error_list (the property the old subtest
+  characterized), not because form errors were unrendered.
+- (historical) KNOWN RED on root (found by widgets during W10, outside every allowlist):
+  t/web-message-language.t subtests 1 and 6 (pre-W5 errorbar markup; deleted
+  LJ::entry_form) and t/web-stdmaxlength-language.t subtest 3
+  (LJ::entry_form). Neither is in CI's list, but root is not green until W11
+  (test repair, widgets) lands. Lesson recorded: after a deletion package,
+  grep t/ for every deleted symbol, not only the allowlist.
+- W9 dead widget cleanup 581927a0d + 7cf7f1ab4 bml-opus-review CLEAR;
+  integrated on root as 78a0fc2e3, eab53381e (TagCloud and three Example
+  widgets deleted; compile now 1593). W9 doc commit 7e2fbd54d HELD for
+  corrections to its new findings (help_icon producer list, HELPURL
+  qualifier, ljuser tag sites); W10 (help_icon literal fix) is scoped from the
+  corrected list. T6 protocol/PageStats audit 0655e31a0 under review; T7
+  (ABI-preserving PageStats filename and explicit DISABLE_PROTOCOL adapter)
+  assigned.
+- W8 decoupled journal request range d886c0b7d + 0d645f809 bml-opus-review
+  CLEAR; integrated on root as ff87e378b, 007a69b5d. LJ::make_journal now
+  receives the DW::Request; LJ::S2.pm wraps a DW::BML::RequestAdapter for
+  s2_head_content_extra only when DW::Controller::Journal marks the opts, so
+  the held hook sees exactly what it saw before on both journal and preview
+  paths; the data_handler adapter is untouched. T4 translation shim audit
+  cb9c10831 + correction 920cf07f8 CLEAR; integrated as 7e360e41d, cfcf8096e
+  (doc/BML-TRANSLATION-SHIM.md). T5 cleanup d7b7d5612 + ff564360e CLEAR;
+  integrated as 63d64f887, 505d6a219 (imgupload.css deleted; 160
+  deadphrases.dat entries for the retired keys, which makes the production
+  BETA_FEATURES deploy gate stricter). Root allowlist 12 files 306 PASS;
+  tidy/compile/build logs /tmp/bml-w8t4t5-integrated-*.log.
+- (historical) W8 d886c0b7d was HELD: LJ::S2::Page is also reached
+  from the native entry preview with a plain DW::Request, so always wrapping
+  an adapter at the hook site changes what production hooks see on previews;
+  fix in progress (wrap only when Journal.pm marks the opts) plus a
+  non-vacuous test that calls LJ::S2::Page directly for both shapes.
+- T4 translation shim audit cb9c10831 (docs) bml-opus-review CLEAR on
+  citations; awaiting one correction (it named eight remaining .bml pages
+  that no longer exist) before integration.
+- F2 entry legacy page deletion range 8e2f89fe7, 0bd8bfb89, 6a81f04b5,
+  322205da0 (atop 508229ae9) bml-opus-review CLEAR; integrated on root as
+  9f8428871, b46084e34, 2977bd054, 8d03595e9 (clean picks). update.bml,
+  editjournal.bml, imgupload.bml, tools/endpoints/draft.bml, js/entry.js,
+  js/xpost.js, LJ::entry_form, /preview/entry, LJ::Widget::UserpicSelector and
+  the four retired .text files are gone; only htdocs/_config.bml and the two
+  ext/dw-nonfree _config*.bml remain tracked. Root validation (allowlist +
+  plack-bml-runtime-callers + inbox-cutover): 23 files 911 PASS; tidy,
+  compile and build logs /tmp/bml-f2-integrated-*.log. Reviewer browser runs
+  of entry-preview.js and entry-draft-parity.js PASS after restarting their
+  stale dev server. Non-blocking follow-ups: htdocs/stc/imgupload.css is an
+  orphan; a stale old-page preview POST to /preview/entry now 404s (content
+  stays in the tab); deleted .text keys not yet added to deadphrases.dat.
+- W7-A dead RPC fallback removal a6641ec27 bml-opus-review CLEAR; integrated
+  on root as the next commit. DEPLOY GATE (concrete): production
+  etc/config*.pl or ext/local may populate %LJ::AJAX_URI_MAP (the removed
+  comment named /__rpc_delcomment and /__rpc_talkscreen as Apache-era
+  mappings); if so those URIs now reach the router instead of BML. Check with
+  BETA_FEATURES and the hook list at deploy time.
+- W6 engine retirement audit 18affb0c3 (docs only, not independently
+  reviewed) integrated as doc/BML-ENGINE-RETIREMENT.md: the app.psgi
+  %LJ::AJAX_URI_MAP fallback is dead; DW::BML::RequestAdapter remains
+  load-bearing for LJ::make_journal and the data_handler/s2_head_content_extra
+  hooks independent of any .bml page; held external ABIs need user decisions.
+
+- W1 inbox correctness/security 2c8c21f157f29a1cf8c2f45600a992659ee14584
+  (atop e381a77c7) bml-opus-review CLEAR; integrated on root as 627ba13fd.
+  Reviewer proved the old string eval executed injected Perl and the esn RPC
+  accepted unauthenticated mutations at base. Root five inbox suites PASS 198,
+  node --check OK; tidy/compile logs
+  /tmp/bml-inbox-fixes-integrated-{prove,tidy,compile}.log in 8d7783a043d8.
+  Reviewer non-blocking items (undef view warning, no-JS icon preview,
+  messaging-disabled test, GET bookmark toggle CSRF) are folded into W2.
+- T1 native manager moderation range 6648e8681 + e2b961a02 + d99d4bbf8
+  bml-opus-review FINAL CLEAR (inert recorder, call-count assertions,
+  mutation-proved); integrated on root as abc4e531d, 2ad063c37, 0aa11d135.
+  Root six suites 389 tests PASS after test-only fix 02bce1487: t/post.t (in
+  CI) still expected the relative .error.noentry key although DW/Entry.pm has
+  emitted the absolute /entry/form.tt key since shared commit 0aad3e37f.
+  Full tidy/compile PASS: /tmp/bml-manager-moderation-integrated-*.log.
+- (historical) T1 6648e8681 + correction e2b961a02 were under review;
+  a further test-only commit is required so the deletespam test stubs
+  LJ::mark_entry_as_spam (a local spamreports write is a moderation side
+  effect; tests stay inert per user boundary). Reviewer mutation test showed
+  that with an inert stub only recorder call counts catch a removed guard, so
+  the stub commit must assert 0 calls for every denial case and exactly 1 for
+  the manager happy path. Disclosure: before the boundary was restated, one
+  reviewer probe and one run of the 6648 test each wrote a local spamreports
+  row for disposable fixtures in reviewer container 904e68156988; nothing
+  external; rows left in place.
+- W2 inbox cutover range 13d112a73 + d680ac1e7 bml-opus-review CLEAR;
+  integrated on root as ab4fb2c8e, 5ab7031b9. Canonical /inbox, /inbox/compose,
+  /inbox/markspam are native; old /inbox/new* redirect on GET only and serve
+  POST natively (reviewer proved the first version dropped POST bodies via
+  303, and a stale compose tab now sends). Root seven suites 270 PASS; logs
+  /tmp/bml-inbox-cutover-integrated-*.log. Non-blocking items (old .bml
+  variants not canonicalized, /inbox/new/ trailing-slash POST, inert user-ban
+  stub in spam-errors test, orphan .beta.on) folded into W3. Foreman visual
+  check on root: GET /inbox/ as a seeded user renders the native page at 1280
+  and 390 (captures in doc/bml-evidence/2026-09-23/inbox-native-cutover);
+  anonymous /inbox/ and /inbox/new redirect to login. Full tidy/compile PASS
+  for the integration.
+- W3 inbox legacy removal 9831050718c9a521c9229de068d2e4dd7e6c256a (atop
+  d680ac1e7) bml-opus-review CLEAR; integrated on root as f5c142e72.
+  htdocs/inbox/ is gone with its widgets, esn_inbox.js and stc/inbox.css;
+  /__rpc_esn_inbox serves only get_unread_items. Root seven inbox suites 286
+  PASS, tidy1182, compile1603, build-static PASS:
+  /tmp/bml-inbox-removal-integrated-*.log. DEPLOY GATE (concrete): production
+  %LJ::BETA_FEATURES must drop or expire 'inbox' with this change, or
+  /betafeatures renders missing-string titles. Non-blocking: spam-errors test
+  still writes a local userlog row via log_event('ban_set'); stub folded into
+  W4.
+- W4 entry string relocation range 178c11b39 + e70c01ff2 bml-opus-review
+  FINAL CLEAR; integrated on root as 706e720fa (conflict in
+  t/plack-inbox-spam-errors.t resolved to W4's file, byte-identical to
+  178c11b39's, which carries W3's set_rel stub plus the log_event recorder)
+  and 17c82a952. Native entry code no longer reads /update.bml.*,
+  /editjournal.bml.* or /imgupload.bml.* keys; /preview/entry.bml scope stays
+  inside legacy_preview_handler until F2. Root seven suites 353 PASS; logs
+  /tmp/bml-entry-strings-integrated-*.log. Reviewer's first W4 review caught
+  a W4-introduced picker regression (four editjournal.tt keys missing) that
+  the worker had reported as pre-existing; fixed and covered.
+- T2 entry cutover range dd4705a74 + 049fe9977 + 85f839e2f + 6e88be647
+  bml-opus-review FINAL CLEAR (conditional on atomic T3) and T3 entry adapter
+  deletion b2b432517 HELD only for restoring three tests of kept helpers;
+  landed atomically on root as c23833502, a669da35c, 99985af19, bf9e56d30
+  (T2), abdd80ce7 (T3 with the predicted Entry.pm conflict resolved by
+  deleting the legacy_edit branch), 087f8b2f8 (foreman: maintainer picker-key
+  subtest inverted for W4's relocated keys) and 508229ae9 (foreman: restores
+  t/entry-legacy-decoder.t, t/plack-entry-legacy-new-rerender.t,
+  t/entry-legacy-owned-edit-rerender.t per the reviewer). /update and
+  /editjournal?itemid now redirect GET to native and render old-schema POSTs
+  as a no-save carry-over (community custom security -> private with notice,
+  old friends -> access, logged-out edit keeps body with an edit-specific
+  duplicate-post notice, not-editable shows escaped content read-only,
+  usejournal/journal canonicalised before redirect). 36 legacy subs, 53 legacy
+  suites and 43 browser fixtures removed; decode_entry_form, prepare_entry_form,
+  formdata_from_legacy, legacy_new_rerender, legacy_owned_edit_rerender,
+  legacy_carryover_unrecoverable and legacy_preview_handler kept with
+  callers. Root validation: 30-file entry+inbox sweep 1132 PASS, tidy1107,
+  compile1603, build PASS: /tmp/bml-t2t3-integrated-*.log. Reviewer root
+  recheck of f89f4029c..508229ae9 PASS (patch-ids identical, resolution as
+  described, 30/30 consolidated T2 probe on root). Foreman browser sanity on
+  root: t/browser/entry-draft-parity.js PASS with own server; GET /update
+  and /update.bml 302 to /entry/new with args; /entry/new capture without the
+  beta banner in doc/bml-evidence/2026-09-23/entry-native-cutover. Orphan
+  strings now:
+  views/editjournal.tt.text .success.editedstillsuspended (F2 cleanup).
+- (historical) T2 entry cutover dd4705a74 HELD by reviewer on two content-safety findings
+  (community custom-security carry-over fell back to public; logged-out or
+  not-editable /editjournal carry-over lost the body) plus the condition that
+  the 13 retired-route tests are deleted in the same landing; fix in progress
+  on the T2 branch, then T3 rebases.
+- T2 entry cutover (themenav) and W3 inbox legacy
+  removal (widgets) in progress on
+  bml-sonnet-entry-cutover-20260923 and bml-sonnet-inbox-cutover-20260923.
+- Obsolete preserved branches (not integrated): hook composition 5d282324c,
+  altlogin characterization a0cfe4f23, draft.bml WIP 68789a565.
+
+## HOLD: legacy update/RTE port under scope review (2026-09-23)
+
+User directive after the resume: the old update page and RTE may be retired in
+favour of requiring the native (beta) entry page instead of porting the old
+editor. All legacy update, alternate-login and RTE migration and related
+activation work is HELD; the foreman is assessing native coverage, cutover and
+shared dependencies and will report before anything is implemented. Preserved
+immutable, unreviewed and unintegrated:
+- Themes decode-hook composition eda6394a6 + correction 5d282324c on
+  bml-sonnet-altlogin-hook-composition-20260923 (base 51fc74adb, patch-identical
+  to root 35329b053). Reviewer held eda6 only for run_hook vs run_hooks fan-out
+  and an uninspected caller_context; 5d28 claims both addressed, not re-reviewed.
+- Widgets retained altlogin POST characterization e1a991d88 + correction
+  a0cfe4f23 on bml-sonnet-altlogin-post-characterization-20260923 (base
+  e473de049). Reviewer held e1a9 only for one vacuous success regex; a0cf claims
+  it fixed, not re-reviewed.
+- Widgets draft-endpoint baseline assignment was stopped before commit; any WIP
+  is reported by the worker in its hold acknowledgement.
+Nothing under this hold may be integrated, activated or pushed. Unrelated
+migration work continues only on explicit foreman assignment.
+
+## Pure editor/date composition integrated (2026-09-23)
+
+bml-opus-review CLEAR of Themes 5ec8dec2a210c409c3a68b230f3bc3baaa25c2d6 +
+test-only correction d21b1c3a3d20f89ddfc9cbad900ef0afc0dce8db atop 145cd1e81
+(pure helper gate). Integrated on root as 334b531dc and 35329b053.
+compose_altlogin_hook_delta has no caller outside its module. Root six pure
+suites PASS, 27 top-level tests; full tidy1181 and compile1607 PASS. Logs in
+container 8d7783a043d8: /tmp/bml-editor-date-delta-integrated-{prove,tidy,compile}.log.
+
+## Browser-only alternate-login rerender accepted (2026-09-23)
+
+bml-opus-review CLEAR of Widgets range 4a1d9d121c0b654b4952e2e6da50c2994b5367a3
++ 7c9499af59409290c6a963ec3222bbeafe87e169 atop ce4a7d63c (browser acceptance of
+the integrated cee270600 seam only; not public activation). Integrated on root
+as e8068aa3c and 2dba301fa: three test files only. The reviewer's one finding,
+expected date computed in UTC instead of browser-local, was corrected in 7c9 and
+proved under Etc/UTC and Pacific/Kiritimati. Root normal replay PASS with owned
+fixture/server exit and port18156 free; static build PASS; tidy1180 and
+compile1607 PASS. Logs in container 8d7783a043d8:
+/tmp/bml-altlogin-rerender-browser-integrated{,-build,-tidy,-compile}.log.
+Desktop/narrow captures inspected and preserved in
+doc/bml-evidence/2026-09-23/update-altlogin-rerender. Nothing submits
+credentials or saves an entry; the expected sprintf warning for the deliberate
+invalid year is fixture noise, not a defect.
+
+## Unused raw-hook builder integrated (resume, 2026-09-23)
+
+bml-opus-review CLEAR of Themes correction
+770db2b2d2d2647b846354cca9d530f235b795dd atop c7170b572 (pure-helper gate only).
+Full range d19ba22d5, c7170b572, 770db2b2d integrated on root as 96c253a44,
+ff2163b19, e473de049. Literal `xpost` is removed with the crosspost namespace and
+repeated `entrytime_date`/`entrytime_time` decline before any mutation; native
+parser policy is unchanged. Reviewer non-blocking notes: valid-then-invalid
+ordering cases also passed at base, and the widened pattern drops `xpost_*`
+keys, for which no legitimate non-`prop_xpost_*` field was found.
+Root five pure suites PASS, 21 top-level tests; full tidy1178 and compile1607
+PASS. Logs in container 8d7783a043d8:
+/tmp/bml-raw-builder-integrated-{prove,tidy,compile}.log.
+No hook invocation, auth, save, route or public caller is added. Widgets browser
+candidate 4a1d9d121 (atop ce4a7d63c) is under independent review; Themes pure
+composition WIP is preserved as 815d9fa23 and being finished.
+
+## Pure raw-hook builder candidate pending review
+
+Themes d19ba22d5fcd06622c9a3a9fefb593c577663d8f is committed but NOT
+integrated. Worker mapper/builder2files7top-level PASS, tidy and compile1607 PASS.
+Sol review queued after source-only editor/date reconciliation audit. Foreman
+flagged mixed bit-zero mask representability and invalid date/time observation
+for that review; no native parser policy change or public caller is proposed.
+Widgets browser-only altlogin rerender fixture remains uncommitted WIP, fixing
+restore-dialog navigation handling after the timeout; do not treat it as green.
+Root remains clean through 8e699eb09 with no running root validation processes.
+
+## Render-only alternate-login retry integrated
+
+Sol ce4a7d63c57546e8c19e40a7430034e86f3d78f5 CLEAR; root cee270600.
+Only optional presentation forwarding changed. Root four adjacent suites PASS,
+127 assertions; full tidy1177 and compile1607 PASS. Logs in root container:
+/tmp/bml-altlogin-rerender-integrated.log and corresponding -tidy/-compile logs.
+No root validation process remains. Browser prerequisite is still WIP: seeded
+restore confirmation must be observed before awaiting navigation, fresh state
+proved while open, and deliberate dismissal kept outside nonmutation claim.
+No public activation or credential submission is authorized by this seam.
+
+## Active bounded alternate-login prerequisites
+
+Root through 001ea640f remains clean and validated as recorded below.
+Widgets render-only optional forwarding commit ce4a7d63c57546e8c19e40a7430034e86f3d78f5
+is queued for Sol review, not integrated. Worker focused rerender71 and compile1607
+PASS; separate browser proof is being built without credential submission/save.
+Sol source-only raw-input audit is preserved as BML-ALTLOGIN-RAW-HOOK-BUILDER.md;
+Themes implements only its unused pure builder. Historical known-field filtering
+is explicitly superseded in BML-ALTLOGIN-DECODE-HOOK-SYNC.md by accepted arbitrary
+mutation characterization and delta semantics. Editor/date reconciliation remains
+separate. No public alternate-login activation or held-interface work is approved.
+
+## Reviewed test correction and unused delta integrated
+
+Sol24bfc0c2ec0cfa7ea3011527c95324c16c20522e CLEAR; integrated as ad3d8d9d0.
+Retained anonymous baselines now explicitly scope GET and POST to retained BML
+and prove route restoration. Actual activation evidence continues to use the
+production route, including native share and invalid-target rendering.
+Root combined six suites PASS: 1132 assertions, log
+/tmp/bml-anonymous-public-corrected-prove.log in container 8d7783a043d8.
+The earlier stale-test failures are resolved; production/browser gates unchanged.
+
+Sol full unused delta range 8b144572f..05d595f1b CLEAR; integrated as
+c7a4131c1, f62a8b25e, 17b61d7f1. Final implementation normalizes before/after
+property namespaces, applies only observed deltas, preserves native-only props,
+and deep-clones serializable output. Deeply independent before/after snapshots
+are required; shared-reference mutation history cannot be reconstructed.
+No hook, auth, save, or route caller has been added.
+Root pure mapper/preparation/normalizer/delta four suites PASS, 15 top-level tests;
+full tidy1176 and compile1607 PASS. Logs /tmp/bml-delta-integrated-{prove,tidy,compile}.log.
+All root validation processes completed.
+
+Next bounded work: Widgets implements optional old-schema error-rerender
+presentation forwarding against the corrected current-source handoff, without
+new auth/save/hooks/routes. Sol audits a pure native-altlogin raw hook-input
+builder; Themes checks documentation consistency with accepted mapper,
+characterization, and delta contracts. Public altlogin activation, external
+interface decisions, and previously held platform work remain excluded.
+
+## Public anonymous range integrated; stale retained tests being corrected
+
+Sol40df8aef8fa709e4be6d0d385aac4844f7cafcaf final HTTP697 CLEAR, with prior
+production/plain-app browser gates clear. Integrated fd76..40df as716af91af
+through31c1f0384, excluding already-integrated30b browser prerequisite. Root exact
+build/browser PASS; narrow native retry capture visually inspected, six captures
+preserved under anonymous-update-public. Full tidy1175 and compile1607 PASS.
+
+Root combined5files1131 failed only stale characterization expectations:
+t/plack-anonymous-update-auth-sequence.t12 failures now hit native POST rather
+than retained BML; t/plack-entry-update-activation.t2 shareGET assertions still
+expect BML despite accepted native share. Widgets correcting test-only on root31c
+base: scope retained all-method handler decline/restoration for retained anonymous
+baselines; use inert page stub/native share checks in activation. Do not change
+production. Logs /tmp/bml-anonymous-public-integrated-{prove,build,browser,tidy,compile}.log
+in root8d7783a043d8. Sessions48247/97263/47810 completed; no root tests running.
+
+Delta8b remains unintegrated. Themes correction additionally needs unchanged
+prop_* precedence when props changes, deterministic serialized comparison, deep
+reference boundary and props undef. Sol queued followup after immutable commit.
+Widgets rerender audit was against stale pre-altlogin-template base; must revise
+against31c before use. Existing held external interfaces remain untouched.
+
+## Delta candidate held; public classifier correction active
+
+Unused delta8b144572fe2b97c6953c0ac695396cc6040d1662 is NOT integrated.
+Foreman identified after-reference aliasing into returned output and unordered
+top-level props versus prop_* normalization collision; Sol independently probing
+exact8b, Themes correcting separate immutable followup. Scalar tests alone do
+not establish arbitrary reference isolation. Same-reference before/after cannot
+represent a prior in-place mutation and must not be claimed as a snapshot proof.
+
+Widgets shared native-scope guard instrumentation537 PASS; final additional
+method/action/input run655 initially failed anonymous preview expectations.
+Anonymous no-session transforms decline to retained BML after both classifiers;
+authenticated native transforms are separate. Worker correcting tests only.
+No public anonymous route integrated, no root tests running. Rootthroughb4dd58f78
+has cleared mapper and test-only retained mutation baseline; earlier accepted
+production/browser gates are not reopened.
+
+## Hook mutation characterization integrated
+
+Sol37e6fb87cc08e057b03acc782263964d635cb095 CLEAR; rootd5f8a157e.
+Root mapper/preparation/normalizer3files10top-level PASS and scoped tidy PASS,
+/tmp/bml-hook-mutations-{integrated,tidy}.log. Root session53034 complete.
+Themes next assignment is an unused pure before/after-flat mutation delta helper:
+no hook invocation, raw synthesis, auth/save/route. Preserve arbitrary changed
+fields with existing prop normalization and preserve unchanged native state;
+report concrete unsupported collisions instead of inventing interface policy.
+
+Widgets final classifier suite now passes500+ assertions; final immutable tip
+not yet reported. Optional extra-thought menu appeared: leave model unchanged,
+no action required. Sol cleared corrections throughf6bd381 except native-scope
+auth/login/decode guard proof, which Widgets is finishing. Full public gate
+remains held and no anonymous route integrated in root.
+
+## Mapper integration and remaining public matrix review
+
+Solde55cfe7caec690d48bbfd5b3ed328faf5b677d8 CLEAR; integrated7410b2fc9.
+Root five pure suites20 top-level PASS, full tidy1174 and compile1607 PASS.
+Logs /tmp/bml-altlogin-mapper-{integrated,tidy,compile}.log in root container.
+No mapper caller/hooks/auth/save/routes; no complete raw-hook ABI claim.
+
+Sol reviewing public anonymous corrections88d..f6bd now; Widgets final classifier
+WIP passes447+ assertions and is finishing after compaction. No public route
+integration yet. Test-only retained hook mutation37e6fb87cc08e057b03acc782263964d635cb095
+is queued after current Sol review,2files7top-level PASS. Themes branch clean.
+All root test sessions28506/27120 completed; root has no active test process.
+Keep existing models despite optional rate menus; no deployment/held-interface
+authorization changes.
+
+## Current immutable queue
+
+Unused native alternate-login mapperde55cfe7caec690d48bbfd5b3ed328faf5b677d8
+is with Sol; three subtests/43 assertions, scoped tidy and compile1607 passed
+in Themes container. Foreman mixed-action and shallow seed-props issues were
+corrected before commit. Not integrated pending review. Themes now has a separate
+test-only retained hook mutation characterization assignment: no auth, requests,
+protocol, save, route, or synchronization implementation. Source-only sync audit
+preserved as BML-ALTLOGIN-DECODE-HOOK-SYNC.md; its limitations are design work,
+not a new user approval question or accepted interface narrowing.
+
+Widgets anonymous public tests throughf6bd46d1c pass381 but remain held for
+remaining classifier rows and native-scope auth/decode zero-before-decline proof.
+Exact missing rows were sent: ineligible/readonly, response, preview/spellcheck,
+unknown action, HEAD/nontext; full finite mapping required. Production/browser
+previous bounded reviews remain accepted. Root stays local/clean; no public
+anonymous activation integrated and no root tests running.
+
+## Active followups after alternate-login integration
+
+Root clean integration through e2d0f408a; no root tests running. Widgets public
+anonymous matrix through88d is independently146 PASS but held for exact normal
+failed-postevent trace/ref and fresh authenticated/forced-login persisted rows,
+plus remaining exclusions/isolation and simultaneous error precedence. Clarified
+that normal canonical backend failure still invokes one flat spam hook; canonical
+backend request is distinct from flat decoder/spam ref. Do not impose flat
+identity on that canonical path. Browserf029 remains clear.
+
+Themes next assigned unused pure native HMV mapper from root e2d0f408a, with
+explicit caller seed and separate legacy hook snapshot, no auth/hooks/save/routes.
+Design preserved in BML-ALTLOGIN-NATIVE-FORM-MAPPING.md; raw hook synchronization
+remains separate. Sol is clarifying exact88d trace before final corrected review.
+
+## Callable alternate-login range integrated; public posting matrix remains held
+
+Source14db/67a/ec706/bd787/aa2 is independently clear and integrated as
+4d3c64c78/6efc4451e/a239fd248/05d40134a/d4e5cac46. Root combined six-suite
+run passed245 assertions, exact static build and normal callable browser passed,
+full tidy1172 and compile1607 passed. Logs are in root container8d7783a043d8 at
+/tmp/bml-altlogin-integrated-{prove,build,browser,tidy,compile}.log. Narrow capture
+was visually inspected; desktop/narrow captures are preserved under
+bml-evidence/2026-09-23/update-altlogin-callable. No public alternate-login GET or
+credential submission activation. Sol aa2 confirms nonblank draft/frozen state
+while the restore dialog remains open; deliberate dismissal is outside that
+GET-nonmutation claim. Earlier pending notes below are historical.
+
+Public anonymous browserf029 is independently plain-app clear. Full HTTP matrix
+still held; Widgets has passing exact auth/order/ref, authenticated-first and
+forced-login increments and is finishing finite exclusions/isolation and error
+precedence. Do not integrate its public route from partial evidence.
+
+Retained alternate-login POST test-only9718f68c76bfdd8e9acf821deba4484371e38b71
+is Sol-clear and integrated as45e7bf723. Root adjacent GET/POST baseline run
+passed156 assertions (/tmp/bml-altlogin-baselines-integrated.log); scoped tidy
+passed. Session A identity is explicitly observed: B owns entry/formatting, A
+draft property clears, frozen properties and editor preferences remain. Themes is preparing a source-only native TT schema mapping
+handoff; no new auth execution or route change in that audit. Existing deployment,
+message/inbox and valid reporting holds remain unchanged. All root validation
+processes above completed; no root test remains running.
+
+## Final callable altlogin review and next retained characterization
+
+Themes bd7878fb6f22f912563a92514534da4602e9224e is Sol production-clear: actual
+crosspost wrapper/account suppression and visible credentials proved, ordinary
+renderer unchanged,77 focused PASS. Browser no-write gap corrected test-only in
+aa2bb7041559b9620d281278877bcf87df006aab: nonblank draft/frozen properties asserted
+while observed restore dialog remains open, then deliberate dismissal. Sol narrow
+recheck queued after f029 plain-app anonymous replay. No root altlogin integration
+yet. Themes next task is separate retained altlogin POST test-only actor A/B
+characterization, no production/route changes or external effects.
+
+Corrected source-only audit preserved as BML-ALTLOGIN-POST-COMPOSITION.md. Old
+retained schema may use prepare_entry_form; new native TT schema must NOT feed
+that legacy decoder unchanged. Public alternate-login remains a later gate.
+Widgets f029666f94c152430bb8c876c5d72d24b5038a3b fixes exact target payload/denial and
+removes GET overlay; browser label-only a413 follows. Full public HTTP matrix still
+unfinished. Worker now assigned concrete both-alias3auth/order/ref proof plus
+real-session short-circuit, then forced-login-error/exclusion/isolation rows.
+Root full tidy1169 PASS; no active root test session. Source/runtime already
+integrated remains callable-only anonymous and retained alternate-login.
+
+## Active finite corrections after integrated callable gates
+
+Root is clean through b3a745609 (whitespace-only baseline formatting verified,
+scoped check PASS). Integrated callable browser and baseline results below stand.
+
+Widgets public anonymous candidate fd76fb5a42a3bdde049b7c9cba52a64a8f667752 is
+Sol source/core-clear only (69 assertions); full matrix remains held for exact
+three-auth order/ref, forced-login-error, authenticated-first, exclusions and
+isolation. Foreman additionally routed actual latest-entry ID instead of count,
+and meaningful target fallback instead of accepting a BML exception. Current
+real-form target fixture may append duplicate usejournal; diagnose encoded pairs.
+Browser27a8364da42a738ce50987456eaeba48119f9872 still harvests retained GET through
+an overlay; production POST is exercised but plain-app gate requires removing
+that unnecessary GET overlay and replay. Partial test followup7eef9ceeb is not
+full acceptance. Worker actively correcting; no root public activation.
+
+Themes callable altlogin through ec706 remains held. Sol confirmed remote
+Crosspost UI regression. WIP skipped account enumeration but initially left the
+module/setup panel and asserted nonexistent entryform-crosspost ID. Foreman
+routed actual crosspost-component/data-collapse wrapper and configured-control
+absence, ordinary positive control, and opt-in module suppression without user
+panel mutation. Visible credentials were fixed by moving the opt-in branch out
+of hidden js-only ancestor; normal browser passes, final immutable correction and
+normal/named/EOF/no-write evidence still required. Sol is reviewing public browser
+while waiting. Preserve deployment/inbox/reporting holds; no external effects.
+
+## Callable failure browser and retained altlogin baseline integrated
+
+Sol7d4df528747d4b9fe268fb33387bb8484a4c9dad CLEAR; root906fd65f4. Foreman
+normal replay PASS (/tmp/bml-anonymous-failure-integrated-browser.log), session67467
+complete, owned fixture/server absent. Narrow wrong-password capture visually
+inspected and desktop/narrow evidence preserved in anonymous-failure-callable.
+Public anonymous candidate remains separate Widgets WIP, not root activated.
+
+Sol7144fa64a14fdfe3c69dc962d740d818ca5acf4e baseline CLEAR; source919/1092/0b/14f/7144
+integrated as3d68a723a/7e2ec8b73/29cc1537a/33674d641/f04f3877d. Foreman baseline
+plus adjacent GET suite129 PASS (/tmp/bml-altlogin-baseline-integrated.log),
+session58482 complete. Parsed updateForm credential/action proof is distinct
+from documented shared logout returnto reflection. No production change.
+
+Callable altlogin14db+67a+ec706 remains under Sol source/HTTP review. Themes browser
+still needs diagnosis and acceptance; latest actual log failed username geometry
+at1280, not390. Requested actual rectangle/style evidence, readable harness and
+explicit clean-EOF state-reader handling. Do not accept a status-only stop or
+remove the visibility assertion without evidence. All current root sessions done.
+
+## Altlogin shared-template correction and review sequencing
+
+Foreman found67a submit_action_name was set only by the new renderer although
+entry/form.tt is shared by edit rendering. Worker ec7064c831ff26c236c3132b48956c98b616b802
+restores action:post fallback for both buttons and asserts both parsed edit
+controls; independent review pending. Callable browser390 geometry remains WIP.
+Baseline14f9942b3 still needs parsed input/returnto assertions rather than a
+regex extraction with empty fallback and a whole-body presence label; correction
+routed. No altlogin integration yet.
+
+Sol model was accidentally changed by a rate-limit menu consuming a queued
+prompt; no review result was accepted from that interval. Restored through the
+actual model selector, verified gpt-5.6-sol medium, and explicitly restarted
+independent7d4 review. Widgets retains Terra and is preparing the local public
+anonymous candidate on its separate branch; no foreman activation.
+
+## Current review queue and exact altlogin baseline disposition
+
+Callable continuation3197 is integrated and validated at ca854f263. New test-only
+wrong-password browser7d4df528747d4b9fe268fb33387bb8484a4c9dad is queued for Sol;
+not yet integrated. Final public anonymous matrix is preserved in
+BML-ANONYMOUS-PUBLIC-POST-FINAL-MATRIX.md; no public activation yet.
+
+Sol independently located the altlogin password-marker only in shared logout
+returnto, percent-encoded. The updateForm action is exactly /update?altlogin=1
+and its password blank. Baseline0b remains held for permanent scoped input/action
+proof plus explicit separate returnto characterization, not a header change.
+Themes is correcting it before resuming callable presentation14db+67a. Its first
+390px browser geometry assertion failed; browser WIP is preserved and must be
+finished before acceptance. Neither callable altlogin nor public activation clear.
+
+## Callable anonymous continuation integrated and validated
+
+Sol3197da9d6ee32668b2705f6132b217ba550b9b55 CLEAR. Integrated rootca854f263;
+foreman four retained/callable/native suites343 PASS
+(/tmp/bml-anonymous-continuation-integrated.log), session57383 complete. Full
+tidy1168/compile1607 PASS (/tmp/bml-anonymous-continuation-{tidy,compile}.log),
+session71798 complete. _do_post defaults unchanged; no public anonymous route.
+Earlier cache proposal explicitly superseded74d1284df by native outcome ownership.
+Widgets separate wrong-password browser normal/named passes, final commit/review
+pending. Sol source-only final public matrix underway; no route activation yet.
+
+Altlogin baseline0b979ee5361d86688f44bf625aca21b0443f52fe adds actual A-off proof,
+but does NOT add whole-body unique-marker absence. Foreman initially misdescribed
+that diff to Sol and immediately corrected it. Worker reports retained generic
+returnto links reflect the raw dummy query; Sol must verify marker location and
+scope credential/form-action assertions truthfully. Do not claim whole-body
+nonreflection or introduce an unrelated navigation/auth change. Baseline not clear.
+Themes callable presentation WIP follows concrete audit66888c8af; public schema
+and credential submission remain excluded. No root test sessions active.
+
+## Public share integration complete; callable continuation under review
+
+Sol fa176+d973 CLEAR; integrated94a035428/7f5dc5da1. Foreman corrected six-suite
+315 PASS (/tmp/bml-share-public-corrected.log), session24026 complete. Public
+browser already PASS/cleanup/captures. Full tidy1168 and compile1607 PASS
+(/tmp/bml-share-public-{tidy,compile}.log), session12677 complete. No active root
+validation process. Authenticated share GET is now active; excluded contexts retain
+BML as proved. Root current tree remains local, unpublished.
+
+Widgets committed callable anonymous continuation3197da9d6ee32668b2705f6132b217ba550b9b55,
+base d46d952b7: worker237 combined/tidy/compile pass, queued Sol production review.
+Not integrated. Next worker deliverable is separate callable wrong-password browser
+on a preserved new branch, reusing accepted64ce browser lifecycle and native retry
+semantics. No public anonymous route. Keep _do_post defaults unchanged.
+
+Altlogin baseline1092 remains held: marker assertion must reject encoded reflection
+via unique substring, A formatting OFF needs actual event_format assertion.
+Themes corrections queued; callable-only presentation WIP preserved separately.
+Sol TT source audit also checks explicit action versus credential query nonreflection;
+public credential/target/action schema remains unresolved and unactivated.
+
+## Public share browser replay passed; test-only fixes active
+
+Foreman public-share session94174 PASS (/tmp/bml-share-public-browser.log),
+owned fixture/server check empty, captures preserved under update-share-public.
+Combined HTTP305 remains held only for stale expectations in legacy GET handler
+and terminal tests; Themes is fixing those on the preserved public-share branch.
+No production regression was found by Sol or foreman browser.
+
+Sol919 altlogin baseline61 PASS but held for two finite proofs: GET password-like
+marker must remain absent/blank; actual remote formatting default Aoff/Bon must
+render independently of hook override. Themes handles after share-suite fix, then
+callable-only renderer. Sol source-only TT presentation seam audit underway to
+avoid changing default modal/auth behavior. Widgets callable failed-auth continuation
+still WIP; exact auth/update_fields counts/order and shared flat refs required.
+No active root tests remain. Never infer public anonymous/altlogin activation.
+
+## Public share source integrated; combined test correction pending
+
+Sol fa1767d51bdf087dc50e8caf756ec11224723e02 CLEAR source/160/browser and
+cleanup. Integrated root94a035428, but foreman broader six-suite run305 has three
+stale assertions: legacy-update-get-handler expects share decline/no factory (stub
+dies now called), terminal suite expects share BML form. Routed narrow test-only
+followup to Themes, preserving altlogin WIP. Do not claim combined green until fix.
+Log /tmp/bml-share-public-integrated.log; session91533 complete. Root public browser
+replay started separately; no production mismatch identified in these failures.
+
+Altlogin retained GET baseline919e8eb37f999d7cc73fe0a0a9dfddd5a3e2940d worker61
+PASS, queued Sol. Themes callable-only altlogin rendering successor assigned per
+preserved audit, but stale share-suite correction has priority. No public altlogin
+or credential submission/schema activation. Widgets anonymous continuation active;
+foreman caught login-prefix substitution mismatch and routed exact concatenation.
+
+## Anonymous callable integration validation complete
+
+Foreman browser session29015 PASS (/tmp/bml-anonymous-callable-browser.log),
+owned fixture/server and port18117 clear. Native390 capture inspected: retained
+body/subject, one visible date error, usable in-bounds controls. Six captures
+preserved under anonymous-update-callable. Full tidy1166 and compile1607 PASS
+(/tmp/bml-anonymous-final-{tidy,compile}.log), session77452 complete. No active
+root tests remain. Callable anonymous source/HTTP/browser gate complete; public
+failure-continuation implementation remains separate and active in Widgets.
+
+Sol public sharefa176 exact HTTP78 PASS, plain-app browser review running. Themes
+retained altlogin GET baseline still test-only WIP, correcting actual retained
+control expectations. No public share integration until Sol final disposition.
+
+## Anonymous callable browser accepted and integrated
+
+Sol64ce682e7b9d78c7824303fafa8a3955cc542660 CLEAR: independent normal,
+named failure, clean EOF, owned process cleanup and visual review. Retained390
+horizontal overflow is baseline; native390 retry usable with one date error.
+Integrated rootd5aa0905b. Foreman exact browser replay running session29015,
+log /tmp/bml-anonymous-callable-browser.log; do not duplicate. Accepted callable
+HTTP/browser now complete, public anonymous activation still gated on continuation.
+
+Widgets active branch bml-terra-anonymous-native-failure-20260923 implements only
+callable error continuation from13f4ea792. It briefly stopped after incorrect
+standalone compile bootstrap; explicitly resumed through implementation/tests.
+_do_post defaults and public routes must remain unchanged. Themes active retained
+altlogin GET test-only baseline; fixture corrections routed (valid initial target,
+omitted hook keys for snapshot). Public sharefa176 remains Sol next review.
+
+## Retained auth sequence accepted; next two reviews queued
+
+Sol bc021+5a2 CLEAR108/scoped tidy. Integrated9df4acb83/e018e1fa0; foreman
+sequence+current adapter203 PASS (/tmp/bml-anonymous-sequence-integrated.log),
+session3955 complete. Source-only native failure continuation13f4ea792 preserved;
+Widgets next callable-only implementation on a new branch, _do_post defaults
+unchanged, no public route/auth-policy change. Accepted classification must occur
+before first auth; once attempted all outcomes native-owned to avoid repetition.
+
+Anonymous callable browser64ce682e7b9d78c7824303fafa8a3955cc542660 committed
+atop cleared04ffff. Worker normal/named/earlyEOF, focused/tidy/compile pass; queued
+Sol first. State snapshots exclude password; invalid attempt preserves nonblank
+state, later native retry intentionally clears drafts and changes displaydate.
+No browser integration until independent review. Worker preserves source branch.
+
+Public share fa1767d51bdf087dc50e8caf756ec11224723e02 queued Sol second:
+worker78 public/160 combined, plain-app stub-only normal/named/startup cleanup,
+tidy1165/compile1607 pass. No root activation yet. Themes next test-only retained
+altlogin GET characterization from root13f4ea792; no POST/auth/schema changes.
+No root validation sessions active. Held platform/deployment work remains held.
+
+## Anonymous draft JS integrated; first browser normal pass reached
+
+Sol04ffff315b6d1a99b2d72bb57025636695e9546b CLEAR for retained rendering;
+rootbb6b088e3 integrated. Foreman anonymous adapter+retained baseline163 PASS
+(/tmp/bml-anonymous-draft-js-integrated.log), session83745 complete. It moves one
+escaping map outside remote-only branch; no auth/route/save behavior changes.
+
+Widgets browser normal now exit0 after correcting fixture property reads,
+authoritative date control, active FCK body updates and bounded startup waits.
+Exact owned fixture/server/port check empty. Browser is still WIP: require final
+secret-free state assertions, named failure, clean EOF, tidy/syntax and immutable
+commit before Sol review. No browser gate inferred from first normal pass.
+
+Themes baseline correction5a2bcd8a7b5786881620a490b62ccc8460eaef46 atopbc021
+adds exact failed-stage order/ref and forced-login-error persisted content; worker
+108 PASS, Sol recheck queued. Public share WIP safely restored and worker78 public
+HTTP currently passes; full finite/browser work continues. Sol also owns source-only
+native failed-auth continuation audit; no public anonymous composition authorized
+by that audit and no policy changes. No root validation processes remain active.
+
+## Share formatting cleared; retained auth baseline in review
+
+Sol bbb0a2970 formatting-only CLEAR; source behavior unchanged, node checks pass.
+Foreman narrow share capture inspected: populated subject/RTE/tags and controls fit.
+All integrated share checks complete (178 focused, browser, tidy1163, compile1607).
+Themes committed retained anonymous auth sequence bc021fbd0e493654e160e8318ea871c394ae90cb:
+worker100 PASS, now Sol independent review. Forced protocol-login error still leads
+to postevent/persistence in retained code, so future continuation must preserve
+observed behavior rather than assume no save. Themes next implements finite public
+share activation from root86d47ce3f; factory always stubbed in tests.
+
+Widgets browser exposed retained anonymous JavaScript empty assignments caused by
+escaping draft properties only inside the remote branch. Separate narrow rendering
+fix plus real-response regression requested before browser commit. After initializer
+works, FCK asset loading exceeds the harness15s navigation bound; use bounded ready
+checks, retain resource/page-error assertions. Do not suppress errors or change auth.
+No root test sessions active; worker runs owned in their containers.
+
+## Callable share checks complete; next finite activation prepared
+
+Foreman share tidy1163 and compile1607 PASS, session43129 complete; logs
+/tmp/bml-share-{tidy,compile}.log. Root has no active validation process.
+Source-only public share handoff preserved as BML-UPDATE-SHARE-PUBLIC-ACTIVATION.md:
+altlogin remains BML; share callable is returned directly before ordinary readonly,
+so readonly+share falls back rather than losing prefill. Tests use local factory
+stubs only. Assign Themes after its retained anonymous sequence baseline commits.
+
+## Callable share integrated; anonymous browser remains active
+
+Sol d7784f3f8 + dd049ba45 CLEAR for callable source, HTTP42+52 and browser
+normal/named failure with cleanup. Root integrated as689cb2725,45bf590ce;
+formatting-only bbb0a2970 integrated as800f8d52a, narrow Sol comparison pending.
+Foreman focused four-suite178 PASS (/tmp/bml-share-integrated-prove.log), exact
+static build and browser PASS (/tmp/bml-share-build.log,/tmp/bml-share-browser.log).
+Owned share server/fixture check empty. Captures preserved in update-share-callable.
+Full tidy/compile running session43129; do not duplicate. Public share not activated.
+Sol now audits the finite public share placement/matrix without external fetches.
+
+Anonymous callable HTTP remains accepted through c778. Widgets browser WIP reached
+native correction, then a displaydate assertion failed. Foreman identified wrong
+fixture SQL (userprop/name versus actual property storage); use the property API
+with fresh reads and assert seeded nonempty drafts/displaydate before nonmutation.
+Earlier invalid-date browser probe had date_diff=0, so retained decoder correctly
+ignored raw invalid date; actual settime/date_diff=1 is now used. No production
+regression established. Finish normal, named failure, clean EOF and owned-process
+cleanup before immutable browser review. Do not launch duplicate active runs.
+
+Anonymous public composition stays gated: source audit679c7ad8e documents that
+naive callable auth then BML fallback adds a fourth failed-login check and rate
+side effects. Themes is writing test-only retained sequence characterization,
+not implementing public auth. Altlogin source-only audit is preserved14da59427;
+credential/target schema and failed-auth paths remain separate activation gates.
+Held inbox/platform and deployment hook work remain held; no publishing.
+
+## Public manager property activation integrated and validated
+
+Sol423+09 CLEAR178 with independently cleared plain-app browser. Integrated as
+root8d2be92c5 and88a819e17. Foreman five-suite regression692 PASS
+(/tmp/bml-manager-public-integrated.log), session3905 complete. Plain-app browser
+PASS (/tmp/bml-manager-property-public-browser.log), session25624 complete;
+owned runner/fixture/server check empty. Desktop/narrow captures preserved under
+manager-property-public; GET remains the retained BML baseline unchanged. Full
+formatting1161 and compile1607 PASS (/tmp/bml-manager-public-{tidy,compile}.log),
+session24833 complete. No root validation sessions remain active.
+
+Themes callable authenticated share d7784f3f8244a7d0a3a0171cfd83194b94679f44
+is queued Sol after source-only anonymous composition audit. Worker42 direct plus
+52 adjacent and compile1607 passed. Themes builds callable stub-only browser;
+no real URL fetch or public share activation.
+
+Widgets anonymous callable browser WIP remains held. Repeated browser response
+assertion and owned Starman server leak are under diagnosis with test-only claimed/
+declined headers and redacted field metadata. Foreman found clean-EOF pending-read
+hang in new harness and routed the already-accepted terminal/awaited cleanup fix.
+Do not infer browser acceptance from accepted anonymous HTTP/production.
+
+## Final manager routing proof queued
+
+Sol423 production/HTTP168/plain-app browser normal+named cleanup are clear; two
+finite public rows held. Test-only09d8797351395f09dff89f85436cbf1b0911a87e adds
+actor-self target and real noncoincident B-community composite under A, all inert
+invalid-token savemaintainer with zero writes/fresh state. Worker178 PASS; Sol
+narrow final recheck queued. No manager integration yet.
+
+Themes preserved share WIP in a named stash to make09, then resumes callable share
+implementation. Widgets anonymous browser remains uncommitted; first visible-submit
+issue passed, now diagnosing retained response and owned test-port cleanup. Scope
+credentials to actual #updateForm rather than header controls; do not log passwords
+or duplicate a live run. Accepted anonymous HTTP/production already integrated.
+
+Sol also has bounded source-only anonymous public composition audit queued at
+/tmp/bml-anonymous-public-post-composition.md: handler order and possible duplicate
+auth_okay side effects after failed callable auth followed by BML. No authentication
+execution, public activation or new policy is authorized by that audit itself.
+Root has no active validation process; all accepted integration checks are complete.
+
+## Integrated anonymous callable checks complete
+
+Foreman formatting1160 and compile1607 PASS after anonymous callable integration;
+logs /tmp/bml-anonymous-callable-{tidy,compile}.log, session28024 complete. Combined
+focused614 remains green. Root has no active validation or browser process.
+
+Sol public manager423 HTTP168 and normal/named browser runs passed with cleanup;
+awaiting final finite review disposition. Widgets callable anonymous browser is
+still uncommitted and being diagnosed; no browser acceptance claim. Themes is now
+on callable authenticated share rendering implementation, tests must run in its
+container (one host compile was invalid environment evidence, not a code failure).
+
+## Anonymous callable integrated; public manager under review
+
+Sol finalc778a624c814c4eac438ac158c3563fe1c68a7ba CLEAR93 including nonvacuous
+displaydate. Integrated502/8f/ef1/260/c778 as rootb79ea4bf2,ddb515a8a,58d84973c,
+fd8c6954b,d2b7cc6ba. Foreman five anonymous/legacy/native suites614 PASS
+(/tmp/bml-anonymous-callable-integrated.log), session74391 complete. Full tidy and
+compile running session28024, logs /tmp/bml-anonymous-callable-{tidy,compile}.log.
+Widgets continues first callable browser diagnosis (visible legacy submit hit test),
+with browser files uncommitted; no public anonymous route.
+
+Public manager423eee65ce5616328cb898863adba1117abe1520 queued Sol; worker168,
+plain-app normal/named failure, tidy1160/compile1607 passed. Sol HTTP168 passed,
+independent browser underway. Do not integrate until final finite review disposition.
+
+Themes next branch bml-terra-update-share-get-20260923 fromd2b7cc6ba: authenticated
+callable-only share GET render+finite stub tests. Source audit preserved as
+BML-UPDATE-SHARE-GET.md (root2c9c5d221). No URL fetch, public route, anonymous or
+altlogin composition, global prepopulate change, or deployment interface change.
+Preserve manager423 branch for any Sol correction.
+
+## Anonymous finite persistence review queued
+
+Sol8f60120ec43841e034732a07346f5588c206a56f guard CLEAR85; it declines query
+or POST targets before authentication and failed protocol login before decoding.
+Sole shared-helper cleanup ef1f928c4b1a972a023384d2e6468541d34f8a04 CLEAR84;
+Sol mechanically proved _do_post byte-identical to accepted dc7. Final test-only
+26099bb40e51156a63801b961d0c30f548d87895 is queued for finite persistence review:
+actual editor/format/date controls, explicit missing anonymous userpic picker,
+separate labeled schema userpic persistence, and failure-state sentinels.
+Widgets builds callable-only browser next; public anonymous activation is absent.
+
+Manager public candidate now has130 worker HTTP assertions passing and a plain-app
+normal browser pass. Foreman routed last matrix rows for ineligible routing and
+zero-effect delete/writer counters. Await immutable final candidate and Sol review.
+Root remains clean with no active validation processes; accepted manager callable
+range and captures are already integrated. Pending deployment interfaces and held
+platform work remain unchanged.
+
+## Anonymous candidate held on finite corrections
+
+Sol provisional5020a4e0cc7ef2f40e87bc61431ee6bf32374e07 confirms the missing
+initial invalid GET usejournal guard: omitted POST target plus nonexistent query
+target must decline before login/decode/save/hooks. Widgets has the exact case.
+Finite success proof also needs fresh saved editor/preformatted, valid timestamp/
+backdate and userpic assertions. Shared legacy_suppress_success behavior remains
+under review; explicit anonymous remote undef/master0 must survive all branches.
+Wrong/empty credentials stay BML-owned. Wait corrected immutable tip; no integration.
+
+Manager public candidate first65 tests passed but omitted agreed routing rows.
+Foreman routed full manager invocation/order, contradictory targets, valid-token
+readonly parity, sysban ordering, short circuits and denied-to-valid sequence.
+Worker continues on same isolated branch; no accepted public manager activation yet.
+
+## Callable manager browser accepted and replayed
+
+Sol4a116591173b5ed43d8b2f166566b24ee38ace41 CLEAR; integrated1e7bd2faa.
+Foreman normal browser PASS (/tmp/bml-manager-property-browser.log), session12143
+complete, owned node/fixture/server/Chrome process check empty. Captures preserved
+under manager-property-callable; narrow capture inspected. It retains the old BML
+layout overflow and extensionless title missing-string baseline; no markup change
+or native manager GET claim. Callable integration tidy1157/compile1607 PASS
+(/tmp/bml-manager-callable-{tidy,compile}.log), session49928 complete.
+
+Themes may commit public property-only candidate once its finite validations pass.
+Widgets anonymous owner callable5020a4e0cc7ef2f40e87bc61431ee6bf32374e07 is queued
+Sol source review with a worker followup pending around login-failure context and
+initial invalid GET target ordering. No anonymous integration/public activation.
+No root validation processes remain active.
+
+## Manager callable HTTP integrated
+
+Sol final4c4313af47163f882b1d090c41b7e6df7f1d0b7f CLEAR95; integrated production82
+and tests66/4c as rootd5d91fc4f,88eaa5b1c,a88bb4e97. Foreman four-suite action,
+maintainer, property and same-poster dispatch regression387 PASS
+(/tmp/bml-manager-callable-integrated.log). Session9783 complete.
+Callable browser4a remains under independent replay. Themes public property-only
+candidate remains uncommitted pending that gate; Widgets anonymous composition
+remains under implementation. No active root validation processes.
+
+## Manager final callable review and anonymous composition in progress
+
+Manager production82 and finite test correction66 are source/behavior clear;
+Sol independently ran94 assertions. Remaining reporter-stub safety fix is
+4c4313af47163f882b1d090c41b7e6df7f1d0b7f: count only, never delegate reporting,
+plus no hook calls after the direct unsupported-action loop. Worker95 PASS;
+Sol narrow recheck queued. Separate callable browser4a116591173b5ed43d8b2f166566b24ee38ace41
+has normal, named-failure and clean-EOF evidence; independent replay queued.
+The earlier browser cleanup hang has a submitted correction, not yet accepted.
+
+Themes prepares the finite public property-only dispatch on an isolated branch;
+activation stays uncommitted pending callable/browser clearance. GET and manager
+delete/report surfaces stay retained. No valid delete/report action is authorized
+in this package. Public finite matrix is BML-MANAGER-PROPERTY-PUBLIC-POST.md.
+
+Widgets continues uncommitted successful-password anonymous owner POST composition.
+Current focused WIP has60 passing assertions, but source/acceptance review remains
+pending. Initial invalid GET target ordering and protocol-login failure scope were
+flagged for the worker; do not integrate WIP or activate anonymous routes.
+Root53c3ccf37 has no active validation processes. Existing accepted gates stay closed.
+
+## Anonymous retry prerequisite accepted
+
+Sol dc7db44d222c928cffe7d418a3447560a9f60fac CLEAR; integratedf26b50442.
+Foreman anonymous/legacy/native rerender suites78 PASS
+(/tmp/bml-anonymous-rerender-integrated.log), session34929 done. Optional username
+only affects explicitly anonymous retry, both password controls stay blank.
+
+Widgets uncommitted posting slice now has an initial8-test successful save/retry
+run but is NOT accepted. It still needs full login/ordering/ref/state/decline
+acceptance; worker resumed after compaction. Themes finite manager corrections
+currently94 worker tests pass, with target matrix/browser work still active; wait
+for immutable SHA and Sol recheck. Sol prepares manager public POST finite matrix.
+Root has no active validation processes. No public anonymous or manager activation.
+
+## Manager source clear; finite property tests held
+
+Sol82f59cca2 production source review found no material defect; focused85 passed.
+Permanent gate remains held for: unsupported submit buttons omitted by make_request
+(use exact callable-only fields and zero-effect counters); contradictory target/item
+precedence and personal/own-poster/noncommunity declines; exact raw clear payload
+including missing-control undef. Themes has these finite corrections queued after
+safely resolving/preserving its current property browser run. No valid public
+delete/report request is allowed. Browser set/clear is property-only.
+
+Widgets dc7 anonymous renderer is queued Sol; its subsequent anonymous callable
+POST WIP is uncommitted and initially failed. Worker must finish diagnosis, retained
+login-message step, readonly pre-decoder boundary, hook/state/decline proofs before
+claiming that slice. Correct test app returns request response after native OK;
+actual retained action duplicate controls need careful selection. Do not integrate
+this incomplete WIP or activate anonymous routes.
+
+## Callable property and anonymous retry reviews queued
+
+Manager property adapter82f59cca2f92277afad47073828c2c9c2d2cdb6f is queued Sol;
+worker focused254/tidy1154/compile1607 passed. No route registration, only three
+properties for savemaintainer. Themes builds test-only disposable browser set/clear
+proof; no delete/report action. Foreman flagged submit controls omitted by
+make_request and missing contradictory target rows for finite review.
+
+Anonymous retry prerequisite dc7db44d222c928cffe7d418a3447560a9f60fac (base7ed)
+is queued after manager: explicit anonymous_username, native username field, blank
+password, real TT18 tests and tidy passed. Hidden and visible username controls
+must be distinguished; do not rename native username to legacy user. Widgets now
+implements the ordinary successful-password callable slice atopdc7. Failed auth
+remains BML-owned, no public activation or authentication-policy change.
+
+Rootc5b4a8985 is clean; all integration tests and browser sessions are complete.
+Public community POST and retained anonymous baseline are accepted, not reopened.
+
+## Retained anonymous password baseline accepted
+
+Sol207..2cb742c854a9442d9562aef8ed4b8b99b22c3789 CLEAR; integratede14dda093
+throughfbe73790b. Foreman baseline+anonymous GET128 PASS
+(/tmp/bml-anonymous-baseline-integrated.log), session52317 done. Exact errors,
+retained inputs, blank password, divergent failure sentinels and success formatting
+changes are now characterized. Test-only; no public anonymous route/auth change.
+
+Widgets implements anonymous retry prerequisite (keep native username, select
+visible duplicate input in tests) then successful-password callable owner slice.
+Themes manager property adapter focused254/compile1607 passed, immutable handoff
+pending. Root has no active test/browser sessions and no pending implementation
+edits. Public community POST remains fully accepted and integrated.
+
+## Public same-poster community POST integrated and validated
+
+Sol finaled191efce6294be8edfa2a80e6b38a356426c5e3 HTTP123 CLEAR, with previously
+cleared browser979. Integrated source1d through final corrections as rootbbd359599
+through2e4a449f6; duplicate EOF fixf165 omitted because root already has615.
+Foreman five-suite regression519 PASS (/tmp/bml-community-post-integrated.log).
+Real production-POST browser PASS (/tmp/bml-community-public-browser.log), owned
+fixture/server check empty. Four captures preserved in community-edit-post-public;
+390px native retry visually inspected: one useful error, content/community and
+controls visible/in bounds. Full tidy1154 and compile1607 PASS
+(/tmp/bml-community-public-{tidy,compile}.log). Root sessions31556/69983/16698 done.
+
+Anonymous final baseline2cb742c854a9442d9562aef8ed4b8b99b22c3789 (207/69/8beed)
+is queued Sol, worker68 PASS; not yet integrated. Themes restores its safely
+stashed manager-property WIP after correction. Widgets works on the separate
+anonymous retry-render prerequisite then successful-password callable composition
+from7ed6ece2c. No public anonymous route or manager activation, no publishing.
+
+## Anonymous ordinary composition handoff
+
+BML-ANONYMOUS-POST-COMPOSITION.md preserves Sol's corrected source-only design.
+First callable slice owns successful password authentication only, with no public
+registration. Missing/empty or failed credentials decline before decoder/render;
+retained BML keeps its distinct failure timing. A later failure migration must
+preserve login -> decode -> protocol attempt -> spam hook for nonempty wrong
+password, versus hook-free missing-password rerender. Do not collapse those
+paths into an early generic native error. Existing native legacy-success helpers
+already separate poster formatting changes from remote-only draft/editor writes.
+
+## Latest finite corrections and anonymous baseline recheck
+
+Community corrections through6b8556dfe2a930642e96457463139b9678a55e13 now have
+112 worker assertions: missing token omitted, useful token denial/no redirect,
+exact beta Location (b18a6be69145d4d0a79f4749ce550d1eb7dbaa57), valid-token
+actor/community readonly routing intercepted before retained protocol execution.
+Observable precedence via invalid-date retry and zero mark/report invocation on
+the existing invalid-token-only manager row remain assigned. Sol browser979 is
+clear; do not integrate the public range until final HTTP recheck clears.
+
+Anonymous baseline69d8f68ae7a94b6620f7a0d789ee51196413d7e2 (atop207) has62
+worker assertions and is queued Sol. It distinguishes successful poster formatting
+writes from remote-only draft/editor state and uses exact error/retry controls.
+Foreman asks Sol to check divergent sentinels: failed formatting writes must not
+be masked by stored and submitted values both zero. Manager callable source work
+continues on its preserved branch. Sol also prepares a source-only ordinary
+anonymous callable composition handoff; no public anonymous activation.
+
+## Public browser clear; finite HTTP and anonymous baseline reviews continue
+
+Sol independently cleared public community browser9790446adebcf991c869befd6473c601f8eff035:
+normal production POST replay, named failure, clean EOF, cleanup and narrow capture
+all passed. Public dispatcher remains unintegrated until finite HTTP corrections
+close. d1bd0f2c106712f65d19bddddee732c75953d9bf omits the missing token and formats
+the browser server. Remaining proofs: observable selected target, valid-token
+actor/community readonly guards, exact beta redirect, meaningful token rejection,
+and a zero-call reporting stub on the invalid-token-only manager row. No valid
+manager reporting action may be executed; the earlier automatic rejection stands.
+
+Anonymous retained POST baseline207f80f509cf3039315dafda8e5ab96660053d28 is queued
+Sol: worker51 focused/tidy1154/compile1607 passed. It is test-only, disposable,
+password-based, no Cookie header; no native anonymous activation. Foreman flagged
+broad error matching and separate editor preference coverage for review. Themes
+has moved to the bounded callable-only manager property package described in
+BML-MANAGER-PROPERTY-POST.md, excluding routes/delete/report and external hooks.
+Widgets continues all remaining HTTP corrections; Sol reviews immutable ranges.
+
+## Public community final matrix recheck pending
+
+Final candidate HTTP1be4ae912b2167573f5117edfa3b9d0f5c65eeef (99 worker tests)
+and production-POST browser9790446adebcf991c869befd6473c601f8eff035 are queued
+Sol. Foreman found narrow false-positive rows: precedence checked entry counters
+but not resolved target; readonly used invalid token; beta lacked exact redirect;
+missing token was empty rather than absent. Widgets corrects these test-only
+proofs before acceptance. Six-line production1d/core98 remains source/core clear.
+No public community POST integration yet. GET-only BML harvesting is deliberate;
+POST must use the captured real production route.
+
+Source-only manager property handoff is BML-MANAGER-PROPERTY-POST.md. Retained
+readonly/sysban/redirect/raw-value differences are explicit; no implementation,
+manager routing, deletion or reporting change. Themes test-only anonymous
+password-form baseline is active in its isolated container; no production/auth
+changes and automatic review is respected. Root has no active test processes.
+
+## Corrected anonymous POST source contract preserved
+
+BML-ANONYMOUS-POST-SCHEMA.md is the corrected source-only audit. Retained
+login/postevent seeds do not forward top-level chal/response; response only
+changes missing-password rerender classification. Do not infer unsupported
+challenge behavior. Unknowns are characterization gaps, not product decisions
+that override the requested compatibility default.
+
+Themes next bounded package is test-only retained anonymous password-form
+characterization using disposable local account data, no session cookie, no
+production/auth changes or external delivery. Actual form/ordinary success and
+wrong-empty credential/body responses, fresh state and password rerender behavior
+only. Automatic review remains in force: any affected rejected action must stop,
+not be retried around the guard. This does not activate anonymous native routes.
+
+Widgets final public community matrix1be4ae912 (99 worker assertions) and
+production-POST browser follow-up are queued/in progress for Sol; no integration
+yet. Browser harvest retains GET-only fixture and forwards all POST to real app.
+
+## Anonymous callable browser accepted
+
+Sol d2dc5a1674a8a1708699be710864bde2919bd015 CLEAR, integrated afeafd8ca.
+Foreman no-submit browser replay exited0 (/tmp/bml-anonymous-callable-browser.log),
+owned helper/server/Chrome check empty. Desktop/390 captures preserved under
+update-anonymous-callable; narrow subject/RTE/controls visually fit. Native login
+modal stays closed; this is render-only evidence, not authentication or public
+schema acceptance. Root session30346 complete.
+
+Public community production1d6/core98 is source/core-clear only. Widget tests now
+through1c9e88c7034d0379de0b3fb2c05ffe6d41d868ed (87 worker assertions) still lack
+final configured-spellcheck/precedence/isolation rows and plain-app browser. Keep
+unintegrated. Themes corrects source-only anonymous POST audit to distinguish
+fields actually forwarded from fields merely mentioned; no auth tests or route.
+Sol audits only retained manager property-save source, excluding delete/report.
+
+## Callable community browser accepted and integrated
+
+Sol86165dd08 + lifecycle6157821d CLEAR; integrated936b31e35/7b05844c5.
+Foreman exact browser PASS (/tmp/bml-community-callable-browser.log), no owned
+helpers; desktop/narrow captures saved under community-edit-post-callable.
+390px retry visually inspected: one useful error, preserved content/community,
+visible controls and no horizontal clipping. Full integrated tidy1151 and
+compile1607 PASS (/tmp/bml-anonymous-community-{tidy,compile}.log).
+Root sessions17588/31729 complete; no active root test process.
+
+Widgets public core1d6d23fe4 and partial matrix98c86b19f remain UNINTEGRATED.
+Next concrete rows: itemless/no resolver; missing-invalid tokens with fresh
+nonmutation; invalid/zero/repeated IDs; then readonly/beta/spellcheck/precedence.
+Sol can source-review immutable dispatcher now, full gate remains pending.
+
+Automatic approval review rejected a proposed valid retained deletespam test:
+"The test submits the real `deletespam` action through the public route, which
+could trigger moderation/reporting side effects; the claimed nonmutation is not
+established and the request does not authorize performing that operation."
+The valid action was outside assigned routing-only scope and was not executed.
+Worker corrected to intentionally invalid CSRF; no report was sent. Do not retry
+valid manager/reporting actions or bypass this rejection. Unaffected work continues.
+
+Themes anonymous browser remains WIP after normal/startup-failure validation;
+await immutable SHA and independent review. Public anonymous schema/auth unchanged.
+
+## Anonymous callable integrated; browser lifecycle recheck queued
+
+Sol d8f79ac078e963629b30b787b9de464f0d55eb25 CLEAR, integrated 9e05a87a8.
+Foreman five adjacent suites: 213 PASS (/tmp/bml-anonymous-callable-integrated.log),
+session72840 complete. Shared native renderer has optional title/username input;
+no public anonymous route or authentication/POST change. Native schema remains
+a later gate. Themes now adds render-only browser acceptance without submission.
+
+Community browser861 remains held for clean fixture EOF waiting forever. Narrow
+fix6157821d159b21c341987e1fb0a831ee5c3d2064 is queued Sol: pending/future reads
+reject EOF, with normal/early-clean/named-failure worker proofs. Widgets resumed
+separate public core1d6d23fe4463c76a7d41bd7a2d83971ee9ea537e to finish matrix
+rows4/5 and ordered dispatch markers, then plain-app browser followup. Public
+community POST is NOT integrated. Root has no running tests/browser processes.
+
+## Active worker checkpoint
+
+Callable community browser commit 86165dd0898489a13dce47c33f7428ee90022cbb
+is queued with Sol. Worker normal/named-failure runs and in-container cleanup
+passed; reviewer also checks clean fixture exit before startup JSON. Do not
+integrate until exact browser gate is clear. Widgets has resumed separate public
+EntryPicker composition and finite HTTP matrix, with no manager/report mutations.
+
+Themes anonymous callable renderer remains uncommitted WIP on its isolated
+branch. Focused 60 tests pass after visible username prefill and post-hook read
+ordering were corrected. Final adjacent/tidy/compile checks and immutable review
+are pending. Native credential schema and public authentication remain separate.
+Root clean at bb40cfd52 before this documentation checkpoint; no root processes.
+
+## Finite public community POST matrix preserved
+
+BML-COMMUNITY-POST-ACTIVATION.md records Sol source-only routing requirements
+at ce765e52b. Widgets must finish and commit current callable browser acceptance
+before a separate public composition/matrix commit. Retained GET fixture capture
+may be scoped, but tested POSTs must use actual app dispatch. Manager and
+reporting actions remain routing-only exclusions; no valid mutations in those
+rows. Themes continues anonymous callable rendering only. No root tests running.
+
+## Callable community resolver integrated; shared checks green
+
+Sol 124473f0d58d461faee4645a9cd194a3dd0fbd4d CLEAR; integrated ce765e52b.
+Foreman resolver/helper/personal four-suite replay: 265 PASS
+(/tmp/bml-community-resolver-integrated.log). No production registration.
+After accepted save/delete attempts the resolver always returns native output;
+unsupported contexts fall through before decoder/mutation. Browser acceptance
+is active separately; Sol prepares finite public routing requirements.
+
+Integrated terminal/resolver full tidy 1148 and compile 1607 PASS
+(/tmp/bml-terminal-resolver-{tidy,compile}.log). Root sessions 31454/27939 are
+complete. Root has no running test/browser process. Themes callable anonymous
+renderer remains uncommitted WIP, no public/authentication change.
+
+## Public invalid-target terminal accepted
+
+Sol exact combined tip 24fddcb8244b1b790278f6ad1e12b222d37a3d79 CLEAR;
+integrated as f7f159f6c. Foreman seven-suite regression: 246 PASS
+(/tmp/bml-invalid-terminal-integrated.log). Real browser normal PASS
+(/tmp/bml-invalid-terminal-browser.log), owned helper check empty. Desktop and
+390px captures preserved under update-invalid-terminal; narrow title/body fits
+and retains the exact legacy message. Sol also proved named failure cleanup.
+Root sessions 47782 and 12814 are complete.
+
+Remaining native-consumer audit is BML-REMAINING-NATIVE-CONSUMERS.md: no ordinary
+independent conversion remains outside active editor work and held interfaces.
+Themes now implements only the callable anonymous renderer from the separate
+source audit, with no public route or authentication changes. Widgets continues
+callable community browser acceptance; Sol reviews resolver 124473f0. No BML
+retirement, publishing, deployment or held-interface change is authorized here.
+
+## Pending invalid-target and community resolver review
+
+Canonical invalid-target public tip is 24fddcb8244b1b790278f6ad1e12b222d37a3d79,
+replayed directly atop ff4774366 with accepted readonly fixes already present.
+Worker combined seven suites: 246 PASS. Sol reviews this exact tip, replacing
+stale 94 ancestry. No invalid-target public activation has been integrated yet.
+
+Callable community resolver 124473f0d58d461faee4645a9cd194a3dd0fbd4d is also
+queued for independent review. Widgets continues separate test-only browser
+acceptance; no production registration. Themes audits remaining ordinary BML
+language/request consumers outside held interfaces and current Entry work.
+
+Source-only anonymous rendering handoff is preserved in
+BML-ANONYMOUS-UPDATE-GET-RENDER.md. Its proposed callable shares the native
+renderer, but public activation remains separate from credential/target schema
+and authentication parity. No anonymous implementation or policy change yet.
+All external deployment and platform restrictions remain held.
+
+## Readonly integration fully green
+
+Solc9fb04a1 stale-suite correction CLEAR, integrateded5210e22. Root exact merged
+five-suite run206 PASS (/tmp/bml-readonly-public-integrated-fixed.log). Full tidy
+1146 and compile1607 PASS (/tmp/bml-readonly-community-final-{tidy,compile}.log).
+Public readonly4493 integrateda564 now has complete broader regression evidence,
+plain-app browser PASS/nohelpers, and saved captures. Earlier five stale failures
+are resolved. Root sessions39451/24219 complete; no active root test process.
+
+Community helper55 integrated184a: root3files202PASS (session67807 complete).
+Callable invalid-targeta662 integrated51a7: root17PASS (session73750 complete).
+Widgets implements separate callable community resolver; Themes finishes public
+invalid-target terminal with adjacent stale rows updated before review. Sol has
+source-only anonymous GET rendering audit, explicitly excluding authentication
+implementation/probes and leaving schema/auth parity as separate future gate.
+
+## Community POST helper accepted; readonly test correction pending
+
+Sol55c9 helper CLEAR, integrated184a32c7a. Root three-suite replay session67807
+running (/tmp/bml-community-edit-helper-integrated.log). Explicit community opt-in
+only; personal defaults, session-log/effective-actor distinction and native retry
+are preserved. Widgets now implements separate callable resolver; no public route.
+
+Public readonly production/browser4493 remains independently clear and integrated;
+root broader stale tests await Solc9fb04a1 review, then exact merged five-suite
+rerun. Public captures preserved under update-readonly-public. Sol invalid-target
+callablea662 integrated51a7 and root17PASS; Themes public invalid-target WIP is
+separate and not accepted. All held interfaces remain unchanged.
+
+## Public readonly integration follow-up required
+
+Sol4493 CLEAR, integrateda564e9e50. Root plain-app actual-readonly browser PASS
+(/tmp/bml-readonly-public-browser.log), fixture check empty, captures copied to
+/tmp/bml-readonly-public-browser. Broader five-file root run failed five STALE
+assertions in two older files: plack-update-get-activation22-23 still expects
+readonly BML; legacy-update-get-handler28 expects299 and33-34 expect3 hooks rather
+than4. Themes assigned separate test-only precise native warning/form and once/ref
+correction, preserving invalid-target WIP. Do not report full combined suite clear
+until this fix is independently reviewed and rerun. Root sessions9852/15505 done.
+
+Sol callable invalid-targeta662 CLEAR, integrated51a7ec6c1; no public invalid-target
+route. Focused root replay17 PASS (log /tmp/bml-invalid-target-callable-integrated.log); session73750 complete.
+
+Widgets helper55c9e8a7ad468e0579c734a13cbd5dad2beb8be6 queued Sol: explicit community
+opt-in, personal default unchanged, session log actor vs effective spam/protocol,
+native retry/no BML after attempt. Worker37/339 tests and tidy/compile PASS. Resolver
+contract preparation only; no public route. Held interfaces unchanged.
+
+## Pending public readonly and next independent slices
+
+Public readonly4493a7212e2186bb6662b61f4b5e800b9b820a99 is committed and in
+Sol review; dispatch is after altlogin/share exclusions, preserving same flat
+GET ref and raw canonical action. Worker combined100/browser/tidy/compile PASS;
+not integrated. Themes next slice is invalid GET usejournal terminal rendering,
+preserving /update.bml.title2 and invalidusejournal body before remote/beta,
+with separate callable and public proofs; no POST/auth/share behavior changes.
+
+Widgets same-poster community POST opt-in remains WIP. Sol source correction:
+log_event remote is original session remote; spam_check/_do_edit actor remains
+effective poster. Personal defaults unchanged. No BML fallback after save attempt;
+use existing native retry. Root clean through prior9490d63c8; no active root test
+processes. All external/platform holds remain unchanged.
+
+## Readonly callable and Web headings accepted
+
+Sol readonlye30/b7/843 CLEAR; integrated0fa540eb3/95fc0245e/b5e3183d1. Corrected
+post-hook distinct community target, pre-hook prefill, original hook ref, warning
+help markup and fresh draft/editor preservation are accepted. Foreman three
+suites126 PASS; actual callable browser PASS/nohelpers;390px warning/form visually
+usable, captures under update-readonly-callable. Public activation remains WIP.
+
+Sol Web headingsc8611ed75 CLEAR; integrated5b8aa3ccd. Only two global heading
+lookups plus explicit dependency change; wrappers and supplied content unchanged.
+Foreman three helper suites12 top-level tests PASS. Full integrated tidy1143 and
+compile1607 PASS (/tmp/bml-readonly-web-{tidy,compile}.log). Root sessions74841,
+54412,9183,31944 all complete. Widgets next callable community same-poster POST
+helper keeps personal defaults; no routing, manager/reporting or BML retry after
+attempt. Audit plus this explicit native-retry boundary saved in doc.
+
+## Ordinary manager-delete baseline integrated
+
+Sol6ade9d30be64d79680bc6632ccefcbcc96aabbea CLEAR; integrated6c70d09ef. Foreman
+actual retained-form test30 PASS (/tmp/bml-manager-delete-integrated.log), focused
+tidy PASS. Exact selected deletion/unrelated preservation, original flat request
+seed/ref and decode/log/spam/protocol order are characterized without reporting
+or crosspost calls. Test-only, no native manager action/routing implementation.
+Root session44491 complete. Sol now reviews readonly843 callable; public readonly
+activation remains worker WIP. Two-key Web heading conversion remains worker WIP.
+
+## Latest readonly correction and review queue
+
+Readonly source84384adaa06de1cb81ca329a11ae3f01f578aed2 now actually passes the
+computed post-hook usejournal into the renderer; its test selects a distinct
+authorized community, removing b7's default-owner false positive. Worker24/81
+HTTP, browser, tidy1139/compile1607 PASS. Sol review queued for e30+b7+843;
+not integrated. Themes prepares separate public activation while callable gate
+remains pending; no foreman route activation before both independent reviews.
+
+Sol queue: finish two-heading Web language source audit; review test-only manager
+delete6ade9d30b; review readonly843 range. Widgets implements two-heading native
+Web language conversion separately from rootcd4e87b2e. Root clean through this
+record, no active test sessions; public terminal/community are fully integrated.
+
+## Active work after public GET integration
+
+Root cd4e87b2e is clean; public community and terminal integrations/checks/captures
+are complete. No root test process remains. Readonly callable e30/b7 is HELD:
+foreman exact-source review found computed usejournal unused (renderer still
+receives opts value); owner-target assertion equals native default. Themes must
+wire computed target and prove a distinct authorized community selected after
+hook mutation. Browser evidence alone does not close this target finding.
+
+Manager ordinary-delete characterization6ade9d30b (test-only30 assertions) is
+queued Sol review. Widgets now implements only Web error_list/warning_list native
+language headings on a separate root-based branch; wrappers and all caller,
+authentication, reporting, inbox, and routing behavior stay unchanged. Sol source
+audit of those helpers precedes review. No external or held interfaces unblocked.
+
+## Public terminal update GET accepted
+
+Sol final2ed/a93/3f315 CLEAR; integrated2f36ed6fc/653c12cba/f47aab510. Identity
+and cannot-post responses now use the native terminal renderer, preserving
+legacy titles/localization/configured HTML and invalid-target/beta precedence.
+Combined altlogin/share checks prove early terminal return and no share fetch.
+Startup early-exit cleanup is independently proved; anonymous/readonly remain
+BML. Foreman five adjacent suites266 PASS, normal browser PASS/nohelpers,
+compile1607 PASS. Fulltidy initially found one extra blank line in the community
+browser server; format-onlyeb47aca13 removed it, fulltidy1139 PASS. No behavioral
+change. Captures under update-terminal;390px cannot-post visually inspected.
+Logs /tmp/bml-terminal-public-integrated.log, /tmp/bml-terminal-public-browser.log,
+/tmp/bml-get-followups-compile.log, /tmp/bml-get-followups-tidy-fixed.log.
+All root sessions40196/23701/13879 complete; checkout clean after this record.
+
+Readonly callablee30 remains unaccepted pending target-after-hook correction,
+legacy editor preservation and browser validation. Widgets characterizes ordinary
+manager deletion only; Sol audits bounded Web error/warning language helpers.
+Held inbox/platform and external deployment-hook decisions remain untouched.
+
+## Public same-poster community GET accepted
+
+Sol final354fd2ee7..77382f0a6 CLEAR. Integrated af0643fbe/0c5b6f927/f468b49ac/
+ea8ad7aca, with already accepted XPost guard. Foreman four adjacent suites530
+PASS (/tmp/bml-community-public-integrated.log); exact plain-app browser PASS
+(/tmp/bml-community-public-browser.log), helper check empty. Public captures
+preserved under community-edit-get-public;390px native editor visually usable.
+Manager remains retained BML with maintainer/delete/deletespam, including known
+legacy extensionless title diagnostic. No manager native activation or new POST.
+Root test sessions35579/62331 complete.
+
+Terminal2ed/a93/3f315 final recheck queued; readonly callablee30 target/editor
+correction plus browser is active and unaccepted. Widgets next test-only ordinary
+manager-delete characterization excludes spam-report implementation and routing.
+
+## XPost guard integrated
+
+Sol source/runtime/permanent regression gate CLEAR for3a7923d89+73b560543.
+Integrated locally as d6bd37f19+77930b27b. Foreman exact node regression PASS;
+owned-container static build PASS (/tmp/bml-xpost-integrated-build.log).
+Independent same test fails preguard9177 at the missing-master assertion, and
+real retained ordinary/manager browser before/after proof is recorded. No
+suppression or action removal. Public community activation/browser remains
+separate pending complete actual-app matrix and named-failure cleanup evidence.
+
+## Current immutable reviews and next packages
+
+Sol independently reproduced the retained manager XPost error at preactivation
+9177ba357 and proved the narrow 3a7923d89 guard removes it after an exact static
+build. Ordinary retained forms still initialize; manager forms retain
+savemaintainer, delete, and deletespam. Permanent initializer regression
+73b560543 is queued for independent preguard-failure/fixed-pass review. Public
+same-poster community activation remains pending its actual-app acceptance.
+
+Terminal public activation 2ed3af945 is committed and queued for Sol review;
+worker reports 53 combined HTTP checks, normal/named-failure browser, tidy1137,
+and compile1607. It is not yet integrated. Themes is preparing the next separate
+callable readonly warning/form package, without public activation or anonymous
+schema changes. Existing deployment-hook and platform-held work stays held.
+
+## Public community browser diagnosis
+
+Sol source diagnosis: XPostAccount null-master error belongs to pre-existing
+retained manager BML, not native same-poster form. editjournal loads xpost.js;
+disabled_save omits prop_xpost_check but leaves updateForm. Legacy setup invokes
+updater without master. Widgets assigned separate narrow setup guard plus
+no-master/normal-master regression and exact-assets browser validation; no broad
+pageerror suppression. Public354 stays held pending actual-app matrix/browser.
+Terminal public tests still expanding from stubbed preliminaries to required
+real-session finite matrix; do not accept initial13/18 checks as complete.
+All accepted integrations remain local/clean through8b4af07b2.
+
+## Latest callable community browser integration
+
+Sol6860ee931/c4ee4deea CLEAR, integrated17e74d7e2/98c4e1107. Foreman actual
+browser PASS, cleanup empty, fresh user/entry state preserved; captures committed
+under community-edit-get,390px ordinary+manager visually usable. Root session52247
+complete. Source354 same-poster-only public activation is bounded clear but HELD
+for actual public tests/browser XPostAccount attribution. Other-poster manager
+BML retains delete and deletespam; no suppression of browser errors authorized.
+Terminal public matrix/browser continues; private renderer already accepted.
+
+## Latest private terminal renderer integration
+
+Sol e16cdedeb411c87572816e5c58e8ac1b326fc3e4 CLEAR, integrated1aca57868. Foreman
+three suites96 PASS in /tmp/bml-terminal-renderer-integrated.log; session15329
+complete. No route/classifier/auth change; trusted translated/configured HTML,
+legacy titles and request-local getter preserved. Themes public terminal-response
+matrix/browser implementation active, not accepted. Widgets same-poster public
+community candidate354fd2ee7 source committed, actual public HTTP/browser pending;
+other-poster manager BML delete/control surface must remain unchanged. Sol c4
+checkbox browser recheck/source-boundary audit ongoing. No root test session active.
+
+## Priority public community activation correction
+
+Foreman found native maintainer.tt omits retained manager delete controls; the
+picker regression explicitly proves action:delete plus savemaintainer. Public
+community activation is now SAME-POSTER ONLY. Other-poster manager GET must stay
+BML until separate action-surface parity. Do not weaken the picker test to accept
+lost delete UI. Widgets instructed to preserve callable manager/browser and adapt
+public candidate; Sol asked to source-confirm boundary. No POST/deletespam change.
+Sol686 browser otherwise clear pending checkbox assertionc4ee4deea recheck.
+Terminal renderer e16cdedeb queued review; its public classification WIP separate.
+
+## Latest public update GET integration
+
+Sol a0d94015a/ad63eb656/3e2af975d CLEAR, integrated53f82843f/7963b513d/9177ba357.
+Foreman seven suites787 PASS, tidy1134 PASS, compile1607 PASS; logs
+/tmp/bml-public-update-get-integrated.log and /tmp/bml-public-get-{tidy,compile}.log.
+Actual plain-app browser PASS, cleanup empty; public1280/390 captures preserved
+under legacy-update-get. Narrow capture visually usable. All root sessions
+16269/45137/73964 complete. No BML deletion/push/deployment.
+
+Sol reviews callable community browser6860ee9319f817cb3ef31ecf52bc3bccce420806.
+Widgets implements separate public community GET activation from root9177,
+preserving POST and falling through excluded contexts. Themes private classified
+identity/cannot-post terminal renderer remains active WIP after fixable harness
+failures; must preserve trusted MSG_NO_POST/translated HTML and real request-local
+getter. No route/authentication/anonymous/share/readonly change in that package.
+External Journal deployment-hook question and platform-held work remain held.
+
+## Latest callable community integration
+
+Sol finalcf2b4032 CLEAR for production6b90 and finite HTTP range. Integrated
+003e8c593/ddb2d38b4/d7c4b9058/81fc421f4/36465e9e4/d00ab5dbb. Foreman four
+rendering suites352 PASS in /tmp/bml-community-get-integrated.log; session70598
+complete. No public community route change. Widgets browser WIP active; resumed
+exact existing run through exit/cleanup rather than duplicating it.
+Sol reviews public update GETa0d94015a; worker reported711 HTTP/tidy1133/compile1607
+and actual plain-app normal/named-failure browser pass. Foreman exact branch check
+found invalid-target regex correction had not applied; pending real test-only
+followup. Themes next independent terminal-response renderer branch is preserved.
+All external/held restrictions unchanged; root clean, no active test sessions.
+
+## Latest retained-update prerequisite integration
+
+Sol359579574 +9ceede79d CLEAR; integrated8c9813584/11c75c53e. Foreman real
+four-file prove632 PASS in /tmp/bml-update-fixture-integrated.log; session39400
+complete. Helper scopes BML GET capture only and restores exact route; real POST
+continues through production. Backdating uses actual old prop_opt_backdated and
+native entrytime_outoforder, both required. Public update GET activation still
+worker WIP with passing HTTP; real browser run pending. Foreman corrected an
+early shell exit that otherwise skipped the browser after syntax check.
+Community nondefault security/tags correction still active; no overall gate.
+
+## Latest narrow correction queue
+
+Sol86be24e57 CLEAR resolves entry-versus-user draft assertions. Community final
+parityab562 adds meaningful userpic and anonymous sequence, but tag/security
+nondefaults remain active correction. Custom community bits are not a supported
+native control (Entry::_init excludes community customgroups); acceptance doc
+now calls for nondefault members/admin and explicit absence of custom controls.
+Sol reviews retained-update prerequisite359579574 plus backdating9ceede79d;
+real prove4files629 passed before the three added backdating assertions, focused
+backdating47 passed. Themes now implements public update GET separately. Root
+remains accepted through51c6bf8a7; no test process active, no publishing.
+
+## Live queue after accepted public owned GET
+
+Root001757d13 is clean; all integration runs complete: focused571, retained
+old-form241, tidy1132, compile1607, public owned GET browser PASS/cleanup empty.
+Sol reviews callable community GET6b90c2ac9 atop accepted e16. Foreman found its
+final draft assertions read LJ::Entry instead of user; Terra is correcting with
+seeded user draft/prefs and force-fresh reads. No production finding from that.
+Themes implements test-only retained update-form scope prerequisite from5c91,
+normal and named-failure browser pass; formatting and true multi-file prove
+pending. Foreman corrected a perl-with-multiple-script-names invocation, which
+only executes the first file. Then separate public eligible update GET activation.
+Remaining display audit recorded in BML-UPDATE-GET-REMAINING.md. External and
+platform-held work unchanged. No root test process remains active.
+
+## Latest accepted GET integrations
+
+Update GET callable browser dc3/b2 independently CLEAR, integrated6e1a52ac1/
+009a844b8. Foreman actual browser PASS; no fixture/server remains. Desktop and
+390px captures preserved under doc/bml-evidence/2026-09-23/legacy-update-get.
+Maintainer renderer extractione16 CLEAR, integratedb92d6bd49. Public personal
+owned GET activation727 CLEAR, integrated5c91b54a2: actual app GET now uses the
+accepted narrow native renderer, while excluded contexts retain BML and POST
+is unchanged. Foreman five focused suites571 PASS in
+/tmp/bml-owned-get-public-integrated.log. Formatting1132 and compile1607 PASS; run92196 complete. Public owned GET
+browser integration replay PASS; cleanup empty; public desktop/narrow captures
+preserved. Log /tmp/bml-owned-get-public-browser.log. All root runs complete.
+
+Active: Widgets callable-only community GET atop e16; Themes test-only retained
+update-form prerequisite per /tmp/bml-update-get-activation-tests.md, then
+separate public update GET activation. Sol audits remaining ordinary update GET
+rendering fallbacks while these implementations proceed. External Journal hook
+decision and held restrictions remain unchanged. No push or deployment.
+
+## Latest fixture prerequisite integration
+
+Sol860303fd independently clear, integratedfa4e13737. Foreman493 HTTP PASS in
+/tmp/bml-owned-get-fixture-integrated.log; root session36405 complete. Themes
+implements public owned GET activation on bml-terra-owned-get-activation-20260923
+from860 plus already-reviewed browser cherry-picks. Sol reviews update browserb2.
+Widgets mechanical maintainer render extraction has92 existing passing assertions
+and one invalid direct-helper test; resumed actual RequestWrapper correction
+before commit, then callable community GET. No new approval needed.
+
+## Current review queue and active work
+
+Root HEAD before this ledger update3a7088a5c; code throughd77e85b20 is accepted,
+combined4files302/tidy1128/compile1607 PASS; all root sessions complete.
+
+1. Sol reviews fixture prerequisite860303fd978b16ca063bf994a0a9162dce284576:
+   scoped retained BML GET / captured production POST helper, affected legacy
+   HTTP suites+unchanged callable GET and retained browser normal/intentional
+   pass, full tidy/compile pass. Not integrated yet.
+2. Sol then reviews update GET browserdc3a781bd..b2c2da7cb7f46f7e8143cdbd5ed691af236bab2f
+   with ec6 correction cherry-picked asf7f3f687b. Final empty-first-draft,
+   implemented seed_draft protocol and modal ordering fix normal0/namedfailure1,
+   no helper. Narrow capture visually shows RTE/prefill and fitting controls.
+   Not integrated yet; earlier dc3 failures are preserved historical WIP.
+3. Themes continues separate public personal-owned GET activation atop860;
+   legacy fixture overlay remains confined to old-schema tests, public native
+   GET tests/browser must use actual app without overlay. Sol/browser gate03362
+   already clear. No BML deletion or push.
+4. Widgets starts callable-only community GET per BML-COMMUNITY-EDIT-GET.md on
+   a new branch from3a7088a5c: ordinary same-poster edit and existing property-only
+   maintainer render; no POST/policy/deletespam/public activation change.
+
+The browser timeout previously attributed to FCK was a harness/fixture mismatch,
+now corrected inb2. Held inbox and external Journal hook questions remain held.
+
+## Latest: callable update GET wrapper integrated
+
+Sol final a349/7aa/ec6 CLEAR after the actual default-only crosspost map and
+all-checkbox regression. Integrated8ba47739b/24995c4e5/d77e85b20. Foreman4files302
+PASS, tidy1128 and compile1607 PASS in /tmp/bml-update-get-wrapper-{integrated,
+tidy,compile}.log. All root validation sessions complete. No public GET switch.
+
+Widgets browser WIP is preserved on bml-terra-update-get-browser-20260923
+(dc3a781bd plus ec6 cherry-pickf7f3f687b). Foreman diagnosed its repeated timeout:
+fixture still seeded a draft at initial supposedly-empty GET; JS sent seed_draft
+command unimplemented by fixture; navigation awaited before answering modal.
+Worker resumed concrete fixture/protocol/order correction. Do not call this a
+confirmed FCK production defect or accept swallowed navigation errors.
+Themes continues retained-form test composition on
+bml-terra-owned-get-test-fixture-20260923, passing HTTP/browser but final explicit
+status run/commit pending. Then separate narrow public owned GET activation.
+Sol browser03362 and both callable GET production ranges are clear.
+
+## Latest GET acceptance and pending wrapper
+
+Owned GET browser ee8/03362 independently clear and integrated as
+c7ad9abb9/7e3f9dc51. Foreman actual browser PASS in
+/tmp/bml-owned-get-browser-integrated.log; no helper/server remains. Captures
+are in doc/bml-evidence/2026-09-23/legacy-owned-edit-get. Root test sessions
+complete. Production GET routing remains unchanged.
+
+Pending review: callable update GET wrappera3491e46 + correction7aa50a729
+(44 worker assertions, full tidy/compile pass). Foreman and Sol held the first
+candidate for303 vs retained302 and query-selected vs default-only crosspost;
+7aa did not actually remove the GET override: Sol exact rendered markup checks
+both accounts41/42 while HTML::Form->value reports only first41. Gate remains
+held; Widgets must map defaults directly and enumerate every checkbox. Native
+302 correction is clear. Browser WIP is preserved while this fix takes priority. Widgets continues browser-only update GET acceptance
+on bml-terra-update-get-browser-20260923; its first run failed and diagnosis is
+active. Themes is implementing the test-only retained-form GET/production POST
+fixture prerequisite per BML-OWNED-GET-ACTIVATION-TESTS.md, then narrow public
+owned GET activation as a separate commit. Browser03362 prerequisite is clear.
+Sol also completed BML-COMMUNITY-EDIT-GET.md read-only audit. Held inbox and
+external Journal deployment-hook questions remain unchanged.
+
+## Latest continuation: public transforms integrated
+
+Public transform activation565eb2cff is independently clear (111 public +396
+callable assertions) and integrated locally asd419097ae. Conflict resolution
+only retained the existing owned-edit dispatcher beside the changed comment;
+production diff remains the reviewed activation plus comment. Foreman combined
+3files669 PASS in /tmp/bml-public-transform-integrated.log. The first invocation
+used an incorrect test filename before conflict resolution and is preserved as
+/tmp/bml-public-transform-invocation-error.log; it is not passing evidence.
+Full tidy1123 and compile1607 PASS in /tmp/bml-public-transform-{tidy,compile}.log;
+all foreman validation sessions are complete.
+
+Current immutable review queue: update GET rendererc5 +72f6116e0 +76d27b19f
+(57 real-template/mapping assertions, full tidy/compile worker PASS), and owned
+edit GETcce03c7bf (89 focused/286 adjacent, tidy1124/compile1607 PASS).
+Update GET rendererc5/72f/76d is now independently clear and integrated as
+98f202d14/bc52393ca/b8dbb3758. Foreman4files228 PASS in
+/tmp/bml-update-get-render-integrated.log. Owned GETcce independently clear and integrated asdedfa7bc0. Combined5files454
+PASS plus tidy1125/compile1607 PASS in /tmp/bml-callable-get-{integrated,tidy,compile}.log.
+Widgets continues a callable-only ordinary authenticated update GET wrapper
+around76d, preserving guard/hook/default ordering and altlogin/share/readonly
+fallback. Themes continues browser-only owned GET acceptance atopcce, with
+isolated fixture/server and desktop/narrow capture. Public GET routes unchanged.
+
+# BML removal: current resume handoff
+
+Updated 2026-09-23 after recovery of the same foreman session. This file records
+current state; historical package chronology and evidence are in BML-PROGRESS.md
+and Git history. Read AGENTS.md, BML-PROGRESS.md, BML-REMOVAL-PLAN.md and
+BML-MIGRATION.md before continuing. Do not restart already integrated packages.
+
+## Authorization and boundaries
+
+Continue the full BML removal project through unblocked bounded packages, with
+Astra coordination, up to two Terra implementers and one independent Sol reviewer.
+Use the existing Herdr sessions, worktrees and devcontainers. Host edits/Git;
+tests, formatting and builds inside the owning container. Routine local work is
+authorized with workspace sandboxing and automatic approval review; respect
+rejections. Preserve user focus and other checkouts. No pushes, deployment or
+production changes are authorized for these new commits.
+
+The separate platform-restricted inbox work remains held: do not retry or
+reassign it around the restriction. The external deployment-hook question is
+unanswered: do deployed extensions consume s2_head_content_extra or data_handler:*
+with an Apache-style request? Leave both Journal adapter interfaces unchanged.
+UniqCookie approval was resolved and its package integrated; do not ask again.
+
+## Preserved topology
+
+Foreman: /home/mark/dreamwidth/.worktrees/bml-astra-foreman-20260922,
+branch bml-astra-foreman-20260922, Herdr w5:p1, container 8d7783a043d8.
+Session 01a0c9d6-0108-7401-a170-9ada1e2141c2, model gpt-6-astra.
+
+| Worker | Herdr | Container | Session |
+|---|---|---|---|
+| bml-terra-widgets | w6:p1 | 4da9c8ba2712 | 01a0c9d8-0966-7a70-b058-5a3a4328a791 |
+| bml-terra-themenav | w7:p1 | 48178cc525ed | 01a0c9d8-7910-7fe3-ac68-19dc9567a899 |
+| bml-sol-review | w8:p1 | 904e68156988 | 01a0c9d8-e3d8-7330-bc30-c78bf4ec2b4d |
+
+Worker checkouts are /home/mark/dreamwidth/.worktrees/<worker>-20260922.
+Terra uses gpt-5.6-terra; Sol uses gpt-5.6-sol. Preserve exact sessions and WIP.
+Inspect live panes before directing work: scheduled monitoring snapshots can be
+stale. A done badge is not proof a package finished; collect logs/exit status.
+Do not launch duplicate browser runs when an exact run/helper remains alive.
+
+## Integrated current checkpoint
+
+- Draft timing is CLOSED: source through fc570e26e independently clear,
+  integrated as 11fd6c97d. Sol exact fixed browser PASS and known-broken6616 FAIL
+  at isolated subject persistence; delayed-image/untouched-decline also PASS.
+  Foreman sequential parity and preview browser suites both exit0, build and
+  scoped helper tidy pass, helpers absent. Final ledger commit 2b164e4ee exists.
+  Do not reopen the old 4c/6616 findings from stale recovery messages.
+- Preview shared renderer integrated as abc509db6; method compatibility and
+  executable retirement integrated38dca7bd7 after independent clear013be9041. Foreman3files173 PASS, build PASS,
+  tidy1091/compile1605 PASS, actual popup browser PASS. Before/after captures in
+  doc/bml-evidence/2026-09-23/entry-preview-{before,native}.
+- Legacy spellcheck characterization through47f62923d independently clear,
+  integrated c6c1f96f9. Conditional stored-RTE initialization and non-RTE control
+  replace the vacuous hidden-field assertion. Foreman combined spellcheck and
+  crossposting91 PASS in /tmp/bml-editor-characterization-final.log.
+- Earlier customization/settings/picker/FCK/native language and ordinary editor
+  packages are integrated and reviewed as recorded in BML-PROGRESS.md.
+  Seven executable BML pages still remain in the foreman tree at this update.
+
+## Current bounded queue
+
+1. Themenav: callable transforms throughdc1814ca9 independently clear and
+   integratedda02bde4c..776789fba. Public transform activation is separate WIP;
+   worker111 actual-route assertions pass, remaining checks/commit/review pending.
+2. Widgets: owned personal dispatcher38bd/58b/028e and public browser239e clear,
+   integrated5ea5858fc/31d322889/dad4bc220/06735ba3a. Foreman901 HTTP + real public
+   browser PASS, captures e575e2a76. Worker implements unregistered authenticated
+   update GET renderer/tests, preserving GET/hook/prefill and unchanged prefs.
+   Editor mapping follows accepted retry semantics (BML-UPDATE-GET-EDITORS.md),
+   not a new product approval gate. GET renderer source exists; tests continue.
+3. Sol: all integrated ranges above clear. Read-only ordinary owned edit GET
+   handoff in progress while awaiting immutable transform activation/GET renderer.
+   Held inbox and external Journal deployment decisions remain unchanged.
+
+Current combined-tree matrix/native edit4files221 PASS; earlier callable/legacy/
+native6files462 and actual edit HTTP3files159 PASS. Full tidy1119 and compile1607
+PASS in /tmp/bml-editor-acceptance-{tidy,compile}.log. Foreman update browser PASS
+in /tmp/bml-update-adapter-browser.log after exact static build; captures under
+legacy-update-adapter evidence folder. All root test sessions are complete.
+Latest root code93fab and75e674910 are independently clear, evidence5a390efd4.
+Community combined5files629 PASS and full tidy1119/compile1607 PASS in
+/tmp/bml-community-{integrated,tidy,compile}.log. Root sessions complete.
+Latest combined-tree validation:6files901 HTTP PASS, public edit browser PASS,
+tidy1123 and compile1607 PASS in /tmp/bml-editor-public-*.log and
+/tmp/bml-owned-edit-public-integrated.log. All root sessions complete; no helper
+or server remains. Callable transforms7files517 PASS in
+/tmp/bml-update-transforms-integrated.log.
+All integrations remain local. Accepted /update and personal owned edit POSTs
+now use native adapters; GET and unsupported requests still fall through to BML. No BML editor
+page is deleted, and nothing has been pushed or deployed.
+
+Native spellcheck foreman validation: combined5files205 PASS, tidy1099 PASS,
+compile1605 PASS, static build PASS, and isolated configured real-RTE browser PASS
+with no remaining helper/server. Logs /tmp/bml-native-spellcheck-{combined,tidy,
+compile,build,browser}.log in foreman container. Desktop/narrow captures preserved
+in doc/bml-evidence/2026-09-23/entry-spellcheck-native.
+
+Legacy image URL baseline through6af8b9a4d independently clear, integrated61682d4d3;
+foreman25 PASS in /tmp/bml-imgupload-baseline-integrated.log. Before captures in
+image-insert-before explicitly record old narrow overflow and popup clipping.
+
+## Working method and evidence
+
+Review immutable commits independently. Route concrete findings back to Terra;
+obtain material-fix rechecks. Integrate clean ranges locally and run appropriate
+combined-tree checks. Keep the ledger current without treating a passing
+checkpoint as completion of the whole project. Preserve real URLs/form fields,
+translations, permissions and behavior; retain required visual evidence.
+
+Root checkout and documentation update were confirmed clean/committed after the
+reported recovery. Docker containers survived. Historical macOS /private/tmp
+paths and old container IDs in older logs are not current resources. Shell
+sandbox bwrap loopback errors have required reviewed escalations; do not bypass
+approval review. Use Herdr skill with HERDR_ENV=1, preserve focus, and keep
+unresolved external decisions separate from independent implementation work.
