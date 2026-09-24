@@ -2503,3 +2503,5 @@ and T9 integrated through71d2c5039 after independent review. No .bml page,
 text file or engine module remains; DW::BML::RequestAdapter stays for the held
 hook ABIs. Root validation: allowlist41files550 PASS, tidy/compile/build PASS,
 live probes and browser fixtures PASS.
+- T10 docs/comment sweep integrated as69a30da68/2885eefc3 (Opus CLEAR). All
+  graduation packages complete; see BML-GRADUATION-PLAN.md closing record.

@@ -18,6 +18,20 @@ below this line predate the resume.
 
 ## Graduation progress (2026-09-23)
 
+### FINAL 2026-09-24: graduation packages complete on root
+
+Root `bml-astra-foreman-20260922` HEAD `2885eefc3`, clean. T10 docs/comment
+sweep 9455f59ce + 2519397d0 (bml-opus-review CLEAR) integrated as 69a30da68,
+2885eefc3; compile 1584 and tidy 1112 PASS. No further graduation package is
+in flight; all three worker sessions are idle with refreshed checkpoints
+(BML-THEMENAV-CHECKPOINT.md, BML-WIDGETS-CHECKPOINT.md,
+BML-REVIEW-CHECKPOINT.md, untracked in their worktrees). Foreman container
+8d7783a043d8 dev Starman is running root-era code; reviewer container's dev
+Starman is on 15ab9c051 (E3 fix) code. Nothing pushed, merged remotely or
+deployed. Next steps are the user's: review the closing record and
+deploy-gate checklist in BML-GRADUATION-PLAN.md, then decide on PR shaping
+for the 660-commit local branch.
+
 ### CHECKPOINT 2026-09-24 01:30 UTC: BML engine removed from root
 
 Root `bml-astra-foreman-20260922` HEAD `71d2c5039`, clean. Integrated since
