@@ -1,8 +1,18 @@
+// t/browser/customize-widget-apply.js
+//
 // Customize page behaviors that only a real browser can exercise: the theme
 // browser's AJAX apply (no page reload), and two widget forms (a generic S2
 // property control, and the CodeMirror-backed custom CSS editor) whose
 // values live in JS-managed controls rather than plain form fields.
-// Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
+//
+// Authors:
+//      Mark Smith <mark@dreamwidth.org>
+//
+// Copyright (c) 2026 by Dreamwidth Studios, LLC.
+//
+// This program is free software; you may redistribute it and/or modify it under
+// the same terms as Perl itself.  For a copy of the license, please reference
+// 'perldoc perlartistic' or 'perldoc perlgpl'.
 const assert = require('node:assert/strict');
 const {spawn} = require('node:child_process');
 const puppeteer = require('/opt/dw-screenshot/node_modules/puppeteer-core');
