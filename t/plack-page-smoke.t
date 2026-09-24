@@ -11,9 +11,8 @@
 #
 # Excluded from the missing-string check: profile.service.icq. It has
 # real DB text (en/en_DW both define it as "ICQ"), but no source .dat
-# file defines the key, so the file-backed on-demand lookup this test
-# harness uses reports it missing; pre-existing and unrelated to this
-# migration.
+# file defines the key, so the site's file-backed on-demand lookup
+# (upstream #3577) reports it missing; pre-existing.
 #
 # Authors:
 #     Mark Smith <mark@dreamwidth.org>
