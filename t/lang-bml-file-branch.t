@@ -3,12 +3,13 @@
 # LJ::Lang::get_text's '.bml.' from_files branch for a key backed by a
 # deleted *.bml.text file (every one rendered as a missing-string banner on a
 # dev server) are now relocated to native homes:
-#   cgi-bin/LJ/Setting/Gender.pm            -> setting.gender.option.*
-#   cgi-bin/LJ/Setting/BirthdayDisplay.pm   -> setting.birthdaydisplay.option.*
 #   cgi-bin/DW/Controller/Entry.pm:1674     -> poll.error.accttype
 #   views/manage/index.tt                   -> views/manage/index.tt.text
 #   views/manage/circle/index.tt:20         -> views/manage/circle/index.tt.text
 #   views/delcomment.tt:34                  -> views/delcomment.tt.text
+# (LJ::Setting::Gender and LJ::Setting::BirthdayDisplay, and their
+# setting.gender.option.*/setting.birthdaydisplay.option.* keys, are deleted
+# entirely -- neither class had a live caller anywhere in the tree.)
 # This asserts every former site now renders real text with no missing-string
 # banner, and that no '.bml.' key literal remains anywhere outside
 # deadphrases.dat.
@@ -23,8 +24,6 @@ use Test::More;
 BEGIN { $LJ::_T_CONFIG = 1; require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Lang;
 use LJ::Session;
-use LJ::Setting::BirthdayDisplay;
-use LJ::Setting::Gender;
 use LJ::Test qw(temp_user);
 
 plan skip_all => 'requires a development server' unless $LJ::IS_DEV_SERVER;
@@ -52,37 +51,6 @@ subtest 'the poll error key resolves to real text' => sub {
         "Your account type doesn't allow you to create polls.",
         'poll.error.accttype resolves to its relocated English text'
     );
-};
-
-subtest 'LJ::Setting::Gender and LJ::Setting::BirthdayDisplay render real option text' => sub {
-
-    # Neither class has a live caller anywhere in the tree (grepped
-    # cgi-bin/+views/: only their own package declarations match) -- no
-    # settings page currently renders them, so this calls their own as_html
-    # directly rather than rendering a page that doesn't exist.
-    my $u = temp_user();
-    $u->update_self( { status => 'A', gender => 'F' } );
-
-    my $gender_html = LJ::Setting::Gender->as_html( $u, {} );
-    ok( !LJ::Lang::is_missing_string($gender_html), 'Gender as_html has no missing-string banner' );
-    for my $option ( qw(Female Male Other), 'Rather not say' ) {
-        like( $gender_html, qr/\Q$option\E/, "Gender as_html renders '$option'" );
-    }
-
-    my $birthday_html = LJ::Setting::BirthdayDisplay->as_html( $u, {} );
-    ok(
-        !LJ::Lang::is_missing_string($birthday_html),
-        'BirthdayDisplay as_html has no missing-string banner'
-    );
-    for my $option (
-        'Do not display',
-        'Display only the month and day',
-        'Display only the year',
-        'Display month, day, and year'
-        )
-    {
-        like( $birthday_html, qr/\Q$option\E/, "BirthdayDisplay as_html renders '$option'" );
-    }
 };
 
 my $app = do "$ENV{LJHOME}/app.psgi";

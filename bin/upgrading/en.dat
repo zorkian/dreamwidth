@@ -2529,18 +2529,6 @@ setting.bio.question=Bio:
 
 setting.birthday.question=What's your birthday?
 
-setting.birthdaydisplay.error.invalid=Invalid option
-
-setting.birthdaydisplay.question=Birthday display options:
-
-setting.birthdaydisplay.option.day=Display only the month and day
-
-setting.birthdaydisplay.option.full=Display month, day, and year
-
-setting.birthdaydisplay.option.nothing=Do not display
-
-setting.birthdaydisplay.option.year=Display only the year
-
 setting.commentcaptcha.label=Anti-Spam
 
 setting.commentcaptcha.option=Show CAPTCHA to
@@ -2893,20 +2881,6 @@ setting.entryeditor.option.richtext=Rich Text
 setting.excludeownstats.label=Journal Statistics
 
 setting.excludeownstats.option=Do not include me in my own statistics
-
-setting.gender.error.invalid=Invalid option
-
-setting.gender.error.wrongtype=Only personal or identity journals can have a gender.
-
-setting.gender.question=For statistical purposes, please provide your gender. (It will not be publicly displayed.)
-
-setting.gender.option.female=Female
-
-setting.gender.option.male=Male
-
-setting.gender.option.other=Other
-
-setting.gender.option.unspecified=Rather not say
 
 setting.globalsearch.label=Site-Wide Search Inclusion
 

@@ -4869,3 +4869,17 @@ general /manage/settings/index.bml.title.anon
 general /manage/circle/edit.bml.title2
 general /manage/circle/edit.bml.title3
 general /poll/create.bml.error.accttype2
+
+general setting.birthdaydisplay.error.invalid
+general setting.birthdaydisplay.question
+general setting.birthdaydisplay.option.day
+general setting.birthdaydisplay.option.full
+general setting.birthdaydisplay.option.nothing
+general setting.birthdaydisplay.option.year
+general setting.gender.error.invalid
+general setting.gender.error.wrongtype
+general setting.gender.question
+general setting.gender.option.female
+general setting.gender.option.male
+general setting.gender.option.other
+general setting.gender.option.unspecified
