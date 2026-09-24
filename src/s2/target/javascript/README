@@ -2,6 +2,9 @@
 JavaScript Target for S2
 ------------------------
 
+For the bounded offline Node/TypeScript conformance slice, see SLICE-1.md.
+The instructions below describe the historical browser demonstration runtime.
+
 The JavaScript target compiles layers to JavaScript code which can then
 be used in situations where a JavaScript interpreter is available, such
 as in a web browser.
@@ -36,4 +39,3 @@ ctx.setPrint(document.write);
 ctx.runFunction("main()");
 
 </script>
-
