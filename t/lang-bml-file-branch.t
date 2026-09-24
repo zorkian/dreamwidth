@@ -1,18 +1,12 @@
 #!/usr/bin/perl
-# The 14 keys this file's earlier revision found still asking
-# LJ::Lang::get_text's '.bml.' from_files branch for a key backed by a
-# deleted *.bml.text file (every one rendered as a missing-string banner on a
-# dev server) are now relocated to native homes:
-#   cgi-bin/DW/Controller/Entry.pm:1674     -> poll.error.accttype
-#   views/manage/index.tt                   -> views/manage/index.tt.text
-#   views/manage/circle/index.tt:20         -> views/manage/circle/index.tt.text
-#   views/delcomment.tt:34                  -> views/delcomment.tt.text
-# (LJ::Setting::Gender and LJ::Setting::BirthdayDisplay, and their
-# setting.gender.option.*/setting.birthdaydisplay.option.* keys, are deleted
-# entirely -- neither class had a live caller anywhere in the tree.)
-# This asserts every former site now renders real text with no missing-string
-# banner, and that no '.bml.' key literal remains anywhere outside
-# deadphrases.dat.
+# Native pages must not depend on translation keys scoped to a BML page: no
+# *.bml.text file exists, so such a key can only resolve from a production
+# database row and renders a missing-string banner on a fresh install. This
+# renders the pages whose keys were relocated to native homes
+# (views/manage/index.tt, views/manage/circle/index.tt, views/delcomment.tt,
+# and the poll.error.accttype lookup in DW::Controller::Entry) and asserts
+# real text with no banner, and that no '.bml.' key literal remains anywhere
+# outside deadphrases.dat.
 # Copyright (c) 2026 by Dreamwidth Studios, LLC. Same terms as Perl itself.
 use strict;
 use warnings;
