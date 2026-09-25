@@ -331,6 +331,25 @@ async function pagination(): Promise<void> {
             assert.ok(page.body.includes(Buffer.from(marker + " public 22")));
             assert.ok(!page.body.includes(Buffer.from(marker + " private 23")));
             assert.ok(!page.body.includes(Buffer.from(marker + " usemask 24")));
+            const publicProbe = state.ids["22"];
+            assert.ok(publicProbe);
+            const publicId = publicProbe.jitemid * 256 + publicProbe.anum;
+            const publicEntry = await request(cookie, route + publicId + ".html");
+            assert.equal(publicEntry.status, 200);
+            assert.ok(publicEntry.body.includes(Buffer.from(marker + " public 22")));
+            for (const [index, visibility] of [["23", "private"],
+                ["24", "usemask"]] as const) {
+                const probe = state.ids[index];
+                assert.ok(probe);
+                const id = probe.jitemid * 256 + probe.anum;
+                const hidden = await request(cookie, route + id + ".html");
+                assert.equal(hidden.status, 404, visibility + " exact EntryPage selection");
+                assert.equal(hidden.body.toString("utf8"), "Journal not found\n");
+                assert.equal(hidden.headers.get("cache-control"), "private, no-store");
+                assert.equal(hidden.headers.get("set-cookie"), null);
+                assert.equal(hidden.headers.get("location"), null);
+                assert.ok(!hidden.body.includes(Buffer.from(marker)));
+            }
         });
         const store = await MysqlLiveStore.open(credential);
         let app: ReturnType<typeof createLiveApp> | undefined;
@@ -462,13 +481,118 @@ async function compare(): Promise<void> {
     process.stdout.write("real Perl/TS exact recent HTML " + oracle.length + " bytes: pass\n");
 }
 
+async function compareEntry(): Promise<void> {
+    setup();
+    const {public: publicConfig, credential} = config();
+    const store = await MysqlLiveStore.open(credential);
+    let app: ReturnType<typeof createLiveApp> | undefined;
+    try {
+        const before = await store.loadRawSnapshot("s2js_slice3");
+        assert.ok(before && before.entries.length === 2,
+            "entry comparison requires the two marked seed entries");
+        const ids = before.entries.map(entry => entry.jitemid * 256 + entry.anum);
+        assert.equal(new Set(ids).size, 2);
+        for (const id of ids) assert.ok(Number.isSafeInteger(id) && id > 0);
+        const service = await createComparisonRecentService({
+            repository: store, secretSource: store,
+            artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+            limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
+        }, {
+            purpose: "offline-perl-comparison",
+            clock: {nowSeconds: () => clock},
+            random: {randomBytes: length => new Uint8Array(length)},
+        });
+        app = createLiveApp(publicConfig, service);
+        app.addHook("onClose", async () => { await service.close(); });
+        await app.listen({host: "127.0.0.1", port: 8081});
+        // Exercise the TS entry path before this run's retained EntryPage GET.
+        // A real Perl GET may persist default customtext props; compare after
+        // recording that side effect rather than treating it as a TS write.
+        const firstRoute = route + ids[0] + ".html";
+        const firstTs = await request(cookie, firstRoute);
+        assert.equal(firstTs.status, 200, firstTs.body.toString("utf8").slice(0, 120));
+        assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+            before.fingerprint, "first TS EntryPage GET wrote journal state");
+        const results: Array<{ditemid: number; bytes: number; sha256: string;
+            perlDefaultWrite: boolean}> = [];
+        let priorFingerprint = before.fingerprint;
+        for (const id of ids) {
+            const one = path.join(artifacts, "entry-oracle-" + id + "-one");
+            const two = path.join(artifacts, "entry-oracle-" + id + "-two");
+            mkdirSync(one, {recursive: true});
+            mkdirSync(two, {recursive: true});
+            perl("live-oracle.pl", [publicConfig.canonicalAppOrigin, one,
+                "--comparison", cookie, "--entry", String(id)]);
+            perl("live-oracle.pl", [publicConfig.canonicalAppOrigin, two,
+                "--comparison", cookie, "--entry", String(id)]);
+            const oracle = readFileSync(path.join(one, "page-oracle.html"));
+            assert.ok(oracle.equals(readFileSync(path.join(two, "page-oracle.html"))),
+                "Controlled real Perl EntryPage HTML changed");
+            assert.ok(readFileSync(path.join(one, "response-metadata.json")).equals(
+                readFileSync(path.join(two, "response-metadata.json"))),
+            "Controlled real Perl EntryPage metadata changed");
+            const metadata = JSON.parse(readFileSync(path.join(one, "response-metadata.json"), "utf8"));
+            assert.equal(metadata.status, "200");
+            assert.equal(metadata.entry_ditemid, id);
+            assert.equal(metadata.comparison, true);
+            assert.equal(metadata.comparison_time, clock);
+            assert.equal(metadata.bytes, oracle.length);
+            assert.equal(metadata.sha256, sha(oracle));
+            const afterOracle = await store.loadRawSnapshot("s2js_slice3");
+            assert.ok(afterOracle);
+            const url = route + id + ".html";
+            const rendered = await request(cookie, url);
+            writeFileSync(path.join(artifacts, "entry-ts-" + id + ".html"), rendered.body);
+            assert.equal(rendered.status, 200, rendered.body.toString("utf8").slice(0, 120));
+            assert.equal(rendered.headers.get("content-type"), "text/html; charset=utf-8");
+            assert.equal(rendered.headers.get("cache-control"), "private, no-store");
+            assert.equal(rendered.headers.get("content-length"), String(rendered.body.length));
+            assert.equal(rendered.headers.get("set-cookie"), null);
+            assertExactHtml(oracle, rendered.body);
+            const head = await fetch(url, {
+                method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(20000),
+                headers: {Cookie: "ljuniq=" + cookie},
+            });
+            assert.equal(head.status, 200);
+            assert.equal(head.headers.get("content-type"), rendered.headers.get("content-type"));
+            assert.equal(head.headers.get("cache-control"), rendered.headers.get("cache-control"));
+            assert.equal(head.headers.get("content-length"), String(rendered.body.length));
+            assert.equal(head.headers.get("set-cookie"), null);
+            assert.equal((await head.arrayBuffer()).byteLength, 0);
+            assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                afterOracle.fingerprint, "Compared EntryPage GET/HEAD wrote journal state");
+            results.push({ditemid: id, bytes: oracle.length, sha256: sha(oracle),
+                perlDefaultWrite: afterOracle.fingerprint !== priorFingerprint});
+            priorFingerprint = afterOracle.fingerprint;
+        }
+        writeFileSync(path.join(artifacts, "entry-comparison.json"),
+            JSON.stringify({schema: 1, tsBeforeOracleInThisRun: true, results}, null, 2) + "\n");
+    } finally {
+        if (app) await app.close();
+        await store.close();
+    }
+    process.stdout.write("real Perl/TS exact two-entry GET/HEAD HTML and read-only state: pass\n");
+}
+
 async function resources(): Promise<void> {
     setup();
-    const {public: publicConfig} = config();
+    const {public: publicConfig, credential} = config();
+    const store = await MysqlLiveStore.open(credential);
+    let entryId: number;
+    try {
+        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        assert.ok(snapshot && snapshot.entries.length === 2);
+        entryId = snapshot.entries[0]!.jitemid * 256 + snapshot.entries[0]!.anum;
+        assert.ok(Number.isSafeInteger(entryId) && entryId > 0);
+    } finally {
+        await store.close();
+    }
     await liveServer(async () => {
         const page = await request();
+        const entry = await request(null, route + entryId + ".html");
         assert.equal(page.status, 200);
-        const html = page.body.toString("utf8");
+        assert.equal(entry.status, 200);
+        const html = page.body.toString("utf8") + "\n" + entry.body.toString("utf8");
         const destinations = new Map<string, {method: "GET" | "POST"; target: string}>();
         const attribute = /\b(href|src|action)\s*=\s*(["'])(.*?)\2/gi;
         const attributes = [...html.matchAll(attribute)];
@@ -525,8 +649,29 @@ async function resources(): Promise<void> {
             }
         }
         assert.ok(staticCount > 0, "No stock static resources were checked");
+        for (const dir of ["prev", "next"]) {
+            const target = `/go?dir=${dir}&itemid=${entryId}&journal=s2js_slice3`;
+            for (const method of ["GET", "HEAD"] as const) {
+                const response = await fetch(publicConfig.listenOrigin + target, {
+                    method, redirect: "manual", signal: AbortSignal.timeout(10000),
+                });
+                assert.equal(response.status, 307, method + " " + target);
+                assert.equal(response.headers.get("location"),
+                    publicConfig.canonicalAppOrigin + target);
+                assert.equal(response.headers.get("cache-control"), "private, no-store");
+                await response.arrayBuffer();
+            }
+        }
+        const badGo = await fetch(publicConfig.listenOrigin +
+            `/go?journal=s2js_slice3&itemid=${entryId}&dir=prev`, {
+            redirect: "manual", signal: AbortSignal.timeout(10000),
+        });
+        assert.equal(badGo.status, 400, "Reordered /go query was admitted");
+        assert.equal(badGo.headers.get("location"), null);
+        await badGo.arrayBuffer();
         process.stdout.write("all " + destinations.size + " emitted root-relative URLs " +
-            "redirect exactly; " + staticCount + " retained static targets 200: pass\n");
+            "from Recent+Entry redirect exactly; " + staticCount +
+            " retained static targets 200; exact /go admission: pass\n");
     });
 }
 
@@ -545,6 +690,17 @@ async function appAvailable(): Promise<boolean> {
 async function noPerl(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
+    const {credential} = config();
+    const store = await MysqlLiveStore.open(credential);
+    let entryUrl: string;
+    try {
+        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        assert.ok(snapshot && snapshot.entries.length === 2);
+        const selected = snapshot.entries[0]!;
+        entryUrl = route + (selected.jitemid * 256 + selected.anum) + ".html";
+    } finally {
+        await store.close();
+    }
     assert.equal(await appAvailable(), true, "Retained app must start available");
     await liveServer(async () => {
         const kill = spawnSync("/usr/bin/pkill", ["starman"], {
@@ -570,6 +726,19 @@ async function noPerl(): Promise<void> {
             assert.equal(head.headers.get("cache-control"), "private, no-store");
             assert.ok(Number(head.headers.get("content-length")) > 10000);
             assert.equal((await head.arrayBuffer()).byteLength, 0);
+            const entry = await request(null, entryUrl);
+            assert.equal(entry.status, 200, entry.body.toString("utf8").slice(0, 120));
+            assert.equal(entry.headers.get("content-type"), "text/html; charset=utf-8");
+            assert.equal(entry.headers.get("cache-control"), "private, no-store");
+            assert.equal(entry.headers.get("content-length"), String(entry.body.length));
+            const entryHead = await fetch(entryUrl, {
+                method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(20000),
+            });
+            assert.equal(entryHead.status, 200);
+            assert.equal(entryHead.headers.get("content-type"), entry.headers.get("content-type"));
+            assert.equal(entryHead.headers.get("cache-control"), entry.headers.get("cache-control"));
+            assert.equal(entryHead.headers.get("content-length"), String(entry.body.length));
+            assert.equal((await entryHead.arrayBuffer()).byteLength, 0);
         } finally {
             const start = spawnSync("/usr/bin/bash", [".devcontainer/start.sh"], {
                 cwd: root, env: process.env, timeout: 30000,
@@ -580,7 +749,7 @@ async function noPerl(): Promise<void> {
         }
     });
     assert.equal(await appAvailable(), true, "Retained Perl listener did not recover");
-    process.stdout.write("actual TS recent HTTP 200 while Perl listener unavailable: pass\n");
+    process.stdout.write("actual TS recent/entry GET+HEAD while Perl listener unavailable: pass\n");
 }
 
 async function crossJournal(): Promise<void> {
@@ -612,6 +781,14 @@ async function crossJournal(): Promise<void> {
                 await app.listen({host: "127.0.0.1", port: 8081});
                 const primaryHtml = await request(cookie);
                 assert.equal(primaryHtml.status, 200);
+                const primaryState = JSON.parse(readFileSync(
+                    path.join(artifacts, "other-probe-state.json"), "utf8"));
+                const primaryRecord = primaryState.ids.s2js_slice3;
+                assert.ok(primaryRecord);
+                const primaryEntryUrl = route +
+                    (primaryRecord.jitemid * 256 + primaryRecord.anum) + ".html";
+                const primaryEntryHtml = await request(cookie, primaryEntryUrl);
+                assert.equal(primaryEntryHtml.status, 200);
                 perl("live-other-probe.pl", ["--create-other"]);
                 const state = JSON.parse(readFileSync(
                     path.join(artifacts, "other-probe-state.json"), "utf8"));
@@ -627,10 +804,22 @@ async function crossJournal(): Promise<void> {
                 assert.ok(primary.body.equals(primaryHtml.body));
                 assert.ok(!primary.body.includes(Buffer.from(
                     state.marker + " " + state.run + " s2js_slice3_other")));
+                const primaryEntry = await request(cookie, primaryEntryUrl);
+                assert.equal(primaryEntry.status, 200);
+                assert.ok(primaryEntry.body.equals(primaryEntryHtml.body),
+                    "Foreign same-ID post changed primary EntryPage");
+                assert.ok(!primaryEntry.body.includes(Buffer.from(
+                    state.marker + " " + state.run + " s2js_slice3_other")));
                 const alternate = await request(cookie,
                     "http://localhost:8081/users/s2js_slice3_other/");
                 assert.equal(alternate.status, 400);
                 assert.equal(alternate.body.toString("utf8"), "Unsupported request\n");
+                const alternateEntry = await request(cookie,
+                    "http://localhost:8081/users/s2js_slice3_other/" +
+                    (state.ids.s2js_slice3_other.jitemid * 256 +
+                        state.ids.s2js_slice3_other.anum) + ".html");
+                assert.equal(alternateEntry.status, 400);
+                assert.equal(alternateEntry.body.toString("utf8"), "Unsupported request\n");
             } finally {
                 await app.close();
             }
@@ -644,7 +833,8 @@ async function crossJournal(): Promise<void> {
     } finally {
         await store.close();
     }
-    process.stdout.write("same-ID cross-journal row isolated; other probe restored: pass\n");
+    process.stdout.write("same-ID cross-journal Recent/Entry rows isolated; " +
+        "other probe restored: pass\n");
 }
 
 async function empty(): Promise<void> {
@@ -653,10 +843,12 @@ async function empty(): Promise<void> {
     const {public: publicConfig, credential} = config();
     const baseline = await MysqlLiveStore.open(credential);
     let seedIds: number[];
+    let seedDitemids: number[];
     try {
         const snapshot = await baseline.loadRawSnapshot("s2js_slice3");
         assert.ok(snapshot && snapshot.entries.length === 2);
         seedIds = snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
+        seedDitemids = snapshot.entries.map(entry => entry.jitemid * 256 + entry.anum);
     } finally {
         await baseline.close();
     }
@@ -678,6 +870,13 @@ async function empty(): Promise<void> {
             assert.ok(!page.body.includes(Buffer.from(
                 '/~s2js_slice3/2026/09/24/" title=')));
             assert.equal(page.headers.get("cache-control"), "private, no-store");
+            for (const id of seedDitemids) {
+                const selected = await request(null, route + id + ".html");
+                assert.equal(selected.status, 404, "Empty public cohort entry selection");
+                assert.equal(selected.body.toString("utf8"), "Journal not found\n");
+                assert.equal(selected.headers.get("set-cookie"), null);
+                assert.equal(selected.headers.get("location"), null);
+            }
         });
         const directory = path.join(artifacts, "oracle-empty");
         mkdirSync(directory, {recursive: true});
@@ -739,11 +938,17 @@ async function entryStates(): Promise<void> {
                 const state = JSON.parse(readFileSync(
                     path.join(artifacts, "probe-state.json"), "utf8"));
                 const marker = state.marker + " " + state.run;
+                const probe = state.ids["1"];
+                assert.ok(probe);
+                const entryUrl = route + (probe.jitemid * 256 + probe.anum) + ".html";
                 const dayLink = '/~s2js_slice3/2026/09/23/" title=';
                 const publicPage = await request();
                 assert.equal(publicPage.status, 200);
                 assert.ok(publicPage.body.includes(Buffer.from(marker)));
                 assert.ok(publicPage.body.includes(Buffer.from(dayLink)));
+                const publicEntry = await request(null, entryUrl);
+                assert.equal(publicEntry.status, 200);
+                assert.ok(publicEntry.body.includes(Buffer.from(marker)));
                 const beforeSuspend = await store.loadRawSnapshot("s2js_slice3");
                 assert.ok(beforeSuspend);
                 perl("live-probes.pl", ["--suspend-single"]);
@@ -762,12 +967,29 @@ async function entryStates(): Promise<void> {
                 assert.equal(refused.headers.get("location"), null);
                 assert.ok(!refused.body.includes(Buffer.from(marker)));
                 assert.ok(!refused.body.includes(Buffer.from("<html")));
+                for (const url of [entryUrl, route +
+                    (seed.entries[0]!.jitemid * 256 + seed.entries[0]!.anum) + ".html"]) {
+                    const blockedEntry = await request(null, url);
+                    assert.equal(blockedEntry.status, 422, "Suspended public cohort entry");
+                    assert.equal(blockedEntry.body.toString("utf8"),
+                        "Unsupported journal state\n");
+                    assert.equal(blockedEntry.headers.get("content-type"),
+                        "text/plain; charset=utf-8");
+                    assert.equal(blockedEntry.headers.get("cache-control"),
+                        "private, no-store");
+                    assert.equal(blockedEntry.headers.get("content-length"),
+                        String(blockedEntry.body.length));
+                    assert.equal(blockedEntry.headers.get("set-cookie"), null);
+                    assert.equal(blockedEntry.headers.get("location"), null);
+                    assert.ok(!blockedEntry.body.includes(Buffer.from(marker)));
+                }
                 perl("live-probes.pl", ["--unsuspend-single"]);
                 assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
                     beforeSuspend.fingerprint, "Original entry status property was not restored");
                 const unsuspended = await request();
                 assert.equal(unsuspended.status, 200);
                 assert.ok(unsuspended.body.includes(Buffer.from(marker)));
+                assert.equal((await request(null, entryUrl)).status, 200);
                 for (const security of ["private", "usemask"] as const) {
                     perl("live-probes.pl", ["--" + security + "-single"]);
                     const snapshot = await store.loadRawSnapshot("s2js_slice3");
@@ -779,14 +1001,30 @@ async function entryStates(): Promise<void> {
                     assert.ok(!hidden.body.includes(Buffer.from(marker)));
                     assert.ok(!hidden.body.includes(Buffer.from(dayLink)));
                     assert.ok(hidden.body.includes(Buffer.from("Live sample 1 café")));
+                    const hiddenEntry = await request(null, entryUrl);
+                    assert.equal(hiddenEntry.status, 404, security + " target selection");
+                    assert.equal(hiddenEntry.body.toString("utf8"), "Journal not found\n");
+                    assert.equal(hiddenEntry.headers.get("content-type"),
+                        "text/plain; charset=utf-8");
+                    assert.equal(hiddenEntry.headers.get("cache-control"),
+                        "private, no-store");
+                    assert.equal(hiddenEntry.headers.get("content-length"),
+                        String(hiddenEntry.body.length));
+                    assert.equal(hiddenEntry.headers.get("set-cookie"), null);
+                    assert.equal(hiddenEntry.headers.get("location"), null);
+                    assert.ok(!hiddenEntry.body.includes(Buffer.from(marker)));
                 }
                 perl("live-probes.pl", ["--public-single"]);
                 assert.ok((await request()).body.includes(Buffer.from(marker)));
+                assert.equal((await request(null, entryUrl)).status, 200);
                 perl("live-probes.pl", ["--delete-single"]);
                 const deleted = await request();
                 assert.equal(deleted.status, 200);
                 assert.ok(!deleted.body.includes(Buffer.from(marker)));
                 assert.ok(!deleted.body.includes(Buffer.from(dayLink)));
+                const deletedEntry = await request(null, entryUrl);
+                assert.equal(deletedEntry.status, 404);
+                assert.equal(deletedEntry.body.toString("utf8"), "Journal not found\n");
             } finally {
                 perl("live-probes.pl", ["--restore"]);
             }
@@ -875,6 +1113,10 @@ async function missing(): Promise<void> {
     const store = await MysqlLiveStore.open(credential);
     try {
         assert.equal(await store.loadRawSnapshot("s2js_slice3_missing"), null);
+        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        assert.ok(snapshot && snapshot.entries.length === 2);
+        const selected = snapshot.entries[0]!;
+        const wrongAnum = selected.jitemid * 256 + ((selected.anum + 1) % 256);
         await liveServer(async () => {
             const response = await request(null,
                 "http://localhost:8081/users/s2js_slice3_missing/");
@@ -882,11 +1124,23 @@ async function missing(): Promise<void> {
             assert.equal(response.body.toString("utf8"), "Unsupported request\n");
             assert.equal(response.headers.get("cache-control"), "private, no-store");
             assert.equal(response.headers.get("set-cookie"), null);
+            for (const id of [1, 255, wrongAnum, 4294967295]) {
+                const absent = await request(null, route + id + ".html");
+                assert.equal(absent.status, 404, "Absent exact entry " + id);
+                assert.equal(absent.body.toString("utf8"), "Journal not found\n");
+                assert.equal(absent.headers.get("content-type"), "text/plain; charset=utf-8");
+                assert.equal(absent.headers.get("cache-control"), "private, no-store");
+                assert.equal(absent.headers.get("content-length"), String(absent.body.length));
+                assert.equal(absent.headers.get("set-cookie"), null);
+                assert.equal(absent.headers.get("location"), null);
+            }
+            assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                snapshot.fingerprint, "Missing entry selection wrote journal data");
         });
     } finally {
         await store.close();
     }
-    process.stdout.write("missing primary mapping and unadmitted HTTP journal: pass\n");
+    process.stdout.write("missing journal and canonical absent/wrong-anum entries: pass\n");
 }
 
 async function recheck(): Promise<void> {
@@ -943,15 +1197,16 @@ async function recheck(): Promise<void> {
 
 async function main(): Promise<void> {
     const mode = process.argv[2];
-    assert.ok(mode === "first" || mode === "compare" ||
+    assert.ok(mode === "first" || mode === "compare" || mode === "entry-compare" ||
         mode === "update" || mode === "recovery" || mode === "pagination" ||
         mode === "resources" ||
         mode === "no-perl" || mode === "cross-journal" ||
         mode === "empty" || mode === "entry-states" ||
         mode === "content-refusal" || mode === "missing" || mode === "recheck",
-    "Usage: node dist/tools/check-live.js first|compare|resources|update|recovery|pagination|no-perl|cross-journal|empty|entry-states|content-refusal|missing|recheck");
+    "Usage: node dist/tools/check-live.js first|compare|entry-compare|resources|update|recovery|pagination|no-perl|cross-journal|empty|entry-states|content-refusal|missing|recheck");
     if (mode === "first") await first();
     else if (mode === "compare") await compare();
+    else if (mode === "entry-compare") await compareEntry();
     else if (mode === "update") await update();
     else if (mode === "pagination") await pagination();
     else if (mode === "resources") await resources();

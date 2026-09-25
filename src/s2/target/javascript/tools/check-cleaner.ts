@@ -71,6 +71,14 @@ function sha(bytes: Buffer): string {
     return createHash("sha256").update(bytes).digest("hex");
 }
 
+function assertFullCutBody(html: string, hidden: string): void {
+    const bodyStart = html.indexOf("<body");
+    const anchor = html.indexOf('<a name="cutid1"></a>', bodyStart);
+    const hiddenAt = html.indexOf(hidden, anchor);
+    assert.ok(bodyStart >= 0 && anchor > bodyStart && hiddenAt > anchor &&
+        hiddenAt - anchor < 500, "Full cut body is absent after its generated anchor");
+}
+
 async function getPage(): Promise<{body: Buffer; headers: Headers}> {
     const response = await fetch(route, {
         redirect: "manual", signal: AbortSignal.timeout(20000),
@@ -112,7 +120,10 @@ async function main(): Promise<void> {
             assert.match(state.run, /^[A-Za-z0-9]{16}$/);
             assert.match(String(state.jitemid), /^[1-9][0-9]*$/);
             const observed: Array<{variant: string; bytes: number; sha256: string;
-                fingerprint: string}> = [];
+                entryBytes: number; entrySha256: string; fingerprint: string}> = [];
+            const ditemid = Number(state.jitemid) * 256 + Number(state.anum);
+            assert.ok(Number.isSafeInteger(ditemid) && ditemid > 0);
+            const entryRoute = route + ditemid + ".html";
             for (const variant of variants) {
                 if (variant !== "rich") helperRun(["--set", variant]);
                 const snapshot = await store.loadRawSnapshot("s2js_slice3");
@@ -129,15 +140,38 @@ async function main(): Promise<void> {
                 assert.ok(!html.includes('href="javascript:'));
                 assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
                     snapshot.fingerprint, "TS rich GET wrote journal data");
+                const entryResponse = await fetch(entryRoute, {
+                    redirect: "manual", signal: AbortSignal.timeout(20000),
+                });
+                const entryBody = Buffer.from(await entryResponse.arrayBuffer());
+                const entryHtml = entryBody.toString("utf8");
+                assert.equal(entryResponse.status, 200, entryHtml.slice(0, 120));
+                assert.equal(entryResponse.headers.get("content-type"), "text/html; charset=utf-8");
+                assert.equal(entryResponse.headers.get("cache-control"), "private, no-store");
+                assert.equal(entryResponse.headers.get("content-length"), String(entryBody.length));
+                assert.ok(entryHtml.includes(marker + " " + state.run));
+                assert.ok(entryHtml.includes("id='comments'"));
+                assert.ok(entryHtml.includes('id="ljqrttopcomment"'));
+                assert.ok(!entryHtml.includes("source-id-discarded"));
+                assert.ok(!entryHtml.includes("span-cuttag_other_123_1"));
+                assert.ok(!entryHtml.includes('href="javascript:'));
+                const ogMatch = entryHtml.match(
+                    /<meta property="og:description" content="([^"]*)"\/>/);
+                assert.ok(ogMatch, "EntryPage inert OpenGraph description missing");
+                const ogDescription = ogMatch[1]!;
+                assert.ok(!ogDescription.includes("cutid1"),
+                    "Generated full-cut anchor leaked into inert metadata");
+                assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                    snapshot.fingerprint, "TS rich EntryPage GET wrote journal data");
                 if (variant === "rich") {
+                    assert.ok(ogDescription.includes("Rich café 😀"));
                     assert.ok(html.includes("After cut visible"));
                     assert.ok(html.includes("Rich café 😀"));
                     for (const image of ["pixel.png", "map.png", "bg.png"]) {
                         assert.ok(html.includes("https://asset.slice4.invalid/" + image));
                     }
-                    const ditemid = Number(state.jitemid) * 256 + Number(state.anum);
-                    assert.ok(Number.isSafeInteger(ditemid) && ditemid > 0);
                     assert.ok(html.includes("span-cuttag_s2js_slice3_" + ditemid + "_1"));
+                    assertFullCutBody(entryHtml, "HIDDEN-S2-CONTENT-ONLY");
                     const rpc = await fetch("http://localhost:8081/__rpc_cuttag?" +
                         "journal=s2js_slice3&ditemid=" + ditemid + "&cutid=1", {
                         redirect: "manual", signal: AbortSignal.timeout(20000),
@@ -156,13 +190,23 @@ async function main(): Promise<void> {
                     assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
                         snapshot.fingerprint, "cut RPC refusal wrote journal data");
                     writeFileSync(path.join(artifacts, "slice4-rich-page.html"), body);
+                    writeFileSync(path.join(artifacts, "slice5-rich-entry.html"), entryBody);
                 } else if (variant === "edited") {
+                    assert.ok(ogDescription.includes("Edited rich café 😀"));
+                    assert.ok(ogDescription.includes("HIDDEN-EDITED-ONLY"),
+                        "Inert metadata omitted raw full-cut content");
                     assert.ok(html.includes("Edited rich café 😀"));
                     assert.ok(!html.includes("After cut visible"));
+                    assertFullCutBody(entryHtml, "HIDDEN-EDITED-ONLY");
                 } else if (variant === "forged-cut") {
+                    assert.ok(ogDescription.includes("Forged cut control"));
+                    assert.ok(ogDescription.includes("HIDDEN-FORGED-CASE"),
+                        "Inert metadata omitted raw full-cut content");
                     assert.ok(html.includes("Forged cut control"));
                     assert.ok(html.includes("Visible after cut"));
+                    assertFullCutBody(entryHtml, "HIDDEN-FORGED-CASE");
                     writeFileSync(path.join(artifacts, "slice4-forged-page.html"), body);
+                    writeFileSync(path.join(artifacts, "slice5-forged-entry.html"), entryBody);
                 } else if (variant === "escaped-css") {
                     assert.ok(html.includes("Escaped fixed"));
                     assert.ok(!html.includes("\\66 ixed"));
@@ -175,6 +219,7 @@ async function main(): Promise<void> {
                     assert.ok(!html.includes("javascript:alert"));
                 }
                 observed.push({variant, bytes: body.length, sha256: sha(body),
+                    entryBytes: entryBody.length, entrySha256: sha(entryBody),
                     fingerprint: snapshot.fingerprint});
                 assert.ok(headers.get("set-cookie")?.includes("ljuniq="),
                     "live anonymous token cookie missing");
