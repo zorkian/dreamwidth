@@ -101,12 +101,14 @@ are never trusted merely because their spelling resembles a generated cut ID.
 
 `formatting-cases.ts` records all 98 raw inputs, unnormalized retained Perl
 outputs and individual expected classifications. The unit probe reruns Perl for
-every row. Of those rows, 75 require exact bytes; six explicitly record different
-serialization (nested anchors and five table cases). Chromium checks those six
-against the retained output after actual stock page assembly, including visible
-text, font family/size/weight/style, color, link scopes and structural reparse.
-The 17 remaining implicit-close/adoption/foster cases require Unsupported with no
-fragment, followed by successful recovery. Unsupported cases are not parity.
+every row. Of those rows, 75 require exact bytes; seven explicitly record different
+serialization (nested anchors, five table cases, and an ordinary omitted paragraph
+end). Chromium checks retained visible text, font family/size/weight/style, color,
+link scopes and text-node positions after actual stock page assembly. The ordinary
+paragraph case retains Perl's extra empty-p reparse difference in the ledger while
+requiring equal visible text and layout. The 16 remaining implicit-formatting,
+adoption and foster cases require Unsupported with no fragment, followed by
+successful recovery. Unsupported cases are not parity.
 
 The repair follows the explicit-close stack behavior at
 `cgi-bin/LJ/CleanHTML.pm:1175`: outside tables, an explicit ancestor end tag closes
@@ -122,8 +124,11 @@ Table scope has a separate retained exception: it does not pop intervening tags.
 Reconstructed formatting stays intact only within the same source/DOM table,
 with contents bounded by its source range. Fostered formatting outside that
 source table refuses. Source-less adoption nodes and unproved reconstruction or
-implicit paragraph/list boundaries refuse instead of changing visible formatting.
-This is a finite representation boundary, not a replacement legacy parser.
+implicit formatting boundaries refuse instead of changing visible formatting.
+Ordinary omitted paragraph/list ends without that unproved formatting stay
+supported; native/browser tests retain any raw serialization difference and check
+actual text-node positions. This is a finite representation boundary, not a
+replacement legacy parser.
 
 For assembled formatting browser tests, first build the adapter test project and
 compile the stock artifact using the commands in `COMPONENT.md`. Set
@@ -144,3 +149,43 @@ successful modern body result could become head-hoisted on raw re-entry, so this
 finite cleaner returns Unsupported instead of silently dropping the element,
 inventing source relocation, or adding an idempotence exception. This refusal
 does not apply to ordinary inline `font` formatting.
+
+
+## Source consumption and explicit close tokens
+
+`source-cases.ts` records raw native outputs and the finite supported/refused
+source-context probes. Before transformations create nodes, `policy/source.ts`
+checks parser start/end-tag spans and text/comment/doctype spans. Whole element
+ranges are not treated as proof of visible token consumption. Both uncovered
+ranges and text ranges are inspected: a merged `xy` text node can span the lost
+`</table>` in `x</table>y`. The narrow prefix/name detector rejects lost starts,
+table-part ends and form closes. It does not rewrite HTML or replace the parser.
+Plain less-than text and entities remain text. Rawtext, comments and independently
+eaten/foreign content are excluded from visible-loss classification.
+
+Source-less author nodes refuse, including implied `tr`, stray-end-tag `br`, and
+an empty paragraph created by a stray `</p>`. Parser document scaffolding and
+harmless implied `tbody`/`colgroup` remain. Orphan `tr`/`td` and other dropped table
+parts refuse instead of returning successful `hellobye` or empty output where
+retained Perl displayed literal escaped tag tokens. Normal tables remain supported.
+Equivalent stray `b`, `div`, `span` and `ul` closes remain supported.
+
+An already identified document-wrapper start inside a gap/text range gets narrow
+maintained-JSDOM assistance: parse only the remaining range, require the first
+explicit html/head/body token at offset zero, obtain its exact quote-aware start
+span, then continue detecting after that span. Do not exempt the whole gap. Thus a
+quoted `<td>` in a pasted BODY attribute is ignored, but a following real orphan
+`td` refuses. Helper documents use no scripts/resources and close in `finally`.
+The per-entry work ceiling is 32 helper parses and cumulative helper UTF8 bytes
+at most four times `maxInputBytes` (normally 256KiB). Exceeding either ceiling
+returns Unsupported before the next parse. The real-worker test supplies 48KiB
+of 8,000 BODY starts and requires typed Unsupported, not a timeout, then recovery.
+Original whole-worker deadline, output, heap and credential denials remain.
+
+Source-removed tags and document wrappers cannot prove formatting closure.
+Outside table scope, descendant source extents crossing an explicit retained
+ancestor close refuse, even when merged text starts before that boundary. This
+covers form-close scope loss. Outside a form, select/option replacement preserves
+literal escaped closing tokens only when the parser records an actual source
+endTag. No implicit parser closing token is invented. Native and browser tests
+verify both complete and incomplete control sequences.
