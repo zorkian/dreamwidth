@@ -12,31 +12,38 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from '@playwright/test';
+import { preparedCorpusRoot } from './corpus-paths.mjs';
+import { defaultAttestationRoot, verifyRunAttestation } from './run-attestation.mjs';
 
-const resultPath = process.argv[2];
-assert.ok(resultPath && process.argv.length === 3,
-    'usage: browser-native-entry-matrix.mjs <reviewed-native-result.json>');
+const [resultPath, flag, suppliedAttestation] = process.argv.slice(2);
+assert.ok(resultPath && (!flag || (flag === '--attestation' && suppliedAttestation)) &&
+    process.argv.length <= (flag ? 5 : 3),
+    'usage: browser-native-entry-matrix.mjs native-result.json [--attestation DIR]');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const attestation = suppliedAttestation ?? defaultAttestationRoot;
+verifyRunAttestation(attestation, { nativePath: resultPath });
+execFileSync(process.execPath, [path.join(root, 'tools/check-difference-ledger.mjs'),
+    resultPath, path.join(root, 'corpus/accepted-native-ledger.json'),
+    '--attestation', attestation], { encoding: 'utf8' });
 const manifest = JSON.parse(fs.readFileSync(
     path.join(root, 'corpus/native-browser-cases.json')));
+const inputs = JSON.parse(fs.readFileSync(path.join(preparedCorpusRoot(),
+    'native-derived-entry-cases.json')));
 const ledger = JSON.parse(fs.readFileSync(
     path.join(root, 'corpus/accepted-native-ledger.json')));
 const oracle = JSON.parse(fs.readFileSync(
     path.join(root, 'corpus/native-derived-entry-perl.json')));
-const resultBytes = fs.readFileSync(resultPath);
-const result = JSON.parse(resultBytes);
+const result = JSON.parse(fs.readFileSync(resultPath));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-assert.equal(manifest.schema, 1);
+assert.equal(manifest.schema, 2);
 assert.equal(result.schema, 1);
 assert.equal(result.corpus, 'native');
-assert.equal(result.candidate, manifest.candidate);
-assert.equal(result.buildSha256, manifest.buildSha256);
-assert.equal(sha(resultBytes), manifest.resultSha256);
 assert.equal(manifest.groups.length, 72);
 assert.equal(manifest.coveredCases, 219);
 const targeted = result.rows.filter(row => row.kind === 'ok' &&
@@ -44,14 +51,14 @@ const targeted = result.rows.filter(row => row.kind === 'ok' &&
 assert.equal(targeted.length, manifest.coveredCases);
 const byId = new Map(targeted.map(row => [row.id, row]));
 assert.equal(byId.size, targeted.length);
-const categoryById = new Map(ledger.cases.map(row => [row.id, row.category]));
-const perlById = new Map(oracle.records.map(row => [row.id,
-    Buffer.from(row.outputBase64, 'base64').toString('utf8')]));
+const inputById = new Map(inputs.cases.map(row => [row.id, row]));
+const ledgerById = new Map(ledger.cases.map(row => [row.id, row]));
+const perlById = new Map(oracle.records.map(row => [row.id, row]));
+assert.equal(inputById.size, 384);
+assert.equal(ledgerById.size, 384);
+assert.equal(perlById.size, 384);
 const seen = new Set();
 const groups = manifest.groups.map(group => {
-    assert.match(group.inputSha256, /^[0-9a-f]{64}$/);
-    assert.match(group.perlSha256, /^[0-9a-f]{64}$/);
-    assert.match(group.outputSha256, /^[0-9a-f]{64}$/);
     assert.ok(group.caseIds.length > 0);
     assert.ok(group.expectedResources.length <= 1);
     for (const resource of group.expectedResources) {
@@ -65,18 +72,41 @@ const groups = manifest.groups.map(group => {
         seen.add(id);
         const row = byId.get(id);
         assert.ok(row, `unrequired or missing native browser case: ${id}`);
-        assert.equal(row.inputSha256, group.inputSha256);
-        assert.equal(row.perlSha256, group.perlSha256);
-        assert.equal(row.jsSha256, group.outputSha256);
-        assert.equal(categoryById.get(id), group.category);
-        return row;
+        const input = inputById.get(id);
+        const perl = perlById.get(id);
+        const accepted = ledgerById.get(id);
+        assert.ok(input && perl && accepted, `${id}: missing fixed semantic join`);
+        const inputSha256 = sha(Buffer.from(input.rawInputBase64, 'base64'));
+        const perlBytes = Buffer.from(perl.outputBase64, 'base64');
+        const perlSha256 = sha(perlBytes);
+        const outputSha256 = accepted.expectedJs?.ref === 'perl' ? perlSha256 :
+            accepted.expectedJs?.sha256;
+        assert.equal(row.inputSha256, inputSha256);
+        assert.equal(row.perlSha256, perlSha256);
+        assert.equal(row.jsSha256, outputSha256);
+        assert.equal(row.source, input.nativeSource);
+        assert.equal(accepted.category === 'exact', row.rawEqual);
+        assert.equal(accepted.kind, 'ok');
+        return { row, inputSha256, perlSha256, outputSha256,
+            category: accepted.category, perlHtml: perlBytes.toString('utf8') };
     });
-    assert.ok(rows.every(row => row.jsHtml === rows[0].jsHtml));
-    assert.ok(rows.every(row => perlById.get(row.id) === perlById.get(rows[0].id)));
-    assert.equal(sha(Buffer.from(rows[0].jsHtml, 'utf8')), group.outputSha256);
-    const perlHtml = perlById.get(rows[0].id);
-    assert.equal(sha(Buffer.from(perlHtml, 'utf8')), group.perlSha256);
-    return { ...group, html: rows[0].jsHtml, perlHtml };
+    for (const joined of rows) {
+        assert.deepEqual({ inputSha256: joined.inputSha256,
+            perlSha256: joined.perlSha256, outputSha256: joined.outputSha256,
+            category: joined.category },
+        { inputSha256: rows[0].inputSha256,
+            perlSha256: rows[0].perlSha256, outputSha256: rows[0].outputSha256,
+            category: rows[0].category },
+        `${joined.row.id}: browser group combines different fixed expectations`);
+        assert.equal(joined.row.jsHtml, rows[0].row.jsHtml);
+        assert.equal(joined.perlHtml, rows[0].perlHtml);
+    }
+    assert.equal(sha(Buffer.from(rows[0].row.jsHtml, 'utf8')),
+        rows[0].outputSha256);
+    assert.equal(sha(Buffer.from(rows[0].perlHtml, 'utf8')),
+        rows[0].perlSha256);
+    return { ...group, ...rows[0], html: rows[0].row.jsHtml,
+        perlHtml: rows[0].perlHtml };
 });
 assert.equal(seen.size, targeted.length, 'every required native case needs a browser group');
 assert.ok(targeted.every(row => seen.has(row.id)));
@@ -277,7 +307,7 @@ for (const [engineName, browserType] of [['chromium', chromium],
     }
 }
 process.stdout.write(JSON.stringify({ schema: 1,
-    evidenceStatus: 'reviewed-build-browser-reparse',
+    evidenceStatus: 'attested-current-build-browser-reparse',
     candidate: result.candidate, buildSha256: result.buildSha256,
-    resultSha256: manifest.resultSha256, groups: groups.length,
+    resultSha256: sha(fs.readFileSync(resultPath)), groups: groups.length,
     coveredCases: seen.size, observations: observations.length, rows: observations }) + '\n');
