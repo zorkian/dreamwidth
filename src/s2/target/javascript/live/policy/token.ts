@@ -40,11 +40,12 @@ import { Unsupported } from "./content";
 
 export function parseUniqCookie(header: string | null): string | null {
     if (header === null || header === "") return null;
-    // Accept only one anonymous cookie. No implicit decoding, duplicate
-    // resolution, ignored session cookies, or unexpected cookie extensions.
-    const match = /^ljuniq=([a-zA-Z0-9]{15}:[0-9]{1,10}(?::x)?)$/.exec(header);
+    // CGI::Cookie emits percent-encoded colons. Admit only that one unambiguous
+    // escape (once), or literal colons used by the controlled comparison.
+    // Never decode arbitrary escapes, resolve duplicates or ignore auth cookies.
+    const match = /^ljuniq=([a-zA-Z0-9]{15}(?::|%3[aA])[0-9]{1,10}(?:(?::|%3[aA])x)?)$/.exec(header);
     if (!match) throw new Unsupported();
-    return match[1]!;
+    return match[1]!.replace(/%3[aA]/g, ":");
 }
 function randomCharacters(random: ComparisonRandom, count: number): string {
     const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -74,7 +75,7 @@ export async function formToken(
     const uniq = cookie?.split(":")[0] ?? randomCharacters(random, 15);
     const timestamp = Number(cookie?.split(":")[1] ?? 0);
     const setCookie = !cookie || timestamp > now || now - timestamp >= 86400
-        ? `ljuniq=${uniq}:${now}; Path=/; Max-Age=5184000` : null;
+        ? `ljuniq=${uniq}%3A${now}; Path=/; Max-Age=5184000; SameSite=Lax` : null;
     const attr = `${randomCharacters(random, 10)}-0-${uniq}`;
     const bare = `c0:${secret.stime}:${now - secret.stime}:86400:${attr}`;
     const signature = createHash("md5").update(bare).update(secret.secret).digest("hex");
