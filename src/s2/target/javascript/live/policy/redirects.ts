@@ -16,6 +16,7 @@ import type { CreateRedirectAdmission, RedirectAdmissionDecision } from "../cont
 import { validateConfig } from "./config";
 import { parseUniqCookie } from "./token";
 import { USERNAME } from "./cohort";
+import { validEntryId } from "./entry";
 
 const REJECT: RedirectAdmissionDecision = Object.freeze({ kind: "reject" });
 const GET_PATHS = new Set(["/", "/support/faq", "/interface/atom", "/openid/server", "/lostinfo", "/create"]);
@@ -48,6 +49,11 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
     const expectedHost = new URL(config.listenOrigin).host;
     const recent = "/users/" + USERNAME + "/";
     const originalRecent = config.canonicalAppOrigin + recent;
+    const entryPath = (path: string): number | null => {
+        const match = new RegExp("^" + recent + "([1-9][0-9]{0,9})\\.html$").exec(path);
+        const id = match ? Number(match[1]) : 0;
+        return validEntryId(id) ? id : null;
+    };
     return request => {
         try {
             if (request.host !== expectedHost || request.hasAuthorization || request.hasForwardedHeaders ||
@@ -63,6 +69,12 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
                 return {kind: "recent", request: {method: request.method as "GET" | "HEAD",
                     username: USERNAME, skip, skipPresent: match[1] !== undefined, uniqCookie}};
             }
+            const ditemid = entryPath(raw);
+            if (ditemid !== null && request.method !== "POST") {
+                if (request.origin !== null && request.origin !== config.listenOrigin) return REJECT;
+                return {kind: "entry", request: {method: request.method as "GET" | "HEAD",
+                    username: USERNAME, ditemid, uniqCookie}};
+            }
             if (request.method === "POST") {
                 if ((raw !== "/login" && raw !== "/multisearch") ||
                     request.origin !== config.listenOrigin) return REJECT;
@@ -71,11 +83,15 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
                 const item = /^\/tools\/(memadd|tellafriend)\?journal=s2js_slice3&itemid=([1-9][0-9]{0,12})$/.exec(raw);
                 const returnto = raw.startsWith("/openid/?returnto=") ? raw.slice("/openid/?returnto=".length) : "";
                 const safeReturn = returnto === originalRecent ||
+                    (returnto.startsWith(config.canonicalAppOrigin + "/") &&
+                     entryPath(returnto.slice(config.canonicalAppOrigin.length)) !== null) ||
                     (returnto.startsWith(originalRecent + "?skip=") &&
                      /^(0|[1-9][0-9]{0,2})$/.test(returnto.slice((originalRecent + "?skip=").length)) &&
                      Number(returnto.slice((originalRecent + "?skip=").length)) <= 200);
+                const go = /^\/go\?dir=(prev|next)&itemid=([1-9][0-9]{0,9})&journal=s2js_slice3$/.exec(raw);
+                const safeGo = go !== null && validEntryId(Number(go[2]));
                 if (!GET_PATHS.has(raw) && raw !== "/tools/memories?user=" + USERNAME &&
-                    !item && !safeReturn && !datePath(raw) && !asset(raw)) return REJECT;
+                    !item && !safeReturn && !safeGo && !datePath(raw) && !asset(raw)) return REJECT;
             }
             return {kind: "redirect", status: 307, location: config.canonicalAppOrigin + raw};
         } catch {

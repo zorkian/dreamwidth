@@ -30,6 +30,7 @@ import {createComparisonRecentService} from "../policy/comparison";
 import {createAnonymousRecentService} from "../policy/service";
 import {config, limits, now, snapshot} from "./fixtures";
 import type {AnonymousRecentServiceDeps, RawJournalSnapshot} from "../contracts";
+import type {RenderContentPreparation} from "../render/types";
 
 const path = process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice3-stock.json";
 const runtime = verifyRuntime(path);
@@ -38,6 +39,12 @@ const inputs = {purpose: "offline-perl-comparison" as const, clock: {nowSeconds:
     random: {randomBytes: (n: number) => new Uint8Array(n)}};
 const request = {method: "GET" as const, username: "s2js_slice3", skip: 0, skipPresent: false,
     uniqCookie: "AAAAAAAAAAAAAAA:1790294400:x"};
+// Existing direct Recent model tests inspect pagination only. Actual rendering
+// tests below still exercise the real worker's shared cleaner, never this helper.
+const rawRecentContent: RenderContentPreparation = {
+    body: entry => entry.rawBody,
+    metadata() {throw new Error("Recent preparation must not request metadata");},
+};
 function dependencies(data: () => RawJournalSnapshot): AnonymousRecentServiceDeps {
     return {repository: {loadRawSnapshot: async () => structuredClone(data()),
         revalidateFingerprint: async old => JSON.stringify(old) === JSON.stringify(data()),
@@ -48,7 +55,7 @@ function dependencies(data: () => RawJournalSnapshot): AnonymousRecentServiceDep
 
 test("real isolated child initializes source defaults and prints live Unicode", async () => {
     const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
-    const input = {journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
+    const input = {page: {kind: "recent" as const}, journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     try {
         const html = await renderer.render(input);
@@ -82,7 +89,7 @@ test("one actual isolated worker cleans raw rich text before stock rendering and
     ]});
     assert.equal(journal.entries[0]!.rawBody, body);
     assert.ok(!JSON.stringify(journal).includes("PRIVATE_UNSUPPORTED"));
-    const input = {journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+    const input = {page: {kind: "recent" as const}, journal, config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
     const withBody = (value: string) => ({...input, journal: {...journal,
@@ -132,7 +139,7 @@ test("real child denies credential files, writes, subprocesses, threads and netw
     assert.match(result.stdout, /TCP\/Unix\/listen\/UDP denied/);
 });
 test("real child fails on output and deadline limits, and close stops active render", async () => {
-    const input = {journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
+    const input = {page: {kind: "recent" as const}, journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     for (const changedLimits of [{...limits, maxOutputBytes: 20}, {...limits, timeoutMs: 1}]) {
         const renderer = new Renderer(artifact, path + ".sandbox", changedLimits, runtime);
@@ -233,9 +240,9 @@ test("retained page80/loader79 clamps preserve mixed-public selection and reques
     const journal = approveSnapshot({...data, entries: rows});
     assert.equal(journal.entries.length, 120);
     for (const skip of [79, 80, 81, 200]) {
-        const input = {journal, config, skip, skipPresent: true, nowSeconds: now,
+        const input = {page: {kind: "recent" as const}, journal, config, skip, skipPresent: true, nowSeconds: now,
             formChallenge: "public-test", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
-        const page = prepare(input, new Context(instantiate(artifact), () => {}), body => body);
+        const page = prepare(input, new Context(instantiate(artifact), () => {}), rawRecentContent);
         assert.equal(page.entries.length, 20);
         assert.equal(page.entries[0].itemid, 61 * 256);
         assert.equal(page.entries[19].itemid, 32 * 256);
@@ -258,9 +265,9 @@ test("exactly full final page retains the empty previous-link corner", () => {
     const journal = approveSnapshot({...data, entries: Array.from({length: 20}, (_, i) => ({
         ...data.entries[0]!, jitemid: i + 1,
     }))});
-    const page = prepare({journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+    const page = prepare({page: {kind: "recent"}, journal, config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()},
-        new Context(instantiate(artifact), () => {}), body => body);
+        new Context(instantiate(artifact), () => {}), rawRecentContent);
     assert.equal(page.nav._backward_count, 20);
     assert.equal(page.nav._backward_url, undefined);
 });
@@ -270,7 +277,7 @@ test("future-only current-year calendar retains the source month-zero edge", () 
     const future = {...journal, entries: journal.entries.map(e => ({...e,
         eventtime: "2026-11-01 00:00:00", year: 2026, month: 11, day: 1}))};
     const base = "http://localhost:8080/~s2js_slice3";
-    const month = calendar({journal: future, config, skip: 0, skipPresent: false, nowSeconds: now,
+    const month = calendar({page: {kind: "recent"}, journal: future, config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: {}}, base, false);
     // Independently probed S2::Builtin::LJ::Page__get_latest_month + YearMonth
     // with synthetic November counts and the September comparison clock.
@@ -287,7 +294,7 @@ test("48KiB of discarded wrapper starts produces typed refusal before worker dea
     const body = '<body>'.repeat(8000);
     assert.equal(Buffer.byteLength(body), 48000);
     const journal = approveSnapshot({...data, entries: [{...data.entries[0]!, eventText: body}]});
-    const input = {journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+    const input = {page: {kind: "recent" as const}, journal, config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
     const started = performance.now();

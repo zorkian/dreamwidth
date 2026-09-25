@@ -13,10 +13,11 @@
 //
 
 import {createEntryCleaner} from "@dreamwidth/content";
+import type {EntryContentInput} from "@dreamwidth/content/contracts";
 import {renderStock} from "./engine";
 import {validateArtifact} from "./artifact";
 import {Unsupported} from "../policy/content";
-import type {RenderInput, RendererHeader} from "./types";
+import type {ApprovedEntry, RenderContentPreparation, RenderInput, RendererHeader} from "./types";
 
 // Only stdin/stdout are inherited. One process performs content preparation,
 // stock prop_init/modules_init and Page.print under one parent deadline.
@@ -40,27 +41,62 @@ process.stdin.on("end", () => {
         if (!Number.isSafeInteger(message.maxBytes) || message.maxBytes <= 0 ||
             message.maxBytes > 2097152) throw new Unsupported();
         const request = message.input;
-        const documentUrl = `${request.config.canonicalAppOrigin}/~${request.journal.username}/` +
-            (request.skipPresent ? `?skip=${request.skip}` : "");
-        const html = renderStock(artifact, request, message.maxBytes, (rawBody, entryId, entryUrl) => {
-            const result = cleaner.clean({body: rawBody, format: "html_raw0", context: {
+        if (!request.page || !["recent", "entry"].includes(request.page.kind) ||
+            !Number.isSafeInteger(request.skip) || request.skip < 0 || request.skip > 200 ||
+            typeof request.skipPresent !== "boolean" || (!request.skipPresent && request.skip !== 0)) {
+            throw new Unsupported();
+        }
+        const entryPage = request.page.kind === "entry";
+        if (request.page.kind === "entry" && (request.skip !== 0 || request.skipPresent ||
+            !Number.isSafeInteger(request.page.ditemid) || request.page.ditemid < 1 ||
+            request.page.ditemid > 4294967295 ||
+            !request.journal.entries.some(entry => request.page.kind === "entry" && entry.id === request.page.ditemid))) {
+            throw new Unsupported();
+        }
+        const documentUrl = request.page.kind === "entry" ?
+            `${request.config.canonicalAppOrigin}/users/${request.journal.username}/${request.page.ditemid}.html` :
+            `${request.config.canonicalAppOrigin}/~${request.journal.username}/` +
+                (request.skipPresent ? `?skip=${request.skip}` : "");
+        const contentInput = (entry: ApprovedEntry, entryUrl: string): EntryContentInput => {
+            if (!request.journal.entries.includes(entry) ||
+                (request.page.kind === "entry" && entry.id !== request.page.ditemid)) throw new Unsupported();
+            return {body: entry.rawBody, format: "html_raw0", context: {
                 policy: "dreamwidth-entry-html-raw0-v1", insertionContext: "html-div-flow", documentUrl,
                 entryUrl, journalUsername: request.journal.username, journalId: request.journal.userid,
-                entryId, cuts: "source-compatible-recent", ...request.config.entryContent,
+                entryId: entry.id, cuts: entryPage ? "source-compatible-entry" : "source-compatible-recent",
+                ...request.config.entryContent,
                 reader: {removeColors: false, removeSizes: false, removeFonts: false,
                     maxImageWidth: null, maxImageHeight: null,
                     placeholderUndefinedImageSize: false, extractImages: false},
-            }});
-            if (result.kind === "failure") {
-                if (result.reason === "unsupported") throw new Unsupported();
-                throw new Error("Cleaner unavailable");
-            }
-            // Ordinary live configuration is proxy-absent. Configured synthetic
-            // qualification exercises the separate public image exchange API;
-            // no implicit parent signing service or key reaches this worker.
-            if (result.kind !== "ok") throw new Unsupported();
-            return result.fragment.html;
-        });
+            }};
+        };
+        const content: RenderContentPreparation = {
+            body(entry, entryUrl) {
+                const result = cleaner.clean(contentInput(entry, entryUrl));
+                if (result.kind === "failure") {
+                    if (result.reason === "unsupported") throw new Unsupported();
+                    throw new Error("Cleaner unavailable");
+                }
+                // Ordinary live configuration is proxy-absent. Configured
+                // qualification remains a separate public image exchange test;
+                // no signing service or key reaches this worker.
+                if (result.kind !== "ok") throw new Unsupported();
+                return result.fragment.html;
+            },
+            metadata(entry, entryUrl) {
+                if (!entryPage) throw new Unsupported();
+                // The source helper is independently derived from raw text,
+                // never from body HTML. Only the child engine consumes this
+                // inert value at its escaped OG attribute boundary.
+                const result = cleaner.metadata({subject: entry.subject, entry: contentInput(entry, entryUrl)});
+                if (result.kind === "failure") {
+                    if (result.reason === "unsupported") throw new Unsupported();
+                    throw new Error("Metadata unavailable");
+                }
+                return result.metadata;
+            },
+        };
+        const html = renderStock(artifact, request, message.maxBytes, content);
         output({version: 2, kind: "complete"}, html);
     } catch (error) {
         output({version: 2, kind: "failure",
