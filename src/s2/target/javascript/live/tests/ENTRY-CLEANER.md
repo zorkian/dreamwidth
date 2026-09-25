@@ -1,3 +1,18 @@
+<!--
+ENTRY-CLEANER.md
+
+Full-entry content compatibility decisions and executable component probes.
+
+Authors:
+    Dreamwidth contributors
+
+Copyright (c) 2026 by Dreamwidth Studios, LLC.
+
+This program is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself. For a copy of the license, please reference
+'perldoc perlartistic' or 'perldoc perlgpl'.
+-->
+
 # Full-entry content component checks
 
 Run inside the owning devcontainer after the shared package build:
