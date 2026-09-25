@@ -127,9 +127,10 @@ and security corpus use the checks below.
 
 `tools/browser-entry-reparse.mjs` accepts a 26-row cleaner result JSON. It
 checks the IDs against `corpus/entry-replay-cases.json` and checks each output
-against its own digest. The accepted per-case bytes and categories are checked
-separately by `tools/check-difference-ledger.mjs`; a browser input alone cannot
-authenticate a cleaner build. The browser tool tests each admitted output in
+against its own digest. The permanent per-case bytes and categories are checked
+separately by `tools/check-difference-ledger.mjs` using an ignored current-run
+attestation; a browser input alone cannot authenticate a cleaner build. The
+browser tool tests each admitted output in
 both document and `div.entry-content` contexts across all six installed browser
 modes. A raw control must execute only with
 JavaScript enabled and must hit the denied image/WebSocket traps. Browser

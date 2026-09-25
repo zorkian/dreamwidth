@@ -1,8 +1,6 @@
 {
-  "schema": 1,
+  "schema": 2,
   "purpose": "slice5-entry-full-body-and-inert-metadata",
-  "contentCandidate": "8fc8928659b761cb4f15228059a2c6b2bfd42d75",
-  "buildSha256": "c5b0e7ceeb901c540a4b2cb955691d3ce1f355dcc6c47891a9c4103ee339dae2",
   "context": {
     "policy": "dreamwidth-entry-html-raw0-v1",
     "insertionContext": "html-div-flow",

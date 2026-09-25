@@ -129,12 +129,14 @@ From `src/content`, after both TypeScript builds, regenerate the 410 unchanged
 Recent cases and verify the separate [binding](../../../content/corpus/README.md):
 
 ```sh
-CONTENT_SHA=8fc8928659b761cb4f15228059a2c6b2bfd42d75
 PATH=/opt/dw-node24/bin:$PATH node tools/prepare-corpus.mjs
 PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
-  dist/index.js "$CONTENT_SHA" synthetic > /tmp/slice5-recent-synthetic.json
+  dist/index.js current synthetic > /tmp/slice5-recent-synthetic.json
 PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
-  dist/index.js "$CONTENT_SHA" native > /tmp/slice5-recent-native.json
+  dist/index.js current native > /tmp/slice5-recent-native.json
+PATH=/opt/dw-node24/bin:$PATH node tools/attest-corpus-run.mjs \
+  --synthetic /tmp/slice5-recent-synthetic.json \
+  --native /tmp/slice5-recent-native.json --entry
 PATH=/opt/dw-node24/bin:$PATH node tools/check-slice5-recent-regression.mjs \
   corpus/slice5-recent-binding.json /tmp/slice5-recent-synthetic.json \
   /tmp/slice5-recent-native.json

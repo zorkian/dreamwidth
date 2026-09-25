@@ -20,10 +20,11 @@ import { fileURLToPath } from 'node:url';
 import { preparedCorpusRoot } from './corpus-paths.mjs';
 
 const [moduleArg, candidate, corpusName] = process.argv.slice(2);
-if (!moduleArg || !/^[0-9a-f]{40}$/.test(candidate ?? '') ||
+if (!moduleArg || typeof candidate !== 'string' || candidate.length === 0 ||
+    candidate.length > 128 || !/^[A-Za-z0-9_.:-]+$/.test(candidate) ||
     !['synthetic', 'native'].includes(corpusName)) {
     throw new Error('usage: compare-entry-replays.mjs <built-cleaner-index.js> ' +
-        '<full-candidate-sha> synthetic|native > result.json');
+        '<informational-label> synthetic|native > result.json');
 }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const corpus = path.join(root, 'corpus');
