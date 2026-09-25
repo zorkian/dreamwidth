@@ -53,7 +53,19 @@ function setup(): void {
     perl("live-seed.pl");
     perl("live-config.pl");
     perl("live-grants.pl");
-    perl("live-compile.pl", [path.join(artifacts, "stock.json")]);
+    const artifact = path.join(artifacts, "stock.json");
+    perl("live-compile.pl", [artifact]);
+    const staged = spawnSync("/opt/dw-node24/bin/node", [
+        path.join(root, "src/content/tools/stage-runtime.mjs"), artifact,
+    ], {
+        cwd: root, env: process.env, timeout: 120000, maxBuffer: 1024 * 1024,
+        encoding: "utf8", killSignal: "SIGKILL",
+    });
+    if (staged.error || staged.status !== 0) {
+        throw new Error("closed live worker staging failed: " +
+            (staged.error?.message ?? "status " + staged.status +
+                ", signal " + staged.signal) + "\n" + staged.stderr);
+    }
 }
 
 function config(): {public: PublicAppConfig; credential: MysqlStoreConfig} {
@@ -790,16 +802,21 @@ async function entryStates(): Promise<void> {
         "public/suspended/private/usemask/deleted entry and calendar disclosure: pass\n");
 }
 
-async function contentRefusal(): Promise<void> {
+async function contentCleaning(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
     const {credential} = config();
     const store = await MysqlLiveStore.open(credential);
     const baseline = await store.loadRawSnapshot("s2js_slice3");
     assert.ok(baseline && baseline.entries.length === 2);
+    const expected = {
+        "bad-malformed": "<p>unterminated</p>",
+        "bad-url": "<p><a>bad link</a></p>",
+        "bad-script": "",
+    } as const;
     try {
         await liveServer(async () => {
-            for (const kind of ["bad-malformed", "bad-url", "bad-script"] as const) {
+            for (const kind of Object.keys(expected) as Array<keyof typeof expected>) {
                 try {
                     perl("live-probes.pl", ["--create-" + kind]);
                     const state = JSON.parse(readFileSync(
@@ -810,11 +827,28 @@ async function contentRefusal(): Promise<void> {
                         entry.jitemid === state.ids["1"].jitemid &&
                         entry.subjectText.includes(kind)));
                     const response = await request();
-                    assert.equal(response.status, 422, kind);
-                    assert.equal(response.body.toString("utf8"), "Unsupported journal state\n");
+                    assert.equal(response.status, 200, kind);
+                    const html = response.body.toString("utf8");
+                    const title = html.indexOf(state.marker + " " + state.run);
+                    assert.ok(title >= 0, kind + ": marked entry missing");
+                    const prefix = '<div class="entry-content">';
+                    const start = html.indexOf(prefix, title);
+                    assert.ok(start > title, kind + ": marked entry body missing");
+                    const end = html.indexOf("</div>", start);
+                    assert.ok(end > start, kind + ": marked entry body unclosed");
+                    assert.equal(html.slice(start + prefix.length, end), expected[kind],
+                        kind + ": expected cleaner output changed");
+                    writeFileSync(path.join(artifacts, "slice4-" + kind + "-page.html"),
+                        response.body);
+                    assert.equal(response.headers.get("content-type"),
+                        "text/html; charset=utf-8");
                     assert.equal(response.headers.get("cache-control"), "private, no-store");
-                    assert.equal(response.headers.get("set-cookie"), null);
-                    assert.ok(!response.body.includes(Buffer.from(state.run)));
+                    assert.equal(response.headers.get("content-length"),
+                        String(response.body.length));
+                    assert.equal(response.headers.get("location"), null);
+                    assert.ok(response.headers.get("set-cookie")?.includes("ljuniq="));
+                    assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                        snapshot.fingerprint, kind + ": TS GET wrote journal state");
                 } finally {
                     perl("live-probes.pl", ["--restore"]);
                 }
@@ -825,12 +859,14 @@ async function contentRefusal(): Promise<void> {
         });
         const after = await store.loadRawSnapshot("s2js_slice3");
         assert.ok(after && after.entries.length === 2);
+        assert.equal(after.fingerprint, baseline.fingerprint);
         assert.deepEqual(after.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             baseline.entries.map(entry => entry.jitemid).sort((a, b) => a - b));
     } finally {
         await store.close();
     }
-    process.stdout.write("malformed body, URL attribute and script real HTTP refusal: pass\n");
+    process.stdout.write("three retained content probes safe repaired/sanitized real HTTP " +
+        "and exact baseline restore: pass\n");
 }
 
 async function missing(): Promise<void> {
@@ -924,7 +960,7 @@ async function main(): Promise<void> {
     else if (mode === "cross-journal") await crossJournal();
     else if (mode === "empty") await empty();
     else if (mode === "entry-states") await entryStates();
-    else if (mode === "content-refusal") await contentRefusal();
+    else if (mode === "content-refusal") await contentCleaning();
     else if (mode === "missing") await missing();
     else await recheck();
 }
