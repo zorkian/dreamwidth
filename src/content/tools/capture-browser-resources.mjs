@@ -19,14 +19,30 @@ import { JSDOM } from 'jsdom';
 const [pagePath, outputPath, ...extraPaths] = process.argv.slice(2);
 if (!pagePath || !outputPath) {
     throw new Error('usage: capture-browser-resources.mjs actual-stock-page.html ' +
-        'resource-map.json [extra observed /stc,/js,/img path...]');
+        'resource-map.json [extra observed /stc,/js,/img path...]' +
+        ' | actual-stock-page.html --check-style');
 }
+const checkStyleOnly = outputPath === '--check-style';
 const page = fs.readFileSync(pagePath);
 assert.ok(page.length > 1000 && page.length <= 2 * 1024 * 1024);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const appOrigin = 'http://localhost:8080';
 const browserOrigin = 'http://page.slice4.invalid';
 const document = new JSDOM(page.toString('utf8'), { url: browserOrigin + '/recent' }).window.document;
+const stockStyle = [...document.querySelectorAll('link[rel]')].filter(element =>
+    element.rel.toLowerCase().split(/\s+/).includes('stylesheet')).map(element =>
+    new URL(element.getAttribute('href'), browserOrigin + '/recent')).filter(url =>
+    /^\/~s2js_slice3\/res\/([1-9][0-9]*)\/stylesheet$/.test(url.pathname));
+assert.equal(stockStyle.length, 1,
+    'marked journal must emit exactly one stock stylesheet URL');
+assert.ok([browserOrigin, appOrigin].includes(stockStyle[0].origin));
+assert.equal(stockStyle[0].hash, '');
+const stockStylePath = stockStyle[0].pathname;
+if (checkStyleOnly) {
+    assert.equal(extraPaths.length, 0);
+    console.log(JSON.stringify({ stockStylePath }));
+    process.exit(0);
+}
 const urls = new Set();
 for (const element of document.querySelectorAll('script[src],link[href],img[src]')) {
     const tag = element.tagName.toLowerCase();
@@ -47,8 +63,9 @@ const resources = [];
 let total = 0;
 for (const browserUrl of [...urls].sort()) {
     const url = new URL(browserUrl);
-    assert.ok(/^\/(?:stc|js|img)\/|^\/~s2js_slice3\/res\/8\/stylesheet(?:\?|$)/
-        .test(url.pathname), `unsupported stock resource path: ${url.pathname}`);
+    assert.ok(/^\/(?:stc|js|img)\//.test(url.pathname) ||
+        url.pathname === stockStylePath,
+    `unsupported stock resource path: ${url.pathname}`);
     const sourceUrl = appOrigin + url.pathname + url.search;
     const response = await fetch(sourceUrl, { redirect: 'manual',
         headers: { cookie: '', authorization: '' }, signal: AbortSignal.timeout(10000) });
