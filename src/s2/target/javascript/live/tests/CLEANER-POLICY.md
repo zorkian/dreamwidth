@@ -54,10 +54,13 @@ Any additional source element/text or attribute removal returns Unsupported,
 except the exact maintained `SANITIZE_DOM` name-collision predicate against a
 fresh inert document/form. This audit never confers safety on unsanitized input
 and never overrides a sanitizer decision. `SAFE_FOR_XML`, protocol screening
-and the other maintained defenses remain enabled. DOMPurify's generated body
-wrapper is admitted internally so it is not mistaken for a removed source node;
-source body tags are absent from the serialized input. Tests cover multiple
-visible siblings, form descendants, empty output and actual browser reparse.
+and the other maintained defenses remain enabled. Final sanitation receives the
+cleaner's private BODY node through DOMPurify's non-IN_PLACE cloning path. Source
+body-wrapper attributes are cleared according to the retained remove-tag rule;
+no caller DOM or post-sanitation markup modification is allowed. This avoids
+reinterpreting the transformed tree as a new full document. `basefont` itself
+refuses explicitly in this finite representation, as detailed below. Tests cover multiple visible siblings, form descendants, empty output and actual
+browser reparse.
 
 | Case | Retained behavior and shared result | Classification and probe |
 | --- | --- | --- |
@@ -92,3 +95,52 @@ their trusted-generation provenance when submitted as new raw input, and the
 extract-images reader option extracts the generated placeholder again. The
 separate native second-pass probe demonstrates both transformations. Source IDs
 are never trusted merely because their spelling resembles a generated cut ID.
+
+
+## Formatting reconstruction boundary
+
+`formatting-cases.ts` records all 98 raw inputs, unnormalized retained Perl
+outputs and individual expected classifications. The unit probe reruns Perl for
+every row. Of those rows, 75 require exact bytes; six explicitly record different
+serialization (nested anchors and five table cases). Chromium checks those six
+against the retained output after actual stock page assembly, including visible
+text, font family/size/weight/style, color, link scopes and structural reparse.
+The 17 remaining implicit-close/adoption/foster cases require Unsupported with no
+fragment, followed by successful recovery. Unsupported cases are not parity.
+
+The repair follows the explicit-close stack behavior at
+`cgi-bin/LJ/CleanHTML.pm:1175`: outside tables, an explicit ancestor end tag closes
+intervening formatting. The parser copies original start-tag locations when it
+reconstructs formatting. Only later nodes with the same tag and exact start-tag
+span can be candidates; the first node remains intact. Repair requires matching
+original DOM/source ancestry, the original implicit end exactly at that explicit
+ancestor end tag, and source-located contents after its complete boundary. All
+proofs are checked before any node is unwrapped. Ordinary outer formatting and
+properly closed formatting remain unchanged.
+
+Table scope has a separate retained exception: it does not pop intervening tags.
+Reconstructed formatting stays intact only within the same source/DOM table,
+with contents bounded by its source range. Fostered formatting outside that
+source table refuses. Source-less adoption nodes and unproved reconstruction or
+implicit paragraph/list boundaries refuse instead of changing visible formatting.
+This is a finite representation boundary, not a replacement legacy parser.
+
+For assembled formatting browser tests, first build the adapter test project and
+compile the stock artifact using the commands in `COMPONENT.md`. Set
+`S2_LIVE_TEST_ARTIFACT` to that artifact path (default `/tmp/slice3-stock.json`).
+The browser probe uses actual stock layer initialization/printing offline;
+credential-free worker execution remains a separate test. It intercepts every
+resource request and runs both JavaScript modes. Negative controls verify the
+raw malformed input actually spreads bold/color before the repair.
+
+
+`basefont` is an explicit narrow representation refusal in any source position:
+leading, inside the body, after an eaten/removed predecessor, or in an explicit
+head. Retained Perl emits `<basefont size="3">text` for the leading and removed-
+predecessor probes, `<p>before</p><basefont size="3">text` after a paragraph, and
+`<basefont size="3"><p>after</p>` after an eaten iframe; the explicit-head probe
+retains only `text`. The native/unit test preserves these exact outputs. A first
+successful modern body result could become head-hoisted on raw re-entry, so this
+finite cleaner returns Unsupported instead of silently dropping the element,
+inventing source relocation, or adding an idempotence exception. This refusal
+does not apply to ordinary inline `font` formatting.

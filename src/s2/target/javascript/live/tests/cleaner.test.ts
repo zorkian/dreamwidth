@@ -18,6 +18,7 @@ import {resolve} from "node:path";
 import {spawnSync} from "node:child_process";
 import type {EntryContentContext, EntryContentResult, EntryContentInput} from "@dreamwidth/content/contracts";
 import {config} from "./fixtures";
+import {formattingCases} from "./formatting-cases";
 
 // Offline tests deliberately load the actual compiled shared package. Production
 // parents import declarations only; their isolated child loads the same module.
@@ -357,4 +358,67 @@ test("retained Perl also strips generated IDs and repeats extract-images on actu
     assert.notEqual(placeholder!.first, placeholder!.second);
     assert.equal((placeholder!.first.match(/class="ljimgplaceholder"/g) ?? []).length, 1);
     assert.equal((placeholder!.second.match(/class="ljimgplaceholder"/g) ?? []).length, 2);
+});
+
+
+test("source-proven formatting repair retains all 98 raw/native classifications", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        assert.equal(formattingCases.length, 98);
+        assert.deepEqual(retained(formattingCases.map(row => row.raw)), formattingCases.map(row => row.perl));
+        for (const row of formattingCases) {
+            const result = cleaner.clean(input(row.raw));
+            if (row.classification === "unsupported") {
+                assert.deepEqual(result, {kind: "failure", reason: "unsupported"}, row.id);
+                assert.equal(html(cleaner.clean(input("<p>recovery</p>"))), "<p>recovery</p>");
+            } else {
+                assert.equal(html(result), row.html, row.id);
+                assert.equal(html(cleaner.clean(input(html(result)))), row.html, row.id + " second pass");
+                if (row.classification === "exact") assert.equal(row.html, row.perl, row.id);
+                else assert.notEqual(row.html, row.perl, row.id + " raw difference retained");
+            }
+        }
+    } finally { cleaner.close(); }
+});
+
+test("basefont refuses in every position; private BODY sanitation discards wrapper attributes", () => {
+    const cleaner = createEntryCleaner(limits);
+    const cases = [
+        '<basefont size="3">text',
+        '<p>before</p><basefont size="3">text',
+        '<embed src="https://example.test/x"><basefont size="3">text',
+        '<iframe></iframe><basefont size="3"><p>after</p>',
+        '<head><basefont size="3"></head><body>text</body>',
+    ];
+    try {
+        const native = retained(cases);
+        assert.deepEqual(native, ['<basefont size="3">text', '<p>before</p><basefont size="3">text',
+            '<basefont size="3">text', '<basefont size="3"><p>after</p>', 'text']);
+        for (const body of cases) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"}, body);
+        }
+        const wrapper = '<body onload="alert(1)" class="wrapper" title="a]>b"><p>visible</p></body>';
+        const output = html(cleaner.clean(input(wrapper)));
+        assert.equal(output, '<p>visible</p>');
+        assert.equal(output, retained([wrapper])[0]);
+        assert.equal(html(cleaner.clean(input(output))), output);
+    } finally { cleaner.close(); }
+});
+
+test("legacy formatting and nested well-formed tables retain their original scopes", () => {
+    const cleaner = createEntryCleaner(limits);
+    const cases = [
+        ...["big", "nobr", "s", "small", "strike", "tt"].map(tag => `<p><${tag}>one</p><p>two</p>`),
+        '<table><tbody><tr><td><table><tbody><tr><td><b>one</b></td></tr></tbody></table></td></tr></tbody></table>',
+        '<p><b>one</p><p><em>two</em></p>',
+        '<p><b>one</p><p><span title="kept">two</span></p>',
+    ];
+    try {
+        const native = retained(cases);
+        for (const [index, body] of cases.entries()) {
+            const output = html(cleaner.clean(input(body)));
+            assert.equal(output, native[index], body);
+            assert.equal(html(cleaner.clean(input(output))), output);
+        }
+    } finally { cleaner.close(); }
 });

@@ -22,6 +22,7 @@ import type {BodyFragment, CleanerLimits, EntryCleaner, EntryContentInput,
     EntryContentResult, ImageResolutionSet} from "./contracts";
 import {UnsupportedContent} from "./policy/errors";
 import {validateCleanerLimits, validateInput, inputHash} from "./policy/validation";
+import {repairFormatting} from "./policy/formatting";
 import {replaceCuts} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
@@ -224,6 +225,10 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 checkTree(root, bounds, dom.window.document.head);
                 inventoryHead(dom.window.document.head);
                 removeSourceComments(root);
+                repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
+                // Source body wrappers are removed by clean_event, including all
+                // their attributes. The private BODY remains only as context.
+                for (const attribute of [...root.attributes]) root.removeAttribute(attribute.name);
                 for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
@@ -243,9 +248,9 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 });
                 // Final operation on markup. No later string replacement or raw
                 // substitution may invalidate this body-context sanitation.
-                const html = purify.sanitize(root.innerHTML, {
-                    // body is only DOMPurify's generated parser wrapper: the
-                    // input is root.innerHTML, and source body tags are gone.
+                const html = purify.sanitize(root, {
+                    // The non-IN_PLACE node path deep-clones this private BODY.
+                    // Do not reparse transformed markup as a new document.
                     ALLOWED_TAGS: [...entryTags, "#text", "body"], ALLOWED_ATTR: [...entryAttributes],
                     ALLOW_ARIA_ATTR: true, ALLOW_DATA_ATTR: true, KEEP_CONTENT: true,
                     SANITIZE_DOM: true, ALLOW_UNKNOWN_PROTOCOLS: true,
