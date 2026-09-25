@@ -13,32 +13,29 @@
 //
 
 import { spawn, ChildProcess } from "node:child_process";
-import { resolve } from "node:path";
+import {Unsupported} from "../policy/content";
+import type {VerifiedRuntime} from "./manifest";
 import type { RenderLimits } from "../contracts";
 import type { Artifact, RenderInput } from "./types";
 
-export function childArguments(limits: RenderLimits, script = resolve(__dirname, "worker.js")): string[] {
-    const policy = resolve(__dirname, "../policy");
-    return [process.execPath, "--experimental-permission", "--no-addons",
+export function childArguments(limits: RenderLimits, runtime: VerifiedRuntime,
+    script = runtime.entry): string[] {
+    return [runtime.node, "--permission", "--no-addons",
         "--disable-proto=throw", "--max-old-space-size=" + limits.maxHeapMiB,
-        "--allow-fs-read=" + __dirname,
-        "--allow-fs-read=" + resolve(__dirname, "../../runtime"),
-        "--allow-fs-read=" + resolve(policy, "cohort.js"),
-        "--allow-fs-read=" + resolve(policy, "content.js"),
-        script];
+        "--allow-fs-read=" + runtime.root, script];
 }
 
 export class Renderer {
     private closed = false;
     private readonly children = new Set<ChildProcess>();
     constructor(private readonly artifact: Artifact, private readonly sandbox: string,
-        private readonly limits: RenderLimits) {}
+        private readonly limits: RenderLimits, private readonly runtime: VerifiedRuntime) {}
 
     render(input: RenderInput): Promise<string> {
         if (this.closed || this.children.size >= 2) return Promise.reject(new Error("Renderer unavailable"));
         return new Promise((resolveResult, reject) => {
-            const child = spawn(this.sandbox, childArguments(this.limits), {
-                env: {LANG: "C.UTF-8", TZ: "UTC"}, cwd: __dirname,
+            const child = spawn(this.sandbox, childArguments(this.limits, this.runtime), {
+                env: {LANG: "C.UTF-8", TZ: "UTC"}, cwd: this.runtime.root,
                 stdio: ["pipe", "pipe", "ignore"],
             });
             this.children.add(child);
@@ -54,7 +51,7 @@ export class Renderer {
             child.stdin.once("error", fail);
             child.stdout.on("data", (chunk: Buffer) => {
                 bytes += chunk.length;
-                if (bytes > this.limits.maxOutputBytes) fail();
+                if (bytes > this.limits.maxOutputBytes + 128) fail();
                 else if (!settled) chunks.push(chunk);
             });
             child.once("close", code => {
@@ -64,11 +61,31 @@ export class Renderer {
                 settled = true;
                 if (code !== 0 || this.closed || !bytes) reject(new Error("Renderer unavailable"));
                 else {
-                    try { resolveResult(new TextDecoder("utf-8", {fatal: true}).decode(Buffer.concat(chunks))); }
+                    try {
+                        const output = Buffer.concat(chunks);
+                        const newline = output.indexOf(10);
+                        if (newline < 0 || newline >= 128) throw new Error("Invalid worker framing");
+                        const wire = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(output.subarray(0, newline)));
+                        const body = output.subarray(newline + 1);
+                        if (!wire || wire.version !== 2) {
+                            throw new Error("Invalid worker result");
+                        }
+                        if (wire.kind === "failure") {
+                            if (body.length || Object.keys(wire).length !== 3) throw new Error("Invalid worker failure");
+                            if (wire.reason === "unsupported") { reject(new Unsupported()); return; }
+                            throw new Error("Renderer unavailable");
+                        }
+                        if (wire.kind !== "complete" || Object.keys(wire).length !== 2 ||
+                            !body.length || body.length > this.limits.maxOutputBytes) {
+                            throw new Error("Invalid worker output");
+                        }
+                        resolveResult(new TextDecoder("utf-8", {fatal: true}).decode(body));
+                    }
                     catch { reject(new Error("Renderer unavailable")); }
                 }
             });
-            child.stdin.end(JSON.stringify({artifact: this.artifact, input, maxBytes: this.limits.maxOutputBytes}));
+            child.stdin.end(JSON.stringify({version: 2, artifact: this.artifact, input,
+                maxBytes: this.limits.maxOutputBytes}));
         });
     }
     async close(): Promise<void> {

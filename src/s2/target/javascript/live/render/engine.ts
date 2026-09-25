@@ -49,7 +49,8 @@ function escapeProperties(ctx: Context, layers: StockLayer[]): void {
     }
 }
 
-export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: number): string {
+export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: number,
+    cleanEntry: (rawBody: string, entryId: number, entryUrl: string) => string): string {
     const layers = instantiate(artifact);
     let printing = false;
     let html = "";
@@ -93,7 +94,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     escapeProperties(ctx, layers);
     // Preserve accessor aliases on the Page, because both generated S2 and
     // source-derived host helpers update/read the same underlying fields.
-    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepare(input, ctx)));
+    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepare(input, ctx, cleanEntry)));
     Object.assign(host, hostData(input, page, ctx.prop._reg_firstdayofweek === "monday"));
     page._head_content = head(input, page);
     printing = true;

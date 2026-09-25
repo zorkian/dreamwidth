@@ -22,14 +22,17 @@ import {Context} from "../../runtime/s2runtime";
 import {prepare} from "../render/prepare";
 import {calendar} from "../render/calendar";
 import {Renderer, childArguments} from "../render/child";
+import {verifyRuntime} from "../render/manifest";
 import {loadResourceTimes} from "../render/resources";
 import {approveSnapshot} from "../policy/cohort";
+import {rawBody, Unsupported} from "../policy/content";
 import {createComparisonRecentService} from "../policy/comparison";
 import {createAnonymousRecentService} from "../policy/service";
 import {config, limits, now, snapshot} from "./fixtures";
 import type {AnonymousRecentServiceDeps, RawJournalSnapshot} from "../contracts";
 
 const path = process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice3-stock.json";
+const runtime = verifyRuntime(path);
 const artifact = validateArtifact(JSON.parse(readFileSync(path, "utf8")));
 const inputs = {purpose: "offline-perl-comparison" as const, clock: {nowSeconds: () => now},
     random: {randomBytes: (n: number) => new Uint8Array(n)}};
@@ -44,7 +47,7 @@ function dependencies(data: () => RawJournalSnapshot): AnonymousRecentServiceDep
 }
 
 test("real isolated child initializes source defaults and prints live Unicode", async () => {
-    const renderer = new Renderer(artifact, path + ".sandbox", limits);
+    const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
     const input = {journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     try {
@@ -66,9 +69,59 @@ test("artifact executable bytes cannot be changed by retaining source provenance
     const edited = {...artifact, layers: artifact.layers.map((v, i) => i ? v : {...v, code: v.code + "\n"})};
     assert.throws(() => validateArtifact(edited));
 });
+test("one actual isolated worker cleans raw rich text before stock rendering and recovers after refusal", async () => {
+    const data = snapshot();
+    const body = '<p id="source-id" class="entry-positive" style="position:relative;color:red">' +
+        '<a target="_blank" href="/body-destination">link</a>' +
+        '<span style="--p:\\66 ixed;position:var(--p)">static</span></p>' +
+        '<lj-cut text="More">HIDDEN_CUT_PAYLOAD</lj-cut>';
+    assert.equal(rawBody(body), body, "parent keeps tainted markup; no parser or sanitation");
+    const journal = approveSnapshot({...data, entries: [
+        {...data.entries[0]!, eventText: body},
+        {...data.entries[1]!, security: "private", eventText: '<video>PRIVATE_UNSUPPORTED</video>'},
+    ]});
+    assert.equal(journal.entries[0]!.rawBody, body);
+    assert.ok(!JSON.stringify(journal).includes("PRIVATE_UNSUPPORTED"));
+    const input = {journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+        formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
+    const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
+    const withBody = (value: string) => ({...input, journal: {...journal,
+        entries: [{...journal.entries[0]!, rawBody: value}]}});
+    try {
+        const rich = await renderer.render(input);
+        for (const marker of ['class="entry-positive"', 'position:relative;color:red',
+            'target="_blank" href="http://localhost:8080/body-destination"',
+            '--p:66 ixed;position:var(--p)', 'cut-wrapper', '#cutid1']) assert.ok(rich.includes(marker), marker);
+        for (const marker of ['id="source-id"', 'HIDDEN_CUT_PAYLOAD', 'PRIVATE_UNSUPPORTED', '\\66']) {
+            assert.ok(!rich.includes(marker), marker);
+        }
+        for (const value of ['<video>unsupported</video>', '<div>'.repeat(17) + 'deep' + '</div>'.repeat(17),
+            '<br>'.repeat(4097)]) {
+            await assert.rejects(renderer.render(withBody(value)), Unsupported);
+            assert.ok((await renderer.render(withBody('<p>recovery</p>'))).includes('<p>recovery</p>'));
+        }
+        for (const [raw, clean] of [['<p>unterminated', '<p>unterminated</p>'],
+            ['<a href="javascript:alert(1)">link</a>', '<a>link</a>'],
+            ['<script>UNSAFE_SCRIPT_SENTINEL</script>', '']]) {
+            const page = await renderer.render(withBody(raw!));
+            assert.ok(page.includes(data.entries[0]!.subjectText));
+            if (clean) assert.ok(page.includes(clean));
+            assert.ok(!page.includes('UNSAFE_SCRIPT_SENTINEL') && !page.includes('javascript:alert(1)'));
+        }
+    } finally {await renderer.close();}
+});
+
+test("parent raw-text admission retains UTF8 bounds independently of child parsing", () => {
+    for (const value of ['<script>tainted</script>', '<p>unterminated', '😀'.repeat(16384)]) {
+        assert.equal(rawBody(value), value);
+    }
+    for (const value of ['x'.repeat(65537), '😀'.repeat(16385), '\ud800', '\udc00']) {
+        assert.throws(() => rawBody(value), Unsupported);
+    }
+});
 test("real child denies credential files, writes, subprocesses, threads and network", () => {
     const script = resolve(__dirname, "sandbox-probe.js");
-    const args = childArguments(limits, script);
+    const args = childArguments(limits, runtime, script);
     args.splice(args.length - 1, 0, "--allow-fs-read=" + script);
     const descriptor = openSync(path, "r");
     const result = spawnSync(path + ".sandbox", args, {env: {LANG: "C.UTF-8", TZ: "UTC"},
@@ -81,10 +134,10 @@ test("real child fails on output and deadline limits, and close stops active ren
     const input = {journal: approveSnapshot(snapshot()), config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
     for (const changedLimits of [{...limits, maxOutputBytes: 20}, {...limits, timeoutMs: 1}]) {
-        const renderer = new Renderer(artifact, path + ".sandbox", changedLimits);
+        const renderer = new Renderer(artifact, path + ".sandbox", changedLimits, runtime);
         try {await assert.rejects(renderer.render(input));} finally {await renderer.close();}
     }
-    const renderer = new Renderer(artifact, path + ".sandbox", limits);
+    const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
     const result = renderer.render(input);
     const rejected = assert.rejects(result);
     await renderer.close();
@@ -181,7 +234,7 @@ test("retained page80/loader79 clamps preserve mixed-public selection and reques
     for (const skip of [79, 80, 81, 200]) {
         const input = {journal, config, skip, skipPresent: true, nowSeconds: now,
             formChallenge: "public-test", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
-        const page = prepare(input, new Context(instantiate(artifact), () => {}));
+        const page = prepare(input, new Context(instantiate(artifact), () => {}), body => body);
         assert.equal(page.entries.length, 20);
         assert.equal(page.entries[0].itemid, 61 * 256);
         assert.equal(page.entries[19].itemid, 32 * 256);
@@ -190,7 +243,7 @@ test("retained page80/loader79 clamps preserve mixed-public selection and reques
         assert.equal(page.nav._backward_url, skip === 79
             ? "http://localhost:8080/~s2js_slice3/?skip=99"
             : "http://localhost:8080/~s2js_slice3/2026/09/24");
-        const renderer = new Renderer(artifact, path + ".sandbox", limits);
+        const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
         try {
             const html = await renderer.render(input);
             assert.ok(html.includes(`value="http://localhost:8080/users/s2js_slice3/?skip=${skip}"`));
@@ -206,7 +259,7 @@ test("exactly full final page retains the empty previous-link corner", () => {
     }))});
     const page = prepare({journal, config, skip: 0, skipPresent: false, nowSeconds: now,
         formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()},
-        new Context(instantiate(artifact), () => {}));
+        new Context(instantiate(artifact), () => {}), body => body);
     assert.equal(page.nav._backward_count, 20);
     assert.equal(page.nav._backward_url, undefined);
 });

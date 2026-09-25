@@ -15,15 +15,18 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Live S2 component checks
 
-See [the slice 3 guide](../../SLICE-3.md) for local setup, the actual HTTP route,
-real-database differential testing and retained-app navigation. Run these
-component checks inside the checkout's own devcontainer, from the repository root:
+See [the slice 3 guide](../../SLICE-3.md) for the retained local data/HTTP setup and
+[the content package guide](../../../../../content/README.md) for the pinned
+Node 24 bootstrap and dependency installation. Run these component checks inside
+the checkout's own devcontainer, from the repository root, using the same
+ordinary user for staging and service execution:
 
 ```sh
-perl src/s2/target/javascript/tools/live-compile.pl /tmp/slice3-stock.json
-cd src/s2/target/javascript
-./node_modules/.bin/tsc --strict --target ES2022 --module CommonJS --moduleResolution Node --esModuleInterop --types node --noUncheckedIndexedAccess --outDir dist --rootDir . live/contracts.ts live/policy/*.ts live/render/*.ts live/tests/*.ts
-node --test dist/live/tests/*.test.js
+perl src/s2/target/javascript/tools/live-compile.pl /tmp/slice4-stock.json
+/opt/dw-node24/bin/node src/content/node_modules/typescript/bin/tsc -p src/content/tsconfig.json
+/opt/dw-node24/bin/node src/content/node_modules/typescript/bin/tsc -p src/s2/target/javascript/live/tests/adapter.tsconfig.json
+/opt/dw-node24/bin/node src/content/tools/stage-runtime.mjs /tmp/slice4-stock.json
+S2_LIVE_TEST_ARTIFACT=/tmp/slice4-stock.json /opt/dw-node24/bin/node --test src/s2/target/javascript/dist/live/tests/{render,config,manifest,policy,http-failure}.test.js
 ```
 
 `S2_LIVE_TEST_ARTIFACT` can select another compiled artifact path for the tests.
@@ -33,10 +36,21 @@ schema 1 / ABI 1 contains two ordered source/hash/variable/code records; both so
 hashes and deterministic compiled-code hashes are verified. No prepared
 properties, pages, database data or HTML are compiler inputs.
 
+The closed runtime is derived as `<artifact-path>.runtime`, with a hashed manifest
+and only the compiled worker, required pure S2 modules, shared cleaner and locked
+production packages. Directories must be `0555`, files `0444`, with a uniform
+trusted owner. Browser dependencies, credentials, native addons, symlinks and
+unlisted files are refused. The parent independently verifies the pinned Node
+executable before launch. Use [the cleaner probes](CLEANER-POLICY.md) for the
+focused real-Perl and browser comparisons.
+
 The suite checks:
 
-- Content admission and actual retained `html_raw0` cleaner identity for Unicode,
-  entities, paragraphs, inline tags, whitespace and empty elements.
+- Parent UTF8/size admission retains raw text without loading a DOM/CSS parser.
+  The actual isolated worker cleans rich text before stock printing, omits hidden
+  cut payloads, refuses unsupported content without fragments and recovers on the
+  next job. Historical slice-3 identity-domain probes remain offline references;
+  they do not determine the serving body policy.
 - Anonymous request/redirect admission, tainted headers and ambiguous paths,
   private-entry exclusion, suspended-public whole-response refusal, unsupported
   features, source hashes and dynamic `system` layer-owner identity.
@@ -97,11 +111,11 @@ checks and full HTML comparisons remain in the integrated slice 3 harness.
 
 ## Boundaries
 
-The supported launcher platform is Linux x86_64 with Node 20. It closes inherited
+The supported launcher platform is Linux x86_64 with pinned Node 24.21.0. It closes inherited
 file descriptors beyond explicit stdio, sets `no_new_privs`, validates the syscall
 architecture, rejects x32, and denies sockets, network calls and `io_uring`.
 Filter/launcher failure stops rendering. Node permission mode restricts readable
-JS modules and denies writes, subprocesses, workers and addons. The parent sends
+staged modules and denies writes, subprocesses, workers and addons. The parent sends
 only LANG/TZ and approved public input. This isolates **trusted pinned stock
 code**; it is not an arbitrary JavaScript hosting sandbox. No privilege,
 capability or container changes are required.
@@ -111,12 +125,15 @@ The renderer is capped at two concurrent children, 10 seconds, 2MiB HTML and
 stock `Page.print`. Static resource timestamps are loaded at service creation;
 restart the service after rebuilding static resources.
 
-The body grammar permits plain UTF8 text, balanced lowercase `p`, `strong`, `em`,
-`b`, `i`, and `br`/`br />`, with no attributes or URLs. Only `amp`, `lt`, `gt`,
-`quot` entities are admitted. Limits are 64KiB per body, nesting 16, tokens 4096
-and 2MiB for the complete candidate cohort. Subjects are nonempty plain UTF8,
-at most 1KiB, without markup, entities, quotes or controls. Unsupported input is
-refused rather than repaired. Trusted stock markup is separate from user content.
+Bodies use the shared `dreamwidth-entry-html-raw0-v1` policy, preserving examined
+entry formatting, classes and contextual URL behavior. DOM/CSS parsing runs in
+the same bounded child as stock rendering. Limits are 64KiB per body, depth 16,
+4096 DOM nodes, 64KiB/4096 nodes of CSS, 256 image candidates, 16 cuts and 2MiB for
+the complete candidate cohort. Subjects remain nonempty plain UTF8, at most 1KiB,
+without markup, entities, quotes or controls. Typed unsupported/unavailable
+results cross a bounded status-line protocol; no partial page or raw exception
+is sent. Ordinary local configuration asserts that the image proxy is absent;
+the shared synthetic image-exchange API is a separate qualification boundary.
 
 Only the finite stock-page destinations enumerated by `policy/redirects.ts` are
 redirected to the configured retained app: exact controls/date paths and

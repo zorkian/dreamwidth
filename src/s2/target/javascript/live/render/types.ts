@@ -17,7 +17,7 @@ import type { PublicAppConfig } from "../contracts";
 export interface ApprovedEntry {
     readonly id: number;
     readonly subject: string;
-    readonly text: string;
+    readonly rawBody: string; // tainted; only child cleaner may prepare entry text
     readonly eventtime: string;
     readonly logtime: string;
     readonly reverseTime: number;
@@ -59,3 +59,9 @@ export interface Artifact {
         readonly code: string;
     }[];
 }
+
+// One child per request. A <=128-byte JSON status line precedes complete raw
+// UTF8 HTML (success only); no JSON expansion of the bounded 2MiB HTML payload.
+export type RendererHeader =
+    | {readonly version: 2; readonly kind: "complete"}
+    | {readonly version: 2; readonly kind: "failure"; readonly reason: "unsupported" | "unavailable"};
