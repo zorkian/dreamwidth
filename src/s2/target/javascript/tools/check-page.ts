@@ -13,10 +13,11 @@
 //
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { cleanTrustedSafeChunk, Context } from "../runtime/s2runtime";
+import { escapeHtml, formatPlainSubject } from "./page-execute";
 import { assertExactOutput } from "./run";
 
 const s2Directory = path.resolve(__dirname, "../../../..");
@@ -88,18 +89,71 @@ function entry(fixture: Json): Json {
     return graph.nodes[graph.nodes[page.entries.$ref].value[0].$ref].value;
 }
 
-function main(): void {
+async function proveKilledVariant(directory: string): Promise<void> {
+    const marker = path.join(directory, "variant-edited.marker");
+    rmSync(marker, { force: true });
+    const child = spawn("/usr/bin/perl",
+        [path.join(tools, "page-variant.pl"), "--sleep-after-edit", directory], {
+            cwd: root, env: perlEnv, stdio: "ignore",
+        });
+    let launchError: Error | undefined;
+    child.on("error", error => { launchError = error; });
+    try {
+        for (let tries = 0; !existsSync(marker) && tries < 500; tries++) {
+            if (launchError || child.exitCode !== null || child.signalCode !== null) {
+                throw new Error(`Owned edit handshake process ended: ${launchError?.message ?? "early exit"}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        assert(existsSync(marker), "Timed-out variant lacked a post-edit handshake");
+        assert.equal(readFileSync(marker, "utf8"), "owned edit committed\n");
+        perl("page-variant.pl", ["--assert-variant"]);
+        child.kill("SIGKILL");
+        if (child.exitCode === null && child.signalCode === null) {
+            await new Promise(resolve => child.once("exit", resolve));
+        }
+        assert.equal(child.signalCode, "SIGKILL", "Post-edit process was not killed");
+    } finally {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        perl("page-variant.pl", ["--restore-only"]);
+    }
+}
+
+async function main(): Promise<void> {
     mkdirSync(artifacts, { recursive: true });
     // Recover only the exact temporary body owned by this package if a prior
     // harness was killed before its finally block ran.
     perl("page-variant.pl", ["--restore-only"]);
-    const cleanerCases: { input: string; output: string }[] = JSON.parse(
+    const cleanerCases: { input: string; output: string; supported: boolean;
+        stylesheet?: { href: string; decision: number } }[] = JSON.parse(
         perl("page-cleaner-probe.pl").toString("utf8"));
     for (const item of cleanerCases) {
-        assert.equal(cleanTrustedSafeChunk(item.input), item.output, "Real HTMLCleaner parity");
+        if (item.supported) {
+            assert.equal(cleanTrustedSafeChunk(item.input, item.stylesheet), item.output,
+                "Real HTMLCleaner parity");
+        } else {
+            assert.throws(() => cleanTrustedSafeChunk(item.input, item.stylesheet),
+                /Unsupported/, "Unported HTMLCleaner rule must fail");
+        }
     }
     assert.throws(() => cleanTrustedSafeChunk("<a title='&copy;'>x</a>"), /entity/);
     assert.throws(() => cleanTrustedSafeChunk("<a title='a\nb'>x</a>"), /multiline/);
+    const builtinProbe: { ehtml: { input: string; output: string }[];
+        subjects: { subject: string; html: string }[] } = JSON.parse(
+            perl("page-builtin-probe.pl").toString("utf8"));
+    for (const item of builtinProbe.ehtml) {
+        assert.equal(escapeHtml(item.input), item.output, "Retained LJ::ehtml parity");
+    }
+    for (const item of builtinProbe.subjects) {
+        const prepared = { subject: item.subject,
+            permalink_url: "https://example.invalid/entry" };
+        if (item.subject === "" || item.subject.includes("<")) {
+            assert.throws(() => formatPlainSubject(prepared, {}), /Unsupported/);
+        } else {
+            assert.equal(formatPlainSubject(prepared, {}), item.html,
+                "Retained formatted-subject plain text parity");
+        }
+    }
 
     const first = fixture(path.join(artifacts, "baseline"));
     const again = fixture(path.join(artifacts, "regenerated"));
@@ -159,16 +213,7 @@ function main(): void {
     } finally {
         perl("page-variant.pl", ["--restore-only"]);
     }
-    try {
-        const timeout = spawnSync("/usr/bin/perl",
-            [path.join(tools, "page-variant.pl"), "--sleep-after-edit", failureDirectory], {
-                cwd: root, env: perlEnv, timeout: 100, maxBuffer: 16 * 1024 * 1024,
-                killSignal: "SIGKILL", encoding: "buffer",
-            });
-        assert(timeout.error || timeout.signal, "Injected variant timeout did not fail");
-    } finally {
-        perl("page-variant.pl", ["--restore-only"]);
-    }
+    await proveKilledVariant(failureDirectory);
     const recovered = fixture(path.join(artifacts, "recovered"));
     assert(first.oracle.equals(recovered.oracle) && first.input.equals(recovered.input),
         "Injected failure or timeout left owned sample changed");
@@ -184,6 +229,52 @@ function main(): void {
     rejectExecute(compiledPath,
         writeMutation(first.input, "missing-host", value => { delete value.host.ljuser_html; }),
         "Missing or invalid prepared page fields");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "bad-stylesheet", value => {
+            value.host.stylesheet_validation.decision = 0;
+        }), "Missing named stock stylesheet allow decision");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "empty-subject", value => { entry(value).subject = ""; }),
+        "Unsupported formatted subject domain");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "markup-subject", value => {
+            entry(value).subject = '<a href="/x">linked</a>';
+        }), "Unsupported formatted subject domain");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "missing-link-width", value => {
+            delete value.host.user_links.watch.width;
+        }), "Unsupported user link image dimensions");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "bad-freeze", value => {
+            value.provenance.input_freeze.form_auth_chal = "changed";
+        }), "provenance");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "bad-hash-freeze", value => {
+            value.provenance.input_freeze.perl_hash_seed = "1";
+        }), "provenance");
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "missing-freeze", value => {
+            delete value.provenance.input_freeze;
+        }), "provenance");
+    const missingEnv = spawnSync("/usr/bin/perl", [path.join(tools, "page-fixture.pl"),
+        path.join(artifacts, "baseline")], {
+        cwd: root, env: { ...perlEnv, PERL_HASH_SEED: "1" }, timeout: 60_000,
+        maxBuffer: 16 * 1024 * 1024, encoding: "buffer",
+    });
+    assert.notEqual(missingEnv.status, 0, "Exporter must reject wrong Perl hash seed");
+    assert.match(missingEnv.stderr.toString("utf8"), /Fixed Perl hash seed required/);
+    const missingPerturb = spawnSync("/usr/bin/perl", [path.join(tools, "page-fixture.pl"),
+        path.join(artifacts, "baseline")], {
+        cwd: root, env: { ...perlEnv, PERL_PERTURB_KEYS: "1" }, timeout: 60_000,
+        maxBuffer: 16 * 1024 * 1024, encoding: "buffer",
+    });
+    assert.notEqual(missingPerturb.status, 0, "Exporter must reject wrong Perl perturb setting");
+    assert.match(missingPerturb.stderr.toString("utf8"), /Fixed Perl hash seed required/);
+    rejectExecute(compiledPath,
+        writeMutation(first.input, "noncanonical-reply", value => {
+            const comments = entry(value).comments;
+            value.graph.nodes[comments.$ref].value.post_url += "&unsafe=1";
+        }), "Unsupported noncanonical reply URL");
     const brokenArtifact = path.join(artifacts, "broken-compiled.json");
     const broken = JSON.parse(compiled.toString("utf8"));
     broken.layers[1].code += "\nthrow new Error('deliberate renderer error');";
@@ -192,24 +283,24 @@ function main(): void {
     const context = new Context([], () => undefined);
     assert.throws(() => context.builtin._unknownHostCapability!(context), /Unknown|unknown/i);
 
-    const timed = spawnSync(process.execPath, ["-e", "while(true){}"], {
-        cwd: root, env: jsEnv, timeout: 100, maxBuffer: 2 * 1024 * 1024,
-        killSignal: "SIGKILL", encoding: "buffer",
-    });
-    assert(timed.error || timed.signal, "Subprocess timeout did not fail");
-    const overflow = spawnSync(process.execPath,
-        ["-e", "process.stdout.write('x'.repeat(3*1024*1024))"], {
-            cwd: root, env: jsEnv, timeout: 10_000, maxBuffer: 2 * 1024 * 1024,
-            killSignal: "SIGKILL", encoding: "buffer",
-        });
-    assert(overflow.error, "Subprocess output bound did not fail");
+    const loopArtifact = path.join(artifacts, "loop-compiled.json");
+    const loop = JSON.parse(compiled.toString("utf8"));
+    loop.layers[1].code += '\nlayer_1.registerFunction(["RecentPage::print()"], ' +
+        'function(){ return function(){ while(true){} }; });';
+    writeFileSync(loopArtifact, JSON.stringify(loop));
+    assert.throws(() => execute(loopArtifact, baselinePath), /ETIMEDOUT|timed out/,
+        "Actual page executor timeout must fail");
+    const floodArtifact = path.join(artifacts, "flood-compiled.json");
+    const flood = JSON.parse(compiled.toString("utf8"));
+    flood.layers[1].code += '\nlayer_1.registerFunction(["RecentPage::print()"], ' +
+        'function(){ return function(ctx){ ctx.print("x".repeat(3*1024*1024)); }; });';
+    writeFileSync(floodArtifact, JSON.stringify(flood));
+    rejectExecute(floodArtifact, baselinePath, "HTML output limit exceeded");
     process.stdout.write(`Stock recent page parity passed: ${first.oracle.length} bytes; ` +
         "two entries, deterministic regeneration, real Perl variant, mutations, bounds.\n");
 }
 
-try {
-    main();
-} catch (error) {
+main().catch(error => {
     process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
     process.exitCode = 1;
-}
+});
