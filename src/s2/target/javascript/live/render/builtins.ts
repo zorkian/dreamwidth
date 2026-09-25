@@ -123,6 +123,49 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         }
         return result;
     }
+    function printEntryReplyLink(ctx: Context, rawEntry: unknown, rawOptions: unknown): void {
+        const item = record(rawEntry, "reply entry");
+        const options = record(rawOptions, "reply link options");
+        if (["img_url", "basesubject", "reply_url", "img_width", "img_height",
+            "img_align", "img_border", "alt", "title"].some(key => options[key])) {
+            throw new Error("Unsupported reply link option");
+        }
+        const comments = record(item.comments, "entry comment info");
+        const target = String(options.target ?? "");
+        if (!/^[\w-]+$/.test(target)) return;
+        const linktext = escape(options.linktext ?? "");
+        const css = typeof options.class === "string" && /^[\w\s-]+$/.test(options.class)
+            ? `class="${options.class}"` : "";
+        const quickreply = host.has_quickreply && host.s2quickreply && !host.comments_need_access;
+        const onclick = quickreply
+            ? `onclick='return function(that) {return quickreply("${target}", 0, "",that)}(this)'`
+            : "";
+        const postUrl = comments.post_url;
+        if (typeof postUrl !== "string" || !/^https?:\/\/[^/\s]+\/\S*$/.test(postUrl) ||
+            /[&"'<>]/.test(postUrl)) {
+            throw new Error("Unsupported noncanonical reply URL");
+        }
+        ctx.print(`<a ${onclick} href='${escape(postUrl)}' ${css}>${linktext}</a>`);
+    }
+    function printEntryReplyContainer(ctx: Context, rawEntry: unknown,
+        rawOptions: unknown): void {
+        if (!host.has_quickreply) return;
+        const item = record(rawEntry, "reply container entry");
+        const options = record(rawOptions, "reply container options");
+        const target = String(options.target || item.talkid || "");
+        if (!/^[\w-]+$/.test(target)) return;
+        const css = typeof options.class === "string" && /^[\w\s]+$/.test(options.class)
+            ? `class="${options.class}"` : "";
+        ctx.print(`<div ${css} id="ljqrt${target}" data-quickreply-container="${target}" ` +
+            'style="display: none;"></div>');
+        if (!quickreplyPrinted) {
+            if (typeof host.quickreply_div !== "string") {
+                throw new Error("Missing app-owned quickreply fragment");
+            }
+            ctx.print(host.quickreply_div);
+            quickreplyPrinted = true;
+        }
+    }
     return {
         _get_page: () => page,
         _get_image: (_ctx, name) => {
@@ -145,6 +188,13 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         },
         _EntryLite__formatted_subject: (_ctx, entry, rawOptions) =>
             formatPlainSubject(entry, rawOptions),
+        _Entry__get_plain_subject: (_ctx, rawEntry) => {
+            const entry = record(rawEntry, "plain entry subject");
+            if (typeof entry.subject !== "string" || /[<>]/.test(entry.subject)) {
+                throw new Error("Unsupported plain entry subject");
+            }
+            return entry.subject;
+        },
         _DateTime__date_format: (ctx, date, format, links) =>
             formatDate(ctx, date, format, "date", Boolean(links)),
         _DateTime__time_format: (ctx, date, format) => formatDate(ctx, date, format, "time"),
@@ -199,7 +249,7 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             return host.ljuser_html;
         },
         _Entry__get_link: (ctx, rawEntry, key) => {
-            if (!["edit_entry", "edit_tags", "mem_add", "tell_friend",
+            if (!["edit_entry", "edit_tags", "mem_add", "tell_friend", "nav_prev", "nav_next",
                 "watch_comments", "unwatch_comments"].includes(String(key))) {
                 throw new Error(`Unknown recent-entry link ${String(key)}`);
             }
@@ -208,6 +258,18 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             const itemid = Number(entry.itemid);
             if (!Number.isSafeInteger(itemid) || journal.user !== host.owner_user) {
                 throw new Error("Invalid render entry link identity");
+            }
+            if (key === "nav_prev" || key === "nav_next") {
+                if (page._type !== "EntryPage" || page.entry !== entry ||
+                    typeof host.app_origin !== "string") {
+                    throw new Error("Unsupported entry navigation identity");
+                }
+                const dir = key === "nav_prev" ? "prev" : "next";
+                return s2Object("Link", {
+                    url: `${host.app_origin}/go?dir=${dir}&itemid=${itemid}&journal=${journal.user}`,
+                    caption: ctx.prop[`_text_entry_${dir}`],
+                    icon: record(host[`${dir}_entry_image`], "app navigation icon"), extra: {},
+                });
             }
             if (key === "mem_add" && host.memories_enabled) {
                 return s2Object("Link", {
@@ -226,48 +288,15 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             }
             return { ".type": "Link", ".isnull": true, _url: "" };
         },
-        _Entry__print_reply_link: (ctx, entry, rawOptions) => {
-            const item = record(entry, "reply entry");
-            const options = record(rawOptions, "reply link options");
-            if (["img_url", "basesubject", "reply_url", "img_width", "img_height",
-                "img_align", "img_border", "alt", "title"].some(key => options[key])) {
-                throw new Error("Unsupported reply link option");
-            }
-            const comments = record(item.comments, "entry comment info");
-            const target = String(options.target ?? "");
-            if (!/^[\w-]+$/.test(target)) return;
-            const linktext = escape(options.linktext ?? "");
-            const css = typeof options.class === "string" && /^[\w\s-]+$/.test(options.class)
-                ? `class="${options.class}"` : "";
-            const quickreply = host.has_quickreply && host.s2quickreply && !host.comments_need_access;
-            const onclick = quickreply
-                ? `onclick='return function(that) {return quickreply("${target}", 0, "",that)}(this)'`
-                : "";
-            const postUrl = comments.post_url;
-            if (typeof postUrl !== "string" || !/^https?:\/\/[^/\s]+\/\S*$/.test(postUrl) ||
-                /[&"'<>]/.test(postUrl)) {
-                throw new Error("Unsupported noncanonical reply URL");
-            }
-            const replyUrl = escape(postUrl);
-            ctx.print(`<a ${onclick} href='${replyUrl}' ${css}>${linktext}</a>`);
+        _Entry__print_reply_link: printEntryReplyLink,
+        _Entry__print_reply_container: printEntryReplyContainer,
+        _EntryPage__print_reply_link: (ctx, rawPage, rawOptions) => {
+            if (rawPage !== page) throw new Error("Unknown reply page identity");
+            return printEntryReplyLink(ctx, record(page.entry, "reply page entry"), rawOptions);
         },
-        _Entry__print_reply_container: (ctx, entry, rawOptions) => {
-            if (!host.has_quickreply) return;
-            const item = record(entry, "reply container entry");
-            const options = record(rawOptions, "reply container options");
-            const target = String(options.target || item.talkid || "");
-            if (!/^[\w-]+$/.test(target)) return;
-            const css = typeof options.class === "string" && /^[\w\s]+$/.test(options.class)
-                ? `class="${options.class}"` : "";
-            ctx.print(`<div ${css} id="ljqrt${target}" data-quickreply-container="${target}" ` +
-                'style="display: none;"></div>');
-            if (!quickreplyPrinted) {
-                if (typeof host.quickreply_div !== "string") {
-                    throw new Error("Missing app-owned quickreply fragment");
-                }
-                ctx.print(host.quickreply_div);
-                quickreplyPrinted = true;
-            }
+        _EntryPage__print_reply_container: (ctx, rawPage, rawOptions) => {
+            if (rawPage !== page) throw new Error("Unknown reply page identity");
+            return printEntryReplyContainer(ctx, record(page.entry, "reply page entry"), rawOptions);
         },
         _viewer_logged_in: anonymous, _viewer_is_owner: anonymous,
         _viewer_has_access: anonymous, _viewer_is_subscribed: anonymous,
