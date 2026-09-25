@@ -113,7 +113,9 @@ export function createLiveApp(
             return commonHeaders(reply, "private, no-store")
                 .code(decision.status).header("Location", decision.location).send("");
         }
-        const result = await service.serve(decision.request);
+        const result = decision.kind === "entry"
+            ? await service.serveEntry(decision.request)
+            : await service.serve(decision.request);
         if (!result.ok) return fail(reply, result.reason);
         // The service has just completed its independent primary recheck.
         // Buffer and enqueue synchronously; no subsequent awaited work.

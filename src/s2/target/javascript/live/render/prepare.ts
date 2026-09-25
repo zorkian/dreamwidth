@@ -25,18 +25,19 @@
 
 
 import type { Context } from "../../runtime/s2runtime";
-import type { RenderInput } from "./types";
+import type { RenderContentPreparation, RenderInput } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
 
 export function prepare(input: RenderInput, ctx: Context,
-    cleanEntry: (rawBody: string, entryId: number, entryUrl: string) => string): S2Object {
+    content: RenderContentPreparation): S2Object {
     const { journal: j, config: c } = input;
     const base = `${c.canonicalAppOrigin}/~${j.username}`;
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
         journal_type: "P", userpic_listing_url: `${base}/icons`, host_userid: j.userid,
         link_keyseq: ["manage_membership", "trust", "watch", "post_entry", "track", "message", "tell_friend"],
         default_pic: nullObject("Image"), website_url: "", website_name: ""});
+    if (input.page.kind === "entry") return prepareEntry(input, ctx, content, user, base);
     const itemshow = Math.min(50, Number(ctx.prop._num_items_recent) || 20);
     // RecentPage clamps with itemshow; recent_items clamps again with the extra
     // lookahead row. Preserve this off-by-one behavior at the local max100.
@@ -60,7 +61,7 @@ export function prepare(input: RenderInput, ctx: Context,
             screened: 0, screened_count: 0, show_readlink: 0,
             show_readlink_hidden: Number(e.commentsEnabled), show_postlink: Number(e.commentsEnabled),
             comments_disabled_maintainer: 0});
-        return object("Entry", {subject: e.subject, text: cleanEntry(e.rawBody, e.id, url), journal: user, poster: user,
+        return object("Entry", {subject: e.subject, text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: nullObject("Image"), permalink_url: url,
             itemid: e.id, tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
@@ -105,4 +106,60 @@ export function prepare(input: RenderInput, ctx: Context,
         data_link: links, data_links_order: ["rss", "atom"], timeformat24: 0,
         include_meta_viewport: 1, session_msgs: [], has_activeentries: 0, activeentries: [],
         entries, filter_active: 0, filter_name: "", filter_tags: 0, nav});
+}
+
+function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPreparation,
+    user: S2Object, base: string): S2Object {
+    if (input.page.kind !== "entry" || input.skip !== 0 || input.skipPresent) {
+        throw new Error("Invalid entry render selection");
+    }
+    const {journal: j, config: c} = input;
+    const ditemid = input.page.ditemid;
+    const selected = j.entries.filter(entry => entry.id === ditemid);
+    if (selected.length !== 1) throw new Error("Missing approved entry render target");
+    const e = selected[0]!;
+    const url = `${base}/${e.id}.html`;
+    const enabled = Number(e.commentsEnabled);
+    const comments = object("CommentInfo", {count: 0, read_url: url,
+        post_url: url + "?mode=reply", permalink_url: url, enabled,
+        maxcomments: 0, screened: 0, screened_count: 0,
+        show_readlink: 0, show_readlink_hidden: enabled, show_postlink: enabled,
+        comments_disabled_maintainer: 0});
+    const entry = object("Entry", {
+        subject: e.subject, text: content.body(e, url), journal: user, poster: user,
+        time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
+        comments, userpic: nullObject("Image"), permalink_url: url, itemid: e.id,
+        tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
+        dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
+        link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",
+            "watch_comments", "unwatch_comments"],
+    });
+    const commentPages = object("ItemRange", {
+        all_subitems_displayed: 1, current: 1, from_subitem: 0,
+        num_subitems_displayed: 0, to_subitem: 0, total: 1, total_subitems: 0,
+        url_all: "",
+    });
+    const commentNav = object("CommentNav", {view_mode: "threaded", url,
+        current_page: 1, show_expand_all: 0});
+    const views = {
+        recent: c.canonicalAppOrigin + "/", userinfo: base + "/profile",
+        archive: c.canonicalAppOrigin + "/archive", read: c.canonicalAppOrigin + "/read",
+        network: c.canonicalAppOrigin + "/network", tags: c.canonicalAppOrigin + "/tag/",
+        memories: `${c.siteRoot}/tools/memories?user=${j.username}`,
+    };
+    return object("EntryPage", {view: "entry", args: {}, journal: user, journal_type: "P",
+        layout_name: "Tabula Rasa", theme_name: "(Layout Default)", layout_url: "",
+        time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
+        stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
+        view_url: views, linklist: [], customtext_title: ctx.prop._text_module_customtext,
+        customtext_content: ctx.prop._text_module_customtext_content,
+        customtext_url: ctx.prop._text_module_customtext_url,
+        views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
+        global_title: escapeHtml(j.title), global_subtitle: escapeHtml(j.subtitle),
+        show_control_strip: Number(j.showControlStrip), head_content: "", is_canary: 0,
+        data_link: {}, data_links_order: [], timeformat24: 0, include_meta_viewport: 1,
+        session_msgs: [], has_activeentries: 0, activeentries: [], entry,
+        comments: [], comment_pages: commentPages, comment_nav: commentNav,
+        multiform_on: 0, viewing_thread: 0, _viewing_thread_id: 0,
+    });
 }

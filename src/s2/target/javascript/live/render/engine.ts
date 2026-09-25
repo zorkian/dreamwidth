@@ -29,7 +29,7 @@ import { instantiate, StockLayer } from "./artifact";
 import { callbacks } from "./builtins";
 import { prepare } from "./prepare";
 import { head, hostData } from "./host";
-import type { Artifact, RenderInput } from "./types";
+import type { Artifact, RenderContentPreparation, RenderInput } from "./types";
 
 function escapeProperties(ctx: Context, layers: StockLayer[]): void {
     function escape(value: unknown, mode: string): unknown {
@@ -50,7 +50,7 @@ function escapeProperties(ctx: Context, layers: StockLayer[]): void {
 }
 
 export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: number,
-    cleanEntry: (rawBody: string, entryId: number, entryUrl: string) => string): string {
+    content: RenderContentPreparation): string {
     const layers = instantiate(artifact);
     let printing = false;
     let html = "";
@@ -94,9 +94,17 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     escapeProperties(ctx, layers);
     // Preserve accessor aliases on the Page, because both generated S2 and
     // source-derived host helpers update/read the same underlying fields.
-    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepare(input, ctx, cleanEntry)));
+    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepare(input, ctx, content)));
     Object.assign(host, hostData(input, page, ctx.prop._reg_firstdayofweek === "monday"));
-    page._head_content = head(input, page);
+    let metadata: ReturnType<RenderContentPreparation["metadata"]> | undefined;
+    if (input.page.kind === "entry") {
+        const ditemid = input.page.ditemid;
+        const selected = input.journal.entries.filter(entry => entry.id === ditemid);
+        if (selected.length !== 1) throw new Error("Missing entry metadata source");
+        metadata = content.metadata(selected[0]!,
+            `${input.config.canonicalAppOrigin}/~${input.journal.username}/${ditemid}.html`);
+    }
+    page._head_content = head(input, page, metadata);
     printing = true;
     ctx.runMethod(page, "print()");
     const ending = html.indexOf("</body>");
