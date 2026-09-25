@@ -51,7 +51,9 @@ function decoderEdges(): void {
     ), { name: "RepositoryError", kind: "unsupported" });
 }
 
-function normalHelper(action: "--mutate" | "--restore"): void {
+function normalHelper(
+    action: "--mutate" | "--restore" | "--mutate-text" | "--restore-text",
+): void {
     const root = process.env.LJHOME;
     assert.ok(root, "LJHOME required");
     execFileSync("perl", [path.join(root, "src/s2/target/javascript/tools/live-mutate.pl"), action], {
@@ -94,6 +96,20 @@ async function main(): Promise<void> {
             assert.notEqual(changed.fingerprint, snapshot.fingerprint);
         } finally {
             normalHelper("--restore");
+        }
+        assert.equal(await store.revalidateFingerprint(snapshot), true);
+        try {
+            normalHelper("--mutate-text");
+            assert.equal(await store.revalidateFingerprint(snapshot), false);
+            const changed = await store.loadRawSnapshot("s2js_slice3");
+            assert.ok(changed);
+            assert.equal(changed.owner.name, "S2 slice 3 café 😀");
+            assert.equal(changed.owner.publicSettings.journaltitle, "Journal café 😀");
+            assert.equal(changed.owner.publicSettings.customtext_content,
+                "<p>Custom café 😀</p>");
+            assert.notEqual(changed.fingerprint, snapshot.fingerprint);
+        } finally {
+            normalHelper("--restore-text");
         }
         assert.equal(await store.revalidateFingerprint(snapshot), true);
     } finally {
