@@ -53,7 +53,9 @@ and dw_cluster01 tables as InnoDB. Each load pins one connection and uses a
 repeatable-read, read-only consistent snapshot across both schemas. It
 loads at most 200 complete candidate entries, including private, masked,
 and suspended rows, before policy decides what may be shown. User, poster,
-style, property, text, and unsupported-feature reads are batched.
+style, property, text, and unsupported-feature reads are batched. Public
+properties are read from global userprop, cluster userproplite2, and cluster
+userpropblob with one duplicate check across all three sources.
 
 The fingerprint includes identity mapping, loaded public settings and
 status facts, the style stack and stock source hashes, layer owner usernames,
@@ -66,9 +68,13 @@ later database commits or network receipt.
 The retained DBI connection speaks MySQL latin1 while application text is
 UTF-8 bytes. MySQL latin1 maps the CP1252 range, including otherwise
 undefined C1 bytes. An utf8mb4 stored value such as café can therefore
-contain bytes 63 61 66 C3 83 C2 A9. The loader reverses the connection
-conversion with CONVERT(column USING latin1), verifies a lossless round trip
-back to the stored bytes, then strictly decodes UTF-8. Gzip event bodies are
+contain bytes 63 61 66 C3 83 C2 A9. For every rendered or fingerprinted
+Perl text column, the loader reverses the connection conversion with
+CONVERT(column USING latin1), verifies a lossless round trip back to the
+stored bytes, then strictly decodes UTF-8. This includes names, bio, style
+name, user properties, and entry properties. Blob backed user properties
+hold raw bytes and are strictly decoded without connection reversal. The
+fingerprint records both stored and recovered bytes. Gzip event bodies are
 bounded before and after decompression. Invalid text, unknown conversion,
 NULL required fields, and oversized data fail closed. The renderer receives
 decoded approved text only.
@@ -82,12 +88,15 @@ node dist/live/data/snapshot.test.js
 
 This checks real marked rows through the scoped credential, stock layer
 hashes, UTF-8 and CP1252 edge bytes, bounded gzip, feature counts, and a
-normal-helper name mutation that revokes the fingerprint. The test restores
-the name in a finally block. If the test process is killed during that
-mutation, recover only this owned variant with:
+normal-helper name mutation and Unicode name, title, and blob property
+mutations that revoke the fingerprint. The test restores each mutation in
+finally blocks. Run this test after the first TS-before-Perl-GET proof on a
+fresh database. If the test process is killed during a mutation, recover
+only these exact owned variants with:
 
 ~~~sh
 perl src/s2/target/javascript/tools/live-mutate.pl --restore
+perl src/s2/target/javascript/tools/live-mutate.pl --restore-text
 ~~~
 
 ## Perl comparison oracle
