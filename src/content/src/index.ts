@@ -15,7 +15,7 @@
 // Copyright (c) 2026 by Dreamwidth Studios, LLC.
 //
 
-import {JSDOM} from "jsdom";
+import {JSDOM, VirtualConsole} from "jsdom";
 import createDOMPurify from "dompurify";
 import {createHash} from "node:crypto";
 import type {BodyFragment, CleanerLimits, EntryCleaner, EntryContentInput,
@@ -26,7 +26,7 @@ import {replaceCuts} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
-import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext,
+import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext, discardedHeadTags,
     ordinaryAttribute, externalControlAttributes} from "./policy/inventory";
 
 const media = new Set(["audio", "video", "source", "track"]);
@@ -44,6 +44,29 @@ function checkTree(root: Element, limits: CleanerLimits, extraRoot?: Element): v
     };
     for (const child of root.childNodes) visit(child, 1);
     if (extraRoot) for (const child of extraRoot.childNodes) visit(child, 1);
+}
+
+function inventoryHead(head: Element): void {
+    for (const node of head.childNodes) {
+        if (node.nodeType === 8 || node.nodeType === 3 && !node.textContent?.trim()) continue;
+        if (node.nodeType !== 1) throw new UnsupportedContent();
+        const element = node as Element;
+        if (element.namespaceURI !== "http://www.w3.org/1999/xhtml" ||
+            !discardedHeadTags.has(element.localName)) throw new UnsupportedContent();
+        // With scripting disabled, a head noscript may contain only metadata;
+        // any visible body content is separately moved into the body by parsing.
+        // Verify its children rather than silently swallowing arbitrary contents.
+        if (element.localName === "noscript") inventoryHead(element);
+    }
+}
+
+function removeSourceComments(root: Node): void {
+    // clean_event does not enable keepcomments (CleanHTML.pm1326). Apply that
+    // named source transform before auditing any additional sanitizer removals.
+    for (const node of [...root.childNodes]) {
+        if (node.nodeType === 8) root.removeChild(node);
+        else removeSourceComments(node);
+    }
 }
 
 function navigation(value: string, input: EntryContentInput, href: boolean): string {
@@ -193,9 +216,14 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 // also denied network/files/children by the outer kernel/runtime
                 // boundary; DOMPurify is not treated as a resource-privacy tool.
                 dom = new JSDOM(input.body, {url: input.context.documentUrl,
-                    includeNodeLocations: true, contentType: "text/html"});
+                    includeNodeLocations: true, contentType: "text/html",
+                    // Parser diagnostics must not log raw author markup. Failures
+                    // use the typed result below, not jsdom's ambient console.
+                    virtualConsole: new VirtualConsole()});
                 const root = dom.window.document.body;
                 checkTree(root, bounds, dom.window.document.head);
+                inventoryHead(dom.window.document.head);
+                removeSourceComments(root);
                 for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
@@ -206,19 +234,38 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 }
                 checkTree(root, bounds);
                 const purify = createDOMPurify(dom.window);
+                // Match SANITIZE_DOM's collision predicate against an empty
+                // inert document and form, never against author-defined names.
+                const collisionDocument = dom.window.document.createElement("template").content.ownerDocument;
+                const collisionForm = collisionDocument.createElement("form");
                 purify.addHook("uponSanitizeAttribute", (_node, data) => {
                     if (data.attrName === "id" && !ids.has(data.attrValue)) data.keepAttr = false;
                 });
                 // Final operation on markup. No later string replacement or raw
                 // substitution may invalidate this body-context sanitation.
                 const html = purify.sanitize(root.innerHTML, {
-                    ALLOWED_TAGS: [...entryTags, "#text"], ALLOWED_ATTR: [...entryAttributes],
+                    // body is only DOMPurify's generated parser wrapper: the
+                    // input is root.innerHTML, and source body tags are gone.
+                    ALLOWED_TAGS: [...entryTags, "#text", "body"], ALLOWED_ATTR: [...entryAttributes],
                     ALLOW_ARIA_ATTR: true, ALLOW_DATA_ATTR: true, KEEP_CONTENT: true,
                     SANITIZE_DOM: true, ALLOW_UNKNOWN_PROTOCOLS: true,
                     FORBID_TAGS: ["style", "script", "svg", "math", "template", "iframe", "object", "embed"],
                     RETURN_TRUSTED_TYPE: false,
                 });
                 purify.removeAllHooks();
+                // Maintained sanitizer defenses remain enabled. Their extra
+                // removals cannot silently become successful compatibility loss.
+                // Only the precise, documented name-clobber predicate is exempt;
+                // no source element/text removal or arbitrary attribute is.
+                for (const removal of purify.removed) {
+                    if ("attribute" in removal && removal.attribute?.name === "name" &&
+                        removal.attribute.namespaceURI === null && removal.from.nodeType === 1 &&
+                        (removal.from as Element).namespaceURI === "http://www.w3.org/1999/xhtml") {
+                        const value = removal.attribute.value.trim();
+                        if (value in collisionDocument || value in collisionForm) continue;
+                    }
+                    throw new UnsupportedContent();
+                }
                 if (Buffer.byteLength(html) > bounds.maxOutputBytes) throw new UnsupportedContent();
                 return {kind: "ok", fragment: {context: "html-div-flow", html} as BodyFragment,
                     provenance: {policy: input.context.policy, inputSha256: hash,
