@@ -175,17 +175,54 @@ Example, from `src/content` in the owning devcontainer:
     /tmp/slice4-stock-resources.json > /tmp/slice4-browser-report.json
 ```
 
-Add `--require-rich` to the browser command for the final rich-page run. It
-requires the visible rich marker, one generated cut, one inert source-forged
-cut, and all three declared synthetic image requests. A preserved Slice3 page
-or test-only stock assembly qualifies harness mechanics and resource wiring
-only. The browser report labels its candidate and page as caller-supplied,
-unverified inputs; it never marks source review or live-route acceptance. For
-acceptance, capture a fresh actual TS route response, generate cleaner results
-from the exact reviewed build, and verify them against a separately reviewed
-per-case difference ledger. A self-consistent JSON file is insufficient.
+Add `--require-rich` for the normal rich entry: it requires the visible rich
+marker, one generated cut, and all three declared synthetic image requests.
+Run the separate normal-helper `forged-cut` entry with
+`--require-forged-cut`: it requires one generated cut and one inert source
+forged cut span. A preserved Slice3 page or test-only stock assembly qualifies
+harness mechanics and resource wiring only. The browser report labels its
+candidate and page as caller-supplied, unverified inputs; it never marks source
+review or live-route acceptance. For acceptance, capture fresh actual TS route
+responses for both variants, generate cleaner results from the exact reviewed
+build, and verify them against a separately reviewed per-case difference ledger.
+A self-consistent JSON file is insufficient.
 Browser process telemetry and DNS outside intercepted page requests are not
 claimed by this test.
+
+To reproduce **browser mechanics only** before an actual Slice4 route is
+available, build two labeled synthetic assemblies from the preserved Slice3
+stock page. This builder supplies literal test cut markup and inert images; it
+does not use or qualify cleaner output. From `src/content` in the owning
+devcontainer, with the retained local app running:
+
+```sh
+/opt/dw-node24/bin/node tools/build-stock-mechanics-page.mjs \
+    ../s2/target/javascript/artifacts/live/page-ts.html normal-rich \
+    /tmp/slice4-mechanics-rich.html
+/opt/dw-node24/bin/node tools/build-stock-mechanics-page.mjs \
+    ../s2/target/javascript/artifacts/live/page-ts.html forged-cut \
+    /tmp/slice4-mechanics-forged.html
+for variant in rich forged; do
+    /opt/dw-node24/bin/node tools/capture-browser-resources.mjs \
+        /tmp/slice4-mechanics-$variant.html \
+        /tmp/slice4-mechanics-$variant-resources.json \
+        /img/controlstrip/bg-dark.gif /img/collapse.svg \
+        /img/collapseAll.svg /img/expandAll.svg /img/ajax-loader.gif
+done
+/opt/dw-node24/bin/node tools/browser-entry-reparse.mjs \
+    /tmp/slice4-cleaner-results.json /tmp/slice4-mechanics-rich.html \
+    /tmp/slice4-mechanics-rich-resources.json --require-rich \
+    > /tmp/slice4-mechanics-rich-report.json
+/opt/dw-node24/bin/node tools/browser-entry-reparse.mjs \
+    /tmp/slice4-cleaner-results.json /tmp/slice4-mechanics-forged.html \
+    /tmp/slice4-mechanics-forged-resources.json --require-forged-cut \
+    > /tmp/slice4-mechanics-forged-report.json
+```
+
+`/tmp/slice4-cleaner-results.json` is a local 26-row comparison input for the
+fragment checks. Both reports remain mechanics-only even if all six browser
+modes pass; final acceptance uses reviewed cleaner results and actual TS route
+pages for both normal-helper entry variants.
 
 The original `t/cleaner*.t` source suites remain unmodified. `corpus/` records
 their source contexts, provenance, and assertion counts. Native Perl behavior is
