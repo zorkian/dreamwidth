@@ -148,6 +148,7 @@ export interface AnonymousRecentRequest {
     readonly method: "GET" | "HEAD";
     readonly username: string; // s2js_slice3, bio marker "s2-js-slice3 live dev v1"
     readonly skip: number; // strict decimal input; 0..200 admission bound
+    readonly skipPresent: boolean; // absent query=false; canonical explicit skip (including 0)=true
     readonly uniqCookie: string | null; // only parsed ljuniq value; no other cookies
 }
 
