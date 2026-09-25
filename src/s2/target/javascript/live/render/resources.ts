@@ -1,0 +1,113 @@
+// resources.ts
+//
+// Source-derived stock resource registration and public metadata.
+//
+// Authors:
+//      Dreamwidth contributors
+//
+// Copyright (c) 2026 by Dreamwidth Studios, LLC.
+//
+// Inherited ports: cgi-bin/LJ/Web.pm resource registration/res_includes and LJ/S2.pm script tags.
+//
+// This code was forked from the LiveJournal project owned and operated
+// by Live Journal, Inc. The code has been modified and expanded by
+// Dreamwidth Studios, LLC. These files were originally licensed under
+// the terms of the license supplied by Live Journal, Inc, which can
+// currently be found at:
+//
+// http://code.livejournal.org/trac/livejournal/browser/trunk/LICENSE-LiveJournal.txt
+//
+// In accordance with the original license, this code and all its
+// modifications are provided under the GNU General Public License.
+// A copy of that license can be found in the LICENSE file included as
+// part of this distribution.
+//
+
+
+import { statSync } from "node:fs";
+import { resolve } from "node:path";
+import type { RenderInput } from "./types";
+
+// Registration order and groups ported from LJ::Web resource bootstrap,
+// LJ::S2::tracking_popup_js, LJ::Talk::init_s2journal_js and LJ::S2::generate_page.
+// Only the pinned anonymous Foundation resource closure is supported.
+export const CSS_LIBRARY = ["lj_base.css", "esn.css", "jquery/jquery.ui.core.css",
+    "jquery/jquery.ui.tooltip.css", "jquery.contextualhover.css",
+    "css/foundation/foundation_minimal.css"];
+export const CSS_PAGE = ["css/components/quick-reply.css", "css/components/icon-select.css",
+    "css/components/imageshrink.css", "jquery/jquery.ui.theme.smoothness.css",
+    "controlstrip.css", "controlstrip-dark.css", "jquery/jquery.ui.button.css",
+    "jquery/jquery.ui.dialog.css", "canary.css"];
+export const JS_LIBRARY = ["jquery/jquery-1.8.3.js", "foundation/vendor/custom.modernizr.js",
+    "foundation/foundation/foundation.js", "foundation/foundation/foundation.topbar.js", "dw/dw-core.js",
+    "jquery/jquery.ui.core.js", "jquery/jquery.ui.widget.js", "jquery/jquery.ui.tooltip.js",
+    "jquery.ajaxtip.js", "jquery/jquery.ui.position.js", "jquery.hoverIntent.js", "jquery.contextualhover.js"];
+export const JS_PAGE = ["jquery.esn.js", "jquery.replyforms.js", "jquery.poll.js",
+    "journals/jquery.tag-nav.js", "jquery.mediaplaceholder.js", "jquery.imageshrink.js",
+    "components/jquery.icon-select.js", "jquery.quickreply.js", "jquery.threadexpander.js",
+    "jquery.cuttag-ajax.js", "jquery.default-editor.js",
+    "jquery/jquery.ui.button.js", "jquery/jquery.ui.dialog.js"];
+
+export function loadResourceTimes(): Readonly<Record<string, number>> {
+    const root = resolve(__dirname, "../../../../../../../build/static");
+    const values: Record<string, number> = Object.create(null);
+    for (const [prefix, paths] of [["stc", [...CSS_LIBRARY, ...CSS_PAGE, "controlstrip-light.css"]],
+        ["js", [...JS_LIBRARY, ...JS_PAGE]]] as const) {
+        for (const path of paths) {
+            values[prefix + "/" + path] = Math.floor(statSync(resolve(root, prefix, path)).mtimeMs / 1000);
+        }
+    }
+    return Object.freeze(values);
+}
+function lists(input: RenderInput): [string[], string[]] {
+    const css = CSS_PAGE.filter(path => input.journal.showControlStrip || !path.startsWith("controlstrip"));
+    return [css.map(path => path === "controlstrip-dark.css"
+        ? `controlstrip-${input.journal.controlStripColor}.css` : path), JS_PAGE];
+}
+function bundle(input: RenderInput, prefix: string, files: readonly string[]): string {
+    const max = Math.max(...files.map(path => {
+        const time = input.resourceTimes[prefix + "/" + path];
+        if (!Number.isSafeInteger(time) || time! <= 0) throw new Error("Missing resource metadata");
+        return time!;
+    }));
+    const urlPrefix = prefix === "stc" ? input.config.statPrefix : input.config.siteRoot + "/js";
+    return `${urlPrefix}/??${files.join(",")}?v=${max}`;
+}
+export function resourceHead(input: RenderInput, base: string): string {
+    const c = input.config;
+    const site = {
+        imgprefix: c.imgPrefix, siteroot: c.siteRoot, statprefix: c.statPrefix, iconprefix: c.userpicRoot,
+        currentJournalBase: base, currentJournal: input.journal.username, has_remote: 0,
+        ctx_popup: 1, ctx_popup_icons: 1, ctx_popup_userhead: 1, inbox_update_poll: 1,
+        media_embed_enabled: 1, esn_async: 1, user_domain: "", cmax_comment: 16000,
+    };
+    return `
+            <script type="text/javascript">
+                var Site;
+                if (!Site)
+                    Site = {};
+
+                Site = Object.assign(Site, ${JSON.stringify(site)});
+           </script>
+        ` + [CSS_LIBRARY, lists(input)[0]].map(files =>
+        `<link rel="stylesheet" type="text/css" href="${bundle(input, "stc", files)}" />\n`).join("");
+}
+export function resourceBody(input: RenderInput): string {
+    const c = input.config;
+    const u = input.journal.username;
+    let html = [JS_LIBRARY, JS_PAGE].map(files =>
+        `<script type="text/javascript" src="${bundle(input, "js", files)}"></script>\n`).join("");
+    if (input.journal.showControlStrip) html += `
+<script type='text/javascript'>
+jQuery(function(jQ){
+    if (jQ("#lj_controlstrip").length == 0) {
+        jQ.getJSON("/${u}/__rpc_controlstrip?user=${u}&host=${new URL(c.canonicalAppOrigin).host}&uri=/users/${u}/&args=${input.skipPresent ? "skip%3D" + input.skip : ""}&view=", {},
+            function(data) {
+                jQ("<div></div>").html(data.control_strip).prependTo("body");
+            }
+        );
+    }
+})
+</script>`;
+    return html + "<script>$(document).foundation();</script>";
+}
