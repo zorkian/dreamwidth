@@ -58,6 +58,43 @@ recent endpoint while the Perl app is unavailable. The comparison is controlled
 by explicit clock/random/uniq and `PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0`; HTML is
 never normalized. Serialization order can differ under another Perl hash seed.
 
+## Real database privacy checks
+
+After the first TS-before-Perl-GET proof and local setup in the slice 3 guide, run
+from `src/s2/target/javascript` inside the owning container:
+
+```sh
+./node_modules/.bin/tsc
+node dist/live/tests/privacy-db.js
+```
+
+Run sequentially, with no other mutations of the marked journal. This uses the
+real read-only store, ordinary live service and Fastify over a loopback HTTP
+socket. An offline Perl driver changes only the marked owner's visibility,
+activation status, reply/adult/analytics/custom-content settings and style
+selection through normal `update_self` / `set_prop` helpers between requests.
+It does not invoke account deletion/cancellation hooks, alter style records or
+change entries. Each case must revoke the original fingerprint, return the exact
+fixed HTTP 422 refusal without HTML or cookies, then restore the full raw
+fingerprint and HTTP 200. Unsupported custom content is never reflected.
+
+The driver records the primary baseline and mutation intent in the ignored,
+mode-0600 `artifacts/live/privacy-state.json` before changing anything. Existing
+recovery state and unexpected field changes are refused. Normal `finally` cleanup
+restores the baseline and removes this state only after fingerprint verification.
+If interrupted, use the same scoped recovery path:
+
+```sh
+node dist/live/tests/privacy-db.js --recover
+```
+
+Recovery verifies the marked identity, restores only recorded test fields and
+checks the saved complete primary fingerprint before closing its state. If an
+unrelated change prevents verification, the recovery state is retained for
+inspection; never reset the database or clear it to bypass the check. No Perl
+driver runs in the product request path. Entry mutations, pagination, crossjournal
+checks and full HTML comparisons remain in the integrated slice 3 harness.
+
 ## Boundaries
 
 The supported launcher platform is Linux x86_64 with Node 20. It closes inherited
