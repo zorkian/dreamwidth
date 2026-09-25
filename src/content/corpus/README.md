@@ -98,3 +98,36 @@ Regeneration only uses this container's own test DB. Some original suites use
 temporary test accounts and normal helper writes; run them in an isolated
 development database. Source hashes and log hashes in the manifest catch
 unexpected changes.
+
+## Separate html_raw0 entry replays
+
+`entry-replay-cases.json` defines 26 new, bounded synthetic entry bodies with
+explicit stock RecentPage `editor`, `cuturl`, `journal` and `ditemid` options.
+These are separate records and never inherit a native TAP case's context or
+assertion count. The body text is readable Unicode in JSON; the offline Perl
+oracle encodes it as **unflagged UTF-8 bytes** before `clean_event`, matching
+`LJ::Entry::event_raw` from the marked development journal. That byte shape
+was checked against both original seed entries; their UTF-8 flags were zero.
+`entry-replay-perl.json` retains exact output bytes as base64 with SHA-256,
+the input byte digest and UTF-8 flags, effective options, and the manifest
+digest. `document` and `div.entry-content` reparse targets are explicit per
+case. They expose head hoisting, rawtext, malformed table/form repair and cut
+controls without claiming document parsing is the stock entry insertion
+context. The source/provenance field distinguishes a native suite reference
+from a Slice4 synthetic security probe.
+
+The retained outputs were generated in the owning devcontainer with the real
+Perl cleaner, without `t/lib/ljtestlib.pl` mocks. Verify them byte for byte:
+
+```sh
+PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0 \
+  perl src/content/tools/cleaner-entry-oracle.pl \
+  src/content/corpus/entry-replay-cases.json > /tmp/slice4-entry-replay.json
+cmp /tmp/slice4-entry-replay.json src/content/corpus/entry-replay-perl.json
+/opt/dw-node24/bin/node src/content/tests/entry-replay-oracle.test.mjs
+```
+
+Perl output is evidence for each named input, not an automatic security target.
+The TypeScript difference ledger and real assembled stock/browser checks must
+classify safe repairs, origin adaptations, security corrections and unsupported
+cases individually against a reviewed cleaner source.
