@@ -78,7 +78,9 @@ The synthetic mechanics test runs before the real worker source is available:
 
 It stages one synthetic worker and one synthetic content module, runs them
 under the original seccomp launcher with only the staged root readable, then
-checks a byte-identical rebuild and rejects an unlisted symlink. Its result
+checks every staged directory is mode `0555` and file is mode `0444`, runs the
+same worker as an ordinary non-root user, checks a byte-identical rebuild and
+rejects an unlisted symlink. Its result
 qualifies the packaging boundary, not S2 rendering or sanitizer behavior.
 The real stage still needs the reviewed compiled `dist/index.js` and updated
 stock worker, followed by full artifact/manifest/worker route tests.
