@@ -56,12 +56,17 @@ try {
     assert.equal(new Set(names).size, names.length);
     assert.deepEqual(names, [...names].sort());
     const checkModes = directory => {
-        assert.equal(fs.lstatSync(directory).mode & 0o777, 0o555, directory);
+        const directoryStat = fs.lstatSync(directory);
+        assert.equal(directoryStat.mode & 0o777, 0o555, directory);
+        assert.equal(directoryStat.uid, process.getuid(), directory);
         for (const name of fs.readdirSync(directory)) {
             const filename = path.join(directory, name);
             const stat = fs.lstatSync(filename);
             if (stat.isDirectory()) checkModes(filename);
-            else assert.equal(stat.mode & 0o777, 0o444, filename);
+            else {
+                assert.equal(stat.mode & 0o777, 0o444, filename);
+                assert.equal(stat.uid, process.getuid(), filename);
+            }
         }
     };
     checkModes(stageRoot);
@@ -92,6 +97,52 @@ try {
     build();
     assert.equal(fileHash(path.join(stageRoot, 'manifest.json')),
         createHash('sha256').update(JSON.stringify(manifest, null, 2) + '\n').digest('hex'));
+    assert.ok(!fs.readdirSync(temporary).some(name => name.includes('.runtime.old-')));
+
+    // Build the same closed tree twice as an ordinary user. The old stage's
+    // readonly directory permissions must not prevent its validated removal.
+    const ordinary = path.join(temporary, 'ordinary');
+    fs.mkdirSync(ordinary, { mode: 0o700 });
+    fs.chownSync(ordinary, 65534, 65534);
+    const ordinaryArtifact = path.join(ordinary, 'stock.json');
+    fs.writeFileSync(ordinaryArtifact, '{"schema":1}\n');
+    fs.chownSync(ordinaryArtifact, 65534, 65534);
+    const ordinaryRoot = `${ordinaryArtifact}.runtime`;
+    const buildOrdinary = () => spawnSync('/usr/bin/setpriv',
+        ['--reuid=65534', '--regid=65534', '--clear-groups',
+            '/opt/dw-node24/bin/node', '--input-type=module', '-e',
+            `import {stageRuntime} from ${JSON.stringify(new URL('../tools/stage-runtime.mjs', import.meta.url).href)};
+             stageRuntime(process.argv[1], {s2Dist:process.argv[2], contentDist:process.argv[3]});`,
+            ordinaryArtifact, workerDist, contentDist],
+        { encoding: 'utf8', timeout: 120000,
+            env: { ...process.env, npm_config_cache: path.join(ordinary, 'npm-cache') } });
+    for (let pass = 0; pass < 2; pass++) {
+        const result = buildOrdinary();
+        assert.equal(result.status, 0, result.stderr || String(result.error));
+        const checkOrdinary = directory => {
+            const stat = fs.lstatSync(directory);
+            assert.equal(stat.uid, 65534, directory);
+            assert.equal(stat.mode & 0o777, 0o555, directory);
+            for (const name of fs.readdirSync(directory)) {
+                const filename = path.join(directory, name);
+                const child = fs.lstatSync(filename);
+                if (child.isDirectory()) checkOrdinary(filename);
+                else {
+                    assert.equal(child.uid, 65534, filename);
+                    assert.equal(child.mode & 0o777, 0o444, filename);
+                }
+            }
+        };
+        checkOrdinary(ordinaryRoot);
+        assert.ok(!fs.readdirSync(ordinary).some(name => name.includes('.runtime.old-')));
+    }
+
+    // A member owned by another UID cannot be taken over during replacement.
+    const syntheticPackage = path.join(stageRoot, 'app/package.json');
+    fs.chownSync(syntheticPackage, 65534, 65534);
+    assert.throws(build, /stage ownership or member type differs/);
+    assert.equal(fs.lstatSync(syntheticPackage).uid, 65534);
+    fs.chownSync(syntheticPackage, process.getuid(), process.getgid());
 
     // An unlisted file or symlink makes replacement fail without deletion.
     const extra = path.join(stageRoot, 'unlisted');
@@ -100,7 +151,8 @@ try {
     assert.equal(fs.lstatSync(extra).isSymbolicLink(), true);
     console.log(JSON.stringify({ syntheticWorker: worker.stdout,
         nonRootWorker: nonRoot.stdout, directoryMode: '0555', fileMode: '0444',
-        files: manifest.files.length, repeat: 'identical', tamperedReplacement: 'rejected' }));
+        files: manifest.files.length, repeat: 'root and uid65534',
+        tamperedOwnership: 'rejected', tamperedReplacement: 'rejected' }));
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
 }

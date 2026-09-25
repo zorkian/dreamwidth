@@ -65,9 +65,13 @@ copies app config, credentials, browser packages or repository-wide modules.
 The worker and shared package code are collected from their compiled entrypoints
 through literal CommonJS relative imports. Unexpected bare or dynamic imports
 fail staging. Every regular staged file is hashed in sorted manifest order;
-the previous stage may be replaced only when its entire inventory still matches
-its manifest. The CLI takes only the absolute artifact path, never a caller
-supplied runtime root or source override.
+the previous stage may be replaced only when its entire inventory and owner
+still match. The stager recreates its own synthetic package file after npm's
+install step, so every staged member has the invoking UID. It removes only a
+validated, renamed previous stage or its own unfinished temporary stage;
+readonly directories are made writable by their owner for this cleanup. The
+published stage remains `0555`/`0444`. The CLI takes only the absolute artifact
+path, never a caller supplied runtime root or source override.
 
 The synthetic mechanics test runs before the real worker source is available:
 
@@ -78,9 +82,10 @@ The synthetic mechanics test runs before the real worker source is available:
 
 It stages one synthetic worker and one synthetic content module, runs them
 under the original seccomp launcher with only the staged root readable, then
-checks every staged directory is mode `0555` and file is mode `0444`, runs the
-same worker as an ordinary non-root user, checks a byte-identical rebuild and
-rejects an unlisted symlink. Its result
+checks every staged directory is mode `0555` and file is mode `0444` with a
+uniform owner, and runs the same worker as an ordinary non-root user. Root and
+uid 65534 repeat builds leave no backup directories; the manifest is byte
+identical on rebuild, and an unlisted symlink blocks replacement. Its result
 qualifies the packaging boundary, not S2 rendering or sanitizer behavior.
 The real stage still needs the reviewed compiled `dist/index.js` and updated
 stock worker, followed by full artifact/manifest/worker route tests.
