@@ -19,13 +19,16 @@ import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from '@playwright/test';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [resultsPath, assembledPath, resourcesPath] = process.argv.slice(2);
+const [resultsPath, assembledPath, resourcesPath, richMode] = process.argv.slice(2);
 if (!resultsPath) {
     throw new Error('usage: browser-entry-reparse.mjs <result-json> ' +
-        '[actual-stock-page.html exact-resource-map.json]');
+        '[actual-stock-page.html exact-resource-map.json [--require-rich]]');
 }
 if (Boolean(assembledPath) !== Boolean(resourcesPath)) {
     throw new Error('actual assembled page and exact resource map are required together');
+}
+if (richMode && (richMode !== '--require-rich' || !assembledPath)) {
+    throw new Error('--require-rich requires an assembled page and resource map');
 }
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'corpus/entry-replay-cases.json')));
 const results = JSON.parse(fs.readFileSync(resultsPath));
@@ -49,6 +52,11 @@ for (const input of manifest.cases) {
 }
 
 const assembled = assembledPath ? fs.readFileSync(assembledPath) : null;
+const pixel = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==',
+    'base64');
+const declaredFixtureImages = new Set(['pixel.png', 'map.png', 'bg.png'].map(name =>
+    `https://asset.slice4.invalid/${name}`));
 let resources = new Map();
 if (resourcesPath) {
     const data = JSON.parse(fs.readFileSync(resourcesPath));
@@ -61,17 +69,25 @@ if (resourcesPath) {
         const body = Buffer.from(item.bodyBase64, 'base64');
         assert.equal(item.sha256, sha(body));
         assert.equal(typeof item.contentType, 'string');
-        const original = new URL(item.url);
-        assert.equal(item.sourceUrl,
-            `http://localhost:8080${original.pathname}${original.search}`);
+        if (item.source === 'synthetic-inert-fixture') {
+            assert.ok(declaredFixtureImages.has(item.url),
+                'only declared rich-entry fixture images may bypass app capture');
+            assert.equal(item.sourceUrl, undefined);
+            assert.equal(item.contentType, 'image/png');
+            assert.deepEqual(body, pixel);
+        } else {
+            assert.equal(item.source, 'retained-public-app');
+            const original = new URL(item.url);
+            assert.ok(['http://page.slice4.invalid', 'http://localhost:8080']
+                .includes(original.origin));
+            assert.equal(item.sourceUrl,
+                `http://localhost:8080${original.pathname}${original.search}`);
+        }
         return [item.url, { body, contentType: item.contentType }];
     }));
     assert.equal(resources.size, data.resources.length, 'resource URLs must be unique');
 }
 
-const pixel = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==',
-    'base64');
 const imageUrls = new Set([
     'https://asset.slice4.invalid/bg.png',
     'https://asset.slice4.invalid/var.png',
@@ -86,7 +102,7 @@ const observations = [];
 const websocketState = new WeakMap();
 
 async function runPage(context, label, html, insertion,
-    { rawControl = false, stock = false } = {}) {
+    { rawControl = false, stock = false, jsEnabled = false } = {}) {
     const pageUrl = `${stock ? 'http' : 'https'}://page.slice4.invalid/` +
         encodeURIComponent(label);
     const requests = [];
@@ -95,6 +111,7 @@ async function runPage(context, label, html, insertion,
     const popups = [];
     const errors = [];
     const dialogs = [];
+    const cutRpc = [];
     websocketState.get(context).current = sockets;
     await context.route('**/*', async route => {
         const url = route.request().url();
@@ -111,6 +128,16 @@ async function runPage(context, label, html, insertion,
             const resource = resources.get(url);
             await route.fulfill({ status: 200, contentType: resource.contentType,
                 body: resource.body });
+        } else if (stock && jsEnabled && url.startsWith(
+            'http://page.slice4.invalid/__rpc_cuttag?')) {
+            const request = new URL(url);
+            assert.equal(request.searchParams.get('journal'), 's2js_slice3');
+            assert.match(request.searchParams.get('ditemid') ?? '', /^[1-9][0-9]*$/);
+            assert.match(request.searchParams.get('cutid') ?? '', /^[1-9][0-9]*$/);
+            assert.equal([...request.searchParams.keys()].length, 3);
+            cutRpc.push(url);
+            await route.fulfill({ status: 400, contentType: 'text/plain',
+                body: 'Unsupported request\n' });
         } else {
             forbidden.push(url);
             await route.abort();
@@ -164,9 +191,65 @@ async function runPage(context, label, html, insertion,
                 })(),
                 stockJquery: typeof window.jQuery === 'function',
                 stockCutControls: document.querySelectorAll('.module-cuttagcontrols').length,
+                cutSpans: [...document.querySelectorAll('span.cuttag[id]')].map(element => ({
+                    id: element.id, actions: element.querySelectorAll(
+                        'a.cuttag-action-before').length,
+                })),
+                cutFallbacks: [...document.querySelectorAll('b.cut-text a[href]')]
+                    .map(element => element.href),
+                untrustedCutSpans: [...document.querySelectorAll('span.cuttag:not([id])')]
+                    .map(element => ({ id: element.id,
+                        text: element.textContent,
+                        actions: element.querySelectorAll('a.cuttag-action-before').length })),
+                globalCutTargets: [...document.querySelectorAll(
+                    '.cutTagControls a[aria-controls]')].map(element =>
+                    element.getAttribute('aria-controls')),
             };
         });
         assert.equal(page.url(), pageUrl, `${label}: unexpected navigation`);
+        if (stock) assert.ok(!dom.text.includes('HIDDEN-'),
+            `${label}: hidden entry body reached the stock page`);
+        if (stock && dom.cutSpans.length) {
+            assert.ok(dom.cutSpans.every(cut =>
+                /^span-cuttag_s2js_slice3_[1-9][0-9]*_[1-9][0-9]*$/.test(cut.id)),
+            `${label}: unexpected source or generated cut identity`);
+            assert.equal(dom.cutFallbacks.length, dom.cutSpans.length,
+                `${label}: retained read-more fallback missing`);
+            assert.ok(dom.cutFallbacks.every(url =>
+                url.includes('#cutid') && url.startsWith('http://localhost:8080/')),
+            `${label}: retained read-more fallback target changed`);
+            assert.ok(dom.cutSpans.every(cut => cut.actions === (jsEnabled ? 1 : 0)),
+                `${label}: stock widget attached to wrong cut`);
+            if (jsEnabled) {
+                assert.deepEqual(cutRpc, [], `${label}: cut RPC before user action`);
+                assert.ok(dom.globalCutTargets.some(target =>
+                    dom.cutSpans.some(cut => target.includes(
+                        cut.id.replace(/^span-/, 'div-')))),
+                `${label}: stock global cut control did not select generated ID`);
+                assert.deepEqual(dialogs, [], `${label}: dialog before cut interaction`);
+                await page.locator('span.cuttag[id] a.cuttag-action-before').first().click();
+                await page.waitForTimeout(100);
+                assert.equal(cutRpc.length, 1,
+                    `${label}: expected one deliberately denied cut RPC`);
+                assert.deepEqual(dialogs, ['error'],
+                    `${label}: stock unsupported cut RPC handling changed`);
+                assert.ok(!await page.locator('body').innerText().then(text =>
+                    text.includes('HIDDEN-')), `${label}: denied cut revealed hidden body`);
+            } else {
+                assert.deepEqual(dom.globalCutTargets, [],
+                    `${label}: JS-off generated cut control unexpectedly active`);
+            }
+        }
+        if (stock && dom.untrustedCutSpans.length) {
+            assert.ok(dom.untrustedCutSpans.every(span =>
+                span.id === '' && span.actions === 0),
+            `${label}: source-forged cut gained widget authority`);
+        }
+        if (stock && dom.text.includes('Forged cut control')) {
+            assert.equal(dom.untrustedCutSpans.length, 1,
+                `${label}: source-forged cut disappeared or gained an ID`);
+            assert.ok(!dom.ids.includes('span-cuttag_other_123_1'));
+        }
         if (rawControl) {
             assert.ok(forbidden.includes('https://evil.slice4.invalid/attack.png'),
                 'raw image must exercise the forbidden-resource trap');
@@ -174,7 +257,7 @@ async function runPage(context, label, html, insertion,
             assert.deepEqual(forbidden, [], `${label}: unexpected browser resource`);
             assert.deepEqual(sockets, [], `${label}: websocket attempt`);
             assert.deepEqual(popups, [], `${label}: popup attempt`);
-            assert.deepEqual(dialogs, [], `${label}: dialog attempt`);
+            if (!cutRpc.length) assert.deepEqual(dialogs, [], `${label}: dialog attempt`);
             assert.equal(dom.executed, false, `${label}: script execution`);
             assert.equal(dom.clobbered, false, `${label}: DOM API clobbering`);
             if (!stock) {
@@ -187,7 +270,7 @@ async function runPage(context, label, html, insertion,
                 assert.ok(!dom.text.includes('HIDDEN-'), `${label}: cut body exposed`);
             }
         }
-        observations.push({ label, requests, forbidden, sockets, popups, dialogs,
+        observations.push({ label, requests, forbidden, sockets, popups, dialogs, cutRpc,
             pageErrors: errors, dom });
         return dom;
     } finally {
@@ -270,7 +353,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                 if (assembled) {
                     const dom = await runPage(context,
                         `${engineName}-${enabled}-actual-stock`, assembled.toString('utf8'),
-                        'document', { stock: true });
+                        'document', { stock: true, jsEnabled: enabled });
                     assert.ok(dom.text.includes('s2js_slice3'),
                         'actual assembled page must identify marked journal');
                     if (enabled) assert.equal(dom.stockJquery, true,
@@ -288,6 +371,23 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                     assert.equal(stockObservation.requests.filter(url =>
                         url.includes('/js/??')).length, enabled ? 2 : 0,
                     'stock script bundles must follow JS-on/off');
+                    if (richMode) {
+                        assert.ok(dom.text.includes('After cut visible'),
+                            'rich page marker missing');
+                        assert.equal(dom.cutSpans.length, 1,
+                            'rich page must have one generated cut');
+                        assert.equal(dom.untrustedCutSpans.length, 1,
+                            'rich page must retain one inert forged cut span');
+                    }
+                    if (dom.text.includes('After cut visible')) {
+                        for (const asset of ['pixel.png', 'map.png', 'bg.png']) {
+                            assert.ok(stockObservation.requests.includes(
+                                `https://asset.slice4.invalid/${asset}`),
+                            `actual rich ${asset} resource did not load`);
+                        }
+                        assert.ok(!dom.text.includes('HIDDEN-S2-CONTENT-ONLY'),
+                            'stock output exposed hidden cut body');
+                    }
                 }
             } finally {
                 await context.close();
@@ -297,7 +397,9 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
         await browser.close();
     }
 }
-const report = { schema: 1, candidate: results.candidate,
-    provisional: Boolean(results.provisional), assembledSha256: assembled && sha(assembled),
+const report = { schema: 1, candidateClaim: results.candidate,
+    evidenceStatus: 'mechanics-only-unverified-input',
+    pageSource: assembled ? 'caller-supplied-assembly' : 'none',
+    assembledSha256: assembled && sha(assembled),
     engines: observations.length, observations };
 console.log(JSON.stringify(report));

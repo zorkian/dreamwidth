@@ -147,7 +147,23 @@ that page from the retained local app, then add any CSS background URL observed
 by the browser as a named extra path; an unlisted request fails the run. The
 capture helper uses a fixed loopback app origin and allows only stock static
 and stylesheet paths. It stores response hashes and bytes, with no cookies or
-account data. Example, from `src/content` in the owning devcontainer:
+account data.
+
+The rich-entry fixture declares exactly three `asset.slice4.invalid` image
+URLs (`pixel.png`, `map.png`, `bg.png`). The capture helper never fetches that
+origin: it records inert pixel bytes with separate synthetic-fixture provenance
+only when an emitted image or inline CSS background actually references one of
+those URLs. The browser runner checks the same fixed set and requires all
+three requests for the normal rich variant. Any other external image request
+is trapped. Generated cut-arrow images are retained local `/img/` assets;
+record their exact observed paths as extra capture arguments for a cut page.
+With JavaScript on, a generated cut ID must acquire a stock widget and the
+global cut control must target it; a source-forged ID must remain inert. One
+deliberate cut click receives a fixed unsupported 400 in the synthetic browser
+route, leaving hidden text absent. The real TS route's unsupported RPC response
+is checked separately by the live HTTP harness.
+
+Example, from `src/content` in the owning devcontainer:
 
 ```sh
 /opt/dw-node24/bin/node tools/capture-browser-resources.mjs \
@@ -159,11 +175,15 @@ account data. Example, from `src/content` in the owning devcontainer:
     /tmp/slice4-stock-resources.json > /tmp/slice4-browser-report.json
 ```
 
-The page file must be a fresh assembled Slice4 rich-entry response for final
-acceptance; a preserved Slice3 page only qualifies the harness and stock
-resource wiring. For acceptance, generate cleaner result JSON from the exact
-reviewed build and verify it against a separately reviewed per-case difference
-ledger before this browser run. A self-consistent JSON file is insufficient.
+Add `--require-rich` to the browser command for the final rich-page run. It
+requires the visible rich marker, one generated cut, one inert source-forged
+cut, and all three declared synthetic image requests. A preserved Slice3 page
+or test-only stock assembly qualifies harness mechanics and resource wiring
+only. The browser report labels its candidate and page as caller-supplied,
+unverified inputs; it never marks source review or live-route acceptance. For
+acceptance, capture a fresh actual TS route response, generate cleaner results
+from the exact reviewed build, and verify them against a separately reviewed
+per-case difference ledger. A self-consistent JSON file is insufficient.
 Browser process telemetry and DNS outside intercepted page requests are not
 claimed by this test.
 
