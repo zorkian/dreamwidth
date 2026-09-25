@@ -23,12 +23,13 @@ records supported entry markup and explicit refusals. The separate
 uses synthetic proxy credentials; ordinary serving requires an unconfigured
 image proxy.
 
-The pinned qualification runtime is Node 24.21.0. Verify the official signed
-release list and Linux x64 archive hash with `tools/bootstrap-node24.sh` inside
-the owning devcontainer. The script extracts to `/opt/dw-node24` and leaves
-`/usr/bin/node` unchanged. Build using that binary and npm:
+The pinned qualification runtime is Node 24.21.0. In the owning devcontainer,
+run the bootstrap with scoped setup privileges before any Node 24 command. It
+verifies the signed release list and Linux x64 archive hash, installs to
+`/opt/dw-node24`, and leaves `/usr/bin/node` unchanged. From `src/content`:
 
 ```sh
+bash tools/bootstrap-node24.sh
 PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts
 PATH=/opt/dw-node24/bin:$PATH npm run build
 ```
@@ -112,9 +113,15 @@ uid 65534 repeat builds leave no backup directories; the manifest is byte
 identical on rebuild, and an unlisted symlink blocks replacement. Its result
 qualifies the packaging boundary, not S2 rendering or sanitizer behavior.
 
-Browser availability can be checked with `tools/qualify-browsers.mjs` after
-installing the pinned Playwright browser binaries and OS dependencies. It
-intercepts one synthetic document and one synthetic image in each Chromium,
+Install the lockfile's Playwright engines and system libraries with scoped
+setup privileges, then qualify all six combinations from `src/content`:
+
+```sh
+PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/playwright install --with-deps chromium firefox webkit
+PATH=/opt/dw-node24/bin:$PATH node tools/qualify-browsers.mjs
+```
+
+The qualifier intercepts one synthetic document and one synthetic image in each Chromium,
 Firefox and WebKit JavaScript on/off mode. The actual assembled stock output
 and security corpus use the checks below.
 
