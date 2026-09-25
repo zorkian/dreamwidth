@@ -245,6 +245,32 @@ async function recovery(): Promise<void> {
         assert.equal(existsSync(state), false);
         assert.equal(existsSync(marker), false);
     }
+    perl("live-probes.pl", ["--create-single"]);
+    const suspendedMarker = path.join(artifacts, "probe-suspended.marker");
+    const child = spawn("/usr/bin/perl",
+        [path.join(tools, "live-probes.pl"), "--suspend-single-pause-after-set"],
+        {cwd: root, env: perlEnv, stdio: ["ignore", "ignore", "pipe"]});
+    let stderr = "";
+    child.stderr?.on("data", chunk => { stderr += String(chunk).slice(0, 2048); });
+    const exited = new Promise<void>(resolve => { child.once("exit", () => resolve()); });
+    try {
+        const deadline = Date.now() + 10000;
+        while (!existsSync(suspendedMarker) && Date.now() < deadline &&
+            child.exitCode === null) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        assert.ok(existsSync(suspendedMarker), "No committed-suspension handshake: " + stderr);
+        assert.ok(existsSync(state), "Missing presuspension recovery intent");
+        child.kill("SIGKILL");
+        await exited;
+        assert.equal(child.signalCode, "SIGKILL");
+    } finally {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        await exited;
+        perl("live-probes.pl", ["--restore"]);
+    }
+    assert.equal(existsSync(state), false);
+    assert.equal(existsSync(suspendedMarker), false);
     const restored = await MysqlLiveStore.open(credential);
     try {
         const snapshot = await restored.loadRawSnapshot("s2js_slice3");
@@ -254,7 +280,8 @@ async function recovery(): Promise<void> {
     } finally {
         await restored.close();
     }
-    process.stdout.write("single and mixed SIGKILL after committed post; exact recovery: pass\n");
+    process.stdout.write(
+        "single/mixed post and entry suspension SIGKILL recovery: pass\n");
 }
 
 async function pagination(): Promise<void> {
@@ -371,9 +398,13 @@ async function compare(): Promise<void> {
     assert.equal(metadata.perl_hash_seed, "0");
     assert.equal(metadata.perl_perturb_keys, "0");
     assert.ok(Array.isArray(metadata.response_headers));
+    assert.ok(!metadata.response_headers.some((header: [string, string]) =>
+        header[0].toLowerCase() === "set-cookie"));
     const store = await MysqlLiveStore.open(credential);
     let app: ReturnType<typeof createLiveApp> | undefined;
     try {
+        const before = await store.loadRawSnapshot("s2js_slice3");
+        assert.ok(before);
         const service = await createComparisonRecentService({
             repository: store, secretSource: store,
             artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
@@ -389,9 +420,23 @@ async function compare(): Promise<void> {
         const rendered = await request(cookie);
         writeFileSync(path.join(artifacts, "page-ts.html"), rendered.body);
         assert.equal(rendered.status, 200, rendered.body.toString("utf8").slice(0, 120));
+        assert.equal(rendered.headers.get("content-type"), "text/html; charset=utf-8");
         assert.equal(rendered.headers.get("cache-control"), "private, no-store");
         assert.equal(rendered.headers.get("content-length"), String(rendered.body.length));
+        assert.equal(rendered.headers.get("set-cookie"), null);
         assertExactHtml(oracle, rendered.body);
+        const head = await fetch(route, {
+            method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(20000),
+            headers: {Cookie: "ljuniq=" + cookie},
+        });
+        assert.equal(head.status, 200);
+        assert.equal(head.headers.get("content-type"), rendered.headers.get("content-type"));
+        assert.equal(head.headers.get("cache-control"), rendered.headers.get("cache-control"));
+        assert.equal(head.headers.get("content-length"), String(rendered.body.length));
+        assert.equal(head.headers.get("set-cookie"), null);
+        assert.equal((await head.arrayBuffer()).byteLength, 0);
+        assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+            before.fingerprint, "Compared GET/HEAD wrote journal state");
         const deliberatelyChanged = Buffer.from(rendered.body);
         assert.ok(deliberatelyChanged.length > 10);
         deliberatelyChanged[10] = deliberatelyChanged[10]! ^ 1;
@@ -403,6 +448,74 @@ async function compare(): Promise<void> {
         await store.close();
     }
     process.stdout.write("real Perl/TS exact recent HTML " + oracle.length + " bytes: pass\n");
+}
+
+async function resources(): Promise<void> {
+    setup();
+    const {public: publicConfig} = config();
+    await liveServer(async () => {
+        const page = await request();
+        assert.equal(page.status, 200);
+        const html = page.body.toString("utf8");
+        const destinations = new Map<string, {method: "GET" | "POST"; target: string}>();
+        const attribute = /\b(href|src|action)\s*=\s*(["'])(.*?)\2/gi;
+        const attributes = [...html.matchAll(attribute)];
+        assert.equal(attributes.length,
+            [...html.matchAll(/\b(?:href|src|action)\s*=/gi)].length,
+            "Stock URL attribute was not quoted and enumerated");
+        for (const match of attributes) {
+            const value = match[3]!;
+            if (!value.startsWith("/") || value.startsWith("//")) continue;
+            const tagStart = html.lastIndexOf("<", match.index);
+            const tagEnd = html.indexOf(">", tagStart);
+            assert.ok(tagStart >= 0 && tagEnd > match.index,
+                "Root-relative URL is outside a stock HTML tag");
+            const tag = html.slice(tagStart, tagEnd + 1);
+            let method: "GET" | "POST" = "GET";
+            if (match[1]!.toLowerCase() === "action") {
+                assert.match(tag, /^<form\b/i);
+                const methodAttribute = /\bmethod\s*=\s*(["'])(.*?)\1/i.exec(tag);
+                assert.equal(methodAttribute?.[2]?.toLowerCase(), "post");
+                method = "POST";
+            }
+            // Browser attribute parsing decodes the only entity in the pinned
+            // stock URL inventory before making the request.
+            assert.ok(!/&(?:#|[A-Za-z][A-Za-z0-9]*;)/.test(
+                value.replaceAll("&amp;", "")),
+                "Unsupported URL entity in emitted stock markup");
+            const target = value.replaceAll("&amp;", "&");
+            assert.equal(new URL(target, publicConfig.listenOrigin).pathname +
+                new URL(target, publicConfig.listenOrigin).search, target);
+            destinations.set(method + "\0" + target, {method, target});
+        }
+        assert.ok(destinations.size >= 26, "Stock page URL inventory was incomplete");
+        const posts = [...destinations.values()].filter(item => item.method === "POST")
+            .map(item => item.target).sort();
+        assert.deepEqual(posts, ["/login", "/multisearch"]);
+        let staticCount = 0;
+        for (const {method, target} of destinations.values()) {
+            const response = await fetch(publicConfig.listenOrigin + target, {
+                method, redirect: "manual", signal: AbortSignal.timeout(10000),
+                headers: method === "POST" ? {Origin: publicConfig.listenOrigin} : {},
+            });
+            assert.equal(response.status, 307, method + " " + target);
+            assert.equal(response.headers.get("location"),
+                publicConfig.canonicalAppOrigin + target, method + " " + target);
+            assert.equal(response.headers.get("cache-control"), "private, no-store");
+            await response.arrayBuffer();
+            if (/^\/(?:stc|js|img)\//.test(target)) {
+                staticCount++;
+                const retained = await fetch(publicConfig.canonicalAppOrigin + target, {
+                    redirect: "manual", signal: AbortSignal.timeout(10000),
+                });
+                assert.equal(retained.status, 200, "Retained static " + target);
+                await retained.arrayBuffer();
+            }
+        }
+        assert.ok(staticCount > 0, "No stock static resources were checked");
+        process.stdout.write("all " + destinations.size + " emitted root-relative URLs " +
+            "redirect exactly; " + staticCount + " retained static targets 200: pass\n");
+    });
 }
 
 async function appAvailable(): Promise<boolean> {
@@ -619,6 +732,30 @@ async function entryStates(): Promise<void> {
                 assert.equal(publicPage.status, 200);
                 assert.ok(publicPage.body.includes(Buffer.from(marker)));
                 assert.ok(publicPage.body.includes(Buffer.from(dayLink)));
+                const beforeSuspend = await store.loadRawSnapshot("s2js_slice3");
+                assert.ok(beforeSuspend);
+                perl("live-probes.pl", ["--suspend-single"]);
+                const suspended = await store.loadRawSnapshot("s2js_slice3");
+                assert.ok(suspended);
+                assert.notEqual(suspended.fingerprint, beforeSuspend.fingerprint,
+                    "Suspended entry must revoke the primary fingerprint");
+                assert.equal(suspended.entries.find(entry =>
+                    entry.jitemid === state.ids["1"].jitemid)?.props.statusvis, "S");
+                const refused = await request();
+                assert.equal(refused.status, 422);
+                assert.equal(refused.body.toString("utf8"), "Unsupported journal state\n");
+                assert.equal(refused.headers.get("content-type"), "text/plain; charset=utf-8");
+                assert.equal(refused.headers.get("cache-control"), "private, no-store");
+                assert.equal(refused.headers.get("set-cookie"), null);
+                assert.equal(refused.headers.get("location"), null);
+                assert.ok(!refused.body.includes(Buffer.from(marker)));
+                assert.ok(!refused.body.includes(Buffer.from("<html")));
+                perl("live-probes.pl", ["--unsuspend-single"]);
+                assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                    beforeSuspend.fingerprint, "Original entry status property was not restored");
+                const unsuspended = await request();
+                assert.equal(unsuspended.status, 200);
+                assert.ok(unsuspended.body.includes(Buffer.from(marker)));
                 for (const security of ["private", "usemask"] as const) {
                     perl("live-probes.pl", ["--" + security + "-single"]);
                     const snapshot = await store.loadRawSnapshot("s2js_slice3");
@@ -649,7 +786,8 @@ async function entryStates(): Promise<void> {
     } finally {
         await store.close();
     }
-    process.stdout.write("public/private/usemask/deleted entry and calendar disclosure: pass\n");
+    process.stdout.write(
+        "public/suspended/private/usemask/deleted entry and calendar disclosure: pass\n");
 }
 
 async function contentRefusal(): Promise<void> {
@@ -771,14 +909,16 @@ async function main(): Promise<void> {
     const mode = process.argv[2];
     assert.ok(mode === "first" || mode === "compare" ||
         mode === "update" || mode === "recovery" || mode === "pagination" ||
+        mode === "resources" ||
         mode === "no-perl" || mode === "cross-journal" ||
         mode === "empty" || mode === "entry-states" ||
         mode === "content-refusal" || mode === "missing" || mode === "recheck",
-    "Usage: node dist/tools/check-live.js first|compare|update|recovery|pagination|no-perl|cross-journal|empty|entry-states|content-refusal|missing|recheck");
+    "Usage: node dist/tools/check-live.js first|compare|resources|update|recovery|pagination|no-perl|cross-journal|empty|entry-states|content-refusal|missing|recheck");
     if (mode === "first") await first();
     else if (mode === "compare") await compare();
     else if (mode === "update") await update();
     else if (mode === "pagination") await pagination();
+    else if (mode === "resources") await resources();
     else if (mode === "recovery") await recovery();
     else if (mode === "no-perl") await noPerl();
     else if (mode === "cross-journal") await crossJournal();

@@ -200,6 +200,7 @@ npx tsc
 export S2_LIVE_TEST_ARTIFACT="$PWD/artifacts/live/stock.json"
 node dist/tools/check-live.js first
 node dist/tools/check-live.js compare
+node dist/tools/check-live.js resources
 node dist/tools/check-live.js update
 node dist/tools/check-live.js recovery
 node dist/tools/check-live.js pagination
@@ -231,18 +232,29 @@ compare directly.
 Compare runs two independent real Perl HTTP GETs under the recorded frozen
 comparison conditions, checks they are byte identical, then requests the
 TypeScript HTTP route with the same clock/random/cookie through the separate
-offline comparison factory. It writes the unmodified outputs to
+offline comparison factory. It asserts status, exact content type and
+length, private no-store, no Set-Cookie, and an unchanged primary snapshot
+fingerprint before and after GET and HEAD. HEAD must have the same relevant
+headers and GET byte length but no body. It writes the unmodified outputs to
 artifacts/live/oracle-one/page-oracle.html and artifacts/live/page-ts.html.
 It compares the full bytes with no normalization. The ordinary server imports
 only the live factory and uses live clock and cryptographic randomness.
+
+Resources enumerates every root-relative href, src and action emitted by
+the actual TS recent page. It checks exact 307 Location values against the
+canonical retained app origin, including both POST forms sent with an
+admitted Origin and no body. Every emitted /stc, /js and /img target must
+also return 200 from the retained app. Other controls are checked for
+redirect admission only; their retained target may have its normal 302,
+401 or 404 response.
 
 Update posts and edits one exactly marked temporary entry with normal Perl
 helpers, checks the next ordinary TS HTTP GET shows each change without an
 export or artifact regeneration, then fully removes only that recorded entry.
 Recovery kills the normal helper only after its committed-post handshake,
-once for a single post and once during a mixed batch. The harness invokes
-the separate exact-owner restore in finally and verifies both original
-seed IDs remain.
+once for a single post and once during a mixed batch, and once after a
+recorded entry suspension. The harness invokes the separate exact-owner
+restore in finally and verifies both original seed IDs remain.
 Pagination creates 22 marked public posts plus one private and one usemask post.
 It checks the raw snapshot sees all 26 candidates while anonymous HTML never
 contains the two hidden posts, then compares real Perl and TS full HTML bytes
@@ -275,9 +287,15 @@ perl src/s2/target/javascript/tools/live-empty.pl --restore
 ~~~
 
 Entry-states posts one recorded entry on a distinct date, then checks public,
-private, usemask, restored public and fully deleted transitions against the
-real HTTP route and day link. Content-refusal posts three separately recorded
-invalid bodies (unbalanced markup, a URL attribute and script), verifies
+suspended, restored public, private, usemask and fully deleted transitions
+against the real HTTP route and day link. Suspension uses the retained
+Entry.set_prop(statusvis) helper after recording intent. The fresh
+fingerprint changes, the entire page becomes a fixed 422 without HTML,
+cookie, Location or marker, and restoring the original property returns
+200 with the marker. Recovery can find the exact recorded ID even when
+recent enumeration omits a suspended entry. Content-refusal posts three
+separately recorded invalid bodies (unbalanced markup, a URL attribute and
+script), verifies
 fixed 422 with no content or cookie, and fully deletes each. Recheck changes
 the marked owner's display name through the normal helper just before the
 real independent primary check; the buffered page is discarded as fixed 409,
