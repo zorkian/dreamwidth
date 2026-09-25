@@ -1,5 +1,0 @@
-1..4
-ok 1 - Valid HTML is okay.
-ok 2 - Invalid HTML is not okay.
-ok 3 - User tag is fine.
-ok 4 - Invalid markup with a user tag renders correctly.

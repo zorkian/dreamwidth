@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparedCorpusRoot } from './corpus-paths.mjs';
 
 const [resultPath, ledgerPath] = process.argv.slice(2);
 if (!resultPath || !ledgerPath) {
@@ -41,8 +42,9 @@ assert.equal(result.buildSha256,
     createHash('sha256').update(JSON.stringify(result.compiled)).digest('hex'));
 const native = result.corpus === 'native';
 assert.ok(native || result.corpus === 'synthetic');
-const manifestBytes = fs.readFileSync(path.join(root, 'corpus', native
-    ? 'native-derived-entry-cases.json' : 'entry-replay-cases.json'));
+const manifestBytes = fs.readFileSync(path.join(native ? preparedCorpusRoot() :
+    path.join(root, 'corpus'), native ? 'native-derived-entry-cases.json' :
+    'entry-replay-cases.json'));
 const oracleBytes = fs.readFileSync(path.join(root, 'corpus', native
     ? 'native-derived-entry-perl.json' : 'entry-replay-perl.json'));
 const manifest = JSON.parse(manifestBytes);

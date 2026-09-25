@@ -17,7 +17,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepare:corpus": "node tools/prepare-corpus.mjs"
   },
   "dependencies": {
     "css-tree": "3.2.1",
