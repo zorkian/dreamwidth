@@ -1,0 +1,456 @@
+{
+  "schema": 1,
+  "corpus": "synthetic",
+  "candidate": "71211caa1c95b38b115bb8bd7230a4b183298656",
+  "buildSha256": "47f9d1e4811eadc486660801f355fced9c6d5548614f2f9156b2c1334d37e16d",
+  "compiled": [
+    {
+      "path": "contracts.js",
+      "sha256": "d309ee23c157448d6c8eee9cd0080126d8644bdd8fca0aee8e44b67bb08a256c"
+    },
+    {
+      "path": "index.js",
+      "sha256": "872c54a211b42ea3940aba89b5326553c65b4912f9d6a03fe5a29fcaaaa065e6"
+    },
+    {
+      "path": "policy/css.js",
+      "sha256": "45040aac548a899d6388e5d39f309e4ed32166dad8c49f5477da13127232b409"
+    },
+    {
+      "path": "policy/cuts.js",
+      "sha256": "9bda6fe3655370d241718b7b7ae8ecd0c372ad413b2f6005975547e5ea914431"
+    },
+    {
+      "path": "policy/errors.js",
+      "sha256": "d419a40c7e156ee57ba007e666c629ea8683191ff4c9d86848ffffdecc8745bc"
+    },
+    {
+      "path": "policy/formatting.js",
+      "sha256": "f2d016b7db7773fecdf6728801561e8b939b676534f9ab5456d812dcb6d2038c"
+    },
+    {
+      "path": "policy/images.js",
+      "sha256": "0faaf19d6f38c8da0376c0d9482f067abcf1e7e1beaf0b57acb0cfbb97d069ef"
+    },
+    {
+      "path": "policy/inventory.js",
+      "sha256": "11b5ae25d95555ac565266d4f8f79c0175c15845f957994526949a695b0d55ca"
+    },
+    {
+      "path": "policy/source.js",
+      "sha256": "260b0247007dd6f4985437609d2eb2c8153972fdaac5f20d3b7fcbebd12161ec"
+    },
+    {
+      "path": "policy/urls.js",
+      "sha256": "58dc85159f80b02a6c69be9d0ef605ec2ca226976b9be0f6b50ddcdd88b15676"
+    },
+    {
+      "path": "policy/validation.js",
+      "sha256": "022363e99d6a595dce698a6e4d9224109370f398f05f2eb11656258542ba5613"
+    }
+  ],
+  "lockSha256": "3d6aba06ae7eac36cef44c3c98d4d945b6ec820a3ec532877a136013377f4521",
+  "manifestSha256": "e326c3ecf63aac076713ee0284653bf372ff005d4e9b4a47498d67b15bcd8e7e",
+  "oracleSha256": "b597272a3a397278a32617d355aa2e0595a59f09b4a9dd0905e74034cd16e390",
+  "cases": [
+    {
+      "id": "flow-rich",
+      "source": "slice4 synthetic ordinary-rich positive",
+      "inputSha256": "b6d71deb57c38f972921f1d4a270580cdc663e1fc795059f7de88d040561aa80",
+      "perlSha256": "f1dce3b6b9b96e2f57964cd5c2c1d1a150b4aa8536960d79cdcd9d5fa111a264",
+      "perlBytes": 294,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "f1570d942221366dc0e6c8e7c5499e70a49307ba361e63a1bed30f289eae1f63",
+      "jsBytes": 309,
+      "category": "serialization",
+      "rationale": "The DOM tree inserts an implied tbody and closes omitted table elements; the same table cell text remains in order.",
+      "evidence": [
+        "Input flow-rich exercises implied table tree and close-token serialization; raw UTF-8 SHA-256 b6d71deb57c38f972921f1d4a270580cdc663e1fc795059f7de88d040561aa80.",
+        "Retained Perl 294 bytes SHA-256 f1dce3b6b9b96e2f57964cd5c2c1d1a150b4aa8536960d79cdcd9d5fa111a264; reviewed TS 309 bytes SHA-256 f1570d942221366dc0e6c8e7c5499e70a49307ba361e63a1bed30f289eae1f63. Raw outputs remain in fixed corpus/review result; see CLEANER-POLICY.md and source case.",
+        "Synthetic six-engine browser-entry-reparse.mjs checks the exact reviewed 26-row output in document and entry-fragment contexts; actual rich route is qualified separately."
+      ]
+    },
+    {
+      "id": "css-broad",
+      "source": "cgi-bin/LJ/CSS/Cleaner.pm entry cleancss policy",
+      "inputSha256": "71db52302b1345b2c34323058909adf748e2c49edbf667bf8d1693556b9dee38",
+      "perlSha256": "88e3b12b49d053c2c6903f1c50e02a9e07704881ded98ae9d7b0d7fe0b27ec5a",
+      "perlBytes": 213,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "88e3b12b49d053c2c6903f1c50e02a9e07704881ded98ae9d7b0d7fe0b27ec5a",
+      "jsBytes": 213,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "css-escaped-fixed",
+      "source": "cgi-bin/LJ/CSS/Cleaner.pm escaped active-position regression",
+      "inputSha256": "490e6a4a75a9ed2a9f670286a884d283f2196c32cc668b033633f47bbd283b1f",
+      "perlSha256": "9716085c1426399e6f6321255dcc4ddf4127e41bd70b848ff8cb0fbad8e57739",
+      "perlBytes": 208,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "9716085c1426399e6f6321255dcc4ddf4127e41bd70b848ff8cb0fbad8e57739",
+      "jsBytes": 208,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "css-custom-url",
+      "source": "cgi-bin/LJ/CSS/Cleaner.pm custom-property URL review",
+      "inputSha256": "a9b90b0b9b4641d1aff4afe816adfaa8682c775efaa1b7e847cb821e141c186f",
+      "perlSha256": "a9b90b0b9b4641d1aff4afe816adfaa8682c775efaa1b7e847cb821e141c186f",
+      "perlBytes": 103,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "a9b90b0b9b4641d1aff4afe816adfaa8682c775efaa1b7e847cb821e141c186f",
+      "jsBytes": 103,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "url-known-schemes",
+      "source": "cgi-bin/LJ/CleanHTML.pm safeUri policy",
+      "inputSha256": "6401957c175669a9da8d2ae983275536cc05682a363f7c2ab26eac58496d35ba",
+      "perlSha256": "6401957c175669a9da8d2ae983275536cc05682a363f7c2ab26eac58496d35ba",
+      "perlBytes": 246,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "6401957c175669a9da8d2ae983275536cc05682a363f7c2ab26eac58496d35ba",
+      "jsBytes": 246,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "url-relative-navigation",
+      "source": "Slice4 explicit documentUrl origin adaptation",
+      "inputSha256": "373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837",
+      "perlSha256": "373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837",
+      "perlBytes": 136,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "f55e280f98e8619321765a68f9913ffb89cc494a262e58a02a0d177349e6130e",
+      "jsBytes": 186,
+      "category": "origin-adaptation",
+      "rationale": "A relative resource or navigation URL is resolved against the explicit canonical document URL; the original URL stays in Perl output.",
+      "evidence": [
+        "Input url-relative-navigation exercises explicit document URL origin adaptation; raw UTF-8 SHA-256 373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837.",
+        "Retained Perl 136 bytes SHA-256 373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837; reviewed TS 186 bytes SHA-256 f55e280f98e8619321765a68f9913ffb89cc494a262e58a02a0d177349e6130e. Raw outputs remain in fixed corpus/review result; see CLEANER-POLICY.md and source case.",
+        "Synthetic six-engine browser-entry-reparse.mjs checks the exact reviewed 26-row output in document and entry-fragment contexts; actual rich route is qualified separately."
+      ]
+    },
+    {
+      "id": "url-scheme-active",
+      "source": "t/cleaner-xss.t active URI surface",
+      "inputSha256": "28672375879bdb318b5f364db883450aefd6159f1122c5ad738b0d9de23db63b",
+      "perlSha256": "c7c1a8dafbb1454f7cd4799854b4697acced0556d72ac840e28258176045b37d",
+      "perlBytes": 34,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "c7c1a8dafbb1454f7cd4799854b4697acced0556d72ac840e28258176045b37d",
+      "jsBytes": 34,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "image-and-map",
+      "source": "cgi-bin/LJ/CleanHTML.pm image/map entry policy",
+      "inputSha256": "0b837956b465dfdd4ab11e57c8b86db8520694560332ac728ec28dba22c34d20",
+      "perlSha256": "0b837956b465dfdd4ab11e57c8b86db8520694560332ac728ec28dba22c34d20",
+      "perlBytes": 202,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "0b837956b465dfdd4ab11e57c8b86db8520694560332ac728ec28dba22c34d20",
+      "jsBytes": 202,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "image-srcset-longdesc",
+      "source": "Slice4 closed body URL attribute inventory",
+      "inputSha256": "0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1",
+      "perlSha256": "0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1",
+      "perlBytes": 145,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "fad938f07a320e5edafa3d040d4fe09b28fd5fa4c2a2df85a05f6602872a77c8",
+      "jsBytes": 197,
+      "category": "origin-adaptation",
+      "rationale": "A relative resource or navigation URL is resolved against the explicit canonical document URL; the original URL stays in Perl output.",
+      "evidence": [
+        "Input image-srcset-longdesc exercises explicit document URL origin adaptation; raw UTF-8 SHA-256 0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1.",
+        "Retained Perl 145 bytes SHA-256 0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1; reviewed TS 197 bytes SHA-256 fad938f07a320e5edafa3d040d4fe09b28fd5fa4c2a2df85a05f6602872a77c8. Raw outputs remain in fixed corpus/review result; see CLEANER-POLICY.md and source case.",
+        "Synthetic six-engine browser-entry-reparse.mjs checks the exact reviewed 26-row output in document and entry-fragment contexts; actual rich route is qualified separately."
+      ]
+    },
+    {
+      "id": "image-input-formaction",
+      "source": "Slice4 closed body URL attribute inventory",
+      "inputSha256": "3e242ca1edaeedca348429deb0ffaae1c971711832f3a50acbc2515bbff808a5",
+      "perlSha256": "3e242ca1edaeedca348429deb0ffaae1c971711832f3a50acbc2515bbff808a5",
+      "perlBytes": 232,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "3e242ca1edaeedca348429deb0ffaae1c971711832f3a50acbc2515bbff808a5",
+      "jsBytes": 232,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "form-ordinary",
+      "source": "t/cleaner-forms.t plus explicit html_raw0 replay",
+      "inputSha256": "4ccb3cbbe0b7b36c5d82f6df36f51613ea948c94873b7e5f4ad1199681989b0c",
+      "perlSha256": "4ccb3cbbe0b7b36c5d82f6df36f51613ea948c94873b7e5f4ad1199681989b0c",
+      "perlBytes": 137,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "4ccb3cbbe0b7b36c5d82f6df36f51613ea948c94873b7e5f4ad1199681989b0c",
+      "jsBytes": 137,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "form-relative-action",
+      "source": "cgi-bin/LJ/CleanHTML.pm:700-709 form policy before adaptation",
+      "inputSha256": "c0f74d61a8d4d457594d990b10b7bc8428ea80239690b1d486a284154553ad25",
+      "perlSha256": "40cd2f232ce8709c1c1cee854b644a1fe2cf90448f53dc1383c02cc736f44285",
+      "perlBytes": 66,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "ebd0c161be445e06c8f3fb7b5b6f34acd15b9ad617f2ebe55d6a139c337059a7",
+      "jsBytes": 48,
+      "category": "security-correction",
+      "rationale": "A relative formaction is removed under the contextual form URL policy before any URL adaptation; visible button text remains but submission behavior changes to the actionless current route.",
+      "evidence": [
+        "Input form-relative-action exercises form action validation precedes resolution; raw UTF-8 SHA-256 c0f74d61a8d4d457594d990b10b7bc8428ea80239690b1d486a284154553ad25.",
+        "Retained Perl 66 bytes SHA-256 40cd2f232ce8709c1c1cee854b644a1fe2cf90448f53dc1383c02cc736f44285; reviewed TS 48 bytes SHA-256 ebd0c161be445e06c8f3fb7b5b6f34acd15b9ad617f2ebe55d6a139c337059a7. Raw outputs remain in fixed corpus/review result; see CLEANER-POLICY.md and source case.",
+        "Synthetic six-engine browser-entry-reparse.mjs checks the exact reviewed 26-row output in document and entry-fragment contexts; actual rich route is qualified separately."
+      ]
+    },
+    {
+      "id": "form-password",
+      "source": "t/cleaner-forms.t retained password policy",
+      "inputSha256": "e2cb288d2840d7c2f024fa3b8e85691002e638c2c093395c6ab6228eca056aff",
+      "perlSha256": "77427cc315d51eefe1edecc9538cbce439507f779c3aba282810ffc39232065b",
+      "perlBytes": 94,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "77427cc315d51eefe1edecc9538cbce439507f779c3aba282810ffc39232065b",
+      "jsBytes": 94,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "cut-flat",
+      "source": "cgi-bin/LJ/CleanHTML.pm:551-610 recent cut behavior",
+      "inputSha256": "74534dc809892d4dafe40dfaf905a0b65d41138510c7a8753e54990e075c42e1",
+      "perlSha256": "b34d01b2816ed86c0e695eaa78539b81ac61e7896a3bdfe02c1e6382e9f2cd9a",
+      "perlBytes": 407,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "b34d01b2816ed86c0e695eaa78539b81ac61e7896a3bdfe02c1e6382e9f2cd9a",
+      "jsBytes": 407,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "cut-alias-div",
+      "source": "cgi-bin/LJ/CleanHTML.pm cut alias/div behavior",
+      "inputSha256": "65c3238b4b1fe9df14658fd0dfabe8114454b6fb655898dcca1e77f25293297b",
+      "perlSha256": "0745b06336742eb745f35d23d2a4f0f026caed1eba66e5ed4a64e25fead708c1",
+      "perlBytes": 767,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "0745b06336742eb745f35d23d2a4f0f026caed1eba66e5ed4a64e25fead708c1",
+      "jsBytes": 767,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "cut-forged-id",
+      "source": "jquery.cuttag-ajax.js:313 and source-ID removal policy",
+      "inputSha256": "f02b68bde00c8f8699c445a6e7e6c481c48e64d33414de12b8b4897cbfa5310a",
+      "perlSha256": "5174bc9e87aaff7fa639466ced05a3e4787b99e0f392af53eb576f6656c8214c",
+      "perlBytes": 407,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "5174bc9e87aaff7fa639466ced05a3e4787b99e0f392af53eb576f6656c8214c",
+      "jsBytes": 407,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "cut-unclosed",
+      "source": "Slice4 closed-cut ambiguity refusal",
+      "inputSha256": "ecc68928b25ca1e0c73a23e40b5ab779cba7d812b1f8816175e3635f41d33183",
+      "perlSha256": "fcbf27df8cb64f332478c6fae31ac1ea59102f967ec406f41fcbd22caf93e0c0",
+      "perlBytes": 382,
+      "kind": "failure",
+      "reason": "unsupported",
+      "jsSha256": null,
+      "jsBytes": null,
+      "category": "unsupported",
+      "rationale": "Nested or crossed cuts exceed the explicit flat-cut grammar; no partial fragment or hidden body is returned.",
+      "evidence": [
+        "Input cut-unclosed exercises the flat-cut ambiguity boundary; raw UTF-8 SHA-256 ecc68928b25ca1e0c73a23e40b5ab779cba7d812b1f8816175e3635f41d33183.",
+        "Retained Perl emitted 382 bytes SHA-256 fcbf27df8cb64f332478c6fae31ac1ea59102f967ec406f41fcbd22caf93e0c0; reviewed TS emitted no fragment. See CLEANER-POLICY.md named refusal/source audit and raw corpus input."
+      ]
+    },
+    {
+      "id": "cut-nested",
+      "source": "Slice4 flat-cut scope refusal",
+      "inputSha256": "e44f29f2495733dbac29185da283e0e92627dcc2f36904f6fa36c89864d5cb41",
+      "perlSha256": "2b53a3702c20cbf1591e4e5e86bef02b4e8b4bd2b4d1d481b3b535e918424d74",
+      "perlBytes": 370,
+      "kind": "failure",
+      "reason": "unsupported",
+      "jsSha256": null,
+      "jsBytes": null,
+      "category": "unsupported",
+      "rationale": "Nested or crossed cuts exceed the explicit flat-cut grammar; no partial fragment or hidden body is returned.",
+      "evidence": [
+        "Input cut-nested exercises the flat-cut ambiguity boundary; raw UTF-8 SHA-256 e44f29f2495733dbac29185da283e0e92627dcc2f36904f6fa36c89864d5cb41.",
+        "Retained Perl emitted 370 bytes SHA-256 2b53a3702c20cbf1591e4e5e86bef02b4e8b4bd2b4d1d481b3b535e918424d74; reviewed TS emitted no fragment. See CLEANER-POLICY.md named refusal/source audit and raw corpus input."
+      ]
+    },
+    {
+      "id": "head-hoist",
+      "source": "HTML document versus div.entry-content fragment reparse",
+      "inputSha256": "6196b6e60172647b26db7e192177ea4def35745cdf23c470f479a986b47f2057",
+      "perlSha256": "ab713775707af98be6d5ea3a895cd74a49840d478df692608300d049e8956cec",
+      "perlBytes": 24,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "ab713775707af98be6d5ea3a895cd74a49840d478df692608300d049e8956cec",
+      "jsBytes": 24,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "rawtext-xmp",
+      "source": "HTML document versus div.entry-content rawtext reparse",
+      "inputSha256": "544d4c92ba25f01636174e47929df4ca78b580cf50ed0b74677c90a27d6da594",
+      "perlSha256": "21e53fe5b529f8564e1f6d58982658fb83fb194ebe1864e1d1330a239698f06f",
+      "perlBytes": 61,
+      "kind": "failure",
+      "reason": "unsupported",
+      "jsSha256": null,
+      "jsBytes": null,
+      "category": "unsupported",
+      "rationale": "Rawtext element parser-state behavior is outside the finite entry div representation; visible text is not silently discarded.",
+      "evidence": [
+        "Input rawtext-xmp exercises the rawtext representation boundary; raw UTF-8 SHA-256 544d4c92ba25f01636174e47929df4ca78b580cf50ed0b74677c90a27d6da594.",
+        "Retained Perl emitted 61 bytes SHA-256 21e53fe5b529f8564e1f6d58982658fb83fb194ebe1864e1d1330a239698f06f; reviewed TS emitted no fragment. See CLEANER-POLICY.md named refusal/source audit and raw corpus input."
+      ]
+    },
+    {
+      "id": "rawtext-plaintext",
+      "source": "cgi-bin/LJ/CleanHTML.pm event-eat plaintext plus browser reparse",
+      "inputSha256": "c49cb0f6d2b7aca6ecebb9c76ac173bfad5dc9fb9ebfcbf1f41f8283b08922dd",
+      "perlSha256": "8bb91cacc2a4a0fa000cc1f9c2bdcbbfd13726e10a6b7073c5ae1abd739fb8bb",
+      "perlBytes": 66,
+      "kind": "failure",
+      "reason": "unsupported",
+      "jsSha256": null,
+      "jsBytes": null,
+      "category": "unsupported",
+      "rationale": "Rawtext element parser-state behavior is outside the finite entry div representation; visible text is not silently discarded.",
+      "evidence": [
+        "Input rawtext-plaintext exercises the rawtext representation boundary; raw UTF-8 SHA-256 c49cb0f6d2b7aca6ecebb9c76ac173bfad5dc9fb9ebfcbf1f41f8283b08922dd.",
+        "Retained Perl emitted 66 bytes SHA-256 8bb91cacc2a4a0fa000cc1f9c2bdcbbfd13726e10a6b7073c5ae1abd739fb8bb; reviewed TS emitted no fragment. See CLEANER-POLICY.md named refusal/source audit and raw corpus input."
+      ]
+    },
+    {
+      "id": "rawtext-script-textarea",
+      "source": "HTML rawtext/RCDATA insertion-context review",
+      "inputSha256": "dd8803a078bcfaf21ad3a13fc682a97b505a106beac6e98aee29c7da454f5192",
+      "perlSha256": "aa3e81ea53f1fe03d6c958fc4e334d5c2a951beddae8c4abc1624610957a4530",
+      "perlBytes": 75,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "aa3e81ea53f1fe03d6c958fc4e334d5c2a951beddae8c4abc1624610957a4530",
+      "jsBytes": 75,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "malformed-table",
+      "source": "HTML parser repair under stock entry wrapper",
+      "inputSha256": "9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a",
+      "perlSha256": "9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a",
+      "perlBytes": 61,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "b7bf15c98a8c9e859007deab28646a853e7ea046897abec96bc2df98f86856ad",
+      "jsBytes": 90,
+      "category": "serialization",
+      "rationale": "The DOM tree inserts an implied tbody and closes omitted table elements; the same table cell text remains in order.",
+      "evidence": [
+        "Input malformed-table exercises implied table tree and close-token serialization; raw UTF-8 SHA-256 9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a.",
+        "Retained Perl 61 bytes SHA-256 9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a; reviewed TS 90 bytes SHA-256 b7bf15c98a8c9e859007deab28646a853e7ea046897abec96bc2df98f86856ad. Raw outputs remain in fixed corpus/review result; see CLEANER-POLICY.md and source case.",
+        "Synthetic six-engine browser-entry-reparse.mjs checks the exact reviewed 26-row output in document and entry-fragment contexts; actual rich route is qualified separately."
+      ]
+    },
+    {
+      "id": "malformed-form",
+      "source": "HTML parser repair under stock entry wrapper",
+      "inputSha256": "f85a915b3831f2f3523bfb20cc7cf3abe5193aa5dba5a81387e7a8629516f775",
+      "perlSha256": "7939949e678147637a6e9d3ead698b5dacdfddb16372885bfe7a5ebc8742c881",
+      "perlBytes": 153,
+      "kind": "failure",
+      "reason": "unsupported",
+      "jsSha256": null,
+      "jsBytes": null,
+      "category": "unsupported",
+      "rationale": "Nested form source markup has an unproved parser repair and action association; the whole input refuses before any partial form output.",
+      "evidence": [
+        "Input malformed-form exercises the nested form source repair boundary; raw UTF-8 SHA-256 f85a915b3831f2f3523bfb20cc7cf3abe5193aa5dba5a81387e7a8629516f775.",
+        "Retained Perl emitted 153 bytes SHA-256 7939949e678147637a6e9d3ead698b5dacdfddb16372885bfe7a5ebc8742c881; reviewed TS emitted no fragment. See CLEANER-POLICY.md named refusal/source audit and raw corpus input."
+      ]
+    },
+    {
+      "id": "reader-colors",
+      "source": "t/cleaner-event.t:102-132 reader color options",
+      "inputSha256": "fd581bcfe76aa473ef496c1ec1580bc5df9398e78fc6df294079546e182c66d7",
+      "perlSha256": "c60071203c6e59032f1677f723e116618214e9484cfffb47dac65565126214d7",
+      "perlBytes": 89,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "c60071203c6e59032f1677f723e116618214e9484cfffb47dac65565126214d7",
+      "jsBytes": 89,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    },
+    {
+      "id": "reader-colors-sizes-fonts",
+      "source": "t/cleaner-event.t:102-132 reader CSS options",
+      "inputSha256": "fd581bcfe76aa473ef496c1ec1580bc5df9398e78fc6df294079546e182c66d7",
+      "perlSha256": "f83bd10b2c31f43853b6df2eb0f602860a9e25cfabe3e8532da94d54b42469a0",
+      "perlBytes": 35,
+      "kind": "ok",
+      "reason": null,
+      "jsSha256": "f83bd10b2c31f43853b6df2eb0f602860a9e25cfabe3e8532da94d54b42469a0",
+      "jsBytes": 35,
+      "category": "exact",
+      "rationale": "The reviewed cleaner output is byte-identical to the retained Perl html_raw0 replay.",
+      "evidence": []
+    }
+  ]
+}
