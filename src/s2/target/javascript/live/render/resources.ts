@@ -75,11 +75,15 @@ function bundle(input: RenderInput, prefix: string, files: readonly string[]): s
 }
 export function resourceHead(input: RenderInput, base: string): string {
     const c = input.config;
+    // LJ::Web Site JSON hash order under the controlled PERL_HASH_SEED=0 /
+    // PERL_PERTURB_KEYS=0 oracle. Values are live source-derived public fields;
+    // another Perl hash seed can serialize these same fields in another order.
     const site = {
-        imgprefix: c.imgPrefix, siteroot: c.siteRoot, statprefix: c.statPrefix, iconprefix: c.userpicRoot,
-        currentJournalBase: base, currentJournal: input.journal.username, has_remote: 0,
-        ctx_popup: 1, ctx_popup_icons: 1, ctx_popup_userhead: 1, inbox_update_poll: 1,
-        media_embed_enabled: 1, esn_async: 1, user_domain: "", cmax_comment: 16000,
+        cmax_comment: 16000, statprefix: c.statPrefix, user_domain: "",
+        currentJournal: input.journal.username, iconprefix: c.userpicRoot, ctx_popup: 1,
+        imgprefix: c.imgPrefix, esn_async: 1, ctx_popup_userhead: 1, ctx_popup_icons: 1,
+        media_embed_enabled: 1, inbox_update_poll: 1, siteroot: c.siteRoot,
+        currentJournalBase: base, has_remote: 0,
     };
     return `
             <script type="text/javascript">
