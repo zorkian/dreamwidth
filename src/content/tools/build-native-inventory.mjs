@@ -101,11 +101,44 @@ for (const [filename, context, expected] of suites) {
     if (assertions.length !== expected) throw new Error(`TAP case count mismatch for ${filename}`);
     const sourceSha256 = sha(source);
     const logSha256 = sha(log);
+    const callsPath = `native-calls/${filename}.calls.jsonl`;
+    const callsFile = path.join(contentRoot, 'corpus', callsPath);
+    let capturedCalls = null;
+    const callByTap = new Map();
+    if (fs.existsSync(callsFile)) {
+        const callBytes = fs.readFileSync(callsFile);
+        const records = callBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse);
+        for (let index = 0; index < records.length; index++) {
+            const call = records[index];
+            if (call.suite !== filename || call.source !== sourcePath ||
+                call.callOrdinal !== index + 1 || !Number.isSafeInteger(call.beforeTap) ||
+                call.beforeTap < 0 || call.beforeTap > expected) {
+                throw new Error(`Native call provenance mismatch in ${callsPath}`);
+            }
+            for (const field of ['input', 'output']) {
+                if (call[`${field}Present`]) {
+                    const raw = Buffer.from(call[`${field}Base64`], 'base64');
+                    if (sha(raw) !== call[`${field}Sha256`]) {
+                        throw new Error(`Native ${field} bytes mismatch in ${callsPath}`);
+                    }
+                }
+            }
+            const nextTap = call.beforeTap + 1;
+            if (nextTap <= expected) {
+                const ordinals = callByTap.get(nextTap) || [];
+                ordinals.push(call.callOrdinal);
+                callByTap.set(nextTap, ordinals);
+            }
+        }
+        capturedCalls = { path: callsPath, sha256: sha(callBytes), count: records.length,
+            captureMethod: 'temporary #line-preserving wrapper; original TAP must match byte-for-byte' };
+    }
     const provenance = sourceText.includes('LiveJournal project owned and operated')
         ? 'inherited LiveJournal GPL notice' : 'Dreamwidth Perl-terms notice';
     output.suites.push({ source: sourcePath, sourceSha256, sourceLines: sourceLines.length,
         provenance, nativeContext: context, nativeLog: logPath, nativeLogSha256: logSha256,
-        mockLJTestLib: sourceText.includes('ljtestlib.pl'), sourceAssertionsOriginally: filename ===
+        mockLJTestLib: sourceText.includes('ljtestlib.pl'), capturedCalls,
+        sourceAssertionsOriginally: filename ===
             'cleaner-resource-loading.t' ? 8 : expected, runtimeAssertions: expected });
     for (let index = 0; index < assertions.length; index++) {
         const [, status, number, name = '', todo] = assertions[index];
@@ -116,6 +149,7 @@ for (const [filename, context, expected] of suites) {
             sourceLocationKind: ref.kind, nativeContext: caseContext(filename, name),
             nativePredicate: status, description: name, todo: todo || null,
             nativeTapLine: assertions[index][0], nativeLog: logPath,
+            nativeCallOrdinals: callByTap.get(index + 1) || [],
             replayContext: 'native-only-until-explicit-entry-html_raw0-replay' });
     }
 }
