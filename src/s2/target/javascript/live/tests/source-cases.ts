@@ -31,7 +31,7 @@ export const sourceCases: readonly {raw: string; perl: string; supported: boolea
     {
         "raw": "<p>x</p><head title=\"> <td>\"></head><p>kept</p>",
         "perl": "<p>x</p><p>kept</p>",
-        "supported": true
+        "supported": false
     },
     {
         "raw": "<p>x</p><body title=\"<td>incomplete",

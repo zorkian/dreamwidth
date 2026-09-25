@@ -18,8 +18,8 @@ import {eatenTags} from "./inventory";
 import type {LocateNode, SourceLocation} from "./cuts";
 
 type Span = readonly [number, number];
-const wrappers = new Set(["html", "head", "body"]);
-const scaffolding = new Set([...wrappers, "tbody", "colgroup"]);
+const wrappers = new Set(["html", "body"]);
+const scaffolding = new Set([...wrappers, "head", "tbody", "colgroup"]);
 const tableParts = new Set("table tbody thead tfoot tr td th caption colgroup col".split(" "));
 const rawtext = new Set(["textarea", "title", "script", "style", "iframe", "xmp", "noembed", "noframes", "plaintext"]);
 
@@ -28,6 +28,14 @@ const rawtext = new Set(["textarea", "title", "script", "style", "iframe", "xmp"
 // does not tokenize HTML, reconstruct markup or confer sanitation authority.
 export function auditSource(document: Document, source: string, documentUrl: string,
     locate: LocateNode, maxInputBytes: number): void {
+    // A body token implicitly ends HTML5 HEAD, but clean_event keeps eating
+    // until the source closes HEAD. Its covered start token alone proves no
+    // safe boundary for content moved into BODY. Metadata-only EOF is harmless.
+    const head = locate(document.head);
+    if (head?.startTag && !head.endTag && [...document.body.childNodes].some(node =>
+        node.nodeType === 1 || node.nodeType === 3 && /\S/.test(node.textContent ?? ""))) {
+        throw new UnsupportedContent();
+    }
     const covered: Span[] = [];
     const text: Span[] = [];
     const ignored: Span[] = [];
@@ -71,8 +79,7 @@ export function auditSource(document: Document, source: string, documentUrl: str
         const helper = new JSDOM(suffix, {url: documentUrl, includeNodeLocations: true,
             contentType: "text/html", virtualConsole: new VirtualConsole()});
         try {
-            const wrapper = tag === "html" ? helper.window.document.documentElement :
-                tag === "head" ? helper.window.document.head : helper.window.document.body;
+            const wrapper = tag === "html" ? helper.window.document.documentElement : helper.window.document.body;
             const start = (helper.nodeLocation(wrapper) as SourceLocation | null)?.startTag;
             if (wrapper.localName !== tag || !start || start.startOffset !== 0 ||
                 !Number.isSafeInteger(start.endOffset) || start.endOffset <= tag.length + 1 ||

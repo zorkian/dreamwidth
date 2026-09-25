@@ -172,7 +172,7 @@ Equivalent stray `b`, `div`, `span` and `ul` closes remain supported.
 
 An already identified document-wrapper start inside a gap/text range gets narrow
 maintained-JSDOM assistance: parse only the remaining range, require the first
-explicit html/head/body token at offset zero, obtain its exact quote-aware start
+explicit html/body token at offset zero, obtain its exact quote-aware start
 span, then continue detecting after that span. Do not exempt the whole gap. Thus a
 quoted `<td>` in a pasted BODY attribute is ignored, but a following real orphan
 `td` refuses. Helper documents use no scripts/resources and close in `finally`.
@@ -181,6 +181,16 @@ at most four times `maxInputBytes` (normally 256KiB). Exceeding either ceiling
 returns Unsupported before the next parse. The real-worker test supplies 48KiB
 of 8,000 BODY starts and requires typed Unsupported, not a timeout, then recovery.
 Original whole-worker deadline, output, heap and credential denials remain.
+
+HEAD is source-eaten, not a transparent wrapper. A discarded late head start in
+a gap or text span returns Unsupported, even when closed or containing only
+metadata. For an explicit leading HEAD, a parser-recorded start without an
+endTag cannot admit a BODY element or non-whitespace BODY text: HTML5 can move
+that content out of HEAD while retained Perl keeps eating it. Such inputs refuse
+before transformation. Closed metadata heads and unclosed metadata-only heads
+remain supported; comments and whitespace alone add no visible content. Tests
+retain exact leading/late native outputs, explicit html variants, quoted decoys,
+script/comment decoys and headless controls. No raw head parser or rewrite is used.
 
 Source-removed tags and document wrappers cannot prove formatting closure.
 Outside table scope, descendant source extents crossing an explicit retained
