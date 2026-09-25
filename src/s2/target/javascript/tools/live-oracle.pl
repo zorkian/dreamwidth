@@ -43,6 +43,7 @@ die "Comparison requires fixed Perl hash order at process start\n"
     || ($ENV{PERL_PERTURB_KEYS} // '') ne '0');
 die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
 die "Anonymous CAPTCHA is enabled\n" if $LJ::CAPTCHA_HCAPTCHA_SITEKEY;
+die "Unexpected local recent scrollback limit\n" unless $LJ::MAX_SCROLLBACK_LASTN == 100;
 my $u = LJ::load_user('s2js_slice3') or die "Missing marked journal\n";
 die "Unmarked journal\n" unless ($u->bio(1) // '') eq 's2-js-slice3 live dev v1';
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -92,6 +93,7 @@ die "Expected both owned entries in real HTTP response\n"
     unless $body =~ /Live sample 1/ && $body =~ /Live sample 2/;
 my $public = {
     canonicalAppOrigin => $origin,
+    listenOrigin => 'http://localhost:8081',
     siteRoot => $LJ::SITEROOT // '',
     statPrefix => $LJ::STATPREFIX // '',
     imgPrefix => $LJ::IMGPREFIX // '',
