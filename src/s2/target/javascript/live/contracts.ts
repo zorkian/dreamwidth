@@ -209,7 +209,7 @@ export interface RedirectAdmissionRequest {
 }
 
 export type RedirectAdmissionDecision =
-    | { readonly kind: "recent" } // continue normal anonymous recent-page policy
+    | { readonly kind: "recent"; readonly request: AnonymousRecentRequest }
     | { readonly kind: "reject" } // fixed safe response; no Location
     | { readonly kind: "redirect"; readonly status: 302 | 307; readonly location: string };
 
@@ -220,6 +220,8 @@ export type RedirectAdmissionDecision =
 // and admitted path/query only. The exact recent route continues ordinary policy,
 // and is never redirected as a rendering fallback.
 // Sol calls this before body parsing/logging and only applies the decision.
+// For recent, the server passes request unchanged to service.serve; Astra alone
+// parses and validates cookies, query and method. The server never reparses them.
 // POST controls require 307; no request body, local signing/DB secrets, I/O or
 // proxy enter this seam. Incoming cookies are untrusted admission input only.
 // Recheck the observed inventory after seeding before implementing either side.
