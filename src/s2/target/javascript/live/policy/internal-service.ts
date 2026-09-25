@@ -14,8 +14,11 @@
 
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AnonymousRecentService, AnonymousRecentServiceDeps, PerlComparisonInputs, LiveResult } from "../contracts";
+import type { AnonymousRecentRequest, AnonymousEntryRequest, AnonymousRecentService,
+    AnonymousRecentServiceDeps, PerlComparisonInputs, LiveResult } from "../contracts";
+import type {RenderPage} from "../render/types";
 import { approveSnapshot, USERNAME } from "./cohort";
+import {approveEntrySnapshot, validEntryId} from "./entry";
 import { Unsupported } from "./content";
 import { validateConfig, validateLimits } from "./config";
 import { formToken, parseUniqCookie } from "./token";
@@ -44,41 +47,47 @@ export async function buildService(deps: AnonymousRecentServiceDeps,
     const renderer = new Renderer(artifact, path + ".sandbox", {...deps.limits}, verifyRuntime(path));
     let closed = false;
     let active = 0;
+    async function serve(request: AnonymousRecentRequest | AnonymousEntryRequest, page: RenderPage): Promise<LiveResult> {
+        if (closed || active >= 2) return {ok: false, reason: "unavailable"};
+        active++;
+        try {
+            if (request.username !== USERNAME || !["GET", "HEAD"].includes(request.method)) throw new Unsupported();
+            let skip = 0, skipPresent = false;
+            if (page.kind === "recent") {
+                const recent = request as AnonymousRecentRequest;
+                skip = recent.skip; skipPresent = recent.skipPresent;
+                if (!Number.isSafeInteger(skip) || skip < 0 || skip > 200 ||
+                    typeof skipPresent !== "boolean" || (!skipPresent && skip !== 0)) throw new Unsupported();
+            } else if (!validEntryId(page.ditemid)) throw new Unsupported();
+            if (request.uniqCookie !== null) parseUniqCookie("ljuniq=" + request.uniqCookie);
+            const snapshot = await deps.repository.loadRawSnapshot(request.username);
+            if (snapshot === null) return {ok: false, reason: "not-found"};
+            const journal = page.kind === "entry" ? approveEntrySnapshot(snapshot, page.ditemid) : approveSnapshot(snapshot);
+            if (journal === null) return {ok: false, reason: "not-found"};
+            const nowSeconds = inputs.clock.nowSeconds();
+            const token = await formToken(deps.secretSource, inputs.random, nowSeconds, request.uniqCookie);
+            const html = await renderer.render({page, journal, config, skip, skipPresent, nowSeconds,
+                formChallenge: token.challenge, uniq: token.uniq, resourceTimes: resources});
+            const ready: LiveResult = {ok: true, html, setCookie: token.setCookie};
+            // This independent primary read is the authorization decision.
+            // Full HTML is already buffered. No async work follows success;
+            // the caller immediately enqueues this result. Later commits and
+            // network receipt are outside this bounded decision's guarantee.
+            if (!await deps.repository.revalidateFingerprint(snapshot)) return {ok: false, reason: "changed"};
+            if (closed) return {ok: false, reason: "unavailable"};
+            return ready;
+        } catch (error) {
+            const unsupported = error instanceof Unsupported ||
+                (error instanceof Error && error.name === "RepositoryError" &&
+                 (error as Error & {kind?: unknown}).kind === "unsupported");
+            return {ok: false, reason: unsupported ? "unsupported" : "unavailable"};
+        } finally {
+            active--;
+        }
+    }
     return {
-        async serve(request): Promise<LiveResult> {
-            if (closed || active >= 2) return {ok: false, reason: "unavailable"};
-            active++;
-            try {
-                if (request.username !== USERNAME || !["GET", "HEAD"].includes(request.method) ||
-                    !Number.isSafeInteger(request.skip) || request.skip < 0 || request.skip > 200 ||
-                    typeof request.skipPresent !== "boolean" || (!request.skipPresent && request.skip !== 0)) {
-                    throw new Unsupported();
-                }
-                if (request.uniqCookie !== null) parseUniqCookie("ljuniq=" + request.uniqCookie);
-                const snapshot = await deps.repository.loadRawSnapshot(request.username);
-                if (snapshot === null) return {ok: false, reason: "not-found"};
-                const journal = approveSnapshot(snapshot);
-                const nowSeconds = inputs.clock.nowSeconds();
-                const token = await formToken(deps.secretSource, inputs.random, nowSeconds, request.uniqCookie);
-                const html = await renderer.render({journal, config, skip: request.skip, skipPresent: request.skipPresent, nowSeconds,
-                    formChallenge: token.challenge, uniq: token.uniq, resourceTimes: resources});
-                const ready: LiveResult = {ok: true, html, setCookie: token.setCookie};
-                // This independent primary read is the authorization decision.
-                // Full HTML is already buffered. No async work follows success;
-                // the caller immediately enqueues this result. Later commits and
-                // network receipt are outside this bounded decision's guarantee.
-                if (!await deps.repository.revalidateFingerprint(snapshot)) return {ok: false, reason: "changed"};
-                if (closed) return {ok: false, reason: "unavailable"};
-                return ready;
-            } catch (error) {
-                const unsupported = error instanceof Unsupported ||
-                    (error instanceof Error && error.name === "RepositoryError" &&
-                     (error as Error & {kind?: unknown}).kind === "unsupported");
-                return {ok: false, reason: unsupported ? "unsupported" : "unavailable"};
-            } finally {
-                active--;
-            }
-        },
+        serve: request => serve(request, {kind: "recent"}),
+        serveEntry: request => serve(request, {kind: "entry", ditemid: request.ditemid}),
         async close(): Promise<void> {
             closed = true;
             await renderer.close();

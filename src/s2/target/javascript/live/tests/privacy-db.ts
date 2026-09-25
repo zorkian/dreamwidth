@@ -33,9 +33,9 @@ function helper(args: readonly string[], input?: string): void {
     });
 }
 interface Response {status: number; body: string; headers: IncomingHttpHeaders;}
-function request(port: number): Promise<Response> {
+function request(port: number, target = "/users/s2js_slice3/", method: "GET" | "HEAD" = "GET"): Promise<Response> {
     return new Promise((resolveResponse, reject) => {
-        const req = get({hostname: "127.0.0.1", port, path: "/users/s2js_slice3/",
+        const req = get({hostname: "127.0.0.1", port, path: target, method,
             headers: {Host: "localhost:8081"}}, response => {
             const parts: Buffer[] = [];
             response.on("data", part => parts.push(part));
@@ -47,15 +47,20 @@ function request(port: number): Promise<Response> {
         req.on("error", reject);
     });
 }
-function accepted(response: Response): void {
+function accepted(response: Response, head = false): void {
     assert.equal(response.status, 200);
     assert.equal(response.headers["cache-control"], "private, no-store");
-    assert.match(response.body, /<!DOCTYPE html/);
+    if (head) {
+        assert.equal(response.body, "");
+        assert.ok(Number(response.headers["content-length"]) > 0);
+    } else assert.match(response.body, /<!DOCTYPE html/);
     assert.ok(!response.body.includes("PRIVACY_PROBE_"));
 }
 
 async function main(): Promise<void> {
-    assert.ok(process.argv.length === 2 || (process.argv.length === 3 && process.argv[2] === "--recover"));
+    assert.ok(process.argv.length === 2 || (process.argv.length === 3 &&
+        ["--recover", "--entry"].includes(process.argv[2]!)));
+    const entryMode = process.argv[2] === "--entry";
     const config = JSON.parse(readFileSync("artifacts/live/public-config.json", "utf8")) as PublicAppConfig;
     const store = await MysqlLiveStore.open(JSON.parse(readFileSync("artifacts/live/mysql-readonly.json", "utf8")));
     let service: AnonymousRecentService | undefined;
@@ -74,8 +79,12 @@ async function main(): Promise<void> {
         }
         baseline = await store.loadRawSnapshot("s2js_slice3");
         assert.ok(baseline, "Seeded marked owner required");
+        const selected = baseline.entries.find(entry => entry.security === "public");
+        if (entryMode) assert.ok(selected, "Public entry required");
+        const target = entryMode ? `/users/s2js_slice3/${selected!.jitemid * 256 + selected!.anum}.html` :
+            "/users/s2js_slice3/";
         service = await createAnonymousRecentService({repository: store, secretSource: store,
-            artifact: {path: resolve("artifacts/live/stock.json")}, config,
+            artifact: {path: resolve(process.env.S2_LIVE_TEST_ARTIFACT || "artifacts/live/stock.json")}, config,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128}});
         app = createLiveApp(config, service);
         // Ephemeral loopback socket avoids colliding with an ordinary listener;
@@ -83,7 +92,11 @@ async function main(): Promise<void> {
         await app.listen({host: "127.0.0.1", port: 0});
         const address = app.server.address();
         assert.ok(address && typeof address !== "string");
-        accepted(await request(address.port));
+        const methods: readonly ("GET" | "HEAD")[] = entryMode ? ["GET", "HEAD"] : ["GET"];
+        const checkAccepted = async (): Promise<void> => {
+            for (const method of methods) accepted(await request(address.port, target, method), method === "HEAD");
+        };
+        await checkAccepted();
         const owner = baseline.owner;
         const primary = JSON.stringify({userid: owner.userid, fingerprint: baseline.fingerprint,
             fields: {status: owner.status, statusvis: owner.statusvis,
@@ -97,21 +110,24 @@ async function main(): Promise<void> {
             try {
                 helper(["--case", name]);
                 assert.equal(await store.revalidateFingerprint(baseline), false, name + " revokes baseline");
-                const response = await request(address.port);
-                assert.equal(response.status, 422, name);
-                assert.equal(response.body, "Unsupported journal state\n", name);
-                assert.equal(response.headers["content-type"], "text/plain; charset=utf-8", name);
-                assert.equal(response.headers["cache-control"], "private, no-store", name);
-                assert.equal(response.headers["set-cookie"], undefined, name);
-                assert.equal(response.headers.location, undefined, name);
-                assert.equal(response.headers["content-length"], String(Buffer.byteLength(response.body)), name);
+                for (const method of methods) {
+                    const response = await request(address.port, target, method);
+                    const label = name + ":" + method;
+                    assert.equal(response.status, 422, label);
+                    assert.equal(response.body, method === "HEAD" ? "" : "Unsupported journal state\n", label);
+                    assert.equal(response.headers["content-type"], "text/plain; charset=utf-8", label);
+                    assert.equal(response.headers["cache-control"], "private, no-store", label);
+                    assert.equal(response.headers["set-cookie"], undefined, label);
+                    assert.equal(response.headers.location, undefined, label);
+                    assert.equal(response.headers["content-length"], String(Buffer.byteLength("Unsupported journal state\n")), label);
+                }
             } finally {
                 // Recovery also accepts the saved intent with no mutation yet.
                 helper(["--restore"]);
             }
             assert.equal(await store.revalidateFingerprint(baseline), true, name + " restores exact raw baseline");
-            accepted(await request(address.port));
-            console.log("real HTTP privacy refusal and restoration: " + name);
+            await checkAccepted();
+            console.log("real HTTP privacy refusal and restoration: " + (entryMode ? "entry:" : "") + name);
         }
         // Emulate an interrupted test between mutation and the next HTTP call;
         // invoke the same explicit recovery command documented for operators.
