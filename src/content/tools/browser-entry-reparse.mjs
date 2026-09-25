@@ -23,12 +23,13 @@ const [resultsPath, assembledPath, resourcesPath, requiredMode] = process.argv.s
 if (!resultsPath) {
     throw new Error('usage: browser-entry-reparse.mjs <result-json> ' +
         '[actual-stock-page.html exact-resource-map.json ' +
-        '[--require-rich|--require-forged-cut]]');
+        '[--require-rich|--require-forged-cut|--stock-only]]');
 }
 if (Boolean(assembledPath) !== Boolean(resourcesPath)) {
     throw new Error('actual assembled page and exact resource map are required together');
 }
-if (requiredMode && (!['--require-rich', '--require-forged-cut'].includes(requiredMode)
+if (requiredMode && (!['--require-rich', '--require-forged-cut', '--stock-only']
+    .includes(requiredMode)
     || !assembledPath)) {
     throw new Error('required stock mode needs an assembled page and resource map');
 }
@@ -206,11 +207,37 @@ async function runPage(context, label, html, insertion,
                 globalCutTargets: [...document.querySelectorAll(
                     '.cutTagControls a[aria-controls]')].map(element =>
                     element.getAttribute('aria-controls')),
+                entryContents: [...document.querySelectorAll('div.entry-content')]
+                    .map(content => ({
+                        activeElements: content.querySelectorAll(
+                            'script,iframe,object,embed,svg,math').length,
+                        activeAttributes: [...content.querySelectorAll('*')]
+                            .flatMap(element => [...element.attributes]
+                                .filter(attribute => /^on/i.test(attribute.name) ||
+                                    ['srcdoc', 'ping'].includes(
+                                        attribute.name.toLowerCase()))
+                                .map(attribute => `${element.tagName}.${attribute.name}`)),
+                        unsafeLinks: [...content.querySelectorAll('a[href]')]
+                            .map(element => element.getAttribute('href'))
+                            .filter(href => /^\s*(?:javascript|vbscript|data|file):/i
+                                .test(href)),
+                    })),
             };
         });
         assert.equal(page.url(), pageUrl, `${label}: unexpected navigation`);
         if (stock) assert.ok(!dom.text.includes('HIDDEN-'),
             `${label}: hidden entry body reached the stock page`);
+        if (stock) {
+            assert.ok(dom.entryContents.length >= 2, `${label}: stock entries missing`);
+            for (const content of dom.entryContents) {
+                assert.equal(content.activeElements, 0,
+                    `${label}: active element in stock entry body`);
+                assert.deepEqual(content.activeAttributes, [],
+                    `${label}: active attribute in stock entry body`);
+                assert.deepEqual(content.unsafeLinks, [],
+                    `${label}: active navigation in stock entry body`);
+            }
+        }
         if (stock && dom.cutSpans.length) {
             assert.ok(dom.cutSpans.every(cut =>
                 /^span-cuttag_s2js_slice3_[1-9][0-9]*_[1-9][0-9]*$/.test(cut.id)),
@@ -307,7 +334,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                 const rawObservation = observations.at(-1);
                 assert.equal(rawObservation.sockets.length, enabled ? 1 : 0,
                     'raw websocket control must distinguish JS-on/off');
-                for (const input of manifest.cases) {
+                for (const input of requiredMode === '--stock-only' ? [] : manifest.cases) {
                     const row = rows.get(input.id);
                     if (row.kind !== 'ok') continue;
                     for (const insertion of input.reparse) {

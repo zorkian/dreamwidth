@@ -15,9 +15,13 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Content package
 
-This package is independent of S2, the HTTP server, and the database. Its source
-and policy API are owned separately from the build and corpus tooling. It parses
-untrusted entry HTML only inside the bounded, credential-free stock render child.
+This reusable package is independent of S2, the HTTP server, and the database.
+The stock renderer imports it only inside the bounded, credential-free child.
+The [policy inventory](../s2/target/javascript/live/tests/CLEANER-POLICY.md)
+records supported entry markup and explicit refusals. The separate
+[image qualification](../s2/target/javascript/live/tests/IMAGE-QUALIFICATION.md)
+uses synthetic proxy credentials; ordinary serving requires an unconfigured
+image proxy.
 
 The pinned qualification runtime is Node 24.21.0. Verify the official signed
 release list and Linux x64 archive hash with `tools/bootstrap-node24.sh` inside
@@ -29,11 +33,10 @@ PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts
 PATH=/opt/dw-node24/bin:$PATH npm run build
 ```
 
-The S2 TypeScript package consumes only the built content contracts while
-compiling. Its local development dependency resolves this package through the
-checked-in relative path; the render worker receives a separate closed runtime
-from `stage-runtime.mjs`. From the repository root, install and build the
-content contracts before checking S2 package resolution:
+The S2 TypeScript package consumes the built content contracts while compiling.
+Its local development dependency resolves this package through the checked-in
+relative path; the render worker receives a separate closed runtime from
+`stage-runtime.mjs`. From the repository root, build in this order:
 
 ```sh
 cd src/content
@@ -41,18 +44,6 @@ PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
 PATH=/opt/dw-node24/bin:$PATH npm run build
 cd ../s2/target/javascript
 PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
-PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc \
-  --strict --target ES2022 --module Node16 --moduleResolution Node16 \
-  --types node --noEmit --esModuleInterop --noUncheckedIndexedAccess \
-  live/contracts.ts live/server/app.test.ts
-```
-
-That targeted check qualifies the real package declaration and subpath import
-before the shared cleaner and S2 fixtures have both cleared review. After the
-reviewed cleaner, adapter and `live/tests/fixtures.ts` are assembled, run the
-full package build and page checks from the S2 package directory:
-
-```sh
 PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc --noEmit
 PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc
 PATH=/opt/dw-node24/bin:$PATH npm run check:page
@@ -75,8 +66,9 @@ This probe installs the lockfile into a disposable closed root, loads DOMPurify,
 jsdom and CSS Tree through the original seccomp launcher with a 128 MiB heap
 and ten-second bound, and checks the original credential, write, child, worker
 and socket denials. The only production `@types` package is DOMPurify's
-`trusted-types`; Playwright and native canvas are absent. It is dependency
-qualification, not a claim that the cleaner policy or stock worker is complete.
+`trusted-types`; Playwright and native canvas are absent. This is dependency
+qualification; the live route and browser checks below exercise the assembled
+worker.
 
 Runtime dependencies are exactly pinned in `package.json` and locked transitively
 in `package-lock.json`. Playwright and TypeScript are development dependencies;
@@ -84,7 +76,7 @@ the render child must not read them. The S2 CLI and output paths remain under
 `src/s2/target/javascript/dist`.
 
 `tools/stage-runtime.mjs` builds an artifact-relative closed runtime directory
-once the shared cleaner and stock worker implementations have been compiled.
+after compiling the shared cleaner and stock worker.
 Given absolute compiled stock artifact path `A`, it writes
 `A.runtime/manifest.json`, with the worker at
 `A.runtime/app/dist/live/render/worker.js`. It copies only enumerated compiled
@@ -105,7 +97,7 @@ writable for this bounded cleanup. The published stage remains `0555`/`0444`.
 The CLI takes only the absolute artifact
 path, never a caller supplied runtime root or source override.
 
-The synthetic mechanics test runs before the real worker source is available:
+The synthetic packaging test checks the stage boundary independently:
 
 ```sh
 /opt/dw-node24/bin/node tests/stage-runtime.test.mjs \
@@ -119,27 +111,25 @@ uniform owner, and runs the same worker as an ordinary non-root user. Root and
 uid 65534 repeat builds leave no backup directories; the manifest is byte
 identical on rebuild, and an unlisted symlink blocks replacement. Its result
 qualifies the packaging boundary, not S2 rendering or sanitizer behavior.
-The real stage still needs the reviewed compiled `dist/index.js` and updated
-stock worker, followed by full artifact/manifest/worker route tests.
 
 Browser availability can be checked with `tools/qualify-browsers.mjs` after
 installing the pinned Playwright browser binaries and OS dependencies. It
 intercepts one synthetic document and one synthetic image in each Chromium,
-Firefox and WebKit JS-on/off mode. The actual assembled stock output and
-security corpus need their own browser harness.
+Firefox and WebKit JavaScript on/off mode. The actual assembled stock output
+and security corpus use the checks below.
 
 `tools/browser-entry-reparse.mjs` accepts a 26-row cleaner result JSON. It
 checks the IDs against `corpus/entry-replay-cases.json` and checks each output
-against its own digest. The corpus has no pinned TypeScript output digests;
-this harness alone does not authenticate the cleaner build or approve a
-difference category. It tests each admitted output in both recorded document
-and `div.entry-content` contexts
-across all six installed browser modes. A raw control must execute only with
+against its own digest. The accepted per-case bytes and categories are checked
+separately by `tools/check-difference-ledger.mjs`; a browser input alone cannot
+authenticate a cleaner build. The browser tool tests each admitted output in
+both document and `div.entry-content` contexts across all six installed browser
+modes. A raw control must execute only with
 JavaScript enabled and must hit the denied image/WebSocket traps. Browser
 service workers are blocked, every request is intercepted, and only enumerated
-synthetic image URLs are served. Four named ambiguous cut/rawtext cases must
-remain explicit refusals. This run is a fragment/reparse check, not an actual
-stock page check.
+synthetic image URLs are served. Five named ambiguous cut/rawtext/form cases
+must remain explicit refusals. This run is a fragment/reparse check; the
+separate stock-page modes use actual route output.
 
 For the assembled check, supply the **actual TS route response bytes** and an
 exact public-resource map. Capture only the public resources referenced by
@@ -163,14 +153,15 @@ deliberate cut click receives a fixed unsupported 400 in the synthetic browser
 route, leaving hidden text absent. The real TS route's unsupported RPC response
 is checked separately by the live HTTP harness.
 
-Example, from `src/content` in the owning devcontainer:
+Example, from `src/content` in the owning devcontainer after generating the
+reviewed 26-row results as shown in [the corpus guide](corpus/README.md):
 
 ```sh
 /opt/dw-node24/bin/node tools/capture-browser-resources.mjs \
     ../s2/target/javascript/artifacts/live/page-ts.html \
     /tmp/slice4-stock-resources.json /img/controlstrip/bg-dark.gif
 /opt/dw-node24/bin/node tools/browser-entry-reparse.mjs \
-    /tmp/slice4-reviewed-cleaner-results.json \
+    /tmp/slice4-synthetic-results.json \
     ../s2/target/javascript/artifacts/live/page-ts.html \
     /tmp/slice4-stock-resources.json > /tmp/slice4-browser-report.json
 ```
@@ -184,13 +175,13 @@ harness mechanics and resource wiring only. The browser report labels its
 candidate and page as caller-supplied, unverified inputs; it never marks source
 review or live-route acceptance. For acceptance, capture fresh actual TS route
 responses for both variants, generate cleaner results from the exact reviewed
-build, and verify them against a separately reviewed per-case difference ledger.
+build, and verify them against the pinned per-case difference ledger.
 A self-consistent JSON file is insufficient.
 Browser process telemetry and DNS outside intercepted page requests are not
 claimed by this test.
 
-To reproduce **browser mechanics only** before an actual Slice4 route is
-available, build two labeled synthetic assemblies from the preserved Slice3
+To reproduce **browser mechanics only**, build two labeled synthetic assemblies
+from the preserved Slice3
 stock page. This builder supplies literal test cut markup and inert images; it
 does not use or qualify cleaner output. From `src/content` in the owning
 devcontainer, with the retained local app running:
@@ -221,10 +212,18 @@ done
 
 `/tmp/slice4-cleaner-results.json` is a local 26-row comparison input for the
 fragment checks. Both reports remain mechanics-only even if all six browser
-modes pass; final acceptance uses reviewed cleaner results and actual TS route
-pages for both normal-helper entry variants.
+modes pass. For the actual route, `node dist/tools/check-cleaner.js` in the S2
+package creates and restores one exact marked post, records six live variants,
+and saves rich and forged full pages under `artifacts/live/`. Capture their
+exact public resources, then run the two required modes against those bytes.
+`--stock-only` checks a full stock page without replaying all 26 fragments;
+the three migrated legacy-content probes use it with their actual saved pages.
 
 The original `t/cleaner*.t` source suites remain unmodified. `corpus/` records
 their source contexts, provenance, and assertion counts. Native Perl behavior is
 the compatibility oracle; browser execution and resource checks are separate
 security evidence. A source case is never dropped to make the new cleaner pass.
+The [corpus guide](corpus/README.md) covers all 1,116 native TAP assertions,
+384 source-derived entry replays, their accepted ledger and the 219-case native
+browser matrix. The [S2 live guide](../s2/target/javascript/SLICE-4.md) gives
+the complete route, recovery and browser sequence.
