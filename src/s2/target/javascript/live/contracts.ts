@@ -198,31 +198,37 @@ export interface PublicAppConfig {
     readonly anonymousCaptchaDisabled: true;
 }
 
-export interface AppRedirectRequest {
+export interface RedirectAdmissionRequest {
     readonly method: string;
-    readonly rawUrl: string; // original path/query before decoding; never a body
+    readonly rawTarget: string; // original path/query before decoding; never a body
     readonly host: string;
     readonly origin: string | null;
     readonly hasForwardedHeaders: boolean;
     readonly hasAuthorization: boolean;
+    readonly cookieHeader: string | null; // admission only; never log or render
 }
 
-export type AppRedirectDecision =
+export type RedirectAdmissionDecision =
     | { readonly kind: "recent" } // continue normal anonymous recent-page policy
     | { readonly kind: "reject" } // fixed safe response; no Location
     | { readonly kind: "redirect"; readonly status: 302 | 307; readonly location: string };
 
-// Astra policy/redirects.ts exports decideAppRedirect: pure synchronous admission
-// of the finite method/path/query inventory observed in the pinned slice3 page.
-// Astra validates Host/Origin/auth/forwarded headers and rejects ambiguous paths,
+// Pure synchronous admission of the finite method/path/query inventory observed
+// in the pinned slice3 page. Astra validates Host/Origin/cookie/auth/forwarded
+// headers and rejects ambiguous paths,
 // arbitrary destinations and unknown requests. Location uses canonicalAppOrigin
 // and admitted path/query only. The exact recent route continues ordinary policy,
-// including cookie admission; it is never redirected as a rendering fallback.
+// and is never redirected as a rendering fallback.
 // Sol calls this before body parsing/logging and only applies the decision.
-// POST controls require 307; no request body, secrets, I/O or proxy enter this seam.
+// POST controls require 307; no request body, local signing/DB secrets, I/O or
+// proxy enter this seam. Incoming cookies are untrusted admission input only.
 // Recheck the observed inventory after seeding before implementing either side.
-export type DecideAppRedirect =
-    (request: AppRedirectRequest, config: PublicAppConfig) => AppRedirectDecision;
+export type RedirectAdmission =
+    (request: RedirectAdmissionRequest) => RedirectAdmissionDecision;
+
+// Astra policy/redirects.ts exports createRedirectAdmission. Sol's earliest hook
+// delegates all admission to this policy; it does not duplicate the allowlist.
+export type CreateRedirectAdmission = (config: PublicAppConfig) => RedirectAdmission;
 
 export interface CompiledStockArtifact {
     // Local source-derived artifact, read/validated once at service creation;
