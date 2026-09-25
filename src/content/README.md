@@ -29,6 +29,21 @@ PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts
 PATH=/opt/dw-node24/bin:$PATH npm run build
 ```
 
+The S2 TypeScript package consumes only the built content contracts while
+compiling. Its local development dependency resolves this package through the
+checked-in relative path; the render worker receives a separate closed runtime
+from `stage-runtime.mjs`. From the repository root, build in this order:
+
+```sh
+cd src/content
+PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
+PATH=/opt/dw-node24/bin:$PATH npm run build
+cd ../s2/target/javascript
+PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
+PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc --noEmit
+PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc
+```
+
 The bootstrap pins the official release keyring, signed release checksum,
 archive digest and extracted executable digest. The container's system Node 20
 remains available for earlier S2 checks. Node 24 uses `--permission` for the
