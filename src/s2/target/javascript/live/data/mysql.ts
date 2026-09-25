@@ -50,7 +50,7 @@ const PUBLIC_SETTINGS = [
 
 const GLOBAL_TABLES = [
     "user", "useridmap", "userprop", "userproplist", "s2styles", "s2layers",
-    "s2compiled", "s2source_inno", "logproplist", "secrets",
+    "s2compiled", "s2source_inno", "logproplist", "secrets", "sysban",
 ] as const;
 const CLUSTER_TABLES = [
     "userbio", "userproplite2", "userpropblob", "s2stylelayers2",
@@ -309,7 +309,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         const { entries, rawText } = await this.loadEntries(
             connection, ownerId, logRows, itemIds, rawFields,
         );
-        const features = await this.loadFeatures(connection, ownerId);
+        const features = await this.loadFeatures(connection, ownerId, username);
         const rawFieldBytes = rawFields.reduce((sum, field) =>
             sum + (field[1].length + field[2].length) / 2, 0);
         if (rawFieldBytes > 2097152) unsupported();
@@ -586,7 +586,19 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         return { entries, rawText };
     }
 
-    private async loadFeatures(connection: Connection, ownerId: number): Promise<RawFeatureCounts> {
+    private async loadFeatures(
+        connection: Connection, ownerId: number, username: string,
+    ): Promise<RawFeatureCounts> {
+        // Count every exact matching row, including inactive and expired bans.
+        // The table uses a case-insensitive collation, so both predicates must
+        // compare bytes. No administrative row or note leaves this transaction.
+        const banRows = (await sql<Row>`
+            SELECT COUNT(*) AS matching_rows FROM dw_global.sysban
+            WHERE BINARY what = BINARY ${"spamreport"}
+                AND BINARY value = BINARY ${username}
+        `.execute(connection)).rows;
+        if (banRows.length !== 1) unsupported();
+        const spamreportBans = number(banRows[0]?.matching_rows);
         const rows = (await sql<Row>`
             SELECT
                 (SELECT COUNT(*) FROM dw_cluster01.usertags WHERE journalid = ${ownerId}) AS usertags,
@@ -601,6 +613,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         if (rows.length !== 1) unsupported();
         const row = rows[0]!;
         return {
+            spamreportBans,
             usertags: number(row.usertags), userkeywords: number(row.userkeywords),
             logtags: number(row.logtags), logtagsrecent: number(row.logtagsrecent),
             logkwsum: number(row.logkwsum), links: number(row.links),
