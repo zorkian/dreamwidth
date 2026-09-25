@@ -28,11 +28,12 @@ use File::Temp qw(tempfile);
 use HTML::Parser;
 use HTTP::Request::Common;
 use JSON::PP;
+use LJ::Entry;
 use LJ::Web;
 use Plack::Test;
 
 my ($origin, $outdir, @options) = @ARGV;
-my ($comparison, $cookie_value, $skip, $cohort_variant);
+my ($comparison, $cookie_value, $skip, $cohort_variant, $entry_ditemid);
 while (@options) {
     my $option = shift @options;
     if ($option eq '--comparison' && !$comparison && @options) {
@@ -47,13 +48,21 @@ while (@options) {
     elsif ($option eq '--cohort-variant' && !$cohort_variant) {
         $cohort_variant = 1;
     }
+    elsif ($option eq '--entry' && !defined $entry_ditemid && @options) {
+        $entry_ditemid = shift @options;
+        die "Invalid canonical entry ID\n"
+            unless $entry_ditemid =~ /^[1-9][0-9]{0,9}$/
+            && $entry_ditemid <= 4294967295;
+    }
     else {
         die "Invalid oracle option\n";
     }
 }
-die "Usage: perl tools/live-oracle.pl http://localhost:<app-port> <existing-output-dir> [--comparison <ljuniq-value>] [--skip 0..200] [--cohort-variant]\n"
+die "Usage: perl tools/live-oracle.pl http://localhost:<app-port> <existing-output-dir> [--comparison <ljuniq-value>] [--skip 0..200] [--cohort-variant] [--entry <canonical-ditemid>]\n"
     unless defined $origin && defined $outdir
     && $origin =~ m!^http://localhost:\d{1,5}$! && -d $outdir;
+die "Entry oracle cannot use recent-only options\n"
+    if defined $entry_ditemid && (defined $skip || $cohort_variant);
 my ($comparison_uniq) = $comparison
     ? ($cookie_value =~ /^([A-Za-z0-9]{15}):1790294400:[A-Za-z0-9]+$/)
     : ();
@@ -95,10 +104,21 @@ $parser->eof;
 die "Missing placeholder image\n" unless $placeholder_count == 1 && $placeholder->{src};
 my $u = LJ::load_user('s2js_slice3') or die "Missing marked journal\n";
 die "Unmarked journal\n" unless ($u->bio(1) // '') eq 's2-js-slice3 live dev v1';
+if (defined $entry_ditemid) {
+    # The retained /users/ controller supplies ljentry and skips a downstream
+    # anum guard. Verify the intended stored identity before using its output
+    # as an oracle; the serving policy deliberately returns 404 for bad anums.
+    my $entry = LJ::Entry->new($u, ditemid => $entry_ditemid);
+    die "Entry oracle ID does not identify a public stored entry\n"
+        unless $entry && $entry->valid && $entry->correct_anum
+        && $entry->journalid == $u->id && $entry->security eq 'public'
+        && $entry->ditemid == $entry_ditemid;
+}
 my $app = do "$ENV{LJHOME}/app.psgi";
 die "Cannot load real Plack app: $@\n" unless ref $app eq 'CODE';
 my $page_url = "$origin/users/s2js_slice3/"
-    . (defined $skip ? "?skip=$skip" : '');
+    . (defined $entry_ditemid ? "$entry_ditemid.html"
+        : defined $skip ? "?skip=$skip" : '');
 
 my $response;
 if ($comparison) {
@@ -143,9 +163,15 @@ $body = Encode::encode('UTF-8', $body) if Encode::is_utf8($body);
 die "Unexpected marked journal HTTP response\n"
     unless $body =~ /S2 slice 3 fixture/;
 if (!$cohort_variant && !defined $skip) {
-    die "Baseline seed entries absent from retained HTTP response\n"
-        unless $body =~ /Live sample 1 caf\xC3\xA9/
-        && $body =~ /Live sample 2 \xF0\x9F\x98\x80/;
+    if (defined $entry_ditemid) {
+        die "Retained entry canonical identity differs\n"
+            unless $body =~ m!<link rel="canonical" href="\Q$origin\E/~s2js_slice3/\Q$entry_ditemid\E\.html"!;
+    }
+    else {
+        die "Baseline seed entries absent from retained HTTP response\n"
+            unless $body =~ /Live sample 1 caf\xC3\xA9/
+            && $body =~ /Live sample 2 \xF0\x9F\x98\x80/;
+    }
 }
 my $public = {
     canonicalAppOrigin => $origin,
@@ -188,6 +214,7 @@ my $metadata = {
     skip => defined $skip ? 0 + $skip : 0,
     cohort_variant => $cohort_variant ? JSON::PP::true : JSON::PP::false,
 };
+$metadata->{entry_ditemid} = 0 + $entry_ditemid if defined $entry_ditemid;
 if ($comparison) {
     $metadata->{comparison_time} = 1790294400;
     $metadata->{comparison_uniq} = $comparison_uniq;
