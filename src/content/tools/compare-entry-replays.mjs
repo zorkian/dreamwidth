@@ -67,7 +67,7 @@ const buildSha256 = sha(Buffer.from(JSON.stringify(compiled)));
 const lockSha256 = sha(fs.readFileSync(path.join(root, 'package-lock.json')));
 const { createEntryCleaner } = require(modulePath);
 assert.equal(typeof createEntryCleaner, 'function');
-const limits = { maxInputBytes: 65536, maxOutputBytes: 65536, maxNodes: 4096,
+const limits = { maxInputBytes: 65536, maxOutputBytes: 2097152, maxNodes: 4096,
     maxDepth: 16, maxCssBytes: 65536, maxCssNodes: 4096,
     maxImageCandidates: 256, maxCuts: 16 };
 const cleaner = createEntryCleaner(limits);
