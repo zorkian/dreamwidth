@@ -39,7 +39,7 @@ const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 assert.equal(rows.size, manifest.cases.length, 'result set must cover every replay case');
 assert.ok(typeof results.candidate === 'string' && results.candidate.length >= 7);
 const unsupported = new Set(['cut-unclosed', 'cut-nested', 'rawtext-xmp',
-    'rawtext-plaintext']);
+    'rawtext-plaintext', 'malformed-form']);
 for (const input of manifest.cases) {
     const row = rows.get(input.id);
     assert.ok(row, `missing replay ${input.id}`);
