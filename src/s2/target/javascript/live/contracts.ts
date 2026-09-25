@@ -216,13 +216,13 @@ export type RedirectAdmissionDecision =
     | { readonly kind: "redirect"; readonly status: 302 | 307; readonly location: string };
 
 // Pure synchronous admission of the finite method/path/query inventory observed
-// in the pinned slice3 page. Astra validates Host/Origin/cookie/auth/forwarded
-// headers and rejects ambiguous paths,
+// in the pinned slice3 page. The admission policy validates Host/Origin/cookie/
+// auth/forwarded headers and rejects ambiguous paths,
 // arbitrary destinations and unknown requests. Location uses canonicalAppOrigin
 // and admitted path/query only. The exact recent route continues ordinary policy,
 // and is never redirected as a rendering fallback.
-// Sol calls this before body parsing/logging and only applies the decision.
-// For recent, the server passes request unchanged to service.serve; Astra alone
+// The server calls this before body parsing/logging and only applies the decision.
+// For recent, the server passes request unchanged to service.serve; admission alone
 // parses and validates cookies, query and method. The server never reparses them.
 // POST controls require 307; no request body, local signing/DB secrets, I/O or
 // proxy enter this seam. Incoming cookies are untrusted admission input only.
@@ -230,8 +230,8 @@ export type RedirectAdmissionDecision =
 export type RedirectAdmission =
     (request: RedirectAdmissionRequest) => RedirectAdmissionDecision;
 
-// Astra policy/redirects.ts exports createRedirectAdmission. Sol's earliest hook
-// delegates all admission to this policy; it does not duplicate the allowlist.
+// policy/redirects.ts exports createRedirectAdmission. The server's earliest hook
+// delegates all admission to this module; it does not duplicate the allowlist.
 export type CreateRedirectAdmission = (config: PublicAppConfig) => RedirectAdmission;
 
 export interface CompiledStockArtifact {
@@ -272,14 +272,14 @@ export interface PerlComparisonInputs {
     readonly random: ComparisonRandom;
 }
 
-// Astra policy/service.ts exports createAnonymousRecentService with this type.
+// policy/service.ts exports createAnonymousRecentService with this type.
 // It always obtains clock and cryptographic entropy internally from live system
-// sources. Sol's ordinary server imports only this factory; no comparison flag,
+// sources. The ordinary server imports only this factory; no comparison flag,
 // environment toggle, HTTP parameter or config value selects a frozen source.
 export type CreateAnonymousRecentService =
     (deps: AnonymousRecentServiceDeps) => Promise<AnonymousRecentService>;
 
-// Astra policy/comparison.ts exports createComparisonRecentService with this
+// policy/comparison.ts exports createComparisonRecentService with this
 // type. Only offline check-live harness imports that separate entrypoint.
 export type CreateComparisonRecentService =
     (deps: AnonymousRecentServiceDeps, inputs: PerlComparisonInputs) =>
