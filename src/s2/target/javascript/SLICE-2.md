@@ -44,14 +44,19 @@ The preparer requires `IS_DEV_SERVER`, `IS_DEV_CONTAINER`, and local database
 name `S2 slice 2 fixture`, email `s2js-slice2@example.invalid`, bio marker
 `s2-js-slice2 fixture v1`, and two public entries on 2026-09-24 at 11:00 and
 12:00 UTC. Each entry has subject `Sample N & text` and body
-`<p>Fixture N: café &amp; tea 😀</p>`. Existing marked partial setup is
-repaired through normal app helpers; unmarked collisions and unexpected entry
-content fail. The owned variant changes only entry 1 body to
+`<p>Fixture N: café &amp; tea 😀</p>`. A marked account with missing posts or
+display name is repaired through normal app helpers. An unmarked username
+collision, a marked style with the wrong layer stack, and unexpected entry
+content fail. The account creation gap before its bio marker is set is
+deliberately not guessed from email or name. The owned variant changes only
+entry 1 body to
 `<p>Fixture 1 variant: café &amp; tea 😀</p>` through `editevent`, regenerates
 the real Perl HTTP oracle, then restores the baseline through `editevent`.
 The harness has a separate finally restore, plus an initial recovery step for
 an interrupted prior run. Recovery accepts only that exact temporary body;
 it safely skips a missing account or first sample so partial seed can proceed.
+The kill probe waits for a post-edit marker, independently confirms the
+variant in the local DB, kills that script, and verifies baseline recovery.
 
 Seed writes use the real clock. The GET request clock is frozen to
 2026-09-25T00:00:00Z. `PERL_HASH_SEED=0` and `PERL_PERTURB_KEYS=0` fix Perl
@@ -69,7 +74,10 @@ same database.
 `artifacts/page/baseline/page-input.json` is schema 1, JavaScript ABI 1.
 `provenance` records base `aa0f7f1fc3a1cbb897e5f62954d78c3930c35313`,
 ordered source paths, hashes, layer names and resolved IDs, fixed GET request,
-clock, seed version, and baseline/owned-body variant. `graph` records prepared
+clock, seed version, and baseline/owned-body variant. `input_freeze` records
+both Perl hash environment values and the exact
+anonymous-GET form-auth cache value and scope; exporter and renderer reject
+missing or changed values. `graph` records prepared
 S2 hashes and arrays as numbered nodes with `$ref` aliases, plus `root` and
 `properties` references. Typed S2 objects retain `_type`, null members, and
 their prepared fields. The page is `RecentPage` with two `Entry` objects.
@@ -84,7 +92,10 @@ script resource tags from `LJ::S2::get_script_tags`, quickreply fragment from
 metadata from `user_link_bar`, empty visible-tag count from `LJ::Tags`,
 image objects from `LJ::S2::Image_std`, day counts and one calendar month from
 `LJ::S2::get_journal_day_counts` and `LJ::S2::YearMonth`, and app permission
-decisions for controls and links. The footer records the actual results of
+decisions for controls and links. It records `$LJ::SITEROOT` for entry links
+and the exact stock stylesheet URL and allow decision from
+`LJ::valid_stylesheet_url`. Other stylesheet URLs fail. The footer records the
+actual results of
 `insert_html_before_body_close`, `insert_html_before_journalctx_body_close`,
 and `LJ::PageStats::render`; the two hooks must be empty for this fixture.
 The renderer inserts that named footer before the first `</body>`, matching
@@ -98,15 +109,22 @@ formatters, `EntryLite__formatted_subject`, `Entry__get_link` and reply
 printers, `Page__get_latest_month`/control strip/script tags/visible tag list,
 `UserLite__equals`/get_link/ljuser, `alternate`, `clean_css_classname`,
 `ehtml`, `get_image`, `get_page`, `get_plural_phrase`, `string__contains`,
-`striphtml`, `weekdays`, and the ten viewer flag functions. An unmeasured
+`striphtml`, `weekdays`, and the nine viewer flag functions. An unmeasured
 capability fails explicitly. The page's trusted `print safe` chunks use a
-small serializer for the observed HTMLCleaner behavior: normalize quoted
-attributes, escape embedded quotes and ampersands, trim trailing tag space,
-and omit comments. Unsupported attribute entities and multiline values fail.
+small serializer for the observed HTMLCleaner behavior: escape text angles,
+normalize quoted attributes and tag case, escape embedded quotes and
+ampersands, trim trailing tag space, and omit comments. The one reached
+`font-size: smaller;` style is checked against the retained cleaner.
+Event handlers, scripts, unsafe URLs, unvalidated stylesheets, unsupported
+entities, and other unported forms fail explicitly.
 This adapter is scoped to trusted local fixtures and is not a general HTML
 sanitizer. Slice 1 retains its own safe-print behavior and byte-oriented
 string length semantics; S2 substring remains codepoint based as required by
 the retained Perl source helper.
+The plain formatted-subject and reply-link paths reject values whose Perl
+cleaning or option branches are outside the measured domain. Hash foreach
+order outside this page is unsupported because JS object key order differs
+from Perl's seeded hash iteration.
 
 ## Evidence and limits
 

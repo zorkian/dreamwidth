@@ -131,9 +131,15 @@ export const runtime = {
 };
 
 // The real HTMLCleaner receives only S2 `print safe` chunks. For the pinned
-// trusted page, its reached serialization rules are attribute quote
-// canonicalization, removal of trailing tag space, and omission of comments.
-export function cleanTrustedSafeChunk(input: string): string {
+// trusted page, its reached serialization rules are text angle escaping,
+// attribute quote canonicalization, trailing-tag-space removal, and omitted
+// comments. Unported cleaner decisions must fail instead of passing through.
+export interface TrustedStylesheet {
+    href: string;
+    decision: number;
+}
+
+export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesheet): string {
     let output = "";
     for (let index = 0; index < input.length;) {
         if (input.startsWith("<!--", index)) {
@@ -143,8 +149,12 @@ export function cleanTrustedSafeChunk(input: string): string {
             continue;
         }
         if (input[index] !== "<" || !/[A-Za-z/!]/.test(input[index + 1] ?? "")) {
-            output += input[index++];
+            const char = input[index++]!;
+            output += char === "<" ? "&lt;" : char === ">" ? "&gt;" : char;
             continue;
+        }
+        if (input[index + 1] === "!") {
+            throw new Error("Unsupported safe HTML declaration");
         }
         let cursor = index + 1;
         let quote = "";
@@ -157,6 +167,8 @@ export function cleanTrustedSafeChunk(input: string): string {
                     quote = "";
                 } else if (char === '"' && quote === "'") {
                     tag += "&quot;";
+                } else if (char === "'" && quote === '"') {
+                    tag += "&#39;";
                 } else if (char === "&") {
                     const rest = input.slice(cursor);
                     const entity = /^&(?:amp|quot|lt|gt|#[0-9]+|#x[0-9a-fA-F]+);/.exec(rest);
@@ -170,6 +182,8 @@ export function cleanTrustedSafeChunk(input: string): string {
                     }
                 } else if (char === "<") {
                     tag += "&lt;";
+                } else if (char === ">") {
+                    tag += "&gt;";
                 } else if (char === "\n" || char === "\r") {
                     throw new Error("Unsupported multiline safe HTML attribute");
                 } else {
@@ -185,6 +199,53 @@ export function cleanTrustedSafeChunk(input: string): string {
             }
         }
         if (cursor >= input.length || quote) throw new Error("Unclosed safe HTML tag");
+        const original = input.slice(index, cursor + 1);
+        const head = /^<(\/?)([A-Za-z][A-Za-z0-9:-]*)/.exec(original);
+        if (!head) throw new Error("Unsupported safe HTML tag");
+        const name = head[2]!.toLowerCase();
+        if (/^(script|object|iframe|applet|embed|param|style)$/.test(name) ||
+            /^(?:g|fb):/.test(name)) {
+            throw new Error(`Unsupported safe HTML element ${name}`);
+        }
+        const rest = original.slice(head[0].length, -1);
+        if (head[1]) {
+            if (rest.trim() !== "") throw new Error("Unsupported safe HTML end tag");
+            output += `</${name}>`;
+            index = cursor + 1;
+            continue;
+        }
+        const attributes: Record<string, string> = Object.create(null);
+        let remaining = rest.replace(/\s*\/\s*$/, "");
+        while (remaining.trim()) {
+            const match = /^\s+([A-Za-z_:][A-Za-z0-9_:.-]*)\s*=\s*(["'])(.*?)\2/s.exec(remaining);
+            if (!match) throw new Error("Unsupported safe HTML attribute shape");
+            const key = match[1]!.toLowerCase();
+            if (match[1] !== key || match[0] !== ` ${key}=${match[2]}${match[3]}${match[2]}`) {
+                throw new Error("Unsupported safe HTML attribute spacing or case");
+            }
+            if (key in attributes || /^on/.test(key) || key === "datasrc" ||
+                key === "datafld" || key === "style" && match[3] !== "font-size: smaller;") {
+                throw new Error(`Unsupported safe HTML attribute ${key}`);
+            }
+            const value = match[3]!;
+            if (/(?:java|vb)script\s*:|about\s*:/i.test(value)) {
+                throw new Error("Unsupported safe HTML attribute URL");
+            }
+            attributes[key] = value;
+            remaining = remaining.slice(match[0].length);
+        }
+        if (name === "meta" || name === "input" && attributes.type?.toLowerCase() === "password") {
+            throw new Error(`Unsupported safe HTML element ${name}`);
+        }
+        if (name === "link") {
+            if (attributes.rel?.toLowerCase() !== "stylesheet" ||
+                typeof attributes.href !== "string" ||
+                attributes.href !== stylesheet?.href || stylesheet?.decision !== 1 ||
+                !/^https?:\/\/[^/]+\/.*$/.test(attributes.href)) {
+                throw new Error("Unsupported safe HTML stylesheet link");
+            }
+        }
+        tag = tag.replace(/^<[A-Za-z][A-Za-z0-9:-]*/, `<${name}`);
         if (/^<[A-Za-z]/.test(tag) && !tag.endsWith("/")) tag = tag.trimEnd();
         output += tag + ">";
         index = cursor + 1;
