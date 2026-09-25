@@ -40,8 +40,9 @@ function asset(target: string): boolean {
     return Boolean(single && file.test(single[2]!) && !single[2]!.includes(".."));
 }
 
-// Inventory provenance: foreman REDIRECT-INVENTORY.md, actual marked slice3
-// HTTP200 checkpoint. This admits navigation only; it never obtains app output.
+// Inventory: the retained anonymous stock core2/Tabula Rasa recent page emits
+// these controls/resources, including both login and multisearch POST forms.
+// This admits navigation only; it never obtains app output.
 export const createRedirectAdmission: CreateRedirectAdmission = config => {
     validateConfig(config);
     const expectedHost = new URL(config.listenOrigin).host;
