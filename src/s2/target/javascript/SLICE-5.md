@@ -130,6 +130,7 @@ Recent cases and verify the separate [binding](../../../content/corpus/README.md
 
 ```sh
 CONTENT_SHA=8fc8928659b761cb4f15228059a2c6b2bfd42d75
+PATH=/opt/dw-node24/bin:$PATH node tools/prepare-corpus.mjs
 PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
   dist/index.js "$CONTENT_SHA" synthetic > /tmp/slice5-recent-synthetic.json
 PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
@@ -237,6 +238,7 @@ PATH=/opt/dw-node24/bin:$PATH node dist/tools/selftest.js
 PATH=/opt/dw-node24/bin:$PATH node dist/tools/run.js
 PATH=/opt/dw-node24/bin:$PATH node dist/tools/check-page.js
 cd /workspaces/dreamwidth/src/content
+PATH=/opt/dw-node24/bin:$PATH node tools/prepare-corpus.mjs
 PATH=/opt/dw-node24/bin:$PATH node --test tests/entry-replay-oracle.test.mjs \
   tests/native-derived-entry.test.mjs tests/native-inventory.test.mjs
 PATH=/opt/dw-node24/bin:$PATH node tests/stage-runtime.test.mjs \

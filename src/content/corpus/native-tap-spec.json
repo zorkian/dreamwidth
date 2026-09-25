@@ -1,0 +1,883 @@
+{
+  "schema": 1,
+  "_notice": {
+    "file": "native-tap-spec.json",
+    "description": "Exact compact source and TAP expectations for the retained cleaner corpus.",
+    "authors": [
+      "Dreamwidth contributors"
+    ],
+    "copyright": "Copyright (c) 2026 by Dreamwidth Studios, LLC.",
+    "license": "This program is free software; you may redistribute it and/or modify it under the same terms as Perl itself. For a copy of the license, please reference 'perldoc perlartistic' or 'perldoc perlgpl'."
+  },
+  "baseline": "c74831dde24b5597a610407e3317ecd0acad5f61",
+  "vectors": {
+    "xss-base": [
+      "script-plain",
+      "script-src",
+      "script-nested-break",
+      "script-uppercase",
+      "script-null",
+      "img-onerror",
+      "img-onerror-quotes",
+      "img-onerror-backtick",
+      "img-onerror-tab",
+      "img-onerror-formfeed",
+      "body-onload",
+      "input-autofocus",
+      "details-ontoggle",
+      "div-onmouseover",
+      "onpointerrawupdate",
+      "onbeforetoggle",
+      "onscrollend",
+      "attr-newline-handler",
+      "marquee-onstart",
+      "video-source-onerror",
+      "a-js-href",
+      "a-js-href-entity",
+      "a-js-href-entity-hex",
+      "a-js-href-tab",
+      "a-js-href-newline",
+      "a-js-href-leading-space",
+      "a-js-href-mixedcase",
+      "a-js-href-uppercase-key",
+      "a-js-entity-tab-scheme",
+      "a-vbscript",
+      "a-data-html",
+      "img-data-html",
+      "iframe-js",
+      "iframe-srcdoc",
+      "object-data-js",
+      "embed-src-js",
+      "form-action-js",
+      "button-formaction-js",
+      "isindex-formaction",
+      "base-href-js",
+      "meta-refresh-js",
+      "bgsound-js",
+      "style-attr-expression",
+      "style-attr-expr-comment",
+      "style-attr-moz-binding",
+      "style-attr-behavior",
+      "style-attr-bg-js",
+      "style-tag-import",
+      "style-tag-expr",
+      "link-stylesheet",
+      "mxss-noscript",
+      "mxss-style-img",
+      "mxss-style-comment",
+      "mxss-listing",
+      "mxss-xmp",
+      "mxss-textarea",
+      "mxss-title",
+      "mxss-template",
+      "comment-conditional-ie"
+    ],
+    "xss-markdown-extra": [
+      "md-image-js",
+      "md-link-js",
+      "md-link-bracket-js",
+      "md-ref-link-js",
+      "md-autolink-js",
+      "md-raw-img-onerror",
+      "md-raw-script",
+      "md-raw-svg-onload",
+      "md-html-block",
+      "md-code-span-html",
+      "md-link-title-quote"
+    ]
+  },
+  "suites": [
+    {
+      "source": "t/cleaner-comment.t",
+      "sourceSha256": "46164c8862f3e6f5f05596552d68e63bb9de647f3fbb7c358842ab6b391e3f12",
+      "calls": {
+        "path": "native-calls/cleaner-comment.t.calls.jsonl",
+        "sha256": "9046acf5fee6bc47c96b9e1ff9561a6cfdc27b9cf34c7322247e478c3819589e",
+        "count": 28
+      },
+      "log": "native-logs/cleaner-comment.t.log",
+      "logSha256": "527e906a0d684c29ef1c60a120ce298e94c2477788cfe619f927818b7e378355",
+      "assertions": 28,
+      "events": [
+        {
+          "plan": 28
+        },
+        "Removed display:none (<span style=\"   display: inline\"></span>)",
+        "Removed margin (<span style=\"\"></span>)",
+        "Removed height",
+        "All padding removed. (Multiple rules, all too large)",
+        "All padding removed. (Combined into one rule, all too large)",
+        "All padding removed. (Multiple rules, mixed too large and small enough)",
+        "All padding removed. (One dimension in a combined rule, mixed too large and small enough)",
+        "Padding not removed; of reasonable size.",
+        "Font tag closed.",
+        "Spurious closing div stripped.",
+        "Closing div inserted.",
+        "Bad open/closes fixed.",
+        "Aggressively close things.",
+        "Aggressive close with eaten extra close.",
+        {
+          "comment": "# Remove absolute sizes when logged out"
+        },
+        "Retain relative font sizes",
+        "Strip absolute font sizes",
+        "Strip absolute font sizes",
+        {
+          "comment": "# Don't remove absolute sizes when logged in"
+        },
+        "Retain relative font sizes",
+        "Retain absolute font sizes",
+        "Retain absolute font sizes",
+        "Background URL not cleaned: logged-in user",
+        "Background URL removed: anonymous comment",
+        "Full href bold escape",
+        "Empty href bold escape",
+        "Anonymous comment bold escape",
+        {
+          "comment": "# various allowed/disallowed tags"
+        },
+        "em tag allowed",
+        "marquee tag not allowed",
+        "blink tag not allowed"
+      ]
+    },
+    {
+      "source": "t/cleaner-email.t",
+      "sourceSha256": "4014d76ff1d86021aa4b3fd700069ca519bbfffa7ca13b38087b13c08bc74805",
+      "calls": null,
+      "log": "native-logs/cleaner-email.t.log",
+      "logSha256": "aa0365955415f0b2303fe5fb0cbb9583f8e9a238f889734cb6b4ac2b190168f0",
+      "assertions": 17,
+      "events": [
+        {
+          "plan": 17
+        },
+        "got nonquoted text from an email with quoted and nonquoted text",
+        "got nonquoted text from an email without any quoted text",
+        "removed all quoted text when bogus email includes leading space",
+        "got nonquoted text from email, replied via gmail web mail",
+        "got nonquoted text from email, replied via android",
+        "got nonquoted text from email, Jan 31, 2013 date format",
+        "got nonquoted text from email, 31 Jan 2013 date format",
+        "'On wrote...' separator a few lines back - cut back to that point",
+        "'On wrote...' separator too many lines back - don't count as end of the message",
+        "---Original Message--- separator",
+        "------Message d'origine------ separator",
+        "$LJ::BOGUS_EMAIL",
+        "$LJ::BOGUS_EMAIL",
+        "no subject",
+        "just a subject",
+        "subject has Re:",
+        "subject has multiple Re:"
+      ]
+    },
+    {
+      "source": "t/cleaner-embed.t",
+      "sourceSha256": "73ce666513eb39c039b07f0a36293617fd20e00bd71987e56f6536ffd52d79dc",
+      "calls": {
+        "path": "native-calls/cleaner-embed.t.calls.jsonl",
+        "sha256": "69a5dfb300e60fb0f514f40867f6e46533974cd2571152f8a4c9ff7fb0fcb72f",
+        "count": 109
+      },
+      "log": "native-logs/cleaner-embed.t.log",
+      "logSha256": "a8ab544aed8aa149c2623564698c56721ffde104785533ada16fb3c8fe292e64",
+      "assertions": 189,
+      "events": [
+        {
+          "plan": 189
+        },
+        {
+          "comment": "# Testing clean_embed (we provide the contents to be cleaned directly)"
+        },
+        {
+          "comment": "# no content"
+        },
+        "empty",
+        {
+          "comment": "# simple object"
+        },
+        "basic <object>",
+        {
+          "comment": "# <object> and <embed> tags, params different case"
+        },
+        "<object> and <embed> tags",
+        {
+          "comment": "# <object> and <embed> tags"
+        },
+        "<object> and <embed> tags",
+        {
+          "comment": "# <object> and <embed> tags, keep never"
+        },
+        "<object> and <embed> tags",
+        {
+          "comment": "# object tag with data attribute"
+        },
+        "Drop the data attribute",
+        {
+          "comment": "# script tag"
+        },
+        "<script> tag",
+        {
+          "comment": "# iframe tag"
+        },
+        "<iframe> tag",
+        {
+          "comment": "# trusted site: youtube"
+        },
+        "old-style embeds",
+        "<iframe> tag: youtube (not an embed url)",
+        "<iframe> tag: youtube (invalid id)",
+        "<iframe> tag: www.youtube.com (iframe embed code)",
+        "<iframe> tag: youtube.com (iframe embed code)",
+        "<iframe> tag: abc.youtube.com (iframe embed code)",
+        "<iframe> tag: not-youtube.com",
+        "<iframe> tag: www.not-youtube.com",
+        "<iframe> tag: youtube.com (iframe embed code)",
+        "<iframe> tag: nested trusted and untrusted",
+        "<iframe> tag: nested trusted with script tags",
+        "<iframe> tag: nested trusted with style tags",
+        "<iframe> tag: trusted with malicious parameters",
+        "<iframe> tag: trusted with malicious parameters",
+        "<iframe> tag: trusted with malicious parameters",
+        "<iframe> tag: with name parameter",
+        "<iframe> tag: trying to make it invisible",
+        {
+          "description": "<iframe> tag: self-closing trusted",
+          "status": "not ok",
+          "todo": "Not sure how to handle this. The HTML parser treats iframe like it can't contain other tags, so anything up to a closing iframe tag is text. If it's self-closed or not closed, then everything up to the end is considered text. Currently this means that all text after an unclosed iframe is wiped out and not saved to the db -- see LJ::parse_embed_module"
+        },
+        {
+          "comment": "#   Failed (TODO) test '<iframe> tag: self-closing trusted'"
+        },
+        {
+          "comment": "#   at t/cleaner-embed.t line 209."
+        },
+        {
+          "comment": "#          got: '<iframe src=\"http://www.youtube.com/embed/ABC123abc-_\">end</iframe>'"
+        },
+        {
+          "comment": "#     expected: '<iframe src=\"http://www.youtube.com/embed/ABC123abc-_\"></iframe>end'"
+        },
+        "<iframe> tag: self-closing untrusted",
+        {
+          "comment": "# Testing parse_embed (We parse the embed contents first from a post)"
+        },
+        "parse_module_embed: no content",
+        "expand_entry: no content",
+        "expand_entry: no content",
+        "clean_embed: no content",
+        "parse_module_embed: no embeddable content",
+        "expand_entry: no embeddable content",
+        "expand_entry: no embeddable content",
+        "clean_embed: no embeddable content",
+        "parse_module_embed: empty embeddable content",
+        "expand entry: empty embeddable content",
+        "expand_entry: empty embeddable content",
+        "iframe id: empty embeddable content",
+        "iframe name: empty embeddable content",
+        "iframe class: empty embeddable content",
+        "iframe src: empty embeddable content",
+        "iframe allowfullscreen: empty embeddable content",
+        "clean_embed: empty embeddable content",
+        "parse_module_embed: dimensions: object tag with dimensions in percent",
+        "expand_entry: dimensions: object tag with dimensions in percent",
+        "expand_entry: dimensions: object tag with dimensions in percent",
+        "iframe id: dimensions: object tag with dimensions in percent",
+        "iframe name: dimensions: object tag with dimensions in percent",
+        "iframe class: dimensions: object tag with dimensions in percent",
+        "iframe src: dimensions: object tag with dimensions in percent",
+        "iframe allowfullscreen: dimensions: object tag with dimensions in percent",
+        "clean_embed: dimensions: object tag with dimensions in percent",
+        "parse_module_embed: dimensions: object tag with mixed units for dimensions",
+        "expand_entry: dimensions: object tag with mixed units for dimensions",
+        "expand_entry: dimensions: object tag with mixed units for dimensions",
+        "iframe id: dimensions: object tag with mixed units for dimensions",
+        "iframe name: dimensions: object tag with mixed units for dimensions",
+        "iframe class: dimensions: object tag with mixed units for dimensions",
+        "iframe src: dimensions: object tag with mixed units for dimensions",
+        "iframe allowfullscreen: dimensions: object tag with mixed units for dimensions",
+        "clean_embed: dimensions: object tag with mixed units for dimensions",
+        "parse_module_embed: dimensions: object tag with dimensions in percent -- too big",
+        "expand_entry: dimensions: object tag with dimensions in percent -- too big",
+        "expand_entry: dimensions: object tag with dimensions in percent -- too big",
+        "iframe id: dimensions: object tag with dimensions in percent -- too big",
+        "iframe name: dimensions: object tag with dimensions in percent -- too big",
+        "iframe class: dimensions: object tag with dimensions in percent -- too big",
+        "iframe src: dimensions: object tag with dimensions in percent -- too big",
+        "iframe allowfullscreen: dimensions: object tag with dimensions in percent -- too big",
+        "clean_embed: dimensions: object tag with dimensions in percent -- too big",
+        "parse_module_embed: object tag; no site-embed",
+        "expand_entry: object tag; no site-embed",
+        "expand_entry: object tag; no site-embed",
+        "iframe id: object tag; no site-embed",
+        "iframe name: object tag; no site-embed",
+        "iframe class: object tag; no site-embed",
+        "iframe src: object tag; no site-embed",
+        "iframe allowfullscreen: object tag; no site-embed",
+        "clean_embed: object tag; no site-embed",
+        "parse_module_embed: object tag with site-embed",
+        "expand_entry: object tag with site-embed",
+        "expand_entry: object tag with site-embed",
+        "iframe id: object tag with site-embed",
+        "iframe name: object tag with site-embed",
+        "iframe class: object tag with site-embed",
+        "iframe src: object tag with site-embed",
+        "iframe allowfullscreen: object tag with site-embed",
+        "clean_embed: object tag with site-embed",
+        "parse_module_embed: embed tag; no site-embed",
+        "expand_entry: embed tag; no site-embed",
+        "expand_entry: embed tag; no site-embed",
+        "iframe id: embed tag; no site-embed",
+        "iframe name: embed tag; no site-embed",
+        "iframe class: embed tag; no site-embed",
+        "iframe src: embed tag; no site-embed",
+        "iframe allowfullscreen: embed tag; no site-embed",
+        "clean_embed: embed tag; no site-embed",
+        "parse_module_embed: embed tag with site-embed",
+        "expand_entry: embed tag with site-embed",
+        "expand_entry: embed tag with site-embed",
+        "iframe id: embed tag with site-embed",
+        "iframe name: embed tag with site-embed",
+        "iframe class: embed tag with site-embed",
+        "iframe src: embed tag with site-embed",
+        "iframe allowfullscreen: embed tag with site-embed",
+        "clean_embed: embed tag with site-embed",
+        "parse_module_embed: iframe tag; no site-embed (untrusted)",
+        "expand_entry: iframe tag; no site-embed (untrusted)",
+        "expand_entry: iframe tag; no site-embed (untrusted)",
+        "iframe id: iframe tag; no site-embed (untrusted)",
+        "iframe name: iframe tag; no site-embed (untrusted)",
+        "iframe class: iframe tag; no site-embed (untrusted)",
+        "iframe src: iframe tag; no site-embed (untrusted)",
+        "iframe allowfullscreen: iframe tag; no site-embed (untrusted)",
+        "clean_embed: iframe tag; no site-embed (untrusted)",
+        "parse_module_embed: iframe tag with site-embed (untrusted)",
+        "expand_entry: iframe tag with site-embed (untrusted)",
+        "expand_entry: iframe tag with site-embed (untrusted)",
+        "iframe id: iframe tag with site-embed (untrusted)",
+        "iframe name: iframe tag with site-embed (untrusted)",
+        "iframe class: iframe tag with site-embed (untrusted)",
+        "iframe src: iframe tag with site-embed (untrusted)",
+        "iframe allowfullscreen: iframe tag with site-embed (untrusted)",
+        "clean_embed: iframe tag with site-embed (untrusted)",
+        "parse_module_embed: iframe tag; no site-embed (trusted)",
+        "expand_entry: iframe tag; no site-embed (trusted)",
+        "expand_entry: iframe tag; no site-embed (trusted)",
+        "iframe id: iframe tag; no site-embed (trusted)",
+        "iframe name: iframe tag; no site-embed (trusted)",
+        "iframe class: iframe tag; no site-embed (trusted)",
+        "iframe src: iframe tag; no site-embed (trusted)",
+        "iframe allowfullscreen: iframe tag; no site-embed (trusted)",
+        "clean_embed: iframe tag; no site-embed (trusted)",
+        "parse_module_embed: iframe tag with site-embed (trusted)",
+        "expand_entry: iframe tag with site-embed (trusted)",
+        "expand_entry: iframe tag with site-embed (trusted)",
+        "iframe id: iframe tag with site-embed (trusted)",
+        "iframe name: iframe tag with site-embed (trusted)",
+        "iframe class: iframe tag with site-embed (trusted)",
+        "iframe src: iframe tag with site-embed (trusted)",
+        "iframe allowfullscreen: iframe tag with site-embed (trusted)",
+        "clean_embed: iframe tag with site-embed (trusted)",
+        "parse_module_embed: object tag left open; no site-embed",
+        "expand_entry: object tag left open; no site-embed",
+        "expand_entry: object tag left open; no site-embed",
+        "clean_embed: object tag left open; no site-embed",
+        "parse_module_embed: object tag left open in site-embed",
+        "expand_entry: object tag left open in site-embed",
+        "expand_entry: object tag left open in site-embed",
+        "iframe id: object tag left open in site-embed",
+        "iframe name: object tag left open in site-embed",
+        "iframe class: object tag left open in site-embed",
+        "iframe src: object tag left open in site-embed",
+        "iframe allowfullscreen: object tag left open in site-embed",
+        "clean_embed: object tag left open in site-embed",
+        "parse_module_embed: embed tag left open; no site-embed",
+        "expand_entry: embed tag left open; no site-embed",
+        "expand_entry: embed tag left open; no site-embed",
+        "clean_embed: embed tag left open; no site-embed",
+        "parse_module_embed: embed tag left open in site-embed",
+        "expand_entry: embed tag left open in site-embed",
+        "expand_entry: embed tag left open in site-embed",
+        "iframe id: embed tag left open in site-embed",
+        "iframe name: embed tag left open in site-embed",
+        "iframe class: embed tag left open in site-embed",
+        "iframe src: embed tag left open in site-embed",
+        "iframe allowfullscreen: embed tag left open in site-embed",
+        "clean_embed: embed tag left open in site-embed",
+        "parse_module_embed: iframe tag left open; no site-embed (untrusted)",
+        "expand_entry: iframe tag left open; no site-embed (untrusted)",
+        "expand_entry: iframe tag left open; no site-embed (untrusted)",
+        "clean_embed: iframe tag left open; no site-embed (untrusted)",
+        "parse_module_embed: iframe tag left open in site-embed (untrusted)",
+        "expand_entry: iframe tag left open in site-embed (untrusted)",
+        "expand_entry: iframe tag left open in site-embed (untrusted)",
+        "clean_embed: iframe tag left open in site-embed (untrusted)",
+        "parse_module_embed: iframe tag left open; no site-embed (trusted)",
+        "expand_entry: iframe tag left open; no site-embed (trusted)",
+        "expand_entry: iframe tag left open; no site-embed (trusted)",
+        "clean_embed: iframe tag left open; no site-embed (trusted)",
+        "parse_module_embed: iframe tag left open in site-embed (trusted)",
+        "expand_entry: iframe tag left open in site-embed (trusted)",
+        "expand_entry: iframe tag left open in site-embed (trusted)",
+        "clean_embed: iframe tag left open in site-embed (trusted)",
+        "parse_module_embed: site-embed tag left open",
+        "expand_entry: site-embed tag left open",
+        "expand_entry: site-embed tag left open",
+        "clean_embed: site-embed tag left open"
+      ]
+    },
+    {
+      "source": "t/cleaner-event-embed.t",
+      "sourceSha256": "15762a8065e3e474f6050cb05c6cddca1186940bec75a4086ec168d530ab1336",
+      "calls": {
+        "path": "native-calls/cleaner-event-embed.t.calls.jsonl",
+        "sha256": "e8351844a11f174fc4ee768ffb01f91bf90829b076f1b26f65c0e8ad578665c4",
+        "count": 1
+      },
+      "log": "native-logs/cleaner-event-embed.t.log",
+      "logSha256": "088f759d4574834a6d4e3708a7056797c7719635343c256d58dd87066e0ce0f4",
+      "assertions": 1,
+      "events": [
+        {
+          "plan": 1
+        },
+        {
+          "comment": "# <object> and <embed> tags"
+        },
+        "<object> and <embed> tags"
+      ]
+    },
+    {
+      "source": "t/cleaner-event.t",
+      "sourceSha256": "75c4f002e82f4c711b3fc88b88c1d175a8c451d0bfa0365de589e5cb574e5f38",
+      "calls": {
+        "path": "native-calls/cleaner-event.t.calls.jsonl",
+        "sha256": "195a1c1889b1312221be8bfd82cfabf357787992f5f7799bdbf77806e008a4b2",
+        "count": 42
+      },
+      "log": "native-logs/cleaner-event.t.log",
+      "logSha256": "e28c90be83b8cb1cb18bdc9edc7ba890ea3e3595178c95d695b043215079ebbe",
+      "assertions": 42,
+      "events": [
+        {
+          "plan": 42
+        },
+        {
+          "comment": "# malformed html"
+        },
+        "Inner tag isn't closed",
+        "Tag outside a table isn't closed",
+        "Non-table-related tag inside a table is open",
+        "Table-related-tag inside a table is open",
+        "Slash-closed tag",
+        "No closing tags",
+        "Wrong closing tag order",
+        "Wrong closing tag order in table",
+        "Table left open to swallow closing tags",
+        {
+          "comment": "# unwanted tags and attributes"
+        },
+        "Header tags removed",
+        "Colors removed",
+        "Colors and sizes removed",
+        "Fonts and sizes removed",
+        "CSS colors removed",
+        "CSS colors removed",
+        "CSS colors and sizes removed",
+        "CSS fonts and sizes removed",
+        {
+          "comment": "# cut tags"
+        },
+        "Text under first cut, plain",
+        "Text under second cut, plain",
+        "Text under first cut, with HTML tags",
+        "Text under second cut, with HTML tags",
+        "Open textarea tag",
+        "Double textarea tag",
+        "Text under outer cut, plain",
+        "Text under inner cut, plain",
+        "Text under outer cut, HTML",
+        "Text under inner cut, HTML",
+        "text in <div> style cut is retrieved",
+        "text in <div> style cut is retrieved",
+        "text in <lj-cut> style cut after <div> style cut is retrieved",
+        {
+          "comment": "# various allowed/disallowed tags"
+        },
+        "em tag allowed",
+        "marquee tag allowed",
+        "blink tag allowed",
+        {
+          "comment": "# mismatched and misnested tags"
+        },
+        "form tags within a form are allowed",
+        "form tags outside a form are escaped and displayed",
+        "table tags within a table are allowed",
+        "table tags outside a table are escaped and displayed",
+        "mismatched closing tags or misnested closing tags shouldn't be displayed",
+        "self-closing tags that aren't actually self-closing should still be closed.",
+        "empty tags don't get erroneously closed when closing their parent element.",
+        "Text under cut with mismatched HTML tags within and with-out the cut (ignored)",
+        "Full text of entry, with mismatched HTML tags within and with-out the cut"
+      ]
+    },
+    {
+      "source": "t/cleaner-forms.t",
+      "sourceSha256": "8f2cf0fa55930bf4d8ba49d0b0d05249ee8d71a99d76b7e02477d5da36c75337",
+      "calls": {
+        "path": "native-calls/cleaner-forms.t.calls.jsonl",
+        "sha256": "e6668cdb307596f6826ab6005776967d61fa8e114184a23b9fb55b6a512075a4",
+        "count": 6
+      },
+      "log": "native-logs/cleaner-forms.t.log",
+      "logSha256": "0770602a7e212b6fd829c727ed0e48cfc760a02a9e80a68e632aa6943abf162c",
+      "assertions": 6,
+      "events": [
+        {
+          "plan": 6
+        },
+        "has input",
+        "can't do password element",
+        "can't do password element in uppercase",
+        "can do foobar type",
+        "can't do spaces in input type",
+        "can't do bare input"
+      ]
+    },
+    {
+      "source": "t/cleaner-invalid.t",
+      "sourceSha256": "3e7a8c097ffef290069b1ffd3772345e4777cbcac646003bbd35c96a370e9a47",
+      "calls": {
+        "path": "native-calls/cleaner-invalid.t.calls.jsonl",
+        "sha256": "83d1bc19a8fa34217c2bf711fdd606cd7386986775e0de258d4d3ac7fdbe0c7e",
+        "count": 4
+      },
+      "log": "native-logs/cleaner-invalid.t.log",
+      "logSha256": "33d7f6da426d9411cc6b43fdbe23af88189a7b563de7a1a3cac70c02ad3fb0f4",
+      "assertions": 4,
+      "events": [
+        {
+          "plan": 4
+        },
+        "Valid HTML is okay.",
+        "Invalid HTML is not okay.",
+        "User tag is fine.",
+        "Invalid markup with a user tag renders correctly."
+      ]
+    },
+    {
+      "source": "t/cleaner-link.t",
+      "sourceSha256": "2756d7102b1c85278c0b583fee1064552376793896ec77ff0ce9782d4817269a",
+      "calls": null,
+      "log": "native-logs/cleaner-link.t.log",
+      "logSha256": "cf090ebf5302dfda8b2618371ee9b51c69cb3109b0c2bf336de811f482a68d2d",
+      "assertions": 9,
+      "events": [
+        {
+          "plan": 9
+        },
+        "html link rel=alternate",
+        "html link with single valid rel attribute",
+        "html link with two valid rel attributes",
+        "rss style link",
+        "html/atom link, rel is implied 'alternate' in this form",
+        "html link with disallowed stylesheet href",
+        "html link with one good and one bad rel value",
+        "html link with good stylesheet",
+        "html link with script rel, this is not allowed ever"
+      ]
+    },
+    {
+      "source": "t/cleaner-ljtags.t",
+      "sourceSha256": "86d4a38934151bd600d3752b1030ccf8e117105204c57b175b738d8039a78adc",
+      "calls": {
+        "path": "native-calls/cleaner-ljtags.t.calls.jsonl",
+        "sha256": "4337897d1b6f13dbfa2aa40458c9af22863c6ebcb2c37780fc8a384cdab0ac51",
+        "count": 12
+      },
+      "log": "native-logs/cleaner-ljtags.t.log",
+      "logSha256": "e3c2df0e926e49feb7b827e14ea4f2e50f65e3b64c6528fd29e10beba331de00",
+      "assertions": 12,
+      "events": [
+        {
+          "plan": 12
+        },
+        "old lj user tag",
+        "lj comm= on a user",
+        "span ljuser",
+        "span ljuser with junk inside",
+        "old lj-cut",
+        "old lj-cut w/ text",
+        "new lj-cut w/ div",
+        "new lj-cut w/ div w/ text",
+        "nested div cuts",
+        "nested div cuts, expanded",
+        "nested div cuts, expanded, ignored user's extra close div",
+        "nested div cuts, more"
+      ]
+    },
+    {
+      "source": "t/cleaner-markdown.t",
+      "sourceSha256": "ed5c6aed1ad0dbd83d31e81ac2a53e49a4edc854f5bf6c3f7730295b3eaaec9a",
+      "calls": {
+        "path": "native-calls/cleaner-markdown.t.calls.jsonl",
+        "sha256": "c064705e29bfb082a9f0a691512a30be6fbbb4383c2fc8d42bbdff01711bce2a",
+        "count": 28
+      },
+      "log": "native-logs/cleaner-markdown.t.log",
+      "logSha256": "79f5f0696ef0bf4f6049deb203de8802186e3b4c8455c6d7615cc72c2e31df7b",
+      "assertions": 28,
+      "events": [
+        {
+          "plan": 28
+        },
+        "user tag in plain text converted",
+        "escaped user tag in plain text not converted, backslash removed",
+        "md: unescaped user tag is not converted within pre tag",
+        "html: unescaped user tag is not converted within pre tag",
+        "md: escaped user tag is not de-escaped within pre tag",
+        "html: escaped user tag is not de-escaped within pre tag",
+        "md: unescaped user tag is not converted within code tag",
+        "html: unescaped user tag is not converted within textarea tag",
+        "user tag in URL not converted",
+        "user tag in auto-linked URL not converted",
+        "user tag in href not converted, but user tag in link text converted (using de-linked form) []",
+        "bare usertag before period is converted, keeping period",
+        "shortcut sitename usertag before period is converted, keeping period",
+        "full sitename usertag before period is converted, keeping period",
+        "atproto usernames (FQDNs) are not misinterpreted as sites",
+        "user tags work the same in HTML-in-Markdown as in plain Markdown",
+        "local entry made in default editor (newest casual HTML version)",
+        "local entry made in markdown editor",
+        "user tag in plain text converted (undef editor)",
+        "user tag in plain text converted (markdown)",
+        "user tag in pre unconverted and unmarkeddown (markdown)",
+        "old content - user tag in plain text unconverted (undef editor)",
+        "imported content w/o editor set",
+        "imported content w/editor set",
+        "imported content - user tag in plain text unconverted (undef editor)",
+        "syndicated content",
+        "syndicated content - user tag in plain text unconverted",
+        "syndicated content - user tag in pre unconverted"
+      ]
+    },
+    {
+      "source": "t/cleaner-resource-loading.t",
+      "sourceSha256": "92deb59b1116320cf952fe3c32826e169b9f41834d86bc04b199d09e35f5b6f4",
+      "calls": {
+        "path": "native-calls/cleaner-resource-loading.t.calls.jsonl",
+        "sha256": "b4ad9c6c217d45911e98a78ef10c22c6d31c58e433b72c53c588c305636670f4",
+        "count": 10
+      },
+      "log": "native-logs/cleaner-resource-loading.t.log",
+      "logSha256": "12ddc71053623a22ed6d3483fac8646193ba01c2f363ab6d2adc8f975c45c329",
+      "assertions": 12,
+      "events": [
+        "removes <style> blocks (no selector-based CSS exfil)",
+        "drops the url() inside a removed <style> block",
+        "strips url(javascript:) from inline style",
+        "strips expression() from inline style",
+        "removes <style> blocks (no selector-based CSS exfil)",
+        "drops the url() inside a removed <style> block",
+        "strips url(javascript:) from inline style",
+        "strips expression() from inline style",
+        "external <img> passes through (accepted hotlinking; leaks viewer IP by design)",
+        "external <img> in a comment passes through",
+        "external inline CSS url() passes through (accepted; same privacy tradeoff as an image)",
+        "external inline CSS url() in a comment passes through",
+        {
+          "plan": 12
+        }
+      ]
+    },
+    {
+      "source": "t/cleaner-subject.t",
+      "sourceSha256": "4192ccd310118c5e728952efec8f8491b92cdf7fe3ec9fc75395dbfa92ba01e9",
+      "calls": {
+        "path": "native-calls/cleaner-subject.t.calls.jsonl",
+        "sha256": "27b6abf6fd28f110d18418fd1e70b756746059341b049f6b272acc6bdd882be5",
+        "count": 2
+      },
+      "log": "native-logs/cleaner-subject.t.log",
+      "logSha256": "bac2eeaf39c295faceb262312219be2a83ea64d66ad392106d1017d32ef3d7b9",
+      "assertions": 2,
+      "events": [
+        "only text",
+        "only text",
+        {
+          "plan": 2
+        }
+      ]
+    },
+    {
+      "source": "t/cleaner-tables.t",
+      "sourceSha256": "f9ec4103162053f39d4ac9358a54837fe600afc2d446c3928b3091ebf6129685",
+      "calls": {
+        "path": "native-calls/cleaner-tables.t.calls.jsonl",
+        "sha256": "bb42d6791bf7df68e72ee070b672f9e254f54ae2b10ec8f48f48e78fe2b774c1",
+        "count": 9
+      },
+      "log": "native-logs/cleaner-tables.t.log",
+      "logSha256": "b37a2b1b29c4616962b8a6329cfaf34ed2a934267b84053b0b440af7b6c075f0",
+      "assertions": 9,
+      "events": [
+        {
+          "plan": 9
+        },
+        "Table okay if all tags are closed",
+        "Table okay if td and tr tags aren't closed",
+        "All tags escaped",
+        "All tags escaped",
+        "All tags escaped",
+        "All tags escaped",
+        "All tags escaped",
+        "All td tags escaped",
+        "Fixed tbody -- optional"
+      ]
+    },
+    {
+      "source": "t/cleaner-xss.t",
+      "sourceSha256": "3901044250eaac7bb2fea5f97f41430a7f12d917f8b714c129ae367562339059",
+      "calls": {
+        "path": "native-calls/cleaner-xss.t.calls.jsonl",
+        "sha256": "0b43856ae0c3ade9a22166d5f46a9ba7920b8be8fb6a7d891dacc165172d7fb7",
+        "count": 811
+      },
+      "log": "native-logs/cleaner-xss.t.log",
+      "logSha256": "aaa6c8148070fdfe9e37ac2c94602840ea3c8bda3d980247108f6243cfd69b30",
+      "assertions": 757,
+      "events": [
+        {
+          "matrix": {
+            "contexts": [
+              "event/default",
+              "event/preformatted",
+              "event/markdown",
+              "event/syndicated",
+              "comment/default",
+              "comment/anon",
+              "comment/markdown",
+              "comment/preformatted",
+              "subject",
+              "subject_all",
+              "subject_trim",
+              "userbio"
+            ],
+            "vectors": "xss-base"
+          }
+        },
+        {
+          "template": {
+            "context": "event/markdown",
+            "vectors": "xss-markdown-extra"
+          }
+        },
+        {
+          "template": {
+            "context": "comment/markdown",
+            "vectors": "xss-markdown-extra"
+          }
+        },
+        "clean_embed neutralizes embed-script",
+        "clean_embed neutralizes embed-object-script",
+        "clean_embed neutralizes embed-iframe-js",
+        "clean_embed neutralizes embed-iframe-onload",
+        "clean_embed neutralizes embed-iframe-srcdoc",
+        "clean_embed neutralizes embed-object-data-js",
+        "clean_embed neutralizes embed-embed-src-js",
+        "clean_embed neutralizes embed-embed-onmouse",
+        "clean_embed neutralizes embed-object-onclick",
+        "clean_embed neutralizes embed-embed-data-html",
+        {
+          "description": "clean_event strips svg-set-onload",
+          "status": "not ok",
+          "todo": "clean_event does not yet strip SVG/MathML foreign content (namespace-aware sanitizer would; clean_comment already does)"
+        },
+        {
+          "comment": "#   Failed (TODO) test 'clean_event strips svg-set-onload'"
+        },
+        {
+          "comment": "#   at t/cleaner-xss.t line 355."
+        },
+        {
+          "comment": "#                   '<svg><set attributename=\"onload\" to=\"alert(1)\"></set></svg>'"
+        },
+        {
+          "comment": "#           matches '(?^i:<\\s*set\\b)'"
+        },
+        {
+          "description": "clean_event strips svg-handler",
+          "status": "not ok",
+          "todo": "clean_event does not yet strip SVG/MathML foreign content (namespace-aware sanitizer would; clean_comment already does)"
+        },
+        {
+          "comment": "#   Failed (TODO) test 'clean_event strips svg-handler'"
+        },
+        {
+          "comment": "#   at t/cleaner-xss.t line 355."
+        },
+        {
+          "comment": "#                   '<svg><handler ev:event=\"load\">alert(1)</handler></svg>'"
+        },
+        {
+          "comment": "#           matches '(?^i:<\\s*handler\\b)'"
+        },
+        {
+          "description": "clean_event strips svg-animate-href",
+          "status": "not ok",
+          "todo": "clean_event does not yet strip SVG/MathML foreign content (namespace-aware sanitizer would; clean_comment already does)"
+        },
+        {
+          "comment": "#   Failed (TODO) test 'clean_event strips svg-animate-href'"
+        },
+        {
+          "comment": "#   at t/cleaner-xss.t line 355."
+        },
+        {
+          "comment": "#                   '<svg><a><animate attributename=\"href\"></animate></a></svg>'"
+        },
+        {
+          "comment": "#           matches '(?^i:<\\s*animate\\b)'"
+        },
+        {
+          "description": "clean_event strips math-annotation-html",
+          "status": "not ok",
+          "todo": "clean_event does not yet strip SVG/MathML foreign content (namespace-aware sanitizer would; clean_comment already does)"
+        },
+        {
+          "comment": "#   Failed (TODO) test 'clean_event strips math-annotation-html'"
+        },
+        {
+          "comment": "#   at t/cleaner-xss.t line 355."
+        },
+        {
+          "comment": "#                   '<math><annotation-xml encoding=\"text/html\"><img src=\"http://proxy.url\"></annotation-xml></math>'"
+        },
+        {
+          "comment": "#           matches '(?^i:annotation-xml)'"
+        },
+        "clean_comment strips svg-set-onload",
+        "clean_comment strips svg-handler",
+        "clean_comment strips svg-animate-href",
+        "clean_comment strips math-annotation-html",
+        "oracle sees &Tab;-obfuscated scheme",
+        "oracle sees hex-entity (uppercase X, A-F) scheme",
+        "oracle sees a raw event handler",
+        "oracle ignores inert already-escaped &amp;Tab;",
+        "oracle ignores scheme/handler text inside a quoted attribute value",
+        "event keeps benign inline formatting",
+        "comment keeps benign inline formatting",
+        "event keeps a safe link and its text",
+        "event keeps plain text",
+        {
+          "plan": 757
+        }
+      ]
+    }
+  ],
+  "outputsSha256": {
+    "native-inventory.json": "07ca2d1160e1e1cd23b053381b8881a7e71b4fbbff76852212ec87c2d4d58f50",
+    "native-call-replay-map.json": "d116226451f6752036c60f88fea13ef4e87d5c0c93bacb2e80d834ea1b42577c",
+    "native-derived-entry-cases.json": "e203cd7ad4f588972d226f8b21b445fa1870feff090cbcbec4eb1c5016c71698"
+  }
+}

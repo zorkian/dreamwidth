@@ -1,7 +1,0 @@
-1..6
-ok 1 - has input
-ok 2 - can't do password element
-ok 3 - can't do password element in uppercase
-ok 4 - can do foobar type
-ok 5 - can't do spaces in input type
-ok 6 - can't do bare input

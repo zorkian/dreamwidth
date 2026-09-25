@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparedCorpusRoot } from './corpus-paths.mjs';
 
 const [moduleArg, candidate, corpusName] = process.argv.slice(2);
 if (!moduleArg || !/^[0-9a-f]{40}$/.test(candidate ?? '') ||
@@ -27,8 +28,8 @@ if (!moduleArg || !/^[0-9a-f]{40}$/.test(candidate ?? '') ||
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const corpus = path.join(root, 'corpus');
 const native = corpusName === 'native';
-const manifestBytes = fs.readFileSync(path.join(corpus, native
-    ? 'native-derived-entry-cases.json' : 'entry-replay-cases.json'));
+const manifestBytes = fs.readFileSync(path.join(native ? preparedCorpusRoot() : corpus,
+    native ? 'native-derived-entry-cases.json' : 'entry-replay-cases.json'));
 const oracleBytes = fs.readFileSync(path.join(corpus, native
     ? 'native-derived-entry-perl.json' : 'entry-replay-perl.json'));
 const manifest = JSON.parse(manifestBytes);
