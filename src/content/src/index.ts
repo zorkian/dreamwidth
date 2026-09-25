@@ -22,8 +22,9 @@ import type {BodyFragment, CleanerLimits, EntryCleaner, EntryContentInput,
     EntryContentResult, ImageResolutionSet} from "./contracts";
 import {UnsupportedContent} from "./policy/errors";
 import {validateCleanerLimits, validateInput, inputHash} from "./policy/validation";
+import {auditSource} from "./policy/source";
 import {repairFormatting} from "./policy/formatting";
-import {replaceCuts} from "./policy/cuts";
+import {replaceCuts, type LocateNode} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
@@ -82,7 +83,7 @@ function navigation(value: string, input: EntryContentInput, href: boolean): str
 }
 
 function transform(root: Element, input: EntryContentInput, limits: CleanerLimits,
-    images: ImagePass, generatedIds: ReadonlySet<string>): void {
+    images: ImagePass, generatedIds: ReadonlySet<string>, locate: LocateNode): void {
     const cssBudget = {bytes: 0, nodes: 0};
     const document = root.ownerDocument;
     for (const element of [...root.querySelectorAll("*")]) {
@@ -99,7 +100,10 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
         if (removedTags.has(tag)) { element.replaceWith(...element.childNodes); continue; }
         if (!entryTags.has(tag)) throw new UnsupportedContent();
         if (controls.has(tag) && !element.closest("form")) {
-            element.replaceWith(document.createTextNode(`<${tag} ... >`), ...element.childNodes);
+            // Outside a form, clean_event displays both actual source tokens.
+            // An implicit parser close must not invent a visible closing token.
+            const ending = locate(element)?.endTag ? [document.createTextNode(`</${tag}>`)] : [];
+            element.replaceWith(document.createTextNode(`<${tag} ... >`), ...element.childNodes, ...ending);
             continue;
         }
         if (tag === "input") {
@@ -223,6 +227,8 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     virtualConsole: new VirtualConsole()});
                 const root = dom.window.document.body;
                 checkTree(root, bounds, dom.window.document.head);
+                auditSource(dom.window.document, input.body, input.context.documentUrl,
+                    node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 inventoryHead(dom.window.document.head);
                 removeSourceComments(root);
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
@@ -232,7 +238,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
-                transform(root, input, bounds, images, ids);
+                transform(root, input, bounds, images, ids, node => dom!.nodeLocation(node) ?? null);
                 images.finish();
                 if (images.requests.length && !resolutions) {
                     return {kind: "image-resolution-required", images: {inputSha256: hash, requests: images.requests}};

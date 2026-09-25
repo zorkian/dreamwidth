@@ -18,6 +18,7 @@ import {resolve} from "node:path";
 import {spawnSync} from "node:child_process";
 import type {EntryContentContext, EntryContentResult, EntryContentInput} from "@dreamwidth/content/contracts";
 import {config} from "./fixtures";
+import {sourceCases} from "./source-cases";
 import {formattingCases} from "./formatting-cases";
 
 // Offline tests deliberately load the actual compiled shared package. Production
@@ -420,5 +421,93 @@ test("legacy formatting and nested well-formed tables retain their original scop
             assert.equal(output, native[index], body);
             assert.equal(html(cleaner.clean(input(output))), output);
         }
+    } finally { cleaner.close(); }
+});
+
+
+test("removed wrappers cannot prove formatting closure and merged form extents refuse", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const bodies = ['<p>a</p><noscript><b>x</noscript>y',
+            '<form action="https://app.test/f"><b>x</form>y'];
+        const native = retained(bodies);
+        assert.ok(native[0]!.includes('<b>xy</b>'));
+        assert.ok(native[1]!.includes('<b>x</b></form>y'));
+        for (const body of bodies) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"});
+        }
+    } finally { cleaner.close(); }
+});
+
+test("outside-form controls preserve only explicit source closing-token text", () => {
+    const cleaner = createEntryCleaner(limits);
+    const bodies = ['<select><option>hello</option><option>bye</option></select>',
+        '<select><option>hello', '<select><option>hello</select>',
+        '<form><select><option>hello</option><option>bye</option></select></form>'];
+    try {
+        const native = retained(bodies);
+        for (const [index, body] of bodies.entries()) {
+            const result = html(cleaner.clean(input(body)));
+            assert.equal(result, native[index]);
+            assert.equal(html(cleaner.clean(input(result))), result);
+        }
+        assert.ok(native[0]!.includes('&lt;/option&gt;'));
+        assert.ok(native[0]!.endsWith('&lt;/select&gt;'));
+        assert.ok(!native[1]!.includes('&lt;/'));
+    } finally { cleaner.close(); }
+});
+
+test("ordinary omitted paragraph/list ends remain supported without reconstructed formatting", () => {
+    const cleaner = createEntryCleaner(limits);
+    const bodies = ['<p>one<p>two', '<p>one<p>two</p>', '<ul><li>one<li>two</ul>',
+        '<ol><li>a<li>b<li>c</ol><p>after</p>'];
+    const expected = ['<p>one</p><p>two</p>', '<p>one</p><p>two</p>',
+        '<ul><li>one</li><li>two</li></ul>', '<ol><li>a</li><li>b</li><li>c</li></ol><p>after</p>'];
+    try {
+        for (const [index, body] of bodies.entries()) {
+            assert.equal(html(cleaner.clean(input(body))), expected[index]);
+            assert.equal(html(cleaner.clean(input(expected[index]!))), expected[index]);
+        }
+        for (const body of ['<p><b>bold<p>next</p>', '<ul><li><b>x<li>y</ul>']) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"});
+        }
+    } finally { cleaner.close(); }
+});
+
+
+test("source-consumption audit detects lost tokens and preserves classified inert contexts", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        assert.deepEqual(retained(sourceCases.map(row => row.raw)), sourceCases.map(row => row.perl));
+        for (const row of sourceCases) {
+            const result = cleaner.clean(input(row.raw));
+            if (row.supported) {
+                const output = html(result);
+                assert.equal(html(cleaner.clean(input(output))), output, row.raw + " second pass");
+            } else assert.deepEqual(result, {kind: "failure", reason: "unsupported"}, row.raw);
+        }
+        for (const raw of ['<svg><![CDATA[<b>]]></svg>x', '<math><![CDATA[<b>]]></math>x',
+            '<script>var s="<td>not markup</td>";</script>x', '<iframe><td>ignored</td></iframe>x',
+            '<!-- <td>not markup</td> -->x']) assert.equal(html(cleaner.clean(input(raw))), 'x');
+        assert.equal(html(cleaner.clean(input('a &lt;table&gt; b'))), 'a &lt;table&gt; b');
+        assert.equal(html(cleaner.clean(input('<p>intro</p><body title="<td>decoy</td>"><p>kept</p></body>'))),
+            '<p>intro</p><p>kept</p>');
+    } finally { cleaner.close(); }
+});
+
+test("wrapper assistance has cumulative byte and parse-count work ceilings", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const work = '<body>'.repeat(8000);
+        assert.equal(Buffer.byteLength(work), 48000);
+        assert.deepEqual(cleaner.clean(input(work)), {kind: "failure", reason: "unsupported"});
+        assert.deepEqual(cleaner.clean(input('<p>x</p>' + '<body><p>x</p>'.repeat(33))),
+            {kind: "failure", reason: "unsupported"});
+        for (const wrapper of ['<BODY title="> <td>" >', '<body\n title="> <td>">',
+            '<html title="> <td>"/>', '<head title="> <td>"></head>']) {
+            const raw = '<p>before</p>' + wrapper + '<p>after</p>';
+            assert.equal(html(cleaner.clean(input(raw))), '<p>before</p><p>after</p>');
+        }
+        assert.equal(html(cleaner.clean(input('<p>recovery</p>'))), '<p>recovery</p>');
     } finally { cleaner.close(); }
 });
