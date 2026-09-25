@@ -66,6 +66,18 @@ test("unmarked, nonvisible, external authors, unsupported style and feature stat
     assert.throws(() => approveSnapshot({...data, entries: [{...data.entries[0]!, posterid: 7}]}));
     assert.throws(() => approveSnapshot({...data, entries: Array(201).fill(data.entries[0])}));
 });
+test("recent admission accepts only the stock-derived entry-page preference", () => {
+    const data = snapshot();
+    const withPreference = (value: string | null): RawJournalSnapshot => ({...data,
+        owner: {...data.owner, publicSettings: {...data.owner.publicSettings,
+            use_journalstyle_entry_page: value}}});
+    for (const value of [null, "", "Y"]) {
+        assert.deepEqual(approveSnapshot(withPreference(value)), approveSnapshot(data));
+    }
+    for (const value of ["N", "1", "true", "y", " Y", "Y "]) {
+        assert.throws(() => approveSnapshot(withPreference(value)));
+    }
+});
 test("admission owns recent parsing and finite app redirects", () => {
     const decide = createRedirectAdmission(config);
     const base: RedirectAdmissionRequest = {method: "GET", rawTarget: "/users/s2js_slice3/",
