@@ -25,8 +25,10 @@ BEGIN {
 use Digest::SHA qw(sha256_hex);
 use Encode ();
 use File::Temp qw(tempfile);
+use HTML::Parser;
 use HTTP::Request::Common;
 use JSON::PP;
+use LJ::Web;
 use Plack::Test;
 
 my ($origin, $outdir, @options) = @ARGV;
@@ -62,6 +64,35 @@ die "Comparison requires fixed Perl hash order at process start\n"
 die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
 die "Anonymous CAPTCHA is enabled\n" if $LJ::CAPTCHA_HCAPTCHA_SITEKEY;
 die "Unexpected local recent scrollback limit\n" unless $LJ::MAX_SCROLLBACK_LASTN == 100;
+die "Local image proxy unexpectedly configured\n"
+    if $LJ::PROXY_URL || $LJ::PROXY_SALT_FILE;
+my $placeholder_html = LJ::img('placeholder');
+die "Unexpected placeholder helper shape\n"
+    unless defined $placeholder_html && $placeholder_html =~ m!^<img\b[^<>]*/>$!s;
+my ($placeholder, $placeholder_count) = (undef, 0);
+my $parser = HTML::Parser->new(
+    api_version => 3,
+    start_h => [ sub {
+        my ($tag, $attrs) = @_;
+        die "Unexpected placeholder element\n" unless $tag eq 'img' && !$placeholder_count++;
+        my %copy = %$attrs;
+        die "Unexpected placeholder close marker\n" unless (delete $copy{'/'}) eq '/';
+        die "Unexpected placeholder attributes\n"
+            unless join(',', sort keys %copy) eq 'alt,border,height,src,title,width';
+        die "Unexpected placeholder border\n" unless $copy{border} eq '0';
+        die "Invalid placeholder dimensions\n"
+            unless $copy{width} =~ /^[1-9][0-9]*$/
+            && $copy{height} =~ /^[1-9][0-9]*$/;
+        $placeholder = {
+            src => $copy{src}, width => 0 + $copy{width}, height => 0 + $copy{height},
+            alt => $copy{alt}, title => $copy{title},
+        };
+    }, 'tagname, attr' ],
+    text_h => [ sub { die "Unexpected placeholder text\n" if $_[0] =~ /\S/ }, 'text' ],
+);
+$parser->parse($placeholder_html);
+$parser->eof;
+die "Missing placeholder image\n" unless $placeholder_count == 1 && $placeholder->{src};
 my $u = LJ::load_user('s2js_slice3') or die "Missing marked journal\n";
 die "Unmarked journal\n" unless ($u->bio(1) // '') eq 's2-js-slice3 live dev v1';
 my $app = do "$ENV{LJHOME}/app.psgi";
@@ -130,6 +161,17 @@ my $public = {
     appleTouchIcon => $LJ::APPLE_TOUCH_ICON // '',
     facebookPreviewIcon => $LJ::FACEBOOK_PREVIEW_ICON // '',
     anonymousCaptchaDisabled => JSON::PP::true,
+    entryContent => {
+        imagePlaceholder => $placeholder,
+        urls => {
+            siteDomain => $LJ::DOMAIN // '',
+            knownHttpsSites => [ sort grep { $LJ::KNOWN_HTTPS_SITES{$_} }
+                keys %LJ::KNOWN_HTTPS_SITES ],
+            formDomainBanned => [ sort grep { $LJ::FORM_DOMAIN_BANNED{$_} }
+                keys %LJ::FORM_DOMAIN_BANNED ],
+            imageProxy => 'not-configured',
+        },
+    },
 };
 my @headers;
 $response->headers->scan(sub {
