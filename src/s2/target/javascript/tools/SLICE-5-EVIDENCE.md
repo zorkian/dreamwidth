@@ -46,7 +46,7 @@ normal-helper recovery paths in [the guide](../SLICE-5.md):
 | `missing`, `resources` | Absent and wrong-anum targets returned fixed 404; 31 emitted root-relative destinations redirected exactly, 13 retained static targets returned 200, exact `/go` GET/HEAD admitted and reordered query refused. |
 | `entry-states` | Marked public entry 200; suspension returned fixed 422 for the whole cohort; private, usemask and deleted exact targets returned fixed 404. Normal-helper status/security/delete operations restored only the marked probe. |
 | `pagination`, `cross-journal` | Seven real Perl/TS mixed skip outputs matched; 24 marked rows restored. Two marked journals received equal monotonic jitemids without counter reset; foreign content did not alter primary Recent or Entry output, and both probes were restored. |
-| `empty`, `recheck`, `no-perl` | Temporary private seed cohort hid exact entries and calendar metadata, then restored the two seed posts; a primary mutation before final recheck blocked HTML; Recent and Entry GET/HEAD returned 200 while Starman was unavailable and the app was restarted. |
+| `empty`, `recheck`, `no-perl` | Temporary private seed cohort hid exact entries and calendar metadata, then restored the two seed posts; a real primary mutation before final recheck blocked a Recent response; Recent and Entry GET/HEAD returned 200 while Starman was unavailable and the app was restarted. |
 | `content-refusal`, `update`, `recovery`, `compare` | Three retired tiny-grammar probes were safely repaired/sanitized with exact cleanup; normal post/edit appeared on next GET; SIGKILL probe recovery restored baseline; original RecentPage remained byte-equal to real Perl at 17,937 bytes. |
 | `check-cleaner.js`, `privacy-db.js` | One owned rich entry ran rich, edited, forged-cut, escaped CSS, scheme and unsafe-anchor variants through actual Entry and Recent routes; unsupported cut RPC returned fixed 400 without HTML or state change. The entry was fully deleted by normal helper. Ten owner/status/setting/style refusals and exact privacy recovery passed. |
 
@@ -59,6 +59,11 @@ The two seed HTML files `entry-ts-384.html` and `entry-ts-660.html` have SHA256
 and `b93946dd811f8e63659fa9da8b35cb99aa8b65e9f5f35e7dd7f63fcf15246cb8`.
 The selected IDs are local fixture facts; the commands derive actual IDs from
 the DB and comparison report rather than assume them.
+
+The real-DB `recheck` mode exercises Recent only. Entry 409/change gating is
+tested with injected repository mutations through the actual isolated child
+and HTTP transport in the Entry component tests; this record makes no physical
+Entry mutation or MySQL outage claim.
 
 ## Content and browser evidence
 
@@ -92,9 +97,12 @@ and `bash bin/build-static.sh` exited zero with existing Sass `@import`
 deprecation warnings. The content oracle, native call inventory and replay
 tests passed; the closed-stage mechanics test passed when supplied its required
 sandbox binary argument. The Entry cleaner Chromium and source-newline browser
-component tests passed. The retained Slice 4 formatting browser test needed
-its new Recent `page`/content callback fixture adapted separately; this
-record does not count that test as passing until its owned correction clears.
+component tests passed. The retained Slice 4 formatting browser fixture was
+corrected in reviewed `1e54a8615854b1a5b7a916c4a65c1ef6cb51c2c2`, picked
+locally as `33fa010c31fab47305a796aef8e482bb6d372547`. With the fresh
+stock artifact explicitly supplied,
+`node --test live/tests/cleaner-browser.test.mjs` passed 2/2, including all
+98 raw/native stock rows with JavaScript on and off.
 
 The local database's exact `spamreportBans` count is zero. A positive count
 was tested through typed repository injection and an actual worker, while the
