@@ -1,0 +1,598 @@
+{
+   "kind" : "retained-perl-entry-html_raw0-output",
+   "manifestSha256" : "e326c3ecf63aac076713ee0284653bf372ff005d4e9b4a47498d67b15bcd8e7e",
+   "records" : [
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "flow-rich",
+         "inputBytes" : 290,
+         "inputSha256" : "b6d71deb57c38f972921f1d4a270580cdc663e1fc795059f7de88d040561aa80",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGRpdiBjbGFzcz0iZW50cnktcmljaCI+PGgyPlJpY2ggY2Fmw6kg8J+YgDwvaDI+PHA+PGI+Qm9sZDwvYj4gPGVtPmVtcGhhc2lzPC9lbT4gPGZvbnQgY29sb3I9Im5hdnkiPmZvbnQ8L2ZvbnQ+PC9wPjxvbD48bGk+b25lPC9saT48bGk+dHdvPC9saT48L29sPjx0YWJsZT48Y2FwdGlvbj5DYXB0aW9uPC9jYXB0aW9uPjx0cj48dGQ+Q2VsbDwvdGQ+PC90cj48L3RhYmxlPjxydWJ5Pua8ojxydD5rYW48L3J0PjwvcnVieT48ZGV0YWlscz48c3VtbWFyeT5Nb3JlPC9zdW1tYXJ5PkRldGFpbHM8L2RldGFpbHM+PC9kaXY+",
+         "outputBytes" : 294,
+         "outputSha256" : "f1dce3b6b9b96e2f57964cd5c2c1d1a150b4aa8536960d79cdcd9d5fa111a264",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "slice4 synthetic ordinary-rich positive"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "css-broad",
+         "inputBytes" : 211,
+         "inputSha256" : "71db52302b1345b2c34323058909adf748e2c49edbf667bf8d1693556b9dee38",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHAgY2xhc3M9Im9yZGluYXJ5IiBzdHlsZT0iLS10b25lOiMzMzY2OTk7Y29sb3I6dmFyKC0tdG9uZSk7cG9zaXRpb246cmVsYXRpdmU7bGVmdDo0cHg7ei1pbmRleDoyO3RyYW5zZm9ybTp0cmFuc2xhdGVYKDJweCk7ZGlzcGxheTpncmlkO2dhcDoycHg7YmFja2dyb3VuZC1pbWFnZTp1cmwoaHR0cHM6Ly9hc3NldC5zbGljZTQuaW52YWxpZC9iZy5wbmcpIj5TdHlsZWQ8L3A+",
+         "outputBytes" : 213,
+         "outputSha256" : "88e3b12b49d053c2c6903f1c50e02a9e07704881ded98ae9d7b0d7fe0b27ec5a",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CSS/Cleaner.pm entry cleancss policy"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "css-escaped-fixed",
+         "inputBytes" : 211,
+         "inputSha256" : "490e6a4a75a9ed2a9f670286a884d283f2196c32cc668b033633f47bbd283b1f",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGRpdiBzdHlsZT0icG9zaXRpb246NjYgaXhlZDt0b3A6MDtsZWZ0OjAiPkVzY2FwZWQgZml4ZWQ8L2Rpdj48ZGl2IHN0eWxlPSJwb3NpdGlvbjo2MSBic29sdXRlO3RvcDowO2xlZnQ6MCI+RXNjYXBlZCBhYnNvbHV0ZTwvZGl2PjxkaXYgc3R5bGU9Ii0tcDo2NiBpeGVkO3Bvc2l0aW9uOnZhcigtLXApO3RvcDowO2xlZnQ6MCI+RXNjYXBlZCB2YXJpYWJsZTwvZGl2Pg==",
+         "outputBytes" : 208,
+         "outputSha256" : "9716085c1426399e6f6321255dcc4ddf4127e41bd70b848ff8cb0fbad8e57739",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CSS/Cleaner.pm escaped active-position regression"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "css-custom-url",
+         "inputBytes" : 103,
+         "inputSha256" : "a9b90b0b9b4641d1aff4afe816adfaa8682c775efaa1b7e847cb821e141c186f",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGRpdiBzdHlsZT0iLS1iZzp1cmwoaHR0cHM6Ly9hc3NldC5zbGljZTQuaW52YWxpZC92YXIucG5nKTtiYWNrZ3JvdW5kLWltYWdlOnZhcigtLWJnKSI+Q3VzdG9tIFVSTDwvZGl2Pg==",
+         "outputBytes" : 103,
+         "outputSha256" : "a9b90b0b9b4641d1aff4afe816adfaa8682c775efaa1b7e847cb821e141c186f",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CSS/Cleaner.pm custom-property URL review"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "url-known-schemes",
+         "inputBytes" : 246,
+         "inputSha256" : "6401957c175669a9da8d2ae983275536cc05682a363f7c2ab26eac58496d35ba",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHA+PGEgaHJlZj0iZ29waGVyOi8vbGlua3Muc2xpY2U0LmludmFsaWQvaXRlbSI+R29waGVyPC9hPiA8YSBocmVmPSJtYWduZXQ6P3h0PXVybjpidGloOjEyMyI+TWFnbmV0PC9hPiA8YSBocmVmPSJzcG90aWZ5OnRyYWNrOjEyMyI+U3BvdGlmeTwvYT4gPGEgaHJlZj0iZnRwOi8vZmlsZXMuc2xpY2U0LmludmFsaWQvZmlsZSI+RlRQPC9hPiA8YSBocmVmPSJpcmM6Ly9jaGF0LnNsaWNlNC5pbnZhbGlkL3Jvb20iPklSQzwvYT48L3A+",
+         "outputBytes" : 246,
+         "outputSha256" : "6401957c175669a9da8d2ae983275536cc05682a363f7c2ab26eac58496d35ba",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm safeUri policy"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "url-relative-navigation",
+         "inputBytes" : 136,
+         "inputSha256" : "373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGEgaHJlZj0iLi4vYXJjaGl2ZSI+QXJjaGl2ZTwvYT48YSBocmVmPSIjd2l0aGluLWVudHJ5Ij5Mb2NhbDwvYT48YSBuYW1lPSJ3aXRoaW4tZW50cnkiPkFuY2hvcjwvYT48aW1nIHNyYz0iL2ltZy9waXhlbC5wbmciIGFsdD0iUGl4ZWwiPg==",
+         "outputBytes" : 136,
+         "outputSha256" : "373f5bf3307c35bd65deb6589d2e8c146463e355ac3c281b46c703db3b21c837",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "Slice4 explicit documentUrl origin adaptation"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "url-scheme-active",
+         "inputBytes" : 88,
+         "inputSha256" : "28672375879bdb318b5f364db883450aefd6159f1122c5ad738b0d9de23db63b",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGE+SW5lcnQgbGluazwvYT48YT5NaXhlZCBjYXNlPC9hPg==",
+         "outputBytes" : 34,
+         "outputSha256" : "c7c1a8dafbb1454f7cd4799854b4697acced0556d72ac840e28258176045b37d",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "t/cleaner-xss.t active URI surface"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "image-and-map",
+         "inputBytes" : 202,
+         "inputSha256" : "0b837956b465dfdd4ab11e57c8b86db8520694560332ac728ec28dba22c34d20",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PG1hcCBuYW1lPSJtIj48YXJlYSBzaGFwZT0icmVjdCIgY29vcmRzPSIwLDAsMTYsMTYiIGhyZWY9Imh0dHBzOi8vYXBwLnNsaWNlNC5pbnZhbGlkL21hcCIgYWx0PSJNYXAiPjwvbWFwPjxpbWcgc3JjPSJodHRwczovL2Fzc2V0LnNsaWNlNC5pbnZhbGlkL21hcC5wbmciIHVzZW1hcD0iI20iIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgYWx0PSJNYXBwZWQiPg==",
+         "outputBytes" : 202,
+         "outputSha256" : "0b837956b465dfdd4ab11e57c8b86db8520694560332ac728ec28dba22c34d20",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm image/map entry policy"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "image-srcset-longdesc",
+         "inputBytes" : 145,
+         "inputSha256" : "0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGltZyBzcmM9Imh0dHBzOi8vYXNzZXQuc2xpY2U0LmludmFsaWQvYS5wbmciIHNyY3NldD0iaHR0cHM6Ly9hc3NldC5zbGljZTQuaW52YWxpZC9hMi5wbmcgMngsIC9pbWcvYTMucG5nIDN4IiBsb25nZGVzYz0iL2hlbHAvaW1hZ2UiIGFsdD0iSW1hZ2UiPg==",
+         "outputBytes" : 145,
+         "outputSha256" : "0b7bd13f35771a4cda883c12d2ab673dd33921610e8020ddc22eee8dbfee61c1",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "Slice4 closed body URL attribute inventory"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "image-input-formaction",
+         "inputBytes" : 232,
+         "inputSha256" : "3e242ca1edaeedca348429deb0ffaae1c971711832f3a50acbc2515bbff808a5",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGZvcm0gYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9mb3JtIj48aW5wdXQgdHlwZT0iaW1hZ2UiIHNyYz0iaHR0cHM6Ly9hc3NldC5zbGljZTQuaW52YWxpZC9zdWJtaXQucG5nIiBmb3JtYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9vdGhlciI+PGJ1dHRvbiBmb3JtYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9idXR0b24iPkdvPC9idXR0b24+PC9mb3JtPg==",
+         "outputBytes" : 232,
+         "outputSha256" : "3e242ca1edaeedca348429deb0ffaae1c971711832f3a50acbc2515bbff808a5",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "Slice4 closed body URL attribute inventory"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "form-ordinary",
+         "inputBytes" : 137,
+         "inputSha256" : "4ccb3cbbe0b7b36c5d82f6df36f51613ea948c94873b7e5f4ad1199681989b0c",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGZvcm0gYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9mb3JtIj48bGFiZWw+TmFtZSA8aW5wdXQgbmFtZT0icSIgdmFsdWU9ImNhZsOpIj48L2xhYmVsPjxidXR0b24gdHlwZT0ic3VibWl0Ij5HbzwvYnV0dG9uPjwvZm9ybT4=",
+         "outputBytes" : 137,
+         "outputSha256" : "4ccb3cbbe0b7b36c5d82f6df36f51613ea948c94873b7e5f4ad1199681989b0c",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "t/cleaner-forms.t plus explicit html_raw0 replay"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "form-relative-action",
+         "inputBytes" : 85,
+         "inputSha256" : "c0f74d61a8d4d457594d990b10b7bc8428ea80239690b1d486a284154553ad25",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGZvcm0+PGlucHV0IG5hbWU9InEiPjxidXR0b24gZm9ybWFjdGlvbj0ibmV4dCI+R288L2J1dHRvbj48L2Zvcm0+",
+         "outputBytes" : 66,
+         "outputSha256" : "40cd2f232ce8709c1c1cee854b644a1fe2cf90448f53dc1383c02cc736f44285",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm:700-709 form policy before adaptation"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "form-password",
+         "inputBytes" : 110,
+         "inputSha256" : "e2cb288d2840d7c2f024fa3b8e85691002e638c2c093395c6ab6228eca056aff",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGZvcm0gYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9mb3JtIj48aW5wdXQgbmFtZT0ic2VjcmV0Ij48YnV0dG9uPkdvPC9idXR0b24+PC9mb3JtPg==",
+         "outputBytes" : 94,
+         "outputSha256" : "77427cc315d51eefe1edecc9538cbce439507f779c3aba282810ffc39232065b",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "t/cleaner-forms.t retained password policy"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "cut-flat",
+         "inputBytes" : 92,
+         "inputSha256" : "74534dc809892d4dafe40dfaf905a0b65d41138510c7a8753e54990e075c42e1",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHA+QmVmb3JlPC9wPjxzcGFuIGNsYXNzPSJjdXQtd3JhcHBlciI+PHNwYW4gc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0ic3Bhbi1jdXR0YWdfczJqc19zbGljZTNfMTIzXzEiIGNsYXNzPSJjdXR0YWciPjwvc3Bhbj48YiBjbGFzcz0iY3V0LW9wZW4iPigmbmJzcDs8L2I+PGIgY2xhc3M9ImN1dC10ZXh0Ij48YSBocmVmPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9zMmpzX3NsaWNlMy8xMjMuaHRtbCNjdXRpZDEiPlJlYWQgaGlkZGVuIGNhZsOpPC9hPjwvYj48YiBjbGFzcz0iY3V0LWNsb3NlIj4mbmJzcDspPC9iPjwvc3Bhbj48ZGl2IHN0eWxlPSJkaXNwbGF5OiBub25lOyIgaWQ9ImRpdi1jdXR0YWdfczJqc19zbGljZTNfMTIzXzEiIGFyaWEtbGl2ZT0iYXNzZXJ0aXZlIj48L2Rpdj48cD5BZnRlcjwvcD4=",
+         "outputBytes" : 407,
+         "outputSha256" : "b34d01b2816ed86c0e695eaa78539b81ac61e7896a3bdfe02c1e6382e9f2cd9a",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm:551-610 recent cut behavior"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "cut-alias-div",
+         "inputBytes" : 114,
+         "inputSha256" : "65c3238b4b1fe9df14658fd0dfabe8114454b6fb655898dcca1e77f25293297b",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHNwYW4gY2xhc3M9ImN1dC13cmFwcGVyIj48c3BhbiBzdHlsZT0iZGlzcGxheTogbm9uZTsiIGlkPSJzcGFuLWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMSIgY2xhc3M9ImN1dHRhZyI+PC9zcGFuPjxiIGNsYXNzPSJjdXQtb3BlbiI+KCZuYnNwOzwvYj48YiBjbGFzcz0iY3V0LXRleHQiPjxhIGhyZWY9Imh0dHBzOi8vYXBwLnNsaWNlNC5pbnZhbGlkL3MyanNfc2xpY2UzLzEyMy5odG1sI2N1dGlkMSI+QWxpYXM8L2E+PC9iPjxiIGNsYXNzPSJjdXQtY2xvc2UiPiZuYnNwOyk8L2I+PC9zcGFuPjxkaXYgc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0iZGl2LWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMSIgYXJpYS1saXZlPSJhc3NlcnRpdmUiPjwvZGl2PjxkaXY+PHNwYW4gY2xhc3M9ImN1dC13cmFwcGVyIj48c3BhbiBzdHlsZT0iZGlzcGxheTogbm9uZTsiIGlkPSJzcGFuLWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMiIgY2xhc3M9ImN1dHRhZyI+PC9zcGFuPjxiIGNsYXNzPSJjdXQtb3BlbiI+KCZuYnNwOzwvYj48YiBjbGFzcz0iY3V0LXRleHQiPjxhIGhyZWY9Imh0dHBzOi8vYXBwLnNsaWNlNC5pbnZhbGlkL3MyanNfc2xpY2UzLzEyMy5odG1sI2N1dGlkMiI+RGl2IGN1dDwvYT48L2I+PGIgY2xhc3M9ImN1dC1jbG9zZSI+Jm5ic3A7KTwvYj48L3NwYW4+PGRpdiBzdHlsZT0iZGlzcGxheTogbm9uZTsiIGlkPSJkaXYtY3V0dGFnX3MyanNfc2xpY2UzXzEyM18yIiBhcmlhLWxpdmU9ImFzc2VydGl2ZSI+PC9kaXY+PC9kaXY+PHA+VmlzaWJsZTwvcD4=",
+         "outputBytes" : 767,
+         "outputSha256" : "0745b06336742eb745f35d23d2a4f0f026caed1eba66e5ed4a64e25fead708c1",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm cut alias/div behavior"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "cut-forged-id",
+         "inputBytes" : 121,
+         "inputSha256" : "f02b68bde00c8f8699c445a6e7e6c481c48e64d33414de12b8b4897cbfa5310a",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHNwYW4gY2xhc3M9ImN1dHRhZyI+Rm9yZ2VkPC9zcGFuPjxzcGFuIGNsYXNzPSJjdXQtd3JhcHBlciI+PHNwYW4gc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0ic3Bhbi1jdXR0YWdfczJqc19zbGljZTNfMTIzXzEiIGNsYXNzPSJjdXR0YWciPjwvc3Bhbj48YiBjbGFzcz0iY3V0LW9wZW4iPigmbmJzcDs8L2I+PGIgY2xhc3M9ImN1dC10ZXh0Ij48YSBocmVmPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9zMmpzX3NsaWNlMy8xMjMuaHRtbCNjdXRpZDEiPlJlYWwgY3V0PC9hPjwvYj48YiBjbGFzcz0iY3V0LWNsb3NlIj4mbmJzcDspPC9iPjwvc3Bhbj48ZGl2IHN0eWxlPSJkaXNwbGF5OiBub25lOyIgaWQ9ImRpdi1jdXR0YWdfczJqc19zbGljZTNfMTIzXzEiIGFyaWEtbGl2ZT0iYXNzZXJ0aXZlIj48L2Rpdj4=",
+         "outputBytes" : 407,
+         "outputSha256" : "5174bc9e87aaff7fa639466ced05a3e4787b99e0f392af53eb576f6656c8214c",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "jquery.cuttag-ajax.js:313 and source-ID removal policy"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "cut-unclosed",
+         "inputBytes" : 55,
+         "inputSha256" : "ecc68928b25ca1e0c73a23e40b5ab779cba7d812b1f8816175e3635f41d33183",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHA+QmVmb3JlPC9wPjxzcGFuIGNsYXNzPSJjdXQtd3JhcHBlciI+PHNwYW4gc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0ic3Bhbi1jdXR0YWdfczJqc19zbGljZTNfMTIzXzEiIGNsYXNzPSJjdXR0YWciPjwvc3Bhbj48YiBjbGFzcz0iY3V0LW9wZW4iPigmbmJzcDs8L2I+PGIgY2xhc3M9ImN1dC10ZXh0Ij48YSBocmVmPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9zMmpzX3NsaWNlMy8xMjMuaHRtbCNjdXRpZDEiPk9wZW48L2E+PC9iPjxiIGNsYXNzPSJjdXQtY2xvc2UiPiZuYnNwOyk8L2I+PC9zcGFuPjxkaXYgc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0iZGl2LWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMSIgYXJpYS1saXZlPSJhc3NlcnRpdmUiPjwvZGl2Pg==",
+         "outputBytes" : 382,
+         "outputSha256" : "fcbf27df8cb64f332478c6fae31ac1ea59102f967ec406f41fcbd22caf93e0c0",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "Slice4 closed-cut ambiguity refusal"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "cut-nested",
+         "inputBytes" : 91,
+         "inputSha256" : "e44f29f2495733dbac29185da283e0e92627dcc2f36904f6fa36c89864d5cb41",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHNwYW4gY2xhc3M9ImN1dC13cmFwcGVyIj48c3BhbiBzdHlsZT0iZGlzcGxheTogbm9uZTsiIGlkPSJzcGFuLWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMSIgY2xhc3M9ImN1dHRhZyI+PC9zcGFuPjxiIGNsYXNzPSJjdXQtb3BlbiI+KCZuYnNwOzwvYj48YiBjbGFzcz0iY3V0LXRleHQiPjxhIGhyZWY9Imh0dHBzOi8vYXBwLnNsaWNlNC5pbnZhbGlkL3MyanNfc2xpY2UzLzEyMy5odG1sI2N1dGlkMSI+T3V0ZXI8L2E+PC9iPjxiIGNsYXNzPSJjdXQtY2xvc2UiPiZuYnNwOyk8L2I+PC9zcGFuPjxkaXYgc3R5bGU9ImRpc3BsYXk6IG5vbmU7IiBpZD0iZGl2LWN1dHRhZ19zMmpzX3NsaWNlM18xMjNfMSIgYXJpYS1saXZlPSJhc3NlcnRpdmUiPjwvZGl2Pg==",
+         "outputBytes" : 370,
+         "outputSha256" : "2b53a3702c20cbf1591e4e5e86bef02b4e8b4bd2b4d1d481b3b535e918424d74",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "Slice4 flat-cut scope refusal"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "head-hoist",
+         "inputBytes" : 216,
+         "inputSha256" : "6196b6e60172647b26db7e192177ea4def35745cdf23c470f479a986b47f2057",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHA+QWZ0ZXIgaGVhZCB0b2tlbnM8L3A+",
+         "outputBytes" : 24,
+         "outputSha256" : "ab713775707af98be6d5ea3a895cd74a49840d478df692608300d049e8956cec",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "HTML document versus div.entry-content fragment reparse"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "rawtext-xmp",
+         "inputBytes" : 55,
+         "inputSha256" : "544d4c92ba25f01636174e47929df4ca78b580cf50ed0b74677c90a27d6da594",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHhtcD4mbHQ7aW1nIHNyYz14IG9uZXJyb3I9YWxlcnQoMSkmZ3Q7PC94bXA+PHA+QWZ0ZXIgeG1wPC9wPg==",
+         "outputBytes" : 61,
+         "outputSha256" : "21e53fe5b529f8564e1f6d58982658fb83fb194ebe1864e1d1330a239698f06f",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "HTML document versus div.entry-content rawtext reparse"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "rawtext-plaintext",
+         "inputBytes" : 59,
+         "inputSha256" : "c49cb0f6d2b7aca6ecebb9c76ac173bfad5dc9fb9ebfcbf1f41f8283b08922dd",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "Jmx0O2ltZyBzcmM9eCBvbmVycm9yPWFsZXJ0KDEpJmd0OyZsdDtwJmd0O0Fic29yYmVkIHRleHQmbHQ7L3AmZ3Q7",
+         "outputBytes" : 66,
+         "outputSha256" : "8bb91cacc2a4a0fa000cc1f9c2bdcbbfd13726e10a6b7073c5ae1abd739fb8bb",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "cgi-bin/LJ/CleanHTML.pm event-eat plaintext plus browser reparse"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "rawtext-script-textarea",
+         "inputBytes" : 100,
+         "inputSha256" : "dd8803a078bcfaf21ad3a13fc682a97b505a106beac6e98aee29c7da454f5192",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHRleHRhcmVhPiZsdDtpbWcgc3JjPXggb25lcnJvcj1hbGVydCgxKSZndDs8L3RleHRhcmVhPjxwPkFmdGVyIHJhd3RleHQ8L3A+",
+         "outputBytes" : 75,
+         "outputSha256" : "aa3e81ea53f1fe03d6c958fc4e334d5c2a951beddae8c4abc1624610957a4530",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "HTML rawtext/RCDATA insertion-context review"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "malformed-table",
+         "inputBytes" : 61,
+         "inputSha256" : "9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHRhYmxlPjx0cj48dGQ+Q2VsbDxwPlBhcmFncmFwaDwvdGFibGU+PGRpdj5BZnRlciB0YWJsZTwvZGl2Pg==",
+         "outputBytes" : 61,
+         "outputSha256" : "9f9df93722a40aac3a87073ee8ab396cc49e9dbd9ace456dd2f184e458cc173a",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "HTML parser repair under stock entry wrapper"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "malformed-form",
+         "inputBytes" : 138,
+         "inputSha256" : "f85a915b3831f2f3523bfb20cc7cf3abe5193aa5dba5a81387e7a8629516f775",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PGZvcm0gYWN0aW9uPSJodHRwczovL2FwcC5zbGljZTQuaW52YWxpZC9mb3JtIj48cD5GaXJzdDxmb3JtIGFjdGlvbj0iaHR0cHM6Ly9ldmlsLnNsaWNlNC5pbnZhbGlkL290aGVyIj48YnV0dG9uPkdvPC9idXR0b24+PC9mb3JtPjxwPkFmdGVyPC9wPjwvcD48L2Zvcm0+",
+         "outputBytes" : 153,
+         "outputSha256" : "7939949e678147637a6e9d3ead698b5dacdfddb16372885bfe7a5ebc8742c881",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3"
+         },
+         "reparse" : [
+            "document",
+            "div.entry-content"
+         ],
+         "source" : "HTML parser repair under stock entry wrapper"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "reader-colors",
+         "inputBytes" : 127,
+         "inputSha256" : "fd581bcfe76aa473ef496c1ec1580bc5df9398e78fc6df294079546e182c66d7",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHAgc3R5bGU9ImZvbnQtc2l6ZToyNHB4O2ZvbnQtZmFtaWx5OnNlcmlmIj48Zm9udCBzaXplPSI0IiBmYWNlPSJzZXJpZiI+UmVhZGVyPC9mb250PjwvcD4=",
+         "outputBytes" : 89,
+         "outputSha256" : "c60071203c6e59032f1677f723e116618214e9484cfffb47dac65565126214d7",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3",
+            "remove_colors" : 1
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "t/cleaner-event.t:102-132 reader color options"
+      },
+      {
+         "died" : false,
+         "error" : null,
+         "id" : "reader-colors-sizes-fonts",
+         "inputBytes" : 127,
+         "inputSha256" : "fd581bcfe76aa473ef496c1ec1580bc5df9398e78fc6df294079546e182c66d7",
+         "inputUtf8Flag" : false,
+         "outputBase64" : "PHAgc3R5bGU9IiI+PGZvbnQ+UmVhZGVyPC9mb250PjwvcD4=",
+         "outputBytes" : 35,
+         "outputSha256" : "f83bd10b2c31f43853b6df2eb0f602860a9e25cfabe3e8532da94d54b42469a0",
+         "outputUtf8Flag" : false,
+         "perlOptions" : {
+            "cuturl" : "https://app.slice4.invalid/s2js_slice3/123.html",
+            "ditemid" : 123,
+            "editor" : "html_raw0",
+            "journal" : "s2js_slice3",
+            "remove_colors" : 1,
+            "remove_fonts" : 1,
+            "remove_sizes" : 1
+         },
+         "reparse" : [
+            "div.entry-content"
+         ],
+         "source" : "t/cleaner-event.t:102-132 reader CSS options"
+      }
+   ],
+   "schema" : 1
+}
