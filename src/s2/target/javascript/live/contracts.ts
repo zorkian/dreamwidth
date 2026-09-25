@@ -12,6 +12,8 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import type { EntryContentContext, ImagePlaceholder } from "@dreamwidth/content/contracts";
+
 export type PublicSettingName =
     | "stylesys" | "s2_style" | "journaltitle" | "journalsubtitle"
     | "url" | "urlname" | "adult_content" | "adult_content_reason"
@@ -183,6 +185,13 @@ export interface RepositoryError extends Error {
 // untrusted Host. Page markup retains natural prefixes; allowed HTTP redirects
 // target canonicalAppOrigin, never proxying or processing retained-app controls.
 export interface PublicAppConfig {
+    // Public source-derived facts from offline local configuration, never HTML
+    // or proxy credentials. Ordinary live serving asserts proxy not-configured;
+    // synthetic configured-proxy qualification uses a separate host-only key.
+    readonly entryContent: {
+        readonly imagePlaceholder: ImagePlaceholder;
+        readonly urls: EntryContentContext["urls"];
+    };
     readonly canonicalAppOrigin: string;
     readonly listenOrigin: string;
     readonly siteRoot: string;
