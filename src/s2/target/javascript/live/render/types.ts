@@ -12,6 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import type { InertEntryMetadata } from "@dreamwidth/content/contracts";
 import type { PublicAppConfig } from "../contracts";
 
 export interface ApprovedEntry {
@@ -39,9 +40,25 @@ export interface ApprovedJournal {
     readonly blockRobots: boolean;
     readonly entries: readonly ApprovedEntry[];
 }
+export type RenderPage =
+    | { readonly kind: "recent" }
+    | { readonly kind: "entry"; readonly ditemid: number };
+
+// These callbacks/results exist only inside the credential-free render child.
+// The worker derives both independently from the approved raw entry. The engine
+// consumes body HTML in body context and inert metadata at the escaped OG
+// attribute boundary. Neither fragment nor helper string returns to the parent.
+export interface RenderContentPreparation {
+    body(entry: ApprovedEntry, entryUrl: string): string;
+    metadata(entry: ApprovedEntry, entryUrl: string): InertEntryMetadata;
+}
+
 export interface RenderInput {
+    readonly page: RenderPage;
     readonly journal: ApprovedJournal;
     readonly config: PublicAppConfig;
+    // Entry requests require exactly skip=0 and skipPresent=false. Admission,
+    // service and worker enforce this; the page discriminator is not inferred.
     readonly skip: number;
     readonly skipPresent: boolean;
     readonly nowSeconds: number;
