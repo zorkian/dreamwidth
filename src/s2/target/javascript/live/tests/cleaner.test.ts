@@ -42,6 +42,13 @@ function html(result: EntryContentResult): string {
 function input(body: string, changed: Partial<EntryContentContext> = {}): EntryContentInput {
     return {body, format: "html_raw0", context: {...context, ...changed}};
 }
+function retained(bodies: readonly string[]): string[] {
+    const probe = spawnSync("perl", [resolve(__dirname, "../../../live/tests/cleaner-retained.pl")],
+        {input: JSON.stringify(bodies), encoding: "utf8", timeout: 10000,
+            env: {...process.env, PERL_HASH_SEED: "0", PERL_PERTURB_KEYS: "0"}});
+    assert.equal(probe.status, 0, probe.stderr);
+    return JSON.parse(probe.stdout) as string[];
+}
 
 test("actual cleaner preserves rich formatting, classes, names and broad inline CSS", () => {
     const cleaner = createEntryCleaner(limits);
@@ -75,10 +82,80 @@ test("relative navigation/images/CSS resolve at the retained document; fragments
             assert.ok(output.includes(marker), marker);
         }
         const css = html(cleaner.clean(input('<p style="background:u\\72l(/x)">x</p>')));
-        assert.ok(css.includes('url(http://localhost:8080/x)'));
+        assert.equal(css, '<p style="background:u72l(/x)">x</p>');
         const unproxied = html(cleaner.clean(input('<p style="background:url(http://other.test/x)">x</p>',
             {urls: {...context.urls, imageProxy: "host-resolved"}})));
         assert.ok(unproxied.includes('url(http://other.test/x)'));
+    } finally { cleaner.close(); }
+});
+
+test("entry inventory preserves ordinary legacy attributes and refuses uncovered representations explicitly", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const body = '<a href="https://example.test/" target="_blank" rel="nofollow">go</a>' +
+            '<img src="https://example.test/p" hspace="3" vspace="2">' +
+            '<p accesskey="k" contenteditable="true" data-note="kept" aria-label="entry">text</p>' +
+            '<marquee scrollamount="2">moving</marquee><blink>blink</blink><nobr>one two</nobr>' +
+            '<acronym title="Long">short</acronym><big>big</big><dir><li>item</li></dir>';
+        assert.equal(html(cleaner.clean(input(body))), body);
+        assert.equal(html(cleaner.clean(input(html(cleaner.clean(input(body)))))), body);
+        const native = retained([body, '<xmp>visible text</xmp>', '<custom-el>visible text</custom-el>']);
+        for (const marker of ['target="_blank"', 'hspace="3"', 'vspace="2"', 'accesskey="k"',
+            'contenteditable="true"', '<xmp>visible text</xmp>', '<custom-el>visible text</custom-el>']) {
+            assert.ok(native.join('').includes(marker), marker);
+        }
+        for (const raw of ['<xmp>visible text</xmp>', '<listing>visible text</listing>',
+            '<plaintext>visible text', '<custom-el>visible text</custom-el>',
+            '<p unexamined="value">visible text</p>',
+            '<button form="trusted-control">cross-fragment control</button>']) {
+            assert.deepEqual(cleaner.clean(input(raw)), {kind: "failure", reason: "unsupported"}, raw);
+        }
+        // Named DOM-clobbering collisions are the sanitizer's security exception;
+        // ordinary author-provided names remain usable anchors.
+        assert.equal(html(cleaner.clean(input('<a name="location">x</a><a name="ordinary">y</a>'))),
+            '<a>x</a><a name="ordinary">y</a>');
+    } finally { cleaner.close(); }
+});
+
+test("navigation uses the retained dangerous-scheme removal, not a small protocol allowlist", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const bodies = ['gopher://g.test/', 'magnet:?xt=urn:x', 'spotify:track:1',
+            'ftp://ftp.test/path', 'irc://irc.test/channel'].map(url => `<a href="${url}">go</a>`);
+        assert.deepEqual(retained(bodies), bodies);
+        for (const body of bodies) {
+            assert.equal(html(cleaner.clean(input(body))), body);
+        }
+        for (const url of ['javascript:alert(1)', 'vbscript:msgbox(1)', 'data:text/html,x',
+            'about:blank', 'livescript:x', 'jscript:x', 'jAvA&#x09;script:alert(1)']) {
+            assert.equal(html(cleaner.clean(input(`<a href="${url}">go</a>`))), '<a>go</a>');
+        }
+        assert.equal(html(cleaner.clean(input('<form action="gopher://g.test/"><button>go</button></form>'))),
+            '<form><button>go</button></form>');
+    } finally { cleaner.close(); }
+});
+
+test("CSS screening, parsing and emission all use the retained backslash-stripped value", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const cases = [
+            ['position:\\66 ixed;top:0;left:0', 'position:66 ixed;top:0;left:0'],
+            ['position:\\61 bsolute;top:0', 'position:61 bsolute;top:0'],
+            ['--p:\\66 ixed;position:var(--p)', '--p:66 ixed;position:var(--p)'],
+            ['--p:\\61 bsolute;position:var(--p)', '--p:61 bsolute;position:var(--p)'],
+            ['background:u\\72l(/x)', 'background:u72l(/x)'],
+            ['width:e\\78pression(1)', 'width:e78pression(1)'],
+            ['posit\\69 on:fixed', null], ['position:fixed', null], ['position:absolute', null],
+            ['width:expres\\sion(1)', null],
+        ] as const;
+        const raw = cases.map(([style]) => `<p style="${style}">x</p>`);
+        const native = retained(raw);
+        for (const [i, [, style]] of cases.entries()) {
+            const expected = style === null ? '<p>x</p>' : `<p style="${style}">x</p>`;
+            assert.equal(native[i], expected, raw[i]);
+            assert.equal(html(cleaner.clean(input(raw[i]!))), expected, raw[i]);
+            assert.equal(html(cleaner.clean(input(expected))), expected, "actual second pass");
+        }
     } finally { cleaner.close(); }
 });
 

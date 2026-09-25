@@ -53,10 +53,11 @@ export function cleanStyle(value: string, context: EntryContentContext,
     limits: CleanerLimits, budget: CssBudget): string | null {
     budget.bytes += Buffer.byteLength(value);
     if (budget.bytes > limits.maxCssBytes) throw new UnsupportedContent();
-    // Entry cleancss, not comment strongcleancss. The legacy lexical screen is
-    // retained, but parsing original escapes below prevents escaped URL/function
-    // names from evading modern resource checks. No declaration-name allowlist.
-    const legacy = value.replace(/\\/g, "");
+    // CleanHTML.pm769 transforms the value itself before all later processing.
+    // Re-emitting original escapes would reactivate fixed/absolute identifiers,
+    // including inside custom properties. This is entry, not strongcleancss.
+    value = value.replace(/\\/g, "");
+    const legacy = value;
     if (/\/\*|\[|absolute|fixed|expression|eval|behavior|cookie|document|window|javascript|-moz-binding/i.test(legacy) ||
         !secondaryScreen(legacy)) return null;
     let ast: tree.CssNode;
@@ -85,8 +86,8 @@ export function cleanStyle(value: string, context: EntryContentContext,
                 throw new UnsupportedContent();
             }
             if (decoded === "url") {
-                // Escaped url identifiers parse as generic functions. Reparse
-                // the normalized function as a value and require exactly a URL.
+                // Defensively require a generic URL-shaped function to parse
+                // as exactly one resource, including in custom properties.
                 const parsed = tree.parse("url(" + node.children.toArray().map(v => tree.generate(v)).join("") + ")",
                     {context: "value"});
                 if (parsed.type !== "Value" || parsed.children.size !== 1 ||

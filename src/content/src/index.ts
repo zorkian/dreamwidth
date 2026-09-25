@@ -26,17 +26,15 @@ import {replaceCuts} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
+import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext,
+    ordinaryAttribute, externalControlAttributes} from "./policy/inventory";
 
-const eaten = new Set(["head", "title", "style", "layer", "iframe", "applet", "object", "xml",
-    "param", "base", "script"]);
-const removed = new Set(["bgsound", "embed", "link", "body", "meta", "noscript", "plaintext", "noframes"]);
 const media = new Set(["audio", "video", "source", "track"]);
 const applicationTags = new Set(["lj", "user", "poll", "poll-item", "poll-question", "raw-code", "site-embed"]);
 const controls = new Set(["input", "select", "option"]);
 const hrefTags = new Set(["a", "area"]);
 const citeTags = new Set(["blockquote", "q", "del", "ins"]);
 const backgrounds = new Set(["table", "td", "th"]);
-const safeUri = /^(?:(?:https?|ftp|ftps|mailto|tel|callto|sms|cid|xmpp|irc|ircs|news|nntp|webcal):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i;
 
 function checkTree(root: Element, limits: CleanerLimits, extraRoot?: Element): void {
     let nodes = 0;
@@ -56,7 +54,6 @@ function navigation(value: string, input: EntryContentInput, href: boolean): str
         // pass them to a browser as a registered external application scheme.
         throw new UnsupportedContent();
     }
-    if (!safeUri.test(clean)) throw new UnsupportedContent();
     return resolveDocumentUrl(clean, input.context.documentUrl);
 }
 
@@ -67,15 +64,16 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
     for (const element of [...root.querySelectorAll("*")]) {
         if (!root.contains(element)) continue;
         const tag = element.localName;
-        if (element.namespaceURI !== "http://www.w3.org/1999/xhtml" || eaten.has(tag)) {
+        if (element.namespaceURI !== "http://www.w3.org/1999/xhtml" || eatenTags.has(tag)) {
             element.remove();
             continue;
         }
-        if (media.has(tag) || applicationTags.has(tag) || tag === "template" || /^lj-/.test(tag) ||
+        if (unsupportedRawtext.has(tag) || media.has(tag) || applicationTags.has(tag) || tag === "template" || /^lj-/.test(tag) ||
             ["ljuser", "ljvideo"].includes(element.getAttribute("class")?.toLowerCase() ?? "")) {
             throw new UnsupportedContent();
         }
-        if (removed.has(tag)) { element.replaceWith(...element.childNodes); continue; }
+        if (removedTags.has(tag)) { element.replaceWith(...element.childNodes); continue; }
+        if (!entryTags.has(tag)) throw new UnsupportedContent();
         if (controls.has(tag) && !element.closest("form")) {
             element.replaceWith(document.createTextNode(`<${tag} ... >`), ...element.childNodes);
             continue;
@@ -84,6 +82,10 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
             const type = element.getAttribute("type") ?? "";
             if (!/^\w+$/.test(type) || type.toLowerCase() === "password") element.removeAttribute("type");
         }
+        if (element.hasAttribute("data")) {
+            element.removeAttribute("data");
+            element.removeAttribute("type");
+        }
         for (const attribute of [...element.attributes]) {
             const name = attribute.name;
             if (/^(?:on|dynsrc)/.test(name) || ["srcdoc", "ping", "xmlns", "xlink:href"].includes(name) ||
@@ -91,8 +93,8 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
                 element.removeAttribute(name);
                 continue;
             }
-            if (name === "data") {
-                element.removeAttribute("data"); element.removeAttribute("type"); continue;
+            if (externalControlAttributes.has(name) || !ordinaryAttribute(name)) {
+                throw new UnsupportedContent();
             }
             const value = retainedAttributeValue(attribute.value);
             if (value === null) { element.removeAttribute(name); continue; }
@@ -210,10 +212,9 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 // Final operation on markup. No later string replacement or raw
                 // substitution may invalidate this body-context sanitation.
                 const html = purify.sanitize(root.innerHTML, {
-                    USE_PROFILES: {html: true}, SANITIZE_DOM: true,
-                    ALLOWED_URI_REGEXP: safeUri,
-                    ADD_TAGS: ["font", "center", "strike", "tt", "form", "input", "button", "select", "option", "textarea", "map", "area"],
-                    ADD_ATTR: ["name", "usemap", "shape", "coords", "background", "longdesc", "formaction", "border", "color", "bgcolor", "fgcolor", "face", "size"],
+                    ALLOWED_TAGS: [...entryTags, "#text"], ALLOWED_ATTR: [...entryAttributes],
+                    ALLOW_ARIA_ATTR: true, ALLOW_DATA_ATTR: true, KEEP_CONTENT: true,
+                    SANITIZE_DOM: true, ALLOW_UNKNOWN_PROTOCOLS: true,
                     FORBID_TAGS: ["style", "script", "svg", "math", "template", "iframe", "object", "embed"],
                     RETURN_TRUSTED_TYPE: false,
                 });
