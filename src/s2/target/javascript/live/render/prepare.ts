@@ -30,14 +30,21 @@ import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
 
 export function prepare(input: RenderInput, ctx: Context): S2Object {
-    const { journal: j, config: c, skip } = input;
+    const { journal: j, config: c } = input;
     const base = `${c.canonicalAppOrigin}/~${j.username}`;
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
         journal_type: "P", userpic_listing_url: `${base}/icons`, host_userid: j.userid,
         link_keyseq: ["manage_membership", "trust", "watch", "post_entry", "track", "message", "tell_friend"],
         default_pic: nullObject("Image"), website_url: "", website_name: ""});
     const itemshow = Math.min(50, Number(ctx.prop._num_items_recent) || 20);
-    const selected = j.entries.slice(skip, skip + itemshow + 1);
+    // RecentPage clamps with itemshow; recent_items clamps again with the extra
+    // lookahead row. Preserve this off-by-one behavior at the local max100.
+    // The offline config assertion pins MAX_SCROLLBACK_LASTN=100. Request skip
+    // remains in input for exact returnto/script echoes, including explicit0.
+    const maxSkip = 100 - itemshow;
+    const skip = Math.min(input.skip, maxSkip);
+    const loadSkip = Math.min(skip, 100 - (itemshow + 1));
+    const selected = j.entries.slice(loadSkip, loadSkip + itemshow + 1);
     selected.sort((a, b) => b.eventtime.slice(0, 16).localeCompare(a.eventtime.slice(0, 16)) ||
         Math.floor(b.id / 256) - Math.floor(a.id / 256));
     const hasPrevious = selected.length > itemshow;
@@ -68,7 +75,9 @@ export function prepare(input: RenderInput, ctx: Context): S2Object {
     }
     if (entries.length === itemshow) {
         nav._backward_count = itemshow;
-        if (hasPrevious) {
+        if (skip === maxSkip) {
+            nav._backward_url = `${base}/${selected.at(-1)!.eventtime.slice(0, 10).replaceAll("-", "/")}`;
+        } else if (hasPrevious) {
             nav._backward_skip = skip + itemshow;
             nav._backward_url = `${base}/?skip=${nav._backward_skip}`;
         }
