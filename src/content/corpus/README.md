@@ -29,11 +29,17 @@ embed or streaming case.
 
 `native-calls/` contains **1,062** byte-exact `LJ::CleanHTML` input/output
 calls from twelve of those original suites. Each JSONL record stores the
-original test source location, TAP position before the call, method, scalar
-options, UTF-8 flag and base64-encoded bytes with SHA-256. The inventory
-links each TAP case to its call ordinal or explicitly has an empty list.
-One assertion may call the cleaner several times, and one cleaner call may
-support several assertions; 1,062 calls are not 1,116 TAP cases. The native
+test-source line, the repo-relative direct caller and line, nested depth and
+parent call ordinal, every positional argument after the input reference,
+the TAP position before the call, method, UTF-8 flag and base64-encoded bytes
+with SHA-256. Hash argument scalar fields and reference kinds are recorded;
+other references are recorded by kind, without serializing their contents.
+The inventory's `nativeCallsSincePreviousTap` lists calls completed after the
+preceding TAP assertion and before this one. It is an **execution window**,
+not a claim that the assertion consumes each listed output. An empty window
+can still assert on output from an earlier call. One assertion may call the
+cleaner several times, and one cleaner call may support several assertions;
+1,062 calls are not 1,116 TAP cases. The native
 email and direct `HTMLCleaner` link suites have no `LJ::CleanHTML` call trace
 and remain indexed by their original TAP/source evidence. Original `#line`
 locations are retained in the temporary instrumented suite. Every one of the
@@ -69,8 +75,8 @@ cp /tmp/slice4-native-sol/*.log src/content/corpus/native-logs/
 /opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs
 ```
 
-Regenerate call traces in a separate existing directory, then copy only the
-JSONL outputs once the TAP streams match `native-logs/`:
+Regenerate call traces in a separate existing directory. Compare the new
+JSONL with the retained traces as well as the TAP streams before copying:
 
 ```sh
 mkdir -p /tmp/slice4-native-calls
@@ -80,9 +86,12 @@ for suite in t/cleaner*.t; do
     perl src/content/tools/cleaner-native-run.pl "$name" /tmp/slice4-native-calls
     cmp "/tmp/slice4-native-calls/$name.tap" \
         "src/content/corpus/native-logs/$name.log" || exit
+    cmp "/tmp/slice4-native-calls/$name.calls.jsonl" \
+        "src/content/corpus/native-calls/$name.calls.jsonl" || exit
 done
-cp /tmp/slice4-native-calls/*.calls.jsonl src/content/corpus/native-calls/
-/opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs
+/opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs \
+    /tmp/slice4-native-calls /tmp/slice4-native-calls/inventory.json
+cmp /tmp/slice4-native-calls/inventory.json src/content/corpus/native-inventory.json
 ```
 
 Regeneration only uses this container's own test DB. Some original suites use
