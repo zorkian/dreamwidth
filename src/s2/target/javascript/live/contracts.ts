@@ -55,6 +55,7 @@ export interface RawStyleLayer {
     readonly type: string; // expose unsupported types; never silently drop them
     readonly s2lid: number;
     readonly ownerid: number;
+    readonly ownerUsername: string; // joined global owner; missing row unsupported; fingerprint both
     readonly compiledTime: number; // s2compiled.comptime; s2layers has no modtime
     readonly sourceHash: string;
 }
