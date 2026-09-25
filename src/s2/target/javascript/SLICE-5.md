@@ -134,13 +134,16 @@ PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
   dist/index.js current synthetic > /tmp/slice5-recent-synthetic.json
 PATH=/opt/dw-node24/bin:$PATH node tools/compare-entry-replays.mjs \
   dist/index.js current native > /tmp/slice5-recent-native.json
+SLICE5_CORPUS_ATTESTATION=$(mktemp -d /tmp/dw-slice5-corpus-attest.XXXXXX)
 PATH=/opt/dw-node24/bin:$PATH node tools/attest-corpus-run.mjs \
   --synthetic /tmp/slice5-recent-synthetic.json \
-  --native /tmp/slice5-recent-native.json --entry
+  --native /tmp/slice5-recent-native.json --entry \
+  --output "$SLICE5_CORPUS_ATTESTATION"
 PATH=/opt/dw-node24/bin:$PATH node tools/check-slice5-recent-regression.mjs \
   corpus/slice5-recent-binding.json /tmp/slice5-recent-synthetic.json \
-  /tmp/slice5-recent-native.json
-PATH=/opt/dw-node24/bin:$PATH node tools/check-slice5-entry-ledger.mjs
+  /tmp/slice5-recent-native.json --attestation "$SLICE5_CORPUS_ATTESTATION"
+PATH=/opt/dw-node24/bin:$PATH node tools/check-slice5-entry-ledger.mjs \
+  --attestation "$SLICE5_CORPUS_ATTESTATION"
 ```
 
 For the actual TypeScript page/browser matrix, use one of the IDs in
