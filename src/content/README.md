@@ -128,6 +128,41 @@ intercepts one synthetic document and one synthetic image in each Chromium,
 Firefox and WebKit JS-on/off mode. The actual assembled stock output and
 security corpus need their own browser harness.
 
+`tools/browser-entry-reparse.mjs` accepts a 26-row cleaner result JSON whose
+IDs and output digests match `corpus/entry-replay-cases.json`. It tests each
+admitted output in both recorded document and `div.entry-content` contexts
+across all six installed browser modes. A raw control must execute only with
+JavaScript enabled and must hit the denied image/WebSocket traps. Browser
+service workers are blocked, every request is intercepted, and only enumerated
+synthetic image URLs are served. Four named ambiguous cut/rawtext cases must
+remain explicit refusals. This run is a fragment/reparse check, not an actual
+stock page check.
+
+For the assembled check, supply the **actual TS route response bytes** and an
+exact public-resource map. Capture only the public resources referenced by
+that page from the retained local app, then add any CSS background URL observed
+by the browser as a named extra path; an unlisted request fails the run. The
+capture helper uses a fixed loopback app origin and allows only stock static
+and stylesheet paths. It stores response hashes and bytes, with no cookies or
+account data. Example, from `src/content` in the owning devcontainer:
+
+```sh
+/opt/dw-node24/bin/node tools/capture-browser-resources.mjs \
+    ../s2/target/javascript/artifacts/live/page-ts.html \
+    /tmp/slice4-stock-resources.json /img/controlstrip/bg-dark.gif
+/opt/dw-node24/bin/node tools/browser-entry-reparse.mjs \
+    /tmp/slice4-reviewed-cleaner-results.json \
+    ../s2/target/javascript/artifacts/live/page-ts.html \
+    /tmp/slice4-stock-resources.json > /tmp/slice4-browser-report.json
+```
+
+The page file must be a fresh assembled Slice4 rich-entry response for final
+acceptance; a preserved Slice3 page only qualifies the harness and stock
+resource wiring. The cleaner result JSON must come from the reviewed package
+and the pinned per-case difference ledger, not from an unreviewed snapshot.
+Browser process telemetry and DNS outside intercepted page requests are not
+claimed by this test.
+
 The original `t/cleaner*.t` source suites remain unmodified. `corpus/` records
 their source contexts, provenance, and assertion counts. Native Perl behavior is
 the compatibility oracle; browser execution and resource checks are separate
