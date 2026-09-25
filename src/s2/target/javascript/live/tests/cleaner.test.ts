@@ -504,10 +504,69 @@ test("wrapper assistance has cumulative byte and parse-count work ceilings", () 
         assert.deepEqual(cleaner.clean(input('<p>x</p>' + '<body><p>x</p>'.repeat(33))),
             {kind: "failure", reason: "unsupported"});
         for (const wrapper of ['<BODY title="> <td>" >', '<body\n title="> <td>">',
-            '<html title="> <td>"/>', '<head title="> <td>"></head>']) {
+            '<html title="> <td>"/>']) {
             const raw = '<p>before</p>' + wrapper + '<p>after</p>';
             assert.equal(html(cleaner.clean(input(raw))), '<p>before</p><p>after</p>');
         }
         assert.equal(html(cleaner.clean(input('<p>recovery</p>'))), '<p>recovery</p>');
+    } finally { cleaner.close(); }
+});
+
+test("source-open head cannot expose content relocated into BODY", () => {
+    const cleaner = createEntryCleaner(limits);
+    // Keep exact native results, including the retained html wrapper bytes.
+    const refused: readonly (readonly [string, string])[] = [
+        ['<head><p>b</p>', ''],
+        ['<head><p>b</p></head><p>c</p>', '<p>c</p>'],
+        ['<head>text</head><p>c</p>', '<p>c</p>'],
+        ['<html><head><p>b</p>', '<html></html>'],
+        ['<html><head><p>b</p></head><p>c</p></html>', '<html><p>c</p></html>'],
+        ['<html><head>text</head><body><p>c</p></body></html>', '<html><p>c</p></html>'],
+        ['<head>text', ''],
+        ['<HEAD title="> <td>"><p>b</p></HEAD><p>c</p>', '<p>c</p>'],
+        ['<head><title>x</title><p>b</p></head><p>c</p>', '<p>c</p>'],
+        ['<head><noscript><p>b</p></noscript></head><p>c</p>', '<p>c</p>'],
+        ['<head><p>b</p><body><p>c</p>', ''],
+        ['<p>a</p><head><p>b</p>', '<p>a</p>'],
+        ['<p>a</p><head><p>b</p></head><p>c</p>', '<p>a</p><p>c</p>'],
+        ['<p>a</p><head>text</head><p>c</p>', '<p>a</p><p>c</p>'],
+        ['<p>a</p><head></head><p>c</p>', '<p>a</p><p>c</p>'],
+        ['<p>a</p><head><title>title</title></head><p>c</p>', '<p>a</p><p>c</p>'],
+        ['<p>a</p><head title="> <td>decoy</td>"><p>b</p></head><p>c</p>', '<p>a</p><p>c</p>'],
+        ['<p>a</p><head title="> <td>decoy</td>">', '<p>a</p>'],
+        ['<p>a</p><head title="<td>incomplete', '<p>a</p>&lt;head title=&quot;&lt;td&gt;incomplete'],
+    ];
+    const supported: readonly (readonly [string, string])[] = [
+        ['<head><title>title</title><meta charset="utf-8"></head><p>c</p>', '<p>c</p>'],
+        ['<head><title>title</title><meta charset="utf-8">', ''],
+        ['<head></head><p>c</p>', '<p>c</p>'],
+        ['<head title="> <td>"><title>title</title></head><p>c</p>', '<p>c</p>'],
+        ['<head><script>const x="</head><p>decoy</p>";</script></head><p>c</p>', '<p>c</p>'],
+        ['<head><!-- </head><p>decoy</p> --><meta charset="utf-8"></head><p>c</p>', '<p>c</p>'],
+        ['<head>\n  </head><p>c</p>', '<p>c</p>'],
+        ['<head><style>p{color:red}</style></head><p>c</p>', '<p>c</p>'],
+        ['<head><title>x</title> \n<!-- c -->', ''],
+        ['<p>headless</p>', '<p>headless</p>'],
+        ['<body onload="alert(1)"><p>body</p></body>', '<p>body</p>'],
+    ];
+    try {
+        for (const cases of [refused, supported]) {
+            assert.deepEqual(retained(cases.map(row => row[0])), cases.map(row => row[1]));
+        }
+        for (const [body] of refused) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"}, body);
+        }
+        for (const [body, expected] of supported) {
+            assert.equal(html(cleaner.clean(input(body))), expected, body);
+            assert.equal(html(cleaner.clean(input(expected))), expected, body + " second pass");
+        }
+        const document = '<html><head><title>title</title><meta charset="utf-8"></head><body><p>c</p></body></html>';
+        assert.equal(retained([document])[0], '<html><p>c</p></html>');
+        assert.equal(html(cleaner.clean(input(document))), '<p>c</p>');
+        // An explicit unclosed HEAD with only BODY comments/whitespace adds no
+        // visible content. Do not turn that harmless case into blanket refusal.
+        const whitespace = '<head><body><!-- c --> \n';
+        assert.equal(retained([whitespace])[0], '');
+        assert.equal(html(cleaner.clean(input(whitespace))).trim(), '');
     } finally { cleaner.close(); }
 });
