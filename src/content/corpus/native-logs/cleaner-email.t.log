@@ -1,0 +1,18 @@
+1..17
+ok 1 - got nonquoted text from an email with quoted and nonquoted text
+ok 2 - got nonquoted text from an email without any quoted text
+ok 3 - removed all quoted text when bogus email includes leading space
+ok 4 - got nonquoted text from email, replied via gmail web mail
+ok 5 - got nonquoted text from email, replied via android
+ok 6 - got nonquoted text from email, Jan 31, 2013 date format
+ok 7 - got nonquoted text from email, 31 Jan 2013 date format
+ok 8 - 'On wrote...' separator a few lines back - cut back to that point
+ok 9 - 'On wrote...' separator too many lines back - don't count as end of the message
+ok 10 - ---Original Message--- separator
+ok 11 - ------Message d'origine------ separator
+ok 12 - $LJ::BOGUS_EMAIL
+ok 13 - $LJ::BOGUS_EMAIL
+ok 14 - no subject
+ok 15 - just a subject
+ok 16 - subject has Re:
+ok 17 - subject has multiple Re:

@@ -1,0 +1,29 @@
+1..28
+ok 1 - user tag in plain text converted
+ok 2 - escaped user tag in plain text not converted, backslash removed
+ok 3 - md: unescaped user tag is not converted within pre tag
+ok 4 - html: unescaped user tag is not converted within pre tag
+ok 5 - md: escaped user tag is not de-escaped within pre tag
+ok 6 - html: escaped user tag is not de-escaped within pre tag
+ok 7 - md: unescaped user tag is not converted within code tag
+ok 8 - html: unescaped user tag is not converted within textarea tag
+ok 9 - user tag in URL not converted
+ok 10 - user tag in auto-linked URL not converted
+ok 11 - user tag in href not converted, but user tag in link text converted (using de-linked form) []
+ok 12 - bare usertag before period is converted, keeping period
+ok 13 - shortcut sitename usertag before period is converted, keeping period
+ok 14 - full sitename usertag before period is converted, keeping period
+ok 15 - atproto usernames (FQDNs) are not misinterpreted as sites
+ok 16 - user tags work the same in HTML-in-Markdown as in plain Markdown
+ok 17 - local entry made in default editor (newest casual HTML version)
+ok 18 - local entry made in markdown editor
+ok 19 - user tag in plain text converted (undef editor)
+ok 20 - user tag in plain text converted (markdown)
+ok 21 - user tag in pre unconverted and unmarkeddown (markdown)
+ok 22 - old content - user tag in plain text unconverted (undef editor)
+ok 23 - imported content w/o editor set
+ok 24 - imported content w/editor set
+ok 25 - imported content - user tag in plain text unconverted (undef editor)
+ok 26 - syndicated content
+ok 27 - syndicated content - user tag in plain text unconverted
+ok 28 - syndicated content - user tag in pre unconverted
