@@ -17,31 +17,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { preparedCorpusRoot } from './corpus-paths.mjs';
+import { defaultAttestationRoot, verifyRunAttestation } from './run-attestation.mjs';
 
-const [resultPath, ledgerPath] = process.argv.slice(2);
-if (!resultPath || !ledgerPath) {
-    throw new Error('usage: check-difference-ledger.mjs result.json accepted-ledger.json');
+const [resultPath, ledgerPath, flag, suppliedAttestation] = process.argv.slice(2);
+if (!resultPath || !ledgerPath || (flag && (flag !== '--attestation' ||
+    !suppliedAttestation)) || process.argv.length > (flag ? 6 : 4)) {
+    throw new Error('usage: check-difference-ledger.mjs result.json accepted-ledger.json ' +
+        '[--attestation DIR]');
 }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const result = JSON.parse(fs.readFileSync(resultPath));
 const accepted = JSON.parse(fs.readFileSync(ledgerPath));
 assert.equal(result.schema, 1);
-assert.equal(accepted.schema, 1);
+assert.equal(accepted.schema, 2);
 assert.equal(result.corpus, accepted.corpus);
-assert.equal(result.candidate, accepted.candidate);
-assert.match(result.candidate, /^[0-9a-f]{40}$/);
-assert.match(result.buildSha256, /^[0-9a-f]{64}$/);
-assert.equal(result.buildSha256, accepted.buildSha256);
-assert.match(result.lockSha256, /^[0-9a-f]{64}$/);
-assert.equal(result.lockSha256, accepted.lockSha256);
-assert.deepEqual(result.compiled, accepted.compiled);
-assert.ok(result.compiled.length >= 2);
-assert.equal(new Set(result.compiled.map(item => item.path)).size,
-    result.compiled.length);
-assert.equal(result.buildSha256,
-    createHash('sha256').update(JSON.stringify(result.compiled)).digest('hex'));
 const native = result.corpus === 'native';
 assert.ok(native || result.corpus === 'synthetic');
+const attested = verifyRunAttestation(suppliedAttestation ?? defaultAttestationRoot,
+    native ? { nativePath: resultPath } : { syntheticPath: resultPath });
+const fixedName = native ? 'nativeLedger' : 'syntheticLedger';
+assert.equal(path.resolve(ledgerPath), attested.inventory.fixed.get(fixedName),
+    'Use the fixed accepted ledger for this corpus');
 const manifestBytes = fs.readFileSync(path.join(native ? preparedCorpusRoot() :
     path.join(root, 'corpus'), native ? 'native-derived-entry-cases.json' :
     'entry-replay-cases.json'));
@@ -51,9 +47,7 @@ const manifest = JSON.parse(manifestBytes);
 const oracle = JSON.parse(oracleBytes);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 assert.equal(result.manifestSha256, sha(manifestBytes));
-assert.equal(accepted.manifestSha256, sha(manifestBytes));
 assert.equal(result.oracleSha256, sha(oracleBytes));
-assert.equal(accepted.oracleSha256, sha(oracleBytes));
 assert.equal(oracle.manifestSha256, sha(manifestBytes));
 assert.equal(result.rows.length, native ? 384 : 26);
 assert.equal(accepted.cases.length, result.rows.length);
@@ -69,16 +63,12 @@ for (const [index, row] of result.rows.entries()) {
     assert.equal(perl.id, input.id);
     assert.equal(reviewed.id, input.id);
     assert.equal(row.source, native ? input.nativeSource : input.source);
-    assert.equal(reviewed.source, row.source);
     const inputBytes = native ? Buffer.from(input.rawInputBase64, 'base64')
         : Buffer.from(input.body, 'utf8');
     assert.equal(row.inputSha256, sha(inputBytes));
-    assert.equal(reviewed.inputSha256, row.inputSha256);
     const perlBytes = Buffer.from(perl.outputBase64, 'base64');
     assert.equal(row.perlSha256, sha(perlBytes));
     assert.equal(row.perlBytes, perlBytes.length);
-    assert.equal(reviewed.perlSha256, row.perlSha256);
-    assert.equal(reviewed.perlBytes, row.perlBytes);
     assert.ok(categories.has(reviewed.category), `${row.id}: unreviewed category`);
     assert.ok(typeof reviewed.rationale === 'string' && reviewed.rationale.length >= 8,
         `${row.id}: missing case rationale`);
@@ -89,8 +79,6 @@ for (const [index, row] of result.rows.entries()) {
     }
     assert.equal(reviewed.kind, row.kind);
     assert.equal(reviewed.reason, row.reason);
-    assert.equal(reviewed.jsSha256, row.jsSha256);
-    assert.equal(reviewed.jsBytes, row.jsBytes);
     if (row.kind === 'ok') {
         const jsBytes = Buffer.from(row.jsOutputBase64, 'base64');
         assert.equal(row.jsSha256, sha(jsBytes));
@@ -100,6 +88,9 @@ for (const [index, row] of result.rows.entries()) {
         assert.equal(reviewed.category === 'exact', row.rawEqual,
             `${row.id}: exact category must match raw byte equality`);
         assert.notEqual(reviewed.category, 'unsupported');
+        assert.deepEqual(reviewed.expectedJs, row.rawEqual ? { ref: 'perl' } :
+            { sha256: row.jsSha256, bytes: row.jsBytes },
+        `${row.id}: TypeScript bytes changed`);
     } else {
         assert.equal(row.kind, 'failure');
         assert.equal(row.reason, 'unsupported', `${row.id}: unavailable is not accepted`);
@@ -109,6 +100,7 @@ for (const [index, row] of result.rows.entries()) {
         assert.equal(row.jsBytes, null);
         assert.equal(row.rawEqual, false);
         assert.equal(reviewed.category, 'unsupported');
+        assert.equal(reviewed.expectedJs, null);
     }
     counts[reviewed.category] = (counts[reviewed.category] ?? 0) + 1;
 }
