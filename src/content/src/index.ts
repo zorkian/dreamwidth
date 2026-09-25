@@ -19,14 +19,15 @@ import {JSDOM, VirtualConsole} from "jsdom";
 import createDOMPurify from "dompurify";
 import {createHash} from "node:crypto";
 import type {BodyFragment, CleanerLimits, EntryCleaner, EntryContentInput,
-    EntryContentResult, ImageResolutionSet} from "./contracts";
+    EntryContentResult, EntryMetadataInput, EntryMetadataResult, ImageResolutionSet} from "./contracts";
 import {UnsupportedContent} from "./policy/errors";
-import {validateCleanerLimits, validateInput, inputHash} from "./policy/validation";
+import {validateCleanerLimits, validateInput, validateMetadataInput, inputHash} from "./policy/validation";
 import {auditSource} from "./policy/source";
 import {repairFormatting} from "./policy/formatting";
 import {replaceCuts, type LocateNode} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
+import {metadataText} from "./policy/metadata";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
 import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext, discardedHeadTags,
     ordinaryAttribute, externalControlAttributes} from "./policy/inventory";
@@ -281,6 +282,34 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 return {kind: "ok", fragment: {context: "html-div-flow", html} as BodyFragment,
                     provenance: {policy: input.context.policy, inputSha256: hash,
                         outputSha256: createHash("sha256").update(html).digest("hex"), cutsOmitted: ids.size / 2}};
+            } catch (error) {
+                return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
+            } finally { dom?.window.close(); }
+        },
+        metadata(input: EntryMetadataInput): EntryMetadataResult {
+            if (closed) return {kind: "failure", reason: "unavailable"};
+            let dom: JSDOM | undefined;
+            try {
+                validateMetadataInput(input, bounds);
+                const entry = input.entry;
+                // Independent RAW-input parse; never derive helper strings from
+                // the displayed fragment. No scripts/resources or ambient console.
+                dom = new JSDOM(entry.body, {url: entry.context.documentUrl,
+                    includeNodeLocations: true, contentType: "text/html",
+                    virtualConsole: new VirtualConsole()});
+                const root = dom.window.document.body;
+                checkTree(root, bounds, dom.window.document.head);
+                auditSource(dom.window.document, entry.body, entry.context.documentUrl,
+                    node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
+                inventoryHead(dom.window.document.head);
+                // Keep comment locations for first-child/source-gap proof. The
+                // inert serializer skips comments without moving that boundary.
+                repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
+                replaceCuts(root, entry.context, node => dom!.nodeLocation(node) ?? null,
+                    bounds.maxCuts, true);
+                return {kind: "ok", metadata: {kind: "inert-entry-metadata",
+                    subjectText: input.subject,
+                    eventText: metadataText(root, entry, bounds, node => dom!.nodeLocation(node) ?? null)}};
             } catch (error) {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
             } finally { dom?.window.close(); }

@@ -55,6 +55,6 @@ export function snapshot(): RawJournalSnapshot {
             year: 2026, month: 9, day: 24, security: "public", allowmask: "0", replycount: 0,
             compressed: "N", props: Object.assign(Object.create(null), {editor: "html_raw0"}),
             subjectText: `Live sample ${n} café`, eventText: `<p>Fixture ${n}: café &amp; tea 😀</p>` })),
-        features: {usertags: 0, userkeywords: 0, logtags: 0, logtagsrecent: 0, logkwsum: 0,
+        features: {spamreportBans: 0, usertags: 0, userkeywords: 0, logtags: 0, logtagsrecent: 0, logkwsum: 0,
             links: 0, userpics: 0, comments: 0}};
 }
