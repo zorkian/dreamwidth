@@ -29,7 +29,7 @@ use LJ::Protocol;
 my $mode = shift @ARGV // '';
 die "Expected bounded create/edit/security/delete/restore probe mode\n"
     unless !@ARGV
-    && $mode =~ /^--(?:create-(?:(?:single|mixed)(?:-pause-after-post)?|bad-malformed|bad-url|bad-script)|edit-single|private-single|usemask-single|public-single|delete-single|restore)$/;
+    && $mode =~ /^--(?:create-(?:(?:single|mixed)(?:-pause-after-post)?|bad-malformed|bad-url|bad-script)|edit-single|private-single|usemask-single|public-single|suspend-single(?:-pause-after-set)?|unsuspend-single|delete-single|restore)$/;
 die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
 my $u = LJ::load_user('s2js_slice3') or die "Missing dedicated marked journal\n";
 die "Unmarked journal\n"
@@ -40,6 +40,7 @@ make_path($dir) unless -d $dir;
 my $state_path = "$dir/probe-state.json";
 my $lock_path = "$dir/probe-state.lock";
 my $marker_path = "$dir/probe-posted.marker";
+my $suspended_marker_path = "$dir/probe-suspended.marker";
 die "Unsafe probe lock path\n" if -l $lock_path;
 open my $lock, '>>', $lock_path or die "Cannot open probe lock\n";
 chmod 0600, $lock_path or die "Cannot restrict probe lock\n";
@@ -74,7 +75,13 @@ sub load_state {
         && ref $state->{ids} eq 'HASH'
         && ref $state->{seed_ids} eq 'ARRAY' && @{ $state->{seed_ids} } == 2
         && ($state->{kind} ne 'single'
-            || ($state->{visibility} // '') =~ /^(?:public|private|usemask)$/);
+            || (($state->{visibility} // '') =~ /^(?:public|private|usemask)$/
+                && ($state->{statusvis} // '') =~ /^[VS]$/
+                && (!defined $state->{original_statusvis}
+                    || $state->{original_statusvis} eq ''
+                    || $state->{original_statusvis} eq 'V')
+                && (!defined $state->{inflight_statusvis}
+                    || $state->{inflight_statusvis} =~ /^[VS]$/)));
     return $state;
 }
 
@@ -132,6 +139,10 @@ sub validate_probe {
         && $security{ $entry->security }
         && $entry->eventtime_mysql eq $expected->{time}
         && ($entry->prop('editor') // '') eq 'html_raw0';
+    my %statusvis = (($state->{statusvis} // 'V') => 1);
+    $statusvis{ $state->{inflight_statusvis} } = 1
+        if $state->{inflight_statusvis};
+    die "Probe entry status differs\n" unless $statusvis{ $entry->statusvis };
     my $subject = Encode::decode_utf8($entry->subject_raw // '', Encode::FB_CROAK);
     my $body = Encode::decode_utf8($entry->event_raw // '', Encode::FB_CROAK);
     my $edit_subject = "$state->{marker} $state->{run} edited 1";
@@ -170,6 +181,12 @@ sub post {
     my $id = $response{itemid} + 0;
     my $entry = LJ::Entry->new($u, jitemid => $id);
     validate_probe($entry, $item, $state);
+    if ($state->{kind} eq 'single') {
+        my $original = $entry->prop('statusvis');
+        die "Unexpected initial single-probe status property\n"
+            if defined $original && $original ne '' && $original ne 'V';
+        $state->{original_statusvis} = $original;
+    }
     $state->{ids}{ $item->{index} } = { jitemid => $id, anum => $response{anum} + 0 };
     delete $state->{inflight};
     save_state($state);
@@ -195,7 +212,9 @@ if ($mode =~ /^--create-(single|mixed|bad-malformed|bad-url|bad-script)(?:-pause
         version => 1, username => 's2js_slice3', ownerid => $u->userid,
         marker => 'S2JS3 live probe v1', run => $run,
         kind => $kind, seed_ids => \@seed_ids, ids => {},
-        ($kind eq 'single' ? (visibility => 'public') : ()),
+        ($kind eq 'single'
+            ? (visibility => 'public', statusvis => 'V', original_statusvis => undef)
+            : ()),
     };
     save_state($state);
     post($state, $_, $pause && $_->{index} == 1) for plan($state);
@@ -204,11 +223,12 @@ if ($mode =~ /^--create-(single|mixed|bad-malformed|bad-url|bad-script)(?:-pause
 }
 if ($mode eq '--restore' && !$state) {
     unlink $marker_path if -f $marker_path && !-l $marker_path;
+    unlink $suspended_marker_path if -f $suspended_marker_path && !-l $suspended_marker_path;
     print "No owned probe state to restore\n";
     exit 0;
 }
 die "No matching single probe run\n"
-    if $mode =~ /^--(?:edit|private|usemask|public|delete)-single$/
+    if $mode =~ /^--(?:edit|private|usemask|public|suspend|unsuspend|delete)-single(?:-pause-after-set)?$/
     && (!$state || $state->{kind} ne 'single');
 my @expected = plan($state);
 my %by_subject = map { $_->{subject} => $_ } @expected;
@@ -235,6 +255,19 @@ for my $entry (@current) {
         || (!$record && ($state->{inflight} // 0) == $index);
     validate_probe($entry, $item, $state);
     $found{$index} = $entry;
+}
+if ($state->{kind} eq 'single' && !$found{1} && $state->{ids}{1}) {
+    # A suspended entry may disappear from the recent enumeration. Inspect
+    # only the recorded exact ID, then apply the same marker/content checks.
+    my $direct = LJ::Entry->new($u, jitemid => $state->{ids}{1}{jitemid});
+    if ($direct && $direct->valid) {
+        validate_probe($direct, $expected[0], $state);
+        my $subject = Encode::decode_utf8($direct->subject_raw // '', Encode::FB_CROAK);
+        die "Direct probe marker differs\n"
+            unless $subject eq $expected[0]{subject}
+            || $subject eq "$state->{marker} $state->{run} edited 1";
+        $found{1} = $direct;
+    }
 }
 for my $index (keys %{ $state->{ids} }) {
     my $record = $state->{ids}{$index};
@@ -287,6 +320,34 @@ if ($mode =~ /^--(private|usemask|public)-single$/) {
     print "Recorded single probe security is $target\n";
     exit 0;
 }
+if ($mode =~ /^--(suspend|unsuspend)-single(?:-pause-after-set)?$/) {
+    my $target = $1 eq 'suspend' ? 'S' : 'V';
+    my $entry = $found{1} or die "Missing recorded single probe\n";
+    die "Suspension requires public probe\n" unless $entry->security eq 'public';
+    if ($entry->statusvis ne $target) {
+        $state->{inflight_statusvis} = $target;
+        save_state($state);
+        my $raw = $target eq 'S' ? 'S' : $state->{original_statusvis};
+        $entry->set_prop(statusvis => $raw);
+        my $checked = LJ::Entry->new($u, jitemid => $entry->jitemid);
+        die "Normal status helper failed\n"
+            unless $checked && $checked->valid && $checked->statusvis eq $target;
+        if ($mode eq '--suspend-single-pause-after-set') {
+            die "Unsafe suspended-probe handshake path\n" if -l $suspended_marker_path;
+            open my $marker, '>:raw', $suspended_marker_path
+                or die "Cannot write suspended-probe handshake\n";
+            print {$marker} "owned suspension committed\n"
+                or die "Cannot write suspended-probe handshake\n";
+            close $marker or die "Cannot close suspended-probe handshake\n";
+            sleep 30;
+        }
+    }
+    $state->{statusvis} = $target;
+    delete $state->{inflight_statusvis};
+    save_state($state);
+    print "Recorded single probe statusvis is $target\n";
+    exit 0;
+}
 if ($mode eq '--delete-single') {
     my $entry = $found{1} or die "Missing recorded single probe\n";
     die "Cannot fully delete recorded single probe\n"
@@ -296,6 +357,12 @@ if ($mode eq '--delete-single') {
 }
 for my $index (sort { $b <=> $a } keys %found) {
     my $entry = $found{$index};
+    if ($state->{kind} eq 'single' && $entry->statusvis eq 'S') {
+        $entry->set_prop(statusvis => $state->{original_statusvis});
+        my $checked = LJ::Entry->new($u, jitemid => $entry->jitemid);
+        die "Cannot restore original probe status\n"
+            unless $checked && $checked->valid && $checked->statusvis eq 'V';
+    }
     die "Cannot fully delete exact owned probe\n"
         unless LJ::delete_entry($u, $entry->jitemid, 0, $entry->anum);
 }
@@ -306,4 +373,5 @@ die "Original seed entry disappeared during probe removal\n"
     if grep { !$remaining{$_} } @{ $state->{seed_ids} };
 unlink $state_path or die "Cannot remove completed owned probe state\n";
 unlink $marker_path if -f $marker_path && !-l $marker_path;
+unlink $suspended_marker_path if -f $suspended_marker_path && !-l $suspended_marker_path;
 print "Restored only recorded marked probe entries\n";
