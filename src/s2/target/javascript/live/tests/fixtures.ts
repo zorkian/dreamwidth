@@ -16,6 +16,12 @@ import type { PublicAppConfig, PublicSettings, RawJournalSnapshot, RawUser } fro
 import { MARKER, SOURCE_HASHES } from "../policy/cohort";
 
 export const config: PublicAppConfig = {
+    entryContent: {
+        imagePlaceholder: {src: "/img/imageplaceholder2.png", width: 35, height: 35,
+            alt: "Image", title: "Image"},
+        urls: {siteDomain: "", knownHttpsSites: [], formDomainBanned: [],
+            imageProxy: "not-configured"},
+    },
     canonicalAppOrigin: "http://localhost:8080", listenOrigin: "http://localhost:8081",
     siteRoot: "", statPrefix: "/stc", imgPrefix: "/img", palImgRoot: "/palimg", userpicRoot: "/userpic",
     siteName: "DW Devcontainer", siteNameShort: "DWDev", siteNameAbbrev: "DW",
