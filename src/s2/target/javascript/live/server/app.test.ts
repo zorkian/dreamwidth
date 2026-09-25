@@ -82,6 +82,9 @@ async function main(): Promise<void> {
             requests.push(request);
             return {ok: true, html, setCookie: null};
         },
+        async serveEntry() {
+            return {ok: true, html, setCookie: null};
+        },
         async close() {},
     };
     const app = createLiveApp(config, service);
