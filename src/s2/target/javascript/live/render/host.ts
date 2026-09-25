@@ -72,13 +72,16 @@ export function controlStrip(input: RenderInput): string {
     const c = input.config;
     const current = `${c.canonicalAppOrigin}/users/${input.journal.username}/` +
         (input.skipPresent ? `?skip=${input.skip}` : "");
-    const username = '<input type="text" class="text" id="login_user" value="" size="7" ' +
-        'tabindex="1" maxlength="27" name="user" default="" placeholder="Username" aria-required="true" />';
-    const password = '<input type="password" value="" id="login_password" class="text" ' +
-        'placeholder="Password" aria-required="true" name="password" size="7" tabindex="2" />';
-    const submit = '<input type=\'submit\' value="Log in" tabindex="4" id="login_submit" class="submit" />';
-    const checkbox = '<input type=\'checkbox\' tabindex="3" name="remember_me" id="login_remember_me" ' +
-        'class="checkbox" value="1" />';
+    // FormHTML/HTMLControls serialize hash attributes. This explicit order
+    // matches the controlled PERL_HASH_SEED=0 / PERL_PERTURB_KEYS=0 comparison;
+    // source template fields and live values remain independently constructed.
+    const username = '<input type="text" tabindex="1" id="login_user" aria-required="true" ' +
+        'maxlength="27" default="" value="" class="text" name="user" size="7" placeholder="Username" />';
+    const password = '<input type="password" class="text" tabindex="2" name="password" size="7" ' +
+        'id="login_password" aria-required="true" value="" placeholder="Password" />';
+    const submit = '<input type=\'submit\' value="Log in" class="submit" id="login_submit" tabindex="4" />';
+    const checkbox = '<input type=\'checkbox\' class="checkbox" tabindex="3" name="remember_me" ' +
+        'id="login_remember_me" value="1" />';
     const login = `<form action="${c.siteRoot}/login" method="post" class="lj_login_form pkg">
     <div id="login-form">${hidden("lj_form_auth", input.formChallenge)}${hidden("returnto", current)}${label("login_user", "invisible", "Account name:")}${username}${label("login_password", "invisible", "Password:")}${password}${submit}    </div>
     <div id="login-other">    <ul>
@@ -88,8 +91,8 @@ export function controlStrip(input: RenderInput): string {
 </form>`;
     const search = `<div class='appwidget appwidget-search' id='LJWidget_1'>
 <form action='${c.siteRoot}/multisearch' method='post'>
-<input type="text" size="20" name="q" id="search" class="text" title="Search" value="" />
-<select name="type" id="id-type-0" class="select">
+<input type="text" class="text" size="20" id="search" title="Search" name="q" value="" />
+<select class="select" id="id-type-0" name="type">
 <option value="int" selected='selected'>Interest</option>
 <option value="region">Region</option>
 <option value="nav_and_user">Site and Account</option>
@@ -125,7 +128,7 @@ export function head(input: RenderInput, page: S2Object): string {
     let html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
     for (const type of ["rss", "atom"]) html +=
         `<link rel="alternate" type="application/${type === "rss" ? "rss+xml" : "atom+xml"}" ` +
-        `title="${type.toUpperCase()}: all entries" href="${base}/data/${type}" />\n`;
+        `title="${type === "rss" ? "RSS" : "Atom"}: all entries" href="${base}/data/${type}" />\n`;
     html += `<link rel="service" type="application/atomsvc+xml" title="AtomAPI service document" href="${c.siteRoot}/interface/atom" />\n` +
         `<link rel="openid.server" href="${c.siteRoot}/openid/server" />\n` +
         `<link rel="help" href="${c.siteRoot}/support/faq" />\n`;
