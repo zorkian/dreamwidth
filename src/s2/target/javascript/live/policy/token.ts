@@ -43,7 +43,7 @@ export function parseUniqCookie(header: string | null): string | null {
     // CGI::Cookie emits percent-encoded colons. Admit only that one unambiguous
     // escape (once), or literal colons used by the controlled comparison.
     // Never decode arbitrary escapes, resolve duplicates or ignore auth cookies.
-    const match = /^ljuniq=([a-zA-Z0-9]{15}(?::|%3[aA])[0-9]{1,10}(?:(?::|%3[aA])x)?)$/.exec(header);
+    const match = /^ljuniq=([a-zA-Z0-9]{15}(?::|%3[aA])[0-9]{1,10}(?:(?::|%3[aA])[A-Za-z0-9_-]{1,64})?)$/.exec(header);
     if (!match) throw new Unsupported();
     return match[1]!.replace(/%3[aA]/g, ":");
 }
@@ -65,17 +65,25 @@ export async function formToken(
     source: LocalSecretSource, random: ComparisonRandom, now: number, cookie: string | null,
 ): Promise<{ challenge: string; uniq: string; setCookie: string | null }> {
     if (!Number.isSafeInteger(now) || now < 0) throw new Error("Clock unavailable");
-    if (cookie !== null && !/^[a-zA-Z0-9]{15}:[0-9]{1,10}(?::x)?$/.test(cookie)) throw new Unsupported();
+    if (cookie !== null && !/^[a-zA-Z0-9]{15}:[0-9]{1,10}(?::[A-Za-z0-9_-]{1,64})?$/.test(cookie)) {
+        throw new Unsupported();
+    }
     const secret = await source.loadLatestSecret(now, 86400);
     if (!secret || secret.stime % 3600 !== 0 || secret.stime > now - now % 3600 ||
         !Number.isSafeInteger(secret.stime) || secret.stime < 0 || now - secret.stime > 86400 ||
         secret.secret.length !== 32 || !/^[A-Za-z0-9]{32}$/.test(Buffer.from(secret.secret).toString("latin1"))) {
         throw new Error("Local challenge unavailable");
     }
-    const uniq = cookie?.split(":")[0] ?? randomCharacters(random, 15);
-    const timestamp = Number(cookie?.split(":")[1] ?? 0);
-    const setCookie = !cookie || timestamp > now || now - timestamp >= 86400
-        ? `ljuniq=${uniq}%3A${now}; Path=/; Max-Age=5184000; SameSite=Lax` : null;
+    // Preserve parts_from_value's legacy mandatory trailing-part/backtracking
+    // behavior. A two-part cookie loses its final timestamp digit to the extra
+    // capture, so ordinary ten-digit cookies renew every request. One-digit
+    // two-part values do not match and receive a new identifier.
+    const parts = cookie === null ? null : /^([A-Za-z0-9]{15}):(\d+)(.+)$/.exec(cookie);
+    const uniq = parts?.[1] ?? randomCharacters(random, 15);
+    const timestamp = Number(parts?.[2] ?? 0);
+    const setCookie = !parts || now - timestamp >= 86400
+        ? `ljuniq=${uniq}%3A${now}; path=/; expires=${new Date((now + 5184000) * 1000).toUTCString()}; SameSite=Lax`
+        : null;
     const attr = `${randomCharacters(random, 10)}-0-${uniq}`;
     const bare = `c0:${secret.stime}:${now - secret.stime}:86400:${attr}`;
     const signature = createHash("md5").update(bare).update(secret.secret).digest("hex");
