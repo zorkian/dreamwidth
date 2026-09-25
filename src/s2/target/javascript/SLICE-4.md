@@ -26,12 +26,13 @@ the live TypeScript route.
 
 ## Build and run
 
-Use this worktree's devcontainer. Node 24.21.0 is pinned by the content
-bootstrap; do not use the container's Node 20 for this package. From the repo
-root, with the retained local Perl app available on port 8080:
+Use this worktree's devcontainer with scoped setup privileges. Node 24.21.0
+is pinned by the content bootstrap; it leaves the system Node unchanged.
+From the repo root, with the retained local Perl app available on port 8080:
 
 ```sh
 cd src/content
+bash tools/bootstrap-node24.sh
 PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
 PATH=/opt/dw-node24/bin:$PATH npm run build
 cd ../s2/target/javascript
@@ -48,8 +49,9 @@ helpers. It compiles the unchanged stock source to `artifacts/live/stock.json`
 and builds and verifies its sibling `.sandbox` and closed `.runtime` directory.
 The same setup runs before a fresh `check-cleaner` or `content-refusal` check;
 neither depends on a previously staged artifact. The service itself can be
-started with `node dist/live/server/main.js` and listens on container loopback
-port 8081. The retained Perl app stays on 8080. Follow the port-forwarding
+started from the S2 package with
+`PATH=/opt/dw-node24/bin:$PATH node dist/live/server/main.js`; it listens on
+container loopback port 8081. The retained Perl app stays on 8080. Follow the port-forwarding
 directions in Slice 3 for a host browser.
 
 `check-cleaner` creates exactly one marked temporary entry through the normal
@@ -117,6 +119,15 @@ and runs Chromium, Firefox and WebKit with JavaScript on/off. Unsafe raw
 controls must demonstrate that the traps can fire; admitted fragments must
 not gain active handlers, foreign nodes, unexpected resources or DOM clobbering.
 The five named synthetic cut/rawtext/form refusals carry no fragment to parse.
+
+Before browser checks, install the pinned browsers and their OS libraries
+with scoped setup privileges, then verify all three engines in both JavaScript
+modes. From `src/content`:
+
+```sh
+PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/playwright install --with-deps chromium firefox webkit
+PATH=/opt/dw-node24/bin:$PATH node tools/qualify-browsers.mjs
+```
 
 For actual route pages, from `src/content`, first generate and verify the
 26-row synthetic comparison result as shown in the corpus guide. Then capture
