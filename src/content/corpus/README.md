@@ -27,6 +27,21 @@ sites and retain the stable TAP ID. A later explicit `html_raw0` replay is a
 **new** record, never a relabeling of a comment, Markdown, subject, email,
 embed or streaming case.
 
+`native-calls/` contains **1,062** byte-exact `LJ::CleanHTML` input/output
+calls from twelve of those original suites. Each JSONL record stores the
+original test source location, TAP position before the call, method, scalar
+options, UTF-8 flag and base64-encoded bytes with SHA-256. The inventory
+links each TAP case to its call ordinal or explicitly has an empty list.
+One assertion may call the cleaner several times, and one cleaner call may
+support several assertions; 1,062 calls are not 1,116 TAP cases. The native
+email and direct `HTMLCleaner` link suites have no `LJ::CleanHTML` call trace
+and remain indexed by their original TAP/source evidence. Original `#line`
+locations are retained in the temporary instrumented suite. Every one of the
+twelve instrumented TAP streams matched its uninstrumented baseline byte for
+byte; no original test file was edited. The XSS trace reproduced byte for byte
+on a second run. Dynamic test-account values, when present, remain raw in
+their captured run rather than normalized.
+
 The discovery count of 1,112 source-derived assertion instances was four
 short: `cleaner-resource-loading.t` executes twelve assertions, not eight.
 All fourteen suites passed in the owning container with **1,116** runtime
@@ -51,6 +66,22 @@ for suite in t/cleaner*.t; do
     perl "$suite" > "/tmp/slice4-native-sol/$name.log" 2>&1 || exit
 done
 cp /tmp/slice4-native-sol/*.log src/content/corpus/native-logs/
+/opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs
+```
+
+Regenerate call traces in a separate existing directory, then copy only the
+JSONL outputs once the TAP streams match `native-logs/`:
+
+```sh
+mkdir -p /tmp/slice4-native-calls
+for suite in t/cleaner*.t; do
+    name=${suite##*/}
+    case "$name" in cleaner-email.t|cleaner-link.t) continue;; esac
+    perl src/content/tools/cleaner-native-run.pl "$name" /tmp/slice4-native-calls
+    cmp "/tmp/slice4-native-calls/$name.tap" \
+        "src/content/corpus/native-logs/$name.log" || exit
+done
+cp /tmp/slice4-native-calls/*.calls.jsonl src/content/corpus/native-calls/
 /opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs
 ```
 
