@@ -22,10 +22,12 @@ use Encode ();
 use LJ::Entry;
 use LJ::Protocol;
 
-my $mode = @ARGV && $ARGV[0] =~ /^--(?:restore-only|fail-after-edit|sleep-after-edit)$/
+my $mode = @ARGV && $ARGV[0] =~ /^--(?:restore-only|assert-variant|fail-after-edit|sleep-after-edit)$/
     ? shift @ARGV : '';
-my $outdir = $mode eq '--restore-only' ? undef : shift @ARGV;
-die "Expected output directory\n" if $mode ne '--restore-only' && !defined $outdir;
+my $outdir = $mode eq '--restore-only' || $mode eq '--assert-variant'
+    ? undef : shift @ARGV;
+die "Expected output directory\n"
+    if $mode ne '--restore-only' && $mode ne '--assert-variant' && !defined $outdir;
 die "Expected one output directory\n" if @ARGV || (defined $outdir && !-d $outdir);
 die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
 my $db = LJ::get_db_writer() or die "No local database writer\n";
@@ -54,7 +56,8 @@ my $baseline = '<p>Fixture 1: café &amp; tea 😀</p>';
 my $variant = '<p>Fixture 1 variant: café &amp; tea 😀</p>';
 my $current = $sample && $sample->valid ? Encode::decode_utf8($sample->event_raw // '') : '';
 die "Missing owned first sample\n" unless $sample && $sample->valid
-    && ($current eq $baseline || ($mode eq '--restore-only' && $current eq $variant))
+    && ($current eq $baseline ||
+        (($mode eq '--restore-only' || $mode eq '--assert-variant') && $current eq $variant))
     && $sample->security eq 'public'
     && $sample->eventtime_mysql eq '2026-09-24 11:00:00';
 
@@ -75,11 +78,22 @@ if ($mode eq '--restore-only') {
     print "Owned first sample verified at baseline\n";
     exit 0;
 }
+if ($mode eq '--assert-variant') {
+    die "Expected owned variant after edit handshake\n" unless $current eq $variant;
+    print "Owned first sample is the edited variant\n";
+    exit 0;
+}
 my $error;
 eval {
     edit_body($variant);
     die "Injected failure after owned edit\n" if $mode eq '--fail-after-edit';
-    sleep 2 if $mode eq '--sleep-after-edit';
+    if ($mode eq '--sleep-after-edit') {
+        open my $marker, '>:raw', "$outdir/variant-edited.marker"
+            or die "Cannot write edit handshake marker: $!\n";
+        print {$marker} "owned edit committed\n";
+        close $marker or die "Cannot close edit handshake marker: $!\n";
+        sleep 30;
+    }
     my $exit = system($^X,
         "$ENV{LJHOME}/src/s2/target/javascript/tools/page-fixture.pl",
         $outdir, '--variant-read');
