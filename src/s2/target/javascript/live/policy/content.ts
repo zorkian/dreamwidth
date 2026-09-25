@@ -25,9 +25,19 @@ export function plainSubject(value: string): string {
     return value;
 }
 
-// Admission proves that retained html_raw0 cleaning is the identity function.
-// This parser deliberately refuses repair, attributes, unknown entities and DW
-// constructs. It is separate from the trusted stock print-safe adapter.
+// Parent admission performs only UTF8/size checks. No DOM/CSS parser or safe
+// fragment is loaded into the process holding repository and signing access.
+export function rawBody(value: string): string {
+    if (typeof value !== "string" || value.length > 65536 || Buffer.byteLength(value) > 65536 ||
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value)) {
+        throw new Unsupported();
+    }
+    return value;
+}
+
+// Historical slice-3 identity-domain oracle, retained for its offline regression
+// probes only. Serving admission uses rawBody; the isolated worker performs the
+// actual entry cleaning. This function must not confer serving HTML authority.
 export function bodyHtml(value: string): string {
     if (Buffer.byteLength(value) > 65536 || /[\x00-\x08\x0b-\x1f\x7f]/.test(value) ||
         /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value)) {

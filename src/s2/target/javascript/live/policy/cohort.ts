@@ -14,7 +14,7 @@
 
 import type { RawJournalSnapshot } from "../contracts";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
-import { bodyHtml, plainSubject, Unsupported } from "./content";
+import { rawBody, plainSubject, Unsupported } from "./content";
 
 export const USERNAME = "s2js_slice3";
 export const MARKER = "s2-js-slice3 live dev v1";
@@ -116,7 +116,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot): ApprovedJournal {
             entry.day !== Number(entry.eventtime.slice(8, 10))) throw new Unsupported();
         entries.push({
             id: entry.jitemid * 256 + entry.anum,
-            subject: plainSubject(entry.subjectText), text: bodyHtml(entry.eventText),
+            subject: plainSubject(entry.subjectText), rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             commentsEnabled: u.optShowTalkLinks === "Y" && !perlTrue(props.opt_nocomments),

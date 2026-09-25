@@ -21,6 +21,7 @@ import { validateConfig, validateLimits } from "./config";
 import { formToken, parseUniqCookie } from "./token";
 import { validateArtifact } from "../render/artifact";
 import { Renderer } from "../render/child";
+import {verifyRuntime} from "../render/manifest";
 import { loadResourceTimes } from "../render/resources";
 
 // Shared implementation, not an HTTP/config switch. Only the ordinary factory
@@ -34,8 +35,13 @@ export async function buildService(deps: AnonymousRecentServiceDeps,
     if (statSync(path).size > 8388608 || !statSync(path + ".sandbox").isFile()) throw new Unsupported();
     const artifact = validateArtifact(JSON.parse(readFileSync(path, "utf8")));
     const resources = loadResourceTimes();
-    const config = Object.freeze({...deps.config});
-    const renderer = new Renderer(artifact, path + ".sandbox", {...deps.limits});
+    const config = Object.freeze({...deps.config, entryContent: Object.freeze({
+        imagePlaceholder: Object.freeze({...deps.config.entryContent.imagePlaceholder}),
+        urls: Object.freeze({...deps.config.entryContent.urls,
+            knownHttpsSites: Object.freeze([...deps.config.entryContent.urls.knownHttpsSites]),
+            formDomainBanned: Object.freeze([...deps.config.entryContent.urls.formDomainBanned])}),
+    })});
+    const renderer = new Renderer(artifact, path + ".sandbox", {...deps.limits}, verifyRuntime(path));
     let closed = false;
     let active = 0;
     return {
