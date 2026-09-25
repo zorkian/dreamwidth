@@ -1,0 +1,10 @@
+1..9
+ok 1 - Table okay if all tags are closed
+ok 2 - Table okay if td and tr tags aren't closed
+ok 3 - All tags escaped
+ok 4 - All tags escaped
+ok 5 - All tags escaped
+ok 6 - All tags escaped
+ok 7 - All tags escaped
+ok 8 - All td tags escaped
+ok 9 - Fixed tbody -- optional

@@ -1,0 +1,32 @@
+1..28
+ok 1 - Removed display:none (<span style="   display: inline"></span>)
+ok 2 - Removed margin (<span style=""></span>)
+ok 3 - Removed height
+ok 4 - All padding removed. (Multiple rules, all too large)
+ok 5 - All padding removed. (Combined into one rule, all too large)
+ok 6 - All padding removed. (Multiple rules, mixed too large and small enough)
+ok 7 - All padding removed. (One dimension in a combined rule, mixed too large and small enough)
+ok 8 - Padding not removed; of reasonable size.
+ok 9 - Font tag closed.
+ok 10 - Spurious closing div stripped.
+ok 11 - Closing div inserted.
+ok 12 - Bad open/closes fixed.
+ok 13 - Aggressively close things.
+ok 14 - Aggressive close with eaten extra close.
+# Remove absolute sizes when logged out
+ok 15 - Retain relative font sizes
+ok 16 - Strip absolute font sizes
+ok 17 - Strip absolute font sizes
+# Don't remove absolute sizes when logged in
+ok 18 - Retain relative font sizes
+ok 19 - Retain absolute font sizes
+ok 20 - Retain absolute font sizes
+ok 21 - Background URL not cleaned: logged-in user
+ok 22 - Background URL removed: anonymous comment
+ok 23 - Full href bold escape
+ok 24 - Empty href bold escape
+ok 25 - Anonymous comment bold escape
+# various allowed/disallowed tags
+ok 26 - em tag allowed
+ok 27 - marquee tag not allowed
+ok 28 - blink tag not allowed
