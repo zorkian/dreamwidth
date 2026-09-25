@@ -66,7 +66,7 @@ else {
 }
 
 my @global = qw(user useridmap userprop userproplist s2styles s2layers
-    s2compiled s2source_inno logproplist secrets);
+    s2compiled s2source_inno logproplist secrets sysban);
 my @cluster = qw(userbio userproplite2 userpropblob s2stylelayers2 log2 logtext2 logprop2
     usertags userkeywords logtags logtagsrecent logkwsum links userpic2 talk2);
 my @tables = (
@@ -121,9 +121,19 @@ my $reader = DBI->connect(
 ) or die "Cannot verify serving credential\n";
 die "Serving account identity differs\n"
     unless $reader->selectrow_array('SELECT CURRENT_USER()') eq "$user\@$host";
+my ($matching_bans) = $reader->selectrow_array(
+    'SELECT COUNT(*) FROM dw_global.sysban WHERE BINARY what = BINARY ?'
+        . ' AND BINARY value = BINARY ?', undef, 'spamreport', 's2js_slice3',
+);
+die "Cannot read exact marked sysban count\n" unless defined $matching_bans;
 my $write_allowed = eval {
     $reader->do('UPDATE dw_global.user SET userid=userid WHERE userid=-1');
     1;
 };
 die "Serving account unexpectedly permits UPDATE\n" if $write_allowed;
+my $ban_write_allowed = eval {
+    $reader->do('UPDATE dw_global.sysban SET banid=banid WHERE banid=-1');
+    1;
+};
+die "Serving account unexpectedly permits sysban UPDATE\n" if $ban_write_allowed;
 print "Scoped read-only local MySQL credential ready\n";

@@ -17,6 +17,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
+import mysql from "mysql2/promise";
 import type { MysqlStoreConfig } from "./mysql";
 import { decodeLegacyText } from "./legacy-text";
 import { MysqlLiveStore } from "./mysql";
@@ -61,6 +62,26 @@ function normalHelper(
     });
 }
 
+async function verifyExactBanCount(config: MysqlStoreConfig, expected: number): Promise<void> {
+    const connection = await mysql.createConnection({...config, database: "dw_global",
+        charset: "utf8mb4"});
+    try {
+        const [comparison] = await connection.query<mysql.RowDataPacket[]>(`
+            SELECT 'spamreport' = 'SpamReport' COLLATE utf8mb4_unicode_ci AS folded,
+                BINARY 'spamreport' = BINARY 'SpamReport' AS exact
+        `);
+        assert.equal(Number(comparison[0]?.folded), 1);
+        assert.equal(Number(comparison[0]?.exact), 0);
+        const [rows] = await connection.execute<mysql.RowDataPacket[]>(`
+            SELECT COUNT(*) AS matching FROM dw_global.sysban
+            WHERE BINARY what = BINARY ? AND BINARY value = BINARY ?
+        `, ["spamreport", "s2js_slice3"]);
+        assert.equal(Number(rows[0]?.matching), expected);
+    } finally {
+        await connection.end();
+    }
+}
+
 async function main(): Promise<void> {
     decoderEdges();
     const pathToCredentials = path.join(process.cwd(), "artifacts/live/mysql-readonly.json");
@@ -83,6 +104,8 @@ async function main(): Promise<void> {
         ]);
         assert.deepEqual(snapshot.style?.layers.map(layer => layer.ownerUsername),
             ["system", "system"]);
+        assert.equal(snapshot.features.spamreportBans, 0);
+        await verifyExactBanCount(config, snapshot.features.spamreportBans);
         assert.ok(Object.values(snapshot.features).every(count => count === 0));
         assert.equal(await store.revalidateFingerprint(snapshot), true);
         const key = await store.loadLatestSecret(Math.floor(Date.now() / 1000), 86400);
