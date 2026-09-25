@@ -15,12 +15,10 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defaultPreparedRoot, trackedCorpusRoot } from './corpus-paths.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(contentRoot, '../..');
-const logsRoot = path.join(contentRoot, 'corpus/native-logs');
-const callsRoot = process.argv[2] || path.join(contentRoot, 'corpus/native-calls');
-const destination = process.argv[3] || path.join(contentRoot, 'corpus/native-inventory.json');
 const suites = [
     ['cleaner-comment.t', 'comment', 28],
     ['cleaner-email.t', 'email', 17],
@@ -47,11 +45,6 @@ const expectedCalls = new Map([
 ]);
 const expectedTraceFiles = [...expectedCalls.keys()]
     .map(name => `${name}.calls.jsonl`).sort();
-const actualTraceFiles = fs.readdirSync(callsRoot)
-    .filter(name => name.endsWith('.calls.jsonl')).sort();
-if (JSON.stringify(actualTraceFiles) !== JSON.stringify(expectedTraceFiles)) {
-    throw new Error('Native call trace set mismatch');
-}
 
 function sha(bytes) {
     return createHash('sha256').update(bytes).digest('hex');
@@ -93,102 +86,125 @@ function caseContext(suite, description) {
     return suites.find(row => row[0] === suite)[1];
 }
 
-const output = {
-    schema: 1,
-    base: 'c725406eeed4b239dbb68af0a50f505f4b83b8df',
-    note: 'Native TAP inventory. Exact cleaner input/output replay and diff ledger are separate artifacts.',
-    mockContext: 't/lib/ljtestlib.pl fakes DW::Proxy::get_proxy_url to http://proxy.url and language helpers where imported; this is not the production proxy.',
-    suites: [],
-    cases: [],
-};
-for (const [filename, context, expected] of suites) {
-    const sourcePath = `t/${filename}`;
-    const source = fs.readFileSync(path.join(repoRoot, sourcePath));
-    const sourceText = source.toString('utf8');
-    const sourceLines = sourceText.split('\n');
-    const logPath = `native-logs/${filename}.log`;
-    const log = fs.readFileSync(path.join(contentRoot, 'corpus', logPath));
-    const logText = log.toString('utf8');
-    const plan = [...logText.matchAll(/^1\.\.(\d+)$/gm)];
-    if (plan.length !== 1 || Number(plan[0][1]) !== expected) {
-        throw new Error(`TAP plan mismatch for ${filename}`);
+export function buildNativeInventory({
+    callsRoot = path.join(trackedCorpusRoot, 'native-calls'),
+    logsRoot = path.join(defaultPreparedRoot, 'native-logs'),
+    destination = path.join(defaultPreparedRoot, 'native-inventory.json'),
+} = {}) {
+    const actualTraceFiles = fs.readdirSync(callsRoot)
+        .filter(name => name.endsWith('.calls.jsonl')).sort();
+    if (JSON.stringify(actualTraceFiles) !== JSON.stringify(expectedTraceFiles)) {
+        throw new Error('Native call trace set mismatch');
     }
-    const assertions = [...logText.matchAll(/^(ok|not ok) (\d+)(?: - (.*?))?(?: # TODO (.*))?$/gm)];
-    if (assertions.length !== expected) throw new Error(`TAP case count mismatch for ${filename}`);
-    const sourceSha256 = sha(source);
-    const logSha256 = sha(log);
-    const callsPath = `native-calls/${filename}.calls.jsonl`;
-    const callsFile = path.join(callsRoot, `${filename}.calls.jsonl`);
-    let capturedCalls = null;
-    const callByTap = new Map();
-    if (expectedCalls.has(filename)) {
-        const callBytes = fs.readFileSync(callsFile);
-        const text = callBytes.toString('utf8');
-        if (!text.endsWith('\n') || text.trimEnd() !== text.slice(0, -1)) {
-            throw new Error(`Native call trace truncated in ${callsPath}`);
+    const output = {
+        schema: 1,
+        base: 'c725406eeed4b239dbb68af0a50f505f4b83b8df',
+        note: 'Native TAP inventory. Exact cleaner input/output replay and diff ledger are separate artifacts.',
+        mockContext: 't/lib/ljtestlib.pl fakes DW::Proxy::get_proxy_url to http://proxy.url and language helpers where imported; this is not the production proxy.',
+        suites: [],
+        cases: [],
+    };
+    for (const [filename, context, expected] of suites) {
+        const sourcePath = `t/${filename}`;
+        const source = fs.readFileSync(path.join(repoRoot, sourcePath));
+        const sourceText = source.toString('utf8');
+        const sourceLines = sourceText.split('\n');
+        const logPath = `native-logs/${filename}.log`;
+        const log = fs.readFileSync(path.join(logsRoot, `${filename}.log`));
+        const logText = log.toString('utf8');
+        const plan = [...logText.matchAll(/^1\.\.(\d+)$/gm)];
+        if (plan.length !== 1 || Number(plan[0][1]) !== expected) {
+            throw new Error(`TAP plan mismatch for ${filename}`);
         }
-        const records = text.slice(0, -1).split('\n').map(JSON.parse);
-        if (records.length !== expectedCalls.get(filename)) {
-            throw new Error(`Native call count mismatch in ${callsPath}`);
-        }
-        for (let index = 0; index < records.length; index++) {
-            const call = records[index];
-            if (call.suite !== filename || call.source !== sourcePath ||
-                call.callOrdinal !== index + 1 || !Number.isSafeInteger(call.beforeTap) ||
-                call.beforeTap < 0 || call.beforeTap > expected ||
-                !Number.isSafeInteger(call.sourceLine) || call.sourceLine < 1 ||
-                call.sourceLine > sourceLines.length ||
-                !Number.isSafeInteger(call.directCallerLine) ||
-                !Number.isSafeInteger(call.depth) || call.depth < 0 ||
-                !Number.isSafeInteger(call.entryOrdinal) ||
-                (call.depth === 0 ? call.parentOrdinal !== null :
-                    !Number.isSafeInteger(call.parentOrdinal)) ||
-                !Array.isArray(call.positionalArgs) ||
-                typeof call.directCallerFile !== 'string' ||
-                !(call.directCallerFile === sourcePath ||
-                    call.directCallerFile.startsWith('cgi-bin/'))) {
-                throw new Error(`Native call provenance mismatch in ${callsPath}`);
+        const assertions = [...logText.matchAll(/^(ok|not ok) (\d+)(?: - (.*?))?(?: # TODO (.*))?$/gm)];
+        if (assertions.length !== expected) throw new Error(`TAP case count mismatch for ${filename}`);
+        const sourceSha256 = sha(source);
+        const logSha256 = sha(log);
+        const callsPath = `native-calls/${filename}.calls.jsonl`;
+        const callsFile = path.join(callsRoot, `${filename}.calls.jsonl`);
+        let capturedCalls = null;
+        const callByTap = new Map();
+        if (expectedCalls.has(filename)) {
+            const callBytes = fs.readFileSync(callsFile);
+            const text = callBytes.toString('utf8');
+            if (!text.endsWith('\n') || text.trimEnd() !== text.slice(0, -1)) {
+                throw new Error(`Native call trace truncated in ${callsPath}`);
             }
-            for (const field of ['input', 'output']) {
-                if (call[`${field}Present`]) {
-                    const raw = Buffer.from(call[`${field}Base64`], 'base64');
-                    if (sha(raw) !== call[`${field}Sha256`]) {
-                        throw new Error(`Native ${field} bytes mismatch in ${callsPath}`);
+            const records = text.slice(0, -1).split('\n').map(JSON.parse);
+            if (records.length !== expectedCalls.get(filename)) {
+                throw new Error(`Native call count mismatch in ${callsPath}`);
+            }
+            for (let index = 0; index < records.length; index++) {
+                const call = records[index];
+                if (call.suite !== filename || call.source !== sourcePath ||
+                    call.callOrdinal !== index + 1 || !Number.isSafeInteger(call.beforeTap) ||
+                    call.beforeTap < 0 || call.beforeTap > expected ||
+                    !Number.isSafeInteger(call.sourceLine) || call.sourceLine < 1 ||
+                    call.sourceLine > sourceLines.length ||
+                    !Number.isSafeInteger(call.directCallerLine) ||
+                    !Number.isSafeInteger(call.depth) || call.depth < 0 ||
+                    !Number.isSafeInteger(call.entryOrdinal) ||
+                    (call.depth === 0 ? call.parentOrdinal !== null :
+                        !Number.isSafeInteger(call.parentOrdinal)) ||
+                    !Array.isArray(call.positionalArgs) ||
+                    typeof call.directCallerFile !== 'string' ||
+                    !(call.directCallerFile === sourcePath ||
+                        call.directCallerFile.startsWith('cgi-bin/'))) {
+                    throw new Error(`Native call provenance mismatch in ${callsPath}`);
+                }
+                for (const field of ['input', 'output']) {
+                    if (call[`${field}Present`]) {
+                        const raw = Buffer.from(call[`${field}Base64`], 'base64');
+                        if (sha(raw) !== call[`${field}Sha256`]) {
+                            throw new Error(`Native ${field} bytes mismatch in ${callsPath}`);
+                        }
                     }
                 }
+                const nextTap = call.beforeTap + 1;
+                if (nextTap <= expected) {
+                    const ordinals = callByTap.get(nextTap) || [];
+                    ordinals.push(call.callOrdinal);
+                    callByTap.set(nextTap, ordinals);
+                }
             }
-            const nextTap = call.beforeTap + 1;
-            if (nextTap <= expected) {
-                const ordinals = callByTap.get(nextTap) || [];
-                ordinals.push(call.callOrdinal);
-                callByTap.set(nextTap, ordinals);
-            }
+            capturedCalls = { path: callsPath, sha256: sha(callBytes), count: records.length,
+                captureMethod: 'temporary #line-preserving wrapper; original TAP must match byte-for-byte' };
         }
-        capturedCalls = { path: callsPath, sha256: sha(callBytes), count: records.length,
-            captureMethod: 'temporary #line-preserving wrapper; original TAP must match byte-for-byte' };
+        const provenance = sourceText.includes('LiveJournal project owned and operated')
+            ? 'inherited LiveJournal GPL notice' : 'Dreamwidth Perl-terms notice';
+        output.suites.push({ source: sourcePath, sourceSha256, sourceLines: sourceLines.length,
+            provenance, nativeContext: context, nativeLog: logPath, nativeLogSha256: logSha256,
+            mockLJTestLib: sourceText.includes('ljtestlib.pl'), capturedCalls,
+            sourceAssertionsOriginally: filename ===
+                'cleaner-resource-loading.t' ? 8 : expected, runtimeAssertions: expected });
+        for (let index = 0; index < assertions.length; index++) {
+            const [, status, number, name = '', todo] = assertions[index];
+            if (Number(number) !== index + 1) throw new Error(`TAP numbering gap in ${filename}`);
+            const ref = sourceLocation(sourceLines, name);
+            output.cases.push({ id: `${sourcePath}#tap-${String(number).padStart(4, '0')}`,
+                source: sourcePath, sourceSha256, sourceLines: ref.lines,
+                sourceLocationKind: ref.kind, nativeContext: caseContext(filename, name),
+                nativePredicate: status, description: name, todo: todo || null,
+                nativeTapLine: assertions[index][0], nativeLog: logPath,
+                nativeCallsSincePreviousTap: callByTap.get(index + 1) || [],
+                replayContext: 'native-only-until-explicit-entry-html_raw0-replay' });
+        }
     }
-    const provenance = sourceText.includes('LiveJournal project owned and operated')
-        ? 'inherited LiveJournal GPL notice' : 'Dreamwidth Perl-terms notice';
-    output.suites.push({ source: sourcePath, sourceSha256, sourceLines: sourceLines.length,
-        provenance, nativeContext: context, nativeLog: logPath, nativeLogSha256: logSha256,
-        mockLJTestLib: sourceText.includes('ljtestlib.pl'), capturedCalls,
-        sourceAssertionsOriginally: filename ===
-            'cleaner-resource-loading.t' ? 8 : expected, runtimeAssertions: expected });
-    for (let index = 0; index < assertions.length; index++) {
-        const [, status, number, name = '', todo] = assertions[index];
-        if (Number(number) !== index + 1) throw new Error(`TAP numbering gap in ${filename}`);
-        const ref = sourceLocation(sourceLines, name);
-        output.cases.push({ id: `${sourcePath}#tap-${String(number).padStart(4, '0')}`,
-            source: sourcePath, sourceSha256, sourceLines: ref.lines,
-            sourceLocationKind: ref.kind, nativeContext: caseContext(filename, name),
-            nativePredicate: status, description: name, todo: todo || null,
-            nativeTapLine: assertions[index][0], nativeLog: logPath,
-            nativeCallsSincePreviousTap: callByTap.get(index + 1) || [],
-            replayContext: 'native-only-until-explicit-entry-html_raw0-replay' });
+    if (output.cases.length !== 1116 || output.suites.length !== 14) {
+        throw new Error('Native suite inventory is incomplete');
     }
+    fs.writeFileSync(destination, `${JSON.stringify(output, null, 2)}\n`);
+    return output;
 }
-if (output.cases.length !== 1116 || output.suites.length !== 14) {
-    throw new Error('Native suite inventory is incomplete');
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const output = buildNativeInventory({
+        callsRoot: process.argv[2] || path.join(trackedCorpusRoot, 'native-calls'),
+        logsRoot: path.join(process.env.DW_CONTENT_CORPUS_ROOT || defaultPreparedRoot,
+            'native-logs'),
+        destination: process.argv[3] || path.join(process.env.DW_CONTENT_CORPUS_ROOT ||
+            defaultPreparedRoot, 'native-inventory.json'),
+    });
+    console.log(`Indexed ${output.cases.length} native assertions from ` +
+        `${output.suites.length} suites`);
 }
-fs.writeFileSync(destination, `${JSON.stringify(output, null, 2)}\n`);
-console.log(`Indexed ${output.cases.length} native assertions from ${output.suites.length} suites`);
