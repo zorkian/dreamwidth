@@ -41,7 +41,7 @@ export function snapshot(): RawJournalSnapshot {
     return {owner, posters: [owner], fingerprint: "opaque-test-primary-generation-1",
         style: {styleid: 6, ownerid: 6, name: MARKER, modtime: now,
             layers: SOURCE_HASHES.map((hash, i) => ({type: i ? "layout" : "core", s2lid: i + 1,
-                ownerid: 1, compiledTime: now, sourceHash: hash}))},
+                ownerid: 91, ownerUsername: "system", compiledTime: now, sourceHash: hash}))},
         entries: [1, 2].map(n => ({journalid: 6, jitemid: n, anum: 128, posterid: 6,
             eventtime: `2026-09-24 ${n + 10}:00:00`, logtime: `2026-09-24 ${n + 10}:00:00`,
             rlogtime: 2147483647 - (now - 86400 + (n + 10) * 3600),
