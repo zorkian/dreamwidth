@@ -51,7 +51,7 @@ function admissionInput(request: FastifyRequest): RedirectAdmissionRequest {
             hasForwardedHeaders = true;
         }
     }
-    // Preserve duplicate values as tainted input. Astra's pure admission
+    // Preserve duplicate values as tainted input. The pure admission policy
     // rejects ambiguous Host, Origin, and Cookie values.
     return {
         method: request.raw.method ?? "",
