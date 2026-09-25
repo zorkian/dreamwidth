@@ -55,12 +55,20 @@ export const eatenTags = new Set([
     "head", "title", "style", "layer", "iframe", "applet", "object", "xml", "param", "base", "script",
 ]);
 export const removedTags = new Set([
-    "bgsound", "embed", "link", "body", "meta", "noscript", "noframes",
+    "bgsound", "embed", "link", "body", "meta", "noscript",
 ]);
-export const unsupportedRawtext = new Set(["xmp", "listing", "plaintext"]);
+export const unsupportedRawtext = new Set(["xmp", "listing", "plaintext", "noframes"]);
+
+// These may be hoisted out of an entry body by the HTML parser. Each is already
+// an unconditional source eat/remove rule. Other head contexts, notably template
+// and noframes, must not evade body inventory by disappearing into the head.
+export const discardedHeadTags = new Set(["base", "link", "meta", "style", "title", "script", "noscript"]);
 
 export function ordinaryAttribute(name: string): boolean {
-    return entryAttributes.has(name) || /^(?:data|aria)-[a-z0-9_.:-]+$/.test(name);
+    // Match the maintained DOMPurify DATA_ATTR/ARIA_ATTR name domains; accepting
+    // a broader namespace here would silently lose attributes in the final pass.
+    return entryAttributes.has(name) || /^data-[\-\w.\u00B7-\uFFFF]+$/.test(name) ||
+        /^aria-[\-\w]+$/.test(name);
 }
 
 // Modern form-owner/command/shadow capabilities can target trusted surrounding

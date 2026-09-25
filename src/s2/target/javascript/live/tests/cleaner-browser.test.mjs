@@ -95,6 +95,23 @@ test('Chromium computes retained static positions after escape removal with Java
                     'url("https://resource.test/x")');
             }
             assert.ok(requested > 0, 'raw escaped URL must exercise the intercepted resource path');
+            const form = cleaner.clean({format: 'html_raw0', context,
+                body: '<form action="https://app.test/post"><input type="submit" name="submit" value="send">' +
+                    '<p>VISIBLE_FORM_TEXT</p><a name="ordinary">VISIBLE_ANCHOR_TEXT</a></form>'});
+            assert.equal(form.kind, 'ok');
+            await page.setContent(`<div class="entry-content">${form.fragment.html}</div>`);
+            const before = await page.locator('.entry-content').evaluate(element => ({
+                text: element.textContent,
+                inputName: element.querySelector('input').getAttribute('name'),
+                value: element.querySelector('input').value,
+                submit: typeof element.querySelector('form').submit,
+                anchor: element.querySelector('a').name,
+            }));
+            assert.deepEqual(before, {text: 'VISIBLE_FORM_TEXTVISIBLE_ANCHOR_TEXT',
+                inputName: null, value: 'send', submit: 'function', anchor: 'ordinary'});
+            const reparsed = await page.locator('.entry-content').innerHTML();
+            await page.setContent(`<div class="entry-content">${reparsed}</div>`);
+            assert.equal(await page.locator('.entry-content').textContent(), before.text);
             await browserContext.close();
         }
     } finally { cleaner.close(); await browser.close(); }

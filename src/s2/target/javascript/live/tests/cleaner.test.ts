@@ -135,6 +135,82 @@ test("navigation uses the retained dangerous-scheme removal, not a small protoco
     } finally { cleaner.close(); }
 });
 
+test("head/rawtext contexts cannot silently swallow or escape visible entry content", () => {
+    const cleaner = createEntryCleaner(limits);
+    const cases = ['<noframes><b>bold</b></noframes>',
+        '<p>x</p><noframes><b>bold</b> tail</noframes>',
+        '<template><b>visible template text</b></template><p>after</p>',
+        '<p>before</p><template><b>visible template text</b></template>'];
+    try {
+        const native = retained(cases.slice(0, 2));
+        assert.ok(native[0]!.includes('<b>bold</b>'));
+        assert.ok(native[1]!.includes('<b>bold</b> tail'));
+        for (const body of cases) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"}, body);
+            assert.equal(html(cleaner.clean(input('<p>after refusal</p>'))), '<p>after refusal</p>');
+        }
+        for (const prefix of ['<title>removed</title>', '<style>removed</style>', '<script>removed</script>',
+            '<meta name="x" content="removed">', '<link href="/removed">', '<base href="https://other.test/">']) {
+            assert.equal(html(cleaner.clean(input(prefix + '<p>visible</p>'))), '<p>visible</p>');
+        }
+        assert.equal(html(cleaner.clean(input('<noscript><b>bold</b> tail</noscript>'))), '<b>bold</b> tail');
+        assert.equal(html(cleaner.clean(input('<noscript><meta name="x" content="y"></noscript><p>after</p>'))),
+            '<p>after</p>');
+        const comments = 'before<!-- source comment --><p>visible<!-- another --> text</p>after';
+        assert.equal(html(cleaner.clean(input(comments))), 'before<p>visible text</p>after');
+        assert.equal(retained([comments])[0], 'before<p>visible text</p>after');
+    } finally {cleaner.close();}
+});
+
+test("additional sanitizer attribute removals refuse explicitly without weakening defenses", () => {
+    const cleaner = createEntryCleaner(limits);
+    const cases = [
+        '<a href="applescript://com.apple.scripteditor?action=new">visible</a>',
+        '<a href="ecmascript:foo">visible</a>', '<a href="xscript:foo">visible</a>',
+        '<table><tbody><tr><td abbr="ecmascript:x">visible</td></tr></tbody></table>',
+        '<p title="a]>b">visible</p>', '<p title="x --> y">visible</p>',
+        '<p title="</textarea>">visible</p>', '<img src="https://image.test/x" alt="-->">',
+        '<p data-x:y="1">visible</p>', '<p aria-x:y="2">visible</p>',
+        '<p aria-x.y="3">visible</p>',
+        '<p data-x:y="1" aria-x:y="2">visible</p>',
+    ];
+    try {
+        const native = retained(cases);
+        for (const [index, marker] of ['href=', 'href=', 'href=', 'abbr=', 'title=', 'title=',
+            'title=', 'alt=', 'data-x:y=', 'aria-x:y='].entries()) {
+            assert.ok(native[index]!.includes(marker), cases[index]);
+        }
+        assert.ok(native[10]!.includes('ljparseerror'), 'retained dotted aria name is a parse failure');
+        for (const body of cases) {
+            assert.deepEqual(cleaner.clean(input(body)), {kind: "failure", reason: "unsupported"}, body);
+            assert.equal(html(cleaner.clean(input('<p title="ordinary" data-x="1" aria-label="entry">visible</p>'))),
+                '<p title="ordinary" data-x="1" aria-label="entry">visible</p>');
+        }
+    } finally {cleaner.close();}
+});
+
+test("SANITIZE_DOM collision exception removes only names and preserves form/text content", () => {
+    const cleaner = createEntryCleaner(limits);
+    try {
+        const names = ['location', 'cookie', 'body', 'submit', 'title', 'attributes', 'nodeName'];
+        for (const name of names) {
+            assert.equal(html(cleaner.clean(input(`<a name="${name}"><b>visible ${name}</b></a>`))),
+                `<a><b>visible ${name}</b></a>`);
+        }
+        const form = '<form action="https://app.test/post"><input type="submit" name="submit" value="send">' +
+            '<p>VISIBLE_FORM_TEXT</p><a name="ordinary">VISIBLE_ANCHOR_TEXT</a></form>';
+        const expected = form.replace(' name="submit"', '');
+        assert.ok(retained([form])[0]!.includes('name="submit"'));
+        assert.equal(html(cleaner.clean(input(form))), expected);
+        assert.equal(html(cleaner.clean(input(expected))), expected);
+        assert.equal(html(cleaner.clean(input(''))), '');
+        assert.equal(html(cleaner.clean(input('<b>before</b><i>after</i>'))), '<b>before</b><i>after</i>');
+        const textarea = '<textarea>&lt;/textarea&gt;VISIBLE</textarea><p>after</p>';
+        assert.equal(html(cleaner.clean(input(textarea))), textarea);
+        assert.equal(html(cleaner.clean(input(html(cleaner.clean(input(textarea)))))), textarea);
+    } finally {cleaner.close();}
+});
+
 test("CSS screening, parsing and emission all use the retained backslash-stripped value", () => {
     const cleaner = createEntryCleaner(limits);
     try {
