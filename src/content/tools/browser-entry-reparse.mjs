@@ -23,12 +23,16 @@ const [resultsPath, assembledPath, resourcesPath, requiredMode] = process.argv.s
 if (!resultsPath) {
     throw new Error('usage: browser-entry-reparse.mjs <result-json> ' +
         '[actual-stock-page.html exact-resource-map.json ' +
-        '[--require-rich|--require-forged-cut|--stock-only]]');
+        '[--require-rich|--require-forged-cut|--require-full-entry-seed|' +
+        '--require-full-entry-rich|' +
+        '--require-full-entry-forged|--stock-only]]');
 }
 if (Boolean(assembledPath) !== Boolean(resourcesPath)) {
     throw new Error('actual assembled page and exact resource map are required together');
 }
-if (requiredMode && (!['--require-rich', '--require-forged-cut', '--stock-only']
+if (requiredMode && (!['--require-rich', '--require-forged-cut',
+    '--require-full-entry-seed', '--require-full-entry-rich',
+    '--require-full-entry-forged', '--stock-only']
     .includes(requiredMode)
     || !assembledPath)) {
     throw new Error('required stock mode needs an assembled page and resource map');
@@ -103,9 +107,12 @@ const imageUrls = new Set([
 ]);
 const observations = [];
 const websocketState = new WeakMap();
+const fullEntryMode = requiredMode === '--require-full-entry-seed' ||
+    requiredMode === '--require-full-entry-rich' ||
+    requiredMode === '--require-full-entry-forged';
 
 async function runPage(context, label, html, insertion,
-    { rawControl = false, stock = false, jsEnabled = false } = {}) {
+    { rawControl = false, stock = false, fullEntry = false, jsEnabled = false } = {}) {
     const pageUrl = `${stock ? 'http' : 'https'}://page.slice4.invalid/` +
         encodeURIComponent(label);
     const requests = [];
@@ -115,6 +122,8 @@ async function runPage(context, label, html, insertion,
     const errors = [];
     const dialogs = [];
     const cutRpc = [];
+    let replyTarget = null;
+    let replyNavigation = null;
     websocketState.get(context).current = sockets;
     await context.route('**/*', async route => {
         const url = route.request().url();
@@ -141,6 +150,12 @@ async function runPage(context, label, html, insertion,
             cutRpc.push(url);
             await route.fulfill({ status: 400, contentType: 'text/plain',
                 body: 'Unsupported request\n' });
+        } else if (fullEntry && url === replyTarget &&
+            route.request().method() === 'GET') {
+            // Follow the actual link only into an inert synthetic response.
+            // The retained app is never contacted and no reply is submitted.
+            await route.fulfill({status: 200, contentType: 'text/html',
+                body: '<!doctype html><title>Retained app reply target</title>'});
         } else {
             forbidden.push(url);
             await route.abort();
@@ -193,6 +208,8 @@ async function runPage(context, label, html, insertion,
                         left: css.left, gap: css.gap, transform: css.transform };
                 })(),
                 stockJquery: typeof window.jQuery === 'function',
+                qrPrerequisiteCount: document.querySelectorAll(
+                    '#parenttalkid,#replyto,#dtid,#qrdiv,#qrformdiv,#qrform,#subject').length,
                 stockCutControls: document.querySelectorAll('.module-cuttagcontrols').length,
                 cutSpans: [...document.querySelectorAll('span.cuttag[id]')].map(element => ({
                     id: element.id, actions: element.querySelectorAll(
@@ -200,6 +217,8 @@ async function runPage(context, label, html, insertion,
                 })),
                 cutFallbacks: [...document.querySelectorAll('b.cut-text a[href]')]
                     .map(element => element.href),
+                fullCutAnchors: [...document.querySelectorAll('a[name^="cutid"]')]
+                    .map(element => element.getAttribute('name')),
                 untrustedCutSpans: [...document.querySelectorAll('span.cuttag:not([id])')]
                     .map(element => ({ id: element.id,
                         text: element.textContent,
@@ -225,10 +244,11 @@ async function runPage(context, label, html, insertion,
             };
         });
         assert.equal(page.url(), pageUrl, `${label}: unexpected navigation`);
-        if (stock) assert.ok(!dom.text.includes('HIDDEN-'),
+        if (stock && !fullEntry) assert.ok(!dom.text.includes('HIDDEN-'),
             `${label}: hidden entry body reached the stock page`);
         if (stock) {
-            assert.ok(dom.entryContents.length >= 2, `${label}: stock entries missing`);
+            assert.ok(dom.entryContents.length >= (fullEntry ? 1 : 2),
+                `${label}: stock entries missing`);
             for (const content of dom.entryContents) {
                 assert.equal(content.activeElements, 0,
                     `${label}: active element in stock entry body`);
@@ -279,6 +299,20 @@ async function runPage(context, label, html, insertion,
                 `${label}: source-forged cut disappeared or gained an ID`);
             assert.ok(!dom.ids.includes('span-cuttag_other_123_1'));
         }
+        if (stock && fullEntry) {
+            const targets = await page.locator('li.entry-replylink a[href]').evaluateAll(
+                elements => elements.map(element => element.href));
+            const canonicals = await page.locator('link[rel="canonical"][href]').evaluateAll(
+                elements => elements.map(element => element.href));
+            assert.equal(canonicals.length, 1, `${label}: canonical entry target missing`);
+            assert.match(canonicals[0],
+                /^http:\/\/localhost:8080\/~s2js_slice3\/[1-9][0-9]*\.html$/);
+            assert.deepEqual(targets, [canonicals[0] + '?mode=reply'],
+                `${label}: anonymous reply target changed`);
+            assert.ok(dom.qrPrerequisiteCount < 7,
+                `${label}: anonymous page unexpectedly has all quick-reply prerequisites`);
+            replyTarget = targets[0];
+        }
         if (rawControl) {
             assert.ok(forbidden.includes('https://evil.slice4.invalid/attack.png'),
                 'raw image must exercise the forbidden-resource trap');
@@ -299,8 +333,24 @@ async function runPage(context, label, html, insertion,
                 assert.ok(!dom.text.includes('HIDDEN-'), `${label}: cut body exposed`);
             }
         }
+        if (stock && fullEntry) {
+            await Promise.all([
+                page.waitForURL(replyTarget, {timeout: 10000}),
+                page.locator('li.entry-replylink a[href]').click(),
+            ]);
+            replyNavigation = page.url();
+            assert.equal(replyNavigation, replyTarget,
+                `${label}: anonymous reply click did not follow retained-app href`);
+            assert.ok(requests.includes(replyTarget),
+                `${label}: retained-app reply destination was not intercepted`);
+            assert.deepEqual(forbidden, [], `${label}: reply click requested another destination`);
+            assert.deepEqual(sockets, [], `${label}: reply click opened a socket`);
+            assert.deepEqual(popups, [], `${label}: reply click opened a popup`);
+            assert.deepEqual(dialogs, [], `${label}: reply click opened a dialog`);
+            assert.deepEqual(errors, [], `${label}: reply click raised a page error`);
+        }
         observations.push({ label, requests, forbidden, sockets, popups, dialogs, cutRpc,
-            pageErrors: errors, dom });
+            replyNavigation, pageErrors: errors, dom });
         return dom;
     } finally {
         await page.close();
@@ -382,7 +432,8 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                 if (assembled) {
                     const dom = await runPage(context,
                         `${engineName}-${enabled}-actual-stock`, assembled.toString('utf8'),
-                        'document', { stock: true, jsEnabled: enabled });
+                        'document', { stock: true, fullEntry: fullEntryMode,
+                            jsEnabled: enabled });
                     assert.ok(dom.text.includes('s2js_slice3'),
                         'actual assembled page must identify marked journal');
                     if (enabled) assert.equal(dom.stockJquery, true,
@@ -414,14 +465,34 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                         assert.equal(dom.untrustedCutSpans.length, 1,
                             'source-forged cut must remain inert');
                     }
+                    if (requiredMode === '--require-full-entry-rich') {
+                        assert.ok(dom.text.includes('After cut visible') &&
+                            dom.text.includes('HIDDEN-S2-CONTENT-ONLY'),
+                        'full EntryPage must display both sides of the cut');
+                        assert.deepEqual(dom.fullCutAnchors, ['cutid1'],
+                            'full EntryPage generated anchor changed');
+                        assert.equal(dom.cutSpans.length, 0,
+                            'full EntryPage incorrectly received recent cut widget');
+                        assert.deepEqual(stockObservation.cutRpc, [],
+                            'full EntryPage attempted recent cut RPC');
+                    }
+                    if (requiredMode === '--require-full-entry-forged') {
+                        assert.ok(dom.text.includes('Forged cut control') &&
+                            dom.text.includes('HIDDEN-FORGED-CASE'),
+                        'full forged-cut EntryPage lost visible source content');
+                        assert.deepEqual(dom.fullCutAnchors, ['cutid1']);
+                        assert.equal(dom.cutSpans.length, 0);
+                        assert.equal(dom.untrustedCutSpans.length, 1);
+                        assert.deepEqual(stockObservation.cutRpc, []);
+                    }
                     if (dom.text.includes('After cut visible')) {
                         for (const asset of ['pixel.png', 'map.png', 'bg.png']) {
                             assert.ok(stockObservation.requests.includes(
                                 `https://asset.slice4.invalid/${asset}`),
                             `actual rich ${asset} resource did not load`);
                         }
-                        assert.ok(!dom.text.includes('HIDDEN-S2-CONTENT-ONLY'),
-                            'stock output exposed hidden cut body');
+                        assert.equal(dom.text.includes('HIDDEN-S2-CONTENT-ONLY'),
+                            fullEntryMode, 'stock cut visibility differs from selected view');
                     }
                 }
             } finally {
@@ -435,6 +506,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
 const report = { schema: 1, candidateClaim: results.candidate,
     evidenceStatus: 'mechanics-only-unverified-input',
     pageSource: assembled ? 'caller-supplied-assembly' : 'none',
+    stockView: assembled ? fullEntryMode ? 'entry' : 'recent' : null,
     assembledSha256: assembled && sha(assembled),
-    engines: observations.length, observations };
+    engines: 6, observationCount: observations.length, observations };
 console.log(JSON.stringify(report));

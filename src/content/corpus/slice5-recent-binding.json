@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "purpose": "slice5-recent-cleaner-regression",
+  "baselineLedgers": {
+    "synthetic": "b5d02787c112182b84bc46738ae52216df6c4a88a146c518bf448ea0c63f4607",
+    "native": "3f01ac88123a9749363eefce5a8d1c12df994ef36fd271e133376e4bfeda6f67"
+  },
+  "candidate": "8fc8928659b761cb4f15228059a2c6b2bfd42d75",
+  "buildSha256": "c5b0e7ceeb901c540a4b2cb955691d3ce1f355dcc6c47891a9c4103ee339dae2",
+  "compiled": [
+    {
+      "path": "contracts.js",
+      "sha256": "d309ee23c157448d6c8eee9cd0080126d8644bdd8fca0aee8e44b67bb08a256c"
+    },
+    {
+      "path": "index.js",
+      "sha256": "060d921a447e4812238fe6ac49d0b323e443f485e8a481c26c606ee03618a3bd"
+    },
+    {
+      "path": "policy/css.js",
+      "sha256": "66b305dc2ce361f18022e9530dd61c00596df9d387e142c78f7418859f7a0c79"
+    },
+    {
+      "path": "policy/cuts.js",
+      "sha256": "fb0c369e4835efb09534833cdb21bc8efa0c2d39c232f07d44b782f5cf3675bf"
+    },
+    {
+      "path": "policy/errors.js",
+      "sha256": "d419a40c7e156ee57ba007e666c629ea8683191ff4c9d86848ffffdecc8745bc"
+    },
+    {
+      "path": "policy/formatting.js",
+      "sha256": "f2d016b7db7773fecdf6728801561e8b939b676534f9ab5456d812dcb6d2038c"
+    },
+    {
+      "path": "policy/images.js",
+      "sha256": "0faaf19d6f38c8da0376c0d9482f067abcf1e7e1beaf0b57acb0cfbb97d069ef"
+    },
+    {
+      "path": "policy/inventory.js",
+      "sha256": "11b5ae25d95555ac565266d4f8f79c0175c15845f957994526949a695b0d55ca"
+    },
+    {
+      "path": "policy/metadata.js",
+      "sha256": "f4df38d9c592957f26cb41829078ac96718ea37b6213f0a842dc54329218783c"
+    },
+    {
+      "path": "policy/newlines.js",
+      "sha256": "437fda4e90a4ed422e82648de975fd270ea8c69781adadc0d5b85e5619a33348"
+    },
+    {
+      "path": "policy/source.js",
+      "sha256": "260b0247007dd6f4985437609d2eb2c8153972fdaac5f20d3b7fcbebd12161ec"
+    },
+    {
+      "path": "policy/urls.js",
+      "sha256": "58dc85159f80b02a6c69be9d0ef605ec2ca226976b9be0f6b50ddcdd88b15676"
+    },
+    {
+      "path": "policy/validation.js",
+      "sha256": "318edbe86f7463c28cb6ced873b83a0f6e8795d0036f8c36910c3dd8f2fe8683"
+    }
+  ],
+  "lockSha256": "3d6aba06ae7eac36cef44c3c98d4d945b6ec820a3ec532877a136013377f4521"
+}
