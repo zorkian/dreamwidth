@@ -1,15 +1,23 @@
-# Slice 3 policy/render component evidence
+<!--
+COMPONENT.md
 
-This is preliminary component evidence, not real-database parity or full slice
-acceptance. No Perl journal GET has run on Astra's newly seeded marked account.
-The first actual TS route response must precede any oracle GET. The reviewed
-Sol loader/server/offline-config dependency is still required for that check.
+Component test guide for the bounded local live S2 renderer.
 
-Parent for this component: `71bcae6ae1834551064ea2cd6a766e7226fd300c`.
-The parent already includes the independently reviewed interface amendments and
-seed/oracle dependency cherry-picks. They are outside this component delta.
+Authors:
+    Dreamwidth contributors
 
-Run inside the owning devcontainer, from the repository root:
+Copyright (c) 2026 by Dreamwidth Studios, LLC.
+
+This program is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself. For a copy of the license, please reference
+'perldoc perlartistic' or 'perldoc perlgpl'.
+-->
+
+# Live S2 component checks
+
+See [the slice 3 guide](../../SLICE-3.md) for local setup, the actual HTTP route,
+real-database differential testing and retained-app navigation. Run these
+component checks inside the checkout's own devcontainer, from the repository root:
 
 ```sh
 perl src/s2/target/javascript/tools/live-compile.pl /tmp/slice3-stock.json
@@ -18,80 +26,74 @@ cd src/s2/target/javascript
 node --test dist/live/tests/*.test.js
 ```
 
-The offline compiler requires existing `cc` and emits
-`/tmp/slice3-stock.json` plus `/tmp/slice3-stock.json.sandbox`. Neither generated
-file is committed. JSON schema1/abi1 contains two ordered source/hash/variable/code
-records. Both source hashes and deterministic compiled-code hashes are verified.
-No prepared properties, pages, database data or HTML are compiler inputs.
+`S2_LIVE_TEST_ARTIFACT` can select another compiled artifact path for the tests.
+The offline compiler requires existing `cc` and emits the JSON artifact plus
+`<artifact-path>.sandbox`. Keep generated files outside version control. JSON
+schema 1 / ABI 1 contains two ordered source/hash/variable/code records; both source
+hashes and deterministic compiled-code hashes are verified. No prepared
+properties, pages, database data or HTML are compiler inputs.
 
-The tested platform is the owning Linux x86_64 devcontainer, Node20.20.2.
-The small launcher closes inherited descriptors beyond explicit stdio, sets
-no_new_privs, validates the syscall architecture, rejects x32, and denies sockets,
-network calls and io_uring. Filter or launcher failure stops rendering. Node
-permission mode restricts readable JS modules and denies writes, subprocesses,
-worker threads and addons. The parent supplies only LANG/TZ and approved public
-input. This is isolation for **trusted pinned stock code**, not an arbitrary
-JavaScript hosting sandbox. No privilege/capability/container changes are needed.
+The suite checks:
 
-Sixteen focused tests cover content/refusal cases, real retained html_raw0 cleaner
-probes, pure request/redirect admission, private filtering and whole-response
-suspended-public refusal, real child filesystem/network/process restrictions
-(including an intentionally inherited file descriptor), timeout/output/close
-bounds, executable artifact tampering, token protocol/rollover, live entropy,
-explicit skip0 echoes and the skipPresent invariant, during-render revocation,
-fresh recheck failures and subsequent-request visibility.
+- Content admission and actual retained `html_raw0` cleaner identity for Unicode,
+  entities, paragraphs, inline tags, whitespace and empty elements.
+- Anonymous request/redirect admission, tainted headers and ambiguous paths,
+  private-entry exclusion, suspended-public whole-response refusal, unsupported
+  features, source hashes and dynamic `system` layer-owner identity.
+- Cookie parsing, legacy two-part timestamp backtracking/renewal, first/return
+  requests, percent-encoded colons, exact expiry headers and challenge bytes
+  against actual retained Perl helpers with explicit offline fixture entropy.
+  This protocol unit test uses a declared fixture key. Real local-key verification
+  belongs to the integrated HTTP/oracle checks.
+- Actual isolated child filesystem, network, subprocess and worker restrictions,
+  inherited-descriptor closure, deadline/output/close behavior, artifact tampering,
+  live entropy, revocation during rendering and subsequent-request visibility.
+- Request skip/presence, the retained page 80 / loader 79 clamps, mixed public/private
+  pagination, original request echoes and the exactly-full final-page link corner.
 
-The service generates a real-format signed challenge before rendering. A fresh
-independent primary fingerprint check is the final authorization decision after
-full HTML buffering. No asynchronous work follows success inside policy; the
-server must enqueue immediately. Later commits and network receipt are outside
-this guarantee. Real local-key verification remains an integrated oracle check.
+Component tests do not establish full real-database HTML parity. Integration must
+also prove the first TS request before any Perl journal GET, normal post/edit
+refresh, full-page byte comparisons, real-key verification, and the actual TS
+recent endpoint while the Perl app is unavailable. The comparison is controlled
+by explicit clock/random/uniq and `PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0`; HTML is
+never normalized. Serialization order can differ under another Perl hash seed.
 
-Only inventory recorded in foreman's REDIRECT-INVENTORY.md and confirmed on the
-actual new Sol slice3 seed is admitted: finite controls/date paths and constrained
-/stc, /img, /js resources; POST /login and /multisearch use early307. The redirect
-helper never reads a body or invokes the app. Browser navigation to retained-app
-resources/controls is distinct from the TS journal render path.
+## Boundaries
 
-Substantive ports cite and retain inherited LiveJournal GPL notices from LJ/S2,
-LJ/Web, LJ/HTMLControls, LJ/UniqCookie and related page modules. Template/FormHTML
-and challenge source authors/notices are retained separately. Static strings are
-ports of repository templates and shipped en.dat text, not oracle fragments.
-Deterministic serializer ordering is permitted only under the controlled
-PERL_HASH_SEED=0/PERL_PERTURB_KEYS=0 comparison condition. Exact ordering and all
-remaining live metadata are still subject to full real-Perl differential testing.
+The supported launcher platform is Linux x86_64 with Node 20. It closes inherited
+file descriptors beyond explicit stdio, sets `no_new_privs`, validates the syscall
+architecture, rejects x32, and denies sockets, network calls and `io_uring`.
+Filter/launcher failure stops rendering. Node permission mode restricts readable
+JS modules and denies writes, subprocesses, workers and addons. The parent sends
+only LANG/TZ and approved public input. This isolates **trusted pinned stock
+code**; it is not an arbitrary JavaScript hosting sandbox. No privilege,
+capability or container changes are required.
 
-Remaining acceptance work: reviewed loader/server integration; first TS GET
-before oracle; own DB byte differential under the recorded clock/random/uniq;
-post/edit/private pagination and adversaries; actual recent endpoint with Perl
-app unavailable; required repository regressions/static/screenshot; independent
-full-range Opus CLEAR. A green component suite does not establish those claims.
+The renderer is capped at two concurrent children, 10 seconds, 2MiB HTML and
+128MiB heap. It executes source-derived defaults, `prop_init`, `modules_init` and
+stock `Page.print`. Static resource timestamps are loaded at service creation;
+restart the service after rebuilding static resources.
 
-Followup component checks now pass19 tests. Pagination uses the retained two
-clamps (page80, loader79), preserves request echoes for79/80/81/200, and retains
-the exact-full-page empty-prev-link corner. The local setup probe must assert
-MAX_SCROLLBACK_LASTN100; arbitrary site limits are outside this cohort. Full
-real-DB differential remains outstanding. Cookie admission now accepts the one
-CGI::Cookie colon escape %3A (once), rejects double escapes, and emits a compatible
-encoded anonymous cookie with SameSite=Lax. An offline CGI::Cookie constructor
-confirmed the wire representation without requesting a journal page.
+The body grammar permits plain UTF8 text, balanced lowercase `p`, `strong`, `em`,
+`b`, `i`, and `br`/`br />`, with no attributes or URLs. Only `amp`, `lt`, `gt`,
+`quot` entities are admitted. Limits are 64KiB per body, nesting 16, tokens 4096
+and 2MiB for the complete candidate cohort. Subjects are nonempty plain UTF8,
+at most 1KiB, without markup, entities, quotes or controls. Unsupported input is
+refused rather than repaired. Trusted stock markup is separate from user content.
 
-The owner correction uses joined ownerUsername=system plus the pinned source hash,
-retaining ownerid only as an identity fact; test fixtures deliberately use system
-userid91. Cookie renewal and serialization now follow the exact retained
-parts_from_value/ensure_cookie_value behavior, including two-part timestamp
-backtracking, future three-part timestamps, and first/return requests. The
-cookie differential invokes the actual Perl helpers with a declared unit-test
-key and frozen entropy, not an app signing key; actual local-key verification
-remains the integrated oracle obligation. Safe extras are bounded alphanumeric,
-underscore/hyphen strings; unsupported extras fail admission.
+Only the finite stock-page destinations enumerated by `policy/redirects.ts` are
+redirected to the configured retained app: exact controls/date paths and
+constrained `/stc`, `/img`, `/js` resources. POST `/login` and `/multisearch` receive
+an early 307 without body access. These browser navigations are distinct from TS
+page preparation; redirects neither fetch nor process app output.
 
-Additional own-container regressions passed: npm run check (all9 cases),
-npm run check:page (17716-byte slice2 differential), tidyall-a, t/02-tidy.t
-(1072 checks), t/00-compile.t (1582 checks with normal skips), and build-static.sh
-(exit0; existing Sass deprecation warnings). None requested the slice3 journal.
+A fresh independent primary fingerprint check is the final authorization decision
+after full HTML buffering. The server must enqueue immediately after success.
+Later commits and network receipt are outside this guarantee. The dev-cohort
+refusal design exposes a coarse 422/200 distinction for unsupported private-state
+or count changes; it never returns those fields, bodies or calendar counts. This
+bounded behavior must not be generalized to arbitrary production journals.
 
-The dev-cohort refusal design can expose a coarse422/200 distinction for
-unsupported private-state/count changes. It never returns those private fields,
-bodies or calendar counts. This bounded acceptance is not a production privacy
-contract and must not be generalized to arbitrary journals.
+Ported helpers retain inherited LiveJournal GPL notices; template/FormHTML and
+challenge source authors/notices are retained separately. Static template strings
+come from repository source and shipped `en.dat`, never recorded oracle fragments.
