@@ -67,7 +67,7 @@ post/edit/private pagination and adversaries; actual recent endpoint with Perl
 app unavailable; required repository regressions/static/screenshot; independent
 full-range Opus CLEAR. A green component suite does not establish those claims.
 
-Followup component checks now pass18 tests. Pagination uses the retained two
+Followup component checks now pass19 tests. Pagination uses the retained two
 clamps (page80, loader79), preserves request echoes for79/80/81/200, and retains
 the exact-full-page empty-prev-link corner. The local setup probe must assert
 MAX_SCROLLBACK_LASTN100; arbitrary site limits are outside this cohort. Full
@@ -75,3 +75,23 @@ real-DB differential remains outstanding. Cookie admission now accepts the one
 CGI::Cookie colon escape %3A (once), rejects double escapes, and emits a compatible
 encoded anonymous cookie with SameSite=Lax. An offline CGI::Cookie constructor
 confirmed the wire representation without requesting a journal page.
+
+The owner correction uses joined ownerUsername=system plus the pinned source hash,
+retaining ownerid only as an identity fact; test fixtures deliberately use system
+userid91. Cookie renewal and serialization now follow the exact retained
+parts_from_value/ensure_cookie_value behavior, including two-part timestamp
+backtracking, future three-part timestamps, and first/return requests. The
+cookie differential invokes the actual Perl helpers with a declared unit-test
+key and frozen entropy, not an app signing key; actual local-key verification
+remains the integrated oracle obligation. Safe extras are bounded alphanumeric,
+underscore/hyphen strings; unsupported extras fail admission.
+
+Additional own-container regressions passed: npm run check (all9 cases),
+npm run check:page (17716-byte slice2 differential), tidyall-a, t/02-tidy.t
+(1072 checks), t/00-compile.t (1582 checks with normal skips), and build-static.sh
+(exit0; existing Sass deprecation warnings). None requested the slice3 journal.
+
+The dev-cohort refusal design can expose a coarse422/200 distinction for
+unsupported private-state/count changes. It never returns those private fields,
+bodies or calendar counts. This bounded acceptance is not a production privacy
+contract and must not be generalized to arbitrary journals.

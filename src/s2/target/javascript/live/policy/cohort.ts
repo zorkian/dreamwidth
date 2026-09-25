@@ -62,7 +62,8 @@ export function approveSnapshot(snapshot: RawJournalSnapshot): ApprovedJournal {
         String(style.styleid) !== p.s2_style || style.layers.length !== 2) throw new Unsupported();
     for (const [index, type] of ["core", "layout"].entries()) {
         const layer = style.layers.find(layer => layer.type === type);
-        if (!layer || layer.ownerid !== 1 || layer.sourceHash !== SOURCE_HASHES[index] ||
+        if (!layer || layer.ownerUsername !== "system" || layer.sourceHash !== SOURCE_HASHES[index] ||
+            !Number.isSafeInteger(layer.ownerid) || layer.ownerid <= 0 ||
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !Number.isSafeInteger(layer.compiledTime)) throw new Unsupported();
     }

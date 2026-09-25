@@ -60,6 +60,9 @@ test("unmarked, nonvisible, external authors, unsupported style and feature stat
     assert.throws(() => approveSnapshot({...data, features: {} as RawJournalSnapshot["features"]}));
     assert.throws(() => approveSnapshot({...data, style: {...data.style!,
         layers: [...data.style!.layers, {...data.style!.layers[0]!, type: "user"}]}}));
+    assert.throws(() => approveSnapshot({...data, style: {...data.style!,
+        layers: data.style!.layers.map(layer => ({...layer, ownerid: 1, ownerUsername: "other"}))}}));
+    assert.equal(approveSnapshot(data).styleid, 6); // system userid91 is deliberately not1
     assert.throws(() => approveSnapshot({...data, entries: [{...data.entries[0]!, posterid: 7}]}));
     assert.throws(() => approveSnapshot({...data, entries: Array(201).fill(data.entries[0])}));
 });
@@ -118,6 +121,8 @@ test("real protocol signature uses current age and renews stale anonymous cookie
     const renewed = await formToken(source, {randomBytes: n => new Uint8Array(n)}, now,
         "AAAAAAAAAAAAAAA:1790000000");
     assert.ok(renewed.setCookie?.startsWith("ljuniq=AAAAAAAAAAAAAAA%3A1790294400;"));
+    assert.equal(renewed.setCookie,
+        "ljuniq=AAAAAAAAAAAAAAA%3A1790294400; path=/; expires=Tue, 24 Nov 2026 00:00:00 GMT; SameSite=Lax");
     assert.equal(parseUniqCookie(null), null);
     assert.equal(parseUniqCookie("ljuniq=AAAAAAAAAAAAAAA%3A1790294400"), "AAAAAAAAAAAAAAA:1790294400");
     for (const cookie of ["ljuniq=short:1", "ljuniq=AAAAAAAAAAAAAAA%253A1", "session=1"]) {
