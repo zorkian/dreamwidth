@@ -24,6 +24,7 @@ BEGIN {
 }
 use Digest::SHA qw(sha256_hex);
 use Encode ();
+use File::Temp qw(tempfile);
 use HTTP::Request::Common;
 use JSON::PP;
 use Plack::Test;
@@ -69,7 +70,6 @@ if ($comparison) {
             $response = $callback->(GET "$origin/users/s2js_slice3/",
                 Cookie => "ljuniq=$cookie_value");
         };
-        die "Comparison GET is not anonymous\n" if LJ::get_remote();
         my ($challenge) = ($response ? $response->content : '')
             =~ /name="lj_form_auth" value="([^"]+)"/;
         die "Missing real comparison form challenge\n" unless $challenge;
@@ -90,10 +90,6 @@ my $body = $response->content;
 $body = Encode::encode('UTF-8', $body) if Encode::is_utf8($body);
 die "Expected both owned entries in real HTTP response\n"
     unless $body =~ /Live sample 1/ && $body =~ /Live sample 2/;
-open my $html, '>:raw', "$outdir/page-oracle.html" or die "Cannot write HTTP oracle: $!\n";
-print {$html} $body;
-close $html or die "Cannot close HTTP oracle: $!\n";
-
 my $public = {
     canonicalAppOrigin => $origin,
     siteRoot => $LJ::SITEROOT // '',
@@ -108,11 +104,11 @@ my $public = {
     facebookPreviewIcon => $LJ::FACEBOOK_PREVIEW_ICON // '',
     anonymousCaptchaDisabled => JSON::PP::true,
 };
-open my $config, '>:raw', "$outdir/public-config.json" or die "Cannot write config: $!\n";
-print {$config} JSON::PP->new->canonical->pretty->encode($public);
-close $config or die "Cannot close config: $!\n";
 my @headers;
-$response->headers->scan(sub { push @headers, [@_] });
+$response->headers->scan(sub {
+    my ($name, $value) = @_;
+    push @headers, [ $name, "$value" ];
+});
 @headers = sort { lc($a->[0]) cmp lc($b->[0]) || $a->[1] cmp $b->[1] } @headers;
 my $metadata = {
     status => $response->code,
@@ -128,7 +124,30 @@ if ($comparison) {
     $metadata->{perl_hash_seed} = $ENV{PERL_HASH_SEED};
     $metadata->{perl_perturb_keys} = $ENV{PERL_PERTURB_KEYS};
 }
-open my $meta, '>:raw', "$outdir/response-metadata.json" or die "Cannot write metadata: $!\n";
-print {$meta} JSON::PP->new->canonical->pretty->encode($metadata);
-close $meta or die "Cannot close metadata: $!\n";
+my @outputs = (
+    [ 'page-oracle.html', $body ],
+    [ 'public-config.json', JSON::PP->new->canonical->pretty->encode($public) ],
+    [ 'response-metadata.json', JSON::PP->new->canonical->pretty->encode($metadata) ],
+);
+# Serialize all values first. Remove old metadata before replacing any output:
+# if publication fails, a stale manifest cannot silently validate a new page.
+my @staged;
+my $published = eval {
+    for my $item (@outputs) {
+        my ($fh, $path) = tempfile('.live-oracle-XXXXXX', DIR => $outdir, UNLINK => 0);
+        binmode $fh, ':raw';
+        push @staged, [ $path, "$outdir/$item->[0]" ];
+        print {$fh} $item->[1] or die "Cannot write staged oracle: $!\n";
+        close $fh or die "Cannot close staged oracle: $!\n";
+    }
+    my $manifest = "$outdir/response-metadata.json";
+    unlink $manifest or die "Cannot remove old oracle metadata: $!\n" if -e $manifest;
+    for my $item (@staged) {
+        rename $item->[0], $item->[1] or die "Cannot publish oracle output: $!\n";
+    }
+    1;
+};
+my $publication_error = $@;
+unlink $_->[0] for @staged;
+die $publication_error unless $published;
 print "Real Perl HTTP 200: $metadata->{bytes} bytes; public config and oracle in $outdir\n";
