@@ -29,7 +29,8 @@ import type { RenderInput } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
 
-export function prepare(input: RenderInput, ctx: Context): S2Object {
+export function prepare(input: RenderInput, ctx: Context,
+    cleanEntry: (rawBody: string, entryId: number, entryUrl: string) => string): S2Object {
     const { journal: j, config: c } = input;
     const base = `${c.canonicalAppOrigin}/~${j.username}`;
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
@@ -59,7 +60,7 @@ export function prepare(input: RenderInput, ctx: Context): S2Object {
             screened: 0, screened_count: 0, show_readlink: 0,
             show_readlink_hidden: Number(e.commentsEnabled), show_postlink: Number(e.commentsEnabled),
             comments_disabled_maintainer: 0});
-        return object("Entry", {subject: e.subject, text: e.text, journal: user, poster: user,
+        return object("Entry", {subject: e.subject, text: cleanEntry(e.rawBody, e.id, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: nullObject("Image"), permalink_url: url,
             itemid: e.id, tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
