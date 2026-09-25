@@ -116,3 +116,82 @@ test('Chromium computes retained static positions after escape removal with Java
         }
     } finally { cleaner.close(); await browser.close(); }
 });
+
+test('formatting matrix retains browser text/font/color/link scopes in actual stock pages', async t => {
+    const {readFileSync} = await import('node:fs');
+    const {formattingCases} = requireContent(resolve(here, '../../dist/live/tests/formatting-cases.js'));
+    const {renderStock} = requireContent(resolve(here, '../../dist/live/render/engine.js'));
+    const {validateArtifact} = requireContent(resolve(here, '../../dist/live/render/artifact.js'));
+    const {approveSnapshot} = requireContent(resolve(here, '../../dist/live/policy/cohort.js'));
+    const {loadResourceTimes} = requireContent(resolve(here, '../../dist/live/render/resources.js'));
+    const fixture = requireContent(resolve(here, '../../dist/live/tests/fixtures.js'));
+    const artifact = validateArtifact(JSON.parse(readFileSync(
+        process.env.S2_LIVE_TEST_ARTIFACT || '/tmp/slice3-stock.json', 'utf8')));
+    const data = fixture.snapshot();
+    const journal = approveSnapshot({...data, entries: [data.entries[0]]});
+    const stockInput = {journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
+        formChallenge: 'public-test-challenge', uniq: 'AAAAAAAAAAAAAAA', resourceTimes: loadResourceTimes()};
+    // Offline assembly exercises unchanged prop_init/modules_init/Page.print.
+    // It is deliberately separate from the real isolated-worker qualification.
+    const assemble = fragment => renderStock(artifact, stockInput, 2097152, () => fragment);
+    const retained = spawnSync('perl', [resolve(here, 'cleaner-retained.pl')],
+        {input: JSON.stringify(formattingCases.map(row => row.raw)), encoding: 'utf8', timeout: 10000,
+            env: {...process.env, PERL_HASH_SEED: '0', PERL_PERTURB_KEYS: '0'}});
+    assert.equal(retained.status, 0, retained.stderr);
+    assert.deepEqual(JSON.parse(retained.stdout), formattingCases.map(row => row.perl));
+    const cleaner = createEntryCleaner(limits);
+    const browser = await chromium.launch({headless: true});
+    t.diagnostic(`Chromium ${browser.version()}; 98 raw/native rows; actual stock assembly; JS on/off`);
+    try {
+        for (const javaScriptEnabled of [true, false]) {
+            const browserContext = await browser.newContext({javaScriptEnabled});
+            await browserContext.route('**/*', route => route.abort());
+            const page = await browserContext.newPage();
+            const inspect = async markup => {
+                await page.setContent(assemble(markup));
+                assert.equal(await page.locator('.entry-content').count(), 1);
+                return page.locator('.entry-content').evaluate(element => {
+                    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+                    const textScopes = [];
+                    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                        const parent = node.parentElement;
+                        const style = getComputedStyle(parent);
+                        const href = parent.closest('a')?.getAttribute('href') ?? null;
+                        for (const text of node.textContent) textScopes.push({text, href,
+                            weight: style.fontWeight, font: style.fontFamily, size: style.fontSize,
+                            italic: style.fontStyle, color: style.color});
+                    }
+                    return {html: element.innerHTML, visible: element.innerText, textScopes};
+                });
+            };
+            for (const row of formattingCases) {
+                const result = cleaner.clean({body: row.raw, format: 'html_raw0', context});
+                if (row.classification === 'unsupported') {
+                    assert.deepEqual(result, {kind: 'failure', reason: 'unsupported'}, row.id);
+                    continue;
+                }
+                assert.equal(result.kind, 'ok', row.id);
+                assert.equal(result.fragment.html, row.html, row.id);
+                const measured = await inspect(result.fragment.html);
+                assert.deepEqual(measured, await inspect(row.perl), `${row.id}; JS=${javaScriptEnabled}`);
+                assert.deepEqual(await inspect(measured.html), measured, `${row.id}; assembled reparse`);
+            }
+            const boundary = formattingCases.find(row => row.id === 'b/across-p');
+            assert.notDeepEqual((await inspect(boundary.raw)).textScopes,
+                (await inspect(boundary.html)).textScopes, 'negative control exercises unwanted bold reconstruction');
+            const color = formattingCases.find(row => row.id === 'font/across-p');
+            assert.notDeepEqual((await inspect(color.raw)).textScopes,
+                (await inspect(color.html)).textScopes, 'negative control exercises unwanted color reconstruction');
+            for (const body of [
+                '<body onload="globalThis.bodyExecuted=true" title="a]>b"><p>visible</p></body>']) {
+                const result = cleaner.clean({body, format: 'html_raw0', context});
+                assert.equal(result.kind, 'ok');
+                const measured = await inspect(result.fragment.html);
+                assert.deepEqual(await inspect(measured.html), measured);
+                assert.equal(await page.evaluate(() => globalThis.bodyExecuted), undefined);
+                assert.equal(result.fragment.html, '<p>visible</p>');
+            }
+            await browserContext.close();
+        }
+    } finally { cleaner.close(); await browser.close(); }
+});

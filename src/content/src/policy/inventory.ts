@@ -19,8 +19,10 @@
 // positive tag list. Enumerate the ordinary modern/legacy HTML survivors that
 // this finite body policy handles. Anything else is explicitly unsupported;
 // DOMPurify's changing defaults must not silently define compatibility coverage.
+// basefont is explicitly outside this body representation: a later raw parse
+// can hoist it into HEAD. Refuse it rather than lose it or invent relocation.
 export const entryTags = new Set((
-    "a abbr acronym address area article aside b basefont bdi bdo big blink blockquote br button " +
+    "a abbr acronym address area article aside b bdi bdo big blink blockquote br button " +
     "canvas caption center cite code col colgroup data datalist dd del details dfn dialog dir div " +
     "dl dt em fieldset figcaption figure font footer form h1 h2 h3 h4 h5 h6 header hgroup hr i img " +
     "input ins kbd label legend li main map mark marquee menu menuitem meter nav nobr ol optgroup " +
