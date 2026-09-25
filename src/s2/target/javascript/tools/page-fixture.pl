@@ -39,6 +39,9 @@ binmode STDERR, ':encoding(UTF-8)';
 my $outdir = shift @ARGV // die "Expected one output directory\n";
 my $variant = @ARGV && $ARGV[0] eq '--variant-read' ? shift @ARGV : '';
 die "Expected one output directory and optional --variant-read\n" if @ARGV || !-d $outdir;
+die "Fixed Perl hash seed required\n"
+    unless ($ENV{PERL_HASH_SEED} // '') eq '0'
+    && ($ENV{PERL_PERTURB_KEYS} // '') eq '0';
 die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
 my $db = LJ::get_db_writer() or die "No local database writer\n";
 my $dbname = $db->selectrow_array('SELECT DATABASE()');
@@ -210,6 +213,17 @@ my $response;
         die "Unexpected prepared page class\n" unless $prepared->{_type} eq 'RecentPage';
         $page = $prepared;
         $props = $ctx->[S2::PROPS];
+        $host{siteroot} = $LJ::SITEROOT // '';
+        my $stylesheet = $page->{stylesheet_url} // '';
+        my ($css_host, $css_path) = $stylesheet =~ m!^https?://([^/]+)(/.*)$!;
+        die "Missing absolute stock stylesheet URL\n" unless $css_host && $css_path;
+        my $css_decision = LJ::valid_stylesheet_url($stylesheet, $css_host, $css_path);
+        die "Stock stylesheet did not receive an allow decision\n"
+            unless defined $css_decision && $css_decision =~ /^1$/;
+        $host{stylesheet_validation} = {
+            href => $stylesheet, decision => 0 + $css_decision,
+            helper => 'LJ::valid_stylesheet_url',
+        };
         $host{viewer_sees_control_strip} =
             S2::Builtin::LJ::viewer_sees_control_strip($ctx) ? JSON::PP::true : JSON::PP::false;
         $host{has_quickreply} = LJ::S2::has_quickreply($page)
@@ -331,6 +345,11 @@ my $fixture = {
         layer_names => \@names, layer_ids => \@layer_ids,
         request => { method => 'GET', path => '/users/s2js_slice2/', host => 'localhost' },
         fixed_clock => '2026-09-25T00:00:00Z', seed_version => 1,
+        input_freeze => {
+            perl_hash_seed => '0', perl_perturb_keys => '0',
+            form_auth_chal => 'invalid-s2-js-slice2-fixture',
+            form_auth_scope => 'anonymous GET /users/s2js_slice2/',
+        },
         content_variant => $variant ? 'owned-body-1' : 'baseline',
     },
     graph => { root => $root, properties => $property_root, nodes => \%nodes },

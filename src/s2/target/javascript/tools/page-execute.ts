@@ -33,6 +33,35 @@ function record(value: unknown, label: string): Data {
     return value as Data;
 }
 
+export function escapeHtml(value: unknown): string {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+
+export function formatPlainSubject(rawEntry: unknown, rawOptions: unknown): string {
+    const item = record(rawEntry, "entry subject");
+    const options = record(rawOptions, "subject options");
+    const subject = item.subject;
+    const format = options.format ?? "";
+    if (typeof subject !== "string" || subject === "" ||
+        /[<>"\r\n\t]|&(?:#[0-9]+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);/.test(subject) ||
+        (format !== "" && format !== "text") ||
+        (options.class !== undefined && typeof options.class !== "string") ||
+        (options.style !== undefined && typeof options.style !== "string")) {
+        throw new Error("Unsupported formatted subject domain");
+    }
+    const cssClass = options.class ? ` class="${escapeHtml(options.class)}" ` : "";
+    const style = options.style ? ` style="${escapeHtml(options.style)}" ` : "";
+    if (format === "text") return `<span ${cssClass}${style}>${subject}</span>`;
+    if (typeof item.permalink_url !== "string" ||
+        !/^https?:\/\/[^/\s"<>]+\/\S*$/.test(item.permalink_url)) {
+        throw new Error("Unsupported entry permalink");
+    }
+    return `<a title="${subject}" href="${item.permalink_url}"${cssClass}${style}>${subject}</a>`;
+}
+
 function readFixture(path: string): { page: Data; properties: Data; host: Data } {
     const fixture = record(JSON.parse(readFileSync(path, "utf8")), "page fixture");
     const provenance = record(fixture.provenance, "page provenance");
@@ -45,6 +74,11 @@ function readFixture(path: string): { page: Data; properties: Data; host: Data }
             host: "localhost", method: "GET", path: "/users/s2js_slice2/",
         }) || provenance.fixed_clock !== "2026-09-25T00:00:00Z" ||
         provenance.seed_version !== 1 ||
+        JSON.stringify(provenance.input_freeze) !== JSON.stringify({
+            form_auth_chal: "invalid-s2-js-slice2-fixture",
+            form_auth_scope: "anonymous GET /users/s2js_slice2/",
+            perl_hash_seed: "0", perl_perturb_keys: "0",
+        }) ||
         !["baseline", "owned-body-1"].includes(String(provenance.content_variant))) {
         throw new Error("Wrong page fixture provenance, version, or style stack");
     }
@@ -113,7 +147,8 @@ function readFixture(path: string): { page: Data; properties: Data; host: Data }
         typeof host.script_tags_html !== "string" ||
         typeof host.ljuser_html !== "string" ||
         typeof host.quickreply_div !== "string" ||
-        typeof host.footer_pagestats_html !== "string" ||
+        typeof host.footer_pagestats_html !== "string" || typeof host.siteroot !== "string" ||
+        !host.stylesheet_validation || typeof host.stylesheet_validation !== "object" ||
         !Array.isArray(entries) || entries.some(entry => {
             const item = entry as Data;
             return typeof item.subject !== "string" || typeof item.text !== "string" ||
@@ -151,9 +186,7 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
     const alternates = new Map<string, boolean>();
     let quickreplyPrinted = false;
     const anonymous = () => false;
-    const escape = (value: unknown) => String(value ?? "")
-        .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    const escape = escapeHtml;
     const pad = (number: unknown) => String(number ?? 0).padStart(2, "0");
     function datePart(ctx: Context, item: Data, token: string): string {
         const year = Number(item.year ?? 0);
@@ -228,17 +261,8 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
             }
             ctx.print(host.script_tags_html);
         },
-        _EntryLite__formatted_subject: (_ctx, entry, rawOptions) => {
-            const item = record(entry, "entry subject");
-            const options = record(rawOptions, "subject options");
-            const subject = String(item.subject ?? "");
-            const format = String(options.format ?? "");
-            const cssClass = options.class ? ` class="${escape(options.class)}" ` : "";
-            const style = options.style ? ` style="${escape(options.style)}" ` : "";
-            if (format === "text") return `<span ${cssClass}${style}>${subject}</span>`;
-            if (typeof item.permalink_url !== "string") throw new Error("Missing entry permalink");
-            return `<a title="${subject}" href="${item.permalink_url}"${cssClass}${style}>${subject}</a>`;
-        },
+        _EntryLite__formatted_subject: (_ctx, entry, rawOptions) =>
+            formatPlainSubject(entry, rawOptions),
         _DateTime__date_format: (ctx, date, format, links) =>
             formatDate(ctx, date, format, "date", Boolean(links)),
         _DateTime__time_format: (ctx, date, format) => formatDate(ctx, date, format, "time"),
@@ -282,10 +306,14 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
             const raw = links[String(key)];
             if (raw === undefined) return { ".type": "Link", ".isnull": true, _url: "" };
             const link = record(raw, `user link ${String(key)}`);
+            if (typeof link.image !== "string" || !Number.isSafeInteger(link.width) ||
+                !Number.isSafeInteger(link.height)) {
+                throw new Error("Unsupported user link image dimensions");
+            }
             const caption = ctx.prop._userlite_interaction_links === "text" ? link.text : link.title;
             const icon = s2Object("Image", {
-                url: link.image ?? "", width: link.width ?? 20,
-                height: link.height ?? 18, alttext: "", extra: {},
+                url: link.image, width: link.width,
+                height: link.height, alttext: "", extra: {},
             });
             return s2Object("Link", {
                 url: link.url ?? "", caption: caption ?? "", icon, extra: {},
@@ -313,7 +341,7 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
             }
             if (key === "mem_add" && host.memories_enabled) {
                 return s2Object("Link", {
-                    url: `/tools/memadd?journal=${journal.user}&amp;itemid=${itemid}`,
+                    url: `${host.siteroot}/tools/memadd?journal=${journal.user}&amp;itemid=${itemid}`,
                     caption: ctx.prop._text_mem_add,
                     icon: record(host.memadd_image, "app memory icon"), extra: {},
                 });
@@ -321,7 +349,7 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
             if (key === "tell_friend" && host.tellafriend_enabled &&
                 record(host.entry_can_tell_friend, "tell-friend decisions")[String(itemid)]) {
                 return s2Object("Link", {
-                    url: `/tools/tellafriend?journal=${journal.user}&amp;itemid=${itemid}`,
+                    url: `${host.siteroot}/tools/tellafriend?journal=${journal.user}&amp;itemid=${itemid}`,
                     caption: ctx.prop._text_tell_friend,
                     icon: record(host.tellfriend_image, "app share icon"), extra: {},
                 });
@@ -331,6 +359,10 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
         _Entry__print_reply_link: (ctx, entry, rawOptions) => {
             const item = record(entry, "reply entry");
             const options = record(rawOptions, "reply link options");
+            if (["img_url", "basesubject", "reply_url", "img_width", "img_height",
+                "img_align", "img_border", "alt", "title"].some(key => options[key])) {
+                throw new Error("Unsupported reply link option");
+            }
             const comments = record(item.comments, "entry comment info");
             const target = String(options.target ?? "");
             if (!/^[\w-]+$/.test(target)) return;
@@ -341,7 +373,12 @@ function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
             const onclick = quickreply
                 ? `onclick='return function(that) {return quickreply("${target}", 0, "",that)}(this)'`
                 : "";
-            const replyUrl = escape(comments.post_url ?? "");
+            const postUrl = comments.post_url;
+            if (typeof postUrl !== "string" || !/^https?:\/\/[^/\s]+\/\S*$/.test(postUrl) ||
+                /[&"'<>]/.test(postUrl)) {
+                throw new Error("Unsupported noncanonical reply URL");
+            }
+            const replyUrl = escape(postUrl);
             ctx.print(`<a ${onclick} href='${replyUrl}' ${css}>${linktext}</a>`);
         },
         _Entry__print_reply_container: (ctx, entry, rawOptions) => {
@@ -399,12 +436,19 @@ function main(): void {
     const { page, properties, host } = readFixture(fixturePath);
     let html = "";
     let htmlBytes = 0;
+    const stylesheet = record(host.stylesheet_validation, "stylesheet validation");
+    if (stylesheet.helper !== "LJ::valid_stylesheet_url" ||
+        stylesheet.href !== page.stylesheet_url || stylesheet.decision !== 1) {
+        throw new Error("Missing named stock stylesheet allow decision");
+    }
     const context = new Context(loadLayers(compiledPath), text => {
         htmlBytes += Buffer.byteLength(text, "utf8");
         if (htmlBytes > maxHtmlBytes) throw new Error("Stock page HTML output limit exceeded");
         html += text;
     },
-        properties, callbacks(page, host), cleanTrustedSafeChunk);
+        properties, callbacks(page, host), value => cleanTrustedSafeChunk(value, {
+            href: String(stylesheet.href), decision: Number(stylesheet.decision),
+        }));
     context.runMethod(page, "print()");
     if (host.footer_hook_body !== "" || host.footer_hook_journal !== "" ||
         typeof host.footer_pagestats_html !== "string" ||
@@ -424,9 +468,11 @@ function main(): void {
     process.stdout.write(html);
 }
 
-try {
-    main();
-} catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
-    process.exitCode = 1;
+if (require.main === module) {
+    try {
+        main();
+    } catch (error) {
+        process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+        process.exitCode = 1;
+    }
 }
