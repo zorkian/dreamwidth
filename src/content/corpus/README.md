@@ -128,6 +128,7 @@ cmp /tmp/slice4-entry-replay.json src/content/corpus/entry-replay-perl.json
 ```
 
 Perl output is evidence for each named input, not an automatic security target.
+
 The TypeScript difference ledger and real assembled stock/browser checks must
 classify safe repairs, origin adaptations, security corrections and unsupported
 cases individually against a reviewed cleaner source.
@@ -161,3 +162,27 @@ cmp /tmp/slice4-native-derived-perl.json \
   src/content/corpus/native-derived-entry-perl.json
 /opt/dw-node24/bin/node src/content/tests/native-derived-entry.test.mjs
 ```
+
+After a shared cleaner candidate has been reviewed, run the byte comparator
+against that exact built module and full commit ID from `src/content`. Set
+`CLEANER_SHA` to the reviewed 40-character commit ID first:
+
+```sh
+/opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
+    dist/index.js "${CLEANER_SHA:?set reviewed cleaner SHA}" synthetic \
+    > /tmp/slice4-synthetic-results.json
+/opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
+    dist/index.js "${CLEANER_SHA:?set reviewed cleaner SHA}" native \
+    > /tmp/slice4-native-results.json
+/opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
+    /tmp/slice4-synthetic-results.json corpus/accepted-synthetic-ledger.json
+/opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
+    /tmp/slice4-native-results.json corpus/accepted-native-ledger.json
+```
+
+The two accepted ledger files are final review artifacts, added only after
+source review. The checker compares every case ID, source, raw input and Perl
+digest, exact TypeScript bytes and digest, outcome and category. A regenerated
+result cannot update its own accepted category. Nonexact cases need an explicit
+case rationale and browser/security evidence; a temporary machine-generated
+classification is never an accepted ledger.
