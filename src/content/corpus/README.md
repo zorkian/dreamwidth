@@ -131,3 +131,33 @@ Perl output is evidence for each named input, not an automatic security target.
 The TypeScript difference ledger and real assembled stock/browser checks must
 classify safe repairs, origin adaptations, security corrections and unsupported
 cases individually against a reviewed cleaner source.
+
+`native-call-replay-map.json` accounts for **all 1,062** recorded native
+`LJ::CleanHTML` calls. Its 384 `clean_event` calls produce **new** strict-UTF-8
+`html_raw0` records in `native-derived-entry-cases.json`; all 384 have input
+bytes and no omissions. The other 678 calls keep explicit native-only reasons
+for comment, media embed, subject or user-bio contexts. Original editor,
+options, caller and TAP execution-window evidence remain in the raw trace;
+each replay points back to its exact suite and call ordinal. Recleaning a
+Markdown or default-editor input under `html_raw0` is a context change, not a
+claim that the original TAP assertion expected the new output. The actual
+Perl outputs for the new context are pinned in `native-derived-entry-perl.json`.
+The 384 cases originate from forms 6, event 42, Markdown 28, embed 23,
+resource 5, tables 9, XSS 254, ljtags 12, event-embed 1 and invalid 4.
+
+Regenerate and verify the complete call disposition and output bytes:
+
+```sh
+/opt/dw-node24/bin/node src/content/tools/cleaner-build-native-replay.mjs \
+  /tmp/slice4-native-derived-cases.json /tmp/slice4-native-call-map.json
+cmp /tmp/slice4-native-derived-cases.json \
+  src/content/corpus/native-derived-entry-cases.json
+cmp /tmp/slice4-native-call-map.json src/content/corpus/native-call-replay-map.json
+PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0 \
+  perl src/content/tools/cleaner-native-entry-oracle.pl \
+  src/content/corpus/native-derived-entry-cases.json \
+  > /tmp/slice4-native-derived-perl.json
+cmp /tmp/slice4-native-derived-perl.json \
+  src/content/corpus/native-derived-entry-perl.json
+/opt/dw-node24/bin/node src/content/tests/native-derived-entry.test.mjs
+```
