@@ -28,6 +28,12 @@ assert.ok(page.length > 1000 && page.length <= 2 * 1024 * 1024);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const appOrigin = 'http://localhost:8080';
 const browserOrigin = 'http://page.slice4.invalid';
+const fixtureOrigin = 'https://asset.slice4.invalid';
+const fixturePixel = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==',
+    'base64');
+const fixtureUrls = new Set(['pixel.png', 'map.png', 'bg.png'].map(name =>
+    `${fixtureOrigin}/${name}`));
 const document = new JSDOM(page.toString('utf8'), { url: browserOrigin + '/recent' }).window.document;
 const stockStyle = [...document.querySelectorAll('link[rel]')].filter(element =>
     element.rel.toLowerCase().split(/\s+/).includes('stylesheet')).map(element =>
@@ -44,15 +50,29 @@ if (checkStyleOnly) {
     process.exit(0);
 }
 const urls = new Set();
+const observedFixtures = new Set();
 for (const element of document.querySelectorAll('script[src],link[href],img[src]')) {
     const tag = element.tagName.toLowerCase();
     if (tag === 'link' && !['stylesheet', 'icon'].includes(element.rel.toLowerCase())) continue;
     const raw = element.getAttribute(tag === 'link' ? 'href' : 'src');
     assert.ok(raw && !raw.startsWith('//'), 'resource URL must have a fixed origin');
     const url = new URL(raw, browserOrigin + '/recent');
+    if (tag === 'img' && url.origin === fixtureOrigin) {
+        assert.ok(fixtureUrls.has(url.href), `undeclared synthetic image: ${url.href}`);
+        observedFixtures.add(url.href);
+        urls.add(url.href);
+        continue;
+    }
     assert.ok([browserOrigin, appOrigin].includes(url.origin),
         `unexpected stock resource origin: ${url.origin}`);
     urls.add(url.href);
+}
+for (const element of document.querySelectorAll('[style]')) {
+    if (/url\(\s*["']?https:\/\/asset\.slice4\.invalid\/bg\.png["']?\s*\)/i
+        .test(element.getAttribute('style'))) {
+        observedFixtures.add(`${fixtureOrigin}/bg.png`);
+        urls.add(`${fixtureOrigin}/bg.png`);
+    }
 }
 for (const raw of extraPaths) {
     assert.match(raw, /^\/(?:stc|js|img)\/[^\s?#]+(?:\?[^\s#]*)?$/);
@@ -63,6 +83,13 @@ const resources = [];
 let total = 0;
 for (const browserUrl of [...urls].sort()) {
     const url = new URL(browserUrl);
+    if (observedFixtures.has(browserUrl)) {
+        resources.push({ url: browserUrl, source: 'synthetic-inert-fixture',
+            contentType: 'image/png', sha256: sha(fixturePixel),
+            bodyBase64: fixturePixel.toString('base64') });
+        total += fixturePixel.length;
+        continue;
+    }
     assert.ok(/^\/(?:stc|js|img)\//.test(url.pathname) ||
         url.pathname === stockStylePath,
     `unsupported stock resource path: ${url.pathname}`);
@@ -77,7 +104,7 @@ for (const browserUrl of [...urls].sort()) {
     assert.ok(body.length > 0 && body.length <= 2 * 1024 * 1024, sourceUrl);
     total += body.length;
     assert.ok(total <= 8 * 1024 * 1024, 'stock resource map exceeded 8MiB');
-    resources.push({ url: browserUrl, sourceUrl, contentType,
+    resources.push({ url: browserUrl, source: 'retained-public-app', sourceUrl, contentType,
         sha256: sha(body), bodyBase64: body.toString('base64') });
 }
 const map = { schema: 1, pageSha256: sha(page), resources };
