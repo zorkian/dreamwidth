@@ -19,16 +19,18 @@ import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from '@playwright/test';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [resultsPath, assembledPath, resourcesPath, richMode] = process.argv.slice(2);
+const [resultsPath, assembledPath, resourcesPath, requiredMode] = process.argv.slice(2);
 if (!resultsPath) {
     throw new Error('usage: browser-entry-reparse.mjs <result-json> ' +
-        '[actual-stock-page.html exact-resource-map.json [--require-rich]]');
+        '[actual-stock-page.html exact-resource-map.json ' +
+        '[--require-rich|--require-forged-cut]]');
 }
 if (Boolean(assembledPath) !== Boolean(resourcesPath)) {
     throw new Error('actual assembled page and exact resource map are required together');
 }
-if (richMode && (richMode !== '--require-rich' || !assembledPath)) {
-    throw new Error('--require-rich requires an assembled page and resource map');
+if (requiredMode && (!['--require-rich', '--require-forged-cut'].includes(requiredMode)
+    || !assembledPath)) {
+    throw new Error('required stock mode needs an assembled page and resource map');
 }
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'corpus/entry-replay-cases.json')));
 const results = JSON.parse(fs.readFileSync(resultsPath));
@@ -371,13 +373,19 @@ for (const [engineName, engine] of [['chromium', chromium], ['firefox', firefox]
                     assert.equal(stockObservation.requests.filter(url =>
                         url.includes('/js/??')).length, enabled ? 2 : 0,
                     'stock script bundles must follow JS-on/off');
-                    if (richMode) {
+                    if (requiredMode === '--require-rich') {
                         assert.ok(dom.text.includes('After cut visible'),
                             'rich page marker missing');
                         assert.equal(dom.cutSpans.length, 1,
                             'rich page must have one generated cut');
+                    }
+                    if (requiredMode === '--require-forged-cut') {
+                        assert.ok(dom.text.includes('Forged cut control'),
+                            'source-forged cut marker missing');
+                        assert.equal(dom.cutSpans.length, 1,
+                            'forged-cut page must have one legitimate cut');
                         assert.equal(dom.untrustedCutSpans.length, 1,
-                            'rich page must retain one inert forged cut span');
+                            'source-forged cut must remain inert');
                     }
                     if (dom.text.includes('After cut visible')) {
                         for (const asset of ['pixel.png', 'map.png', 'bg.png']) {
