@@ -128,9 +128,12 @@ intercepts one synthetic document and one synthetic image in each Chromium,
 Firefox and WebKit JS-on/off mode. The actual assembled stock output and
 security corpus need their own browser harness.
 
-`tools/browser-entry-reparse.mjs` accepts a 26-row cleaner result JSON whose
-IDs and output digests match `corpus/entry-replay-cases.json`. It tests each
-admitted output in both recorded document and `div.entry-content` contexts
+`tools/browser-entry-reparse.mjs` accepts a 26-row cleaner result JSON. It
+checks the IDs against `corpus/entry-replay-cases.json` and checks each output
+against its own digest. The corpus has no pinned TypeScript output digests;
+this harness alone does not authenticate the cleaner build or approve a
+difference category. It tests each admitted output in both recorded document
+and `div.entry-content` contexts
 across all six installed browser modes. A raw control must execute only with
 JavaScript enabled and must hit the denied image/WebSocket traps. Browser
 service workers are blocked, every request is intercepted, and only enumerated
@@ -158,8 +161,9 @@ account data. Example, from `src/content` in the owning devcontainer:
 
 The page file must be a fresh assembled Slice4 rich-entry response for final
 acceptance; a preserved Slice3 page only qualifies the harness and stock
-resource wiring. The cleaner result JSON must come from the reviewed package
-and the pinned per-case difference ledger, not from an unreviewed snapshot.
+resource wiring. For acceptance, generate cleaner result JSON from the exact
+reviewed build and verify it against a separately reviewed per-case difference
+ledger before this browser run. A self-consistent JSON file is insufficient.
 Browser process telemetry and DNS outside intercepted page requests are not
 claimed by this test.
 
