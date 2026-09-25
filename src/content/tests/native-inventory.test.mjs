@@ -17,9 +17,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparedCorpusRoot } from '../tools/corpus-paths.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(contentRoot, 'corpus/native-calls');
+const prepared = preparedCorpusRoot();
 const builder = path.join(contentRoot, 'tools/build-native-inventory.mjs');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-native-inventory-'));
 const traces = path.join(temporary, 'traces');
@@ -30,7 +32,7 @@ for (const name of fs.readdirSync(source)) {
 
 function build() {
     return spawnSync(process.execPath, [builder, traces, path.join(temporary, 'out.json')],
-        { encoding: 'utf8' });
+        { encoding: 'utf8', env: { ...process.env, DW_CONTENT_CORPUS_ROOT: prepared } });
 }
 
 try {

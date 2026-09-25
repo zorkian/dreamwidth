@@ -18,12 +18,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparedCorpusRoot } from '../tools/corpus-paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const corpus = path.join(root, 'corpus');
+const corpus = preparedCorpusRoot();
 const casesPath = path.join(corpus, 'native-derived-entry-cases.json');
 const mapPath = path.join(corpus, 'native-call-replay-map.json');
-const oraclePath = path.join(corpus, 'native-derived-entry-perl.json');
+const oraclePath = path.join(root, 'corpus/native-derived-entry-perl.json');
 const casesBytes = fs.readFileSync(casesPath);
 const mapBytes = fs.readFileSync(mapPath);
 const oracleBytes = fs.readFileSync(oraclePath);
@@ -75,7 +76,8 @@ try {
     const newMap = path.join(temporary, 'map.json');
     const builder = spawnSync(process.execPath,
         [path.join(root, 'tools/cleaner-build-native-replay.mjs'), newCases, newMap],
-        { encoding: 'utf8', timeout: 30000 });
+        { encoding: 'utf8', timeout: 30000,
+            env: { ...process.env, DW_CONTENT_CORPUS_ROOT: corpus } });
     assert.equal(builder.status, 0, builder.stderr);
     assert.deepEqual(fs.readFileSync(newCases), casesBytes);
     assert.deepEqual(fs.readFileSync(newMap), mapBytes);

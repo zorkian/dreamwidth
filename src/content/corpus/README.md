@@ -15,12 +15,22 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Native cleaner corpus
 
-`native-inventory.json` indexes every TAP assertion in the fourteen unchanged
+Run `/opt/dw-node24/bin/node src/content/tools/prepare-corpus.mjs` from the
+repository root before native corpus checks. This Node-only command expands
+`native-tap-spec.json` and the tracked `native-calls/` traces into the ignored
+`src/content/artifacts/corpus/` directory. Its finite outputs are fourteen
+`native-logs/*.log` files, three derived JSON files and a digest manifest.
+It verifies source, trace and output hashes on every run, including cache hits.
+For an isolated fresh preparation use `--output /tmp/<owned-directory>/corpus`
+after creating its parent. Set `DW_CONTENT_CORPUS_ROOT` to that output root for
+consumers. Ordinary package build and check commands do not prepare the corpus.
+
+The generated `native-inventory.json` indexes every TAP assertion in the fourteen unchanged
 `t/cleaner*.t` files at base `c725406eeed4b239dbb68af0a50f505f4b83b8df`.
 Each case has a stable source-file/TAP-number ID, source hash, source-line
 locator, native context, predicate, TODO state and exact native TAP line.
-`native-logs/` retains the complete output regenerated in this implementation
-worktree's own devcontainer. The source files remain the authority for input,
+`native-tap-spec.json` retains readable TAP templates, exceptional TODO lines
+and the exact output hashes from the reviewed run. The source files remain the authority for input,
 options and expected predicates. Cases with generated descriptions point to
 their named input definition; other dynamic cases list possible assertion
 sites and retain the stable TAP ID. A later explicit `html_raw0` replay is a
@@ -63,7 +73,8 @@ synthetic key. Native TAP predicates are not an exact input/output oracle by
 themselves; exact retained cleaner outputs and the per-case Perl/TypeScript
 difference ledger belong to the later content replay harness.
 
-Regenerate from the repository root inside the owning devcontainer:
+Separately verify actual Perl TAP in the owning devcontainer. This is an
+explicit native-suite check, never part of test preparation or app build:
 
 ```sh
 mkdir -p /tmp/slice4-native-sol
@@ -71,8 +82,9 @@ for suite in t/cleaner*.t; do
     name=${suite##*/}
     perl "$suite" > "/tmp/slice4-native-sol/$name.log" 2>&1 || exit
 done
-cp /tmp/slice4-native-sol/*.log src/content/corpus/native-logs/
-/opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs
+for log in /tmp/slice4-native-sol/*.log; do
+    cmp "$log" "src/content/artifacts/corpus/native-logs/${log##*/}" || exit
+done
 ```
 
 Regenerate call traces in a separate existing directory. Compare the new
@@ -85,13 +97,15 @@ for suite in t/cleaner*.t; do
     case "$name" in cleaner-email.t|cleaner-link.t) continue;; esac
     perl src/content/tools/cleaner-native-run.pl "$name" /tmp/slice4-native-calls
     cmp "/tmp/slice4-native-calls/$name.tap" \
-        "src/content/corpus/native-logs/$name.log" || exit
+        "src/content/artifacts/corpus/native-logs/$name.log" || exit
     cmp "/tmp/slice4-native-calls/$name.calls.jsonl" \
         "src/content/corpus/native-calls/$name.calls.jsonl" || exit
 done
-/opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs \
+DW_CONTENT_CORPUS_ROOT=$PWD/src/content/artifacts/corpus \
+  /opt/dw-node24/bin/node src/content/tools/build-native-inventory.mjs \
     /tmp/slice4-native-calls /tmp/slice4-native-calls/inventory.json
-cmp /tmp/slice4-native-calls/inventory.json src/content/corpus/native-inventory.json
+cmp /tmp/slice4-native-calls/inventory.json \
+    src/content/artifacts/corpus/native-inventory.json
 ```
 
 Regeneration only uses this container's own test DB. Some original suites use
@@ -152,11 +166,12 @@ Regenerate and verify the complete call disposition and output bytes:
 /opt/dw-node24/bin/node src/content/tools/cleaner-build-native-replay.mjs \
   /tmp/slice4-native-derived-cases.json /tmp/slice4-native-call-map.json
 cmp /tmp/slice4-native-derived-cases.json \
-  src/content/corpus/native-derived-entry-cases.json
-cmp /tmp/slice4-native-call-map.json src/content/corpus/native-call-replay-map.json
+  src/content/artifacts/corpus/native-derived-entry-cases.json
+cmp /tmp/slice4-native-call-map.json \
+  src/content/artifacts/corpus/native-call-replay-map.json
 PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0 \
   perl src/content/tools/cleaner-native-entry-oracle.pl \
-  src/content/corpus/native-derived-entry-cases.json \
+  src/content/artifacts/corpus/native-derived-entry-cases.json \
   > /tmp/slice4-native-derived-perl.json
 cmp /tmp/slice4-native-derived-perl.json \
   src/content/corpus/native-derived-entry-perl.json
