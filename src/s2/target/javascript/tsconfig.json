@@ -12,6 +12,6 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["runtime/**/*.ts", "tools/**/*.ts"],
+  "include": ["runtime/**/*.ts", "live/**/*.ts", "tools/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
