@@ -178,44 +178,54 @@ cmp /tmp/slice4-native-derived-perl.json \
 /opt/dw-node24/bin/node src/content/tests/native-derived-entry.test.mjs
 ```
 
-After a shared cleaner candidate has been reviewed, run the byte comparator
-against that exact built module and full commit ID from `src/content`. Set
-`CLEANER_SHA` to the reviewed 40-character commit ID first:
+After both locked TypeScript builds, run the byte comparator against the
+current built module from `src/content`. The positional label is informational;
+the ignored run attestation binds the actual source, fresh compiled output,
+lockfile, fixed corpus and result bytes:
 
 ```sh
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
-    dist/index.js "${CLEANER_SHA:?set reviewed cleaner SHA}" synthetic \
+    dist/index.js current synthetic \
     > /tmp/slice4-synthetic-results.json
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
-    dist/index.js "${CLEANER_SHA:?set reviewed cleaner SHA}" native \
+    dist/index.js current native \
     > /tmp/slice4-native-results.json
+/opt/dw-node24/bin/node tools/attest-corpus-run.mjs \
+    --synthetic /tmp/slice4-synthetic-results.json \
+    --native /tmp/slice4-native-results.json --entry
 /opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
     /tmp/slice4-synthetic-results.json corpus/accepted-synthetic-ledger.json
 /opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
     /tmp/slice4-native-results.json corpus/accepted-native-ledger.json
 ```
 
-The two accepted ledger files are final review artifacts, added only after
-source review. The checker compares every case ID, source, raw input and Perl
-digest, exact TypeScript bytes and digest, outcome and category. A regenerated
-result cannot update its own accepted category. Nonexact cases need an explicit
-case rationale and browser/security evidence; a temporary machine-generated
-classification is never an accepted ledger.
-
-The ledgers pin the reviewed cleaner source
-`71211caa1c95b38b115bb8bd7230a4b183298656`, the compiled JavaScript
-closure digest, and the content lock digest. The synthetic 26 are 16 exact,
+The permanent ledgers pin case IDs, outcomes, expected TypeScript bytes,
+categories, rationales and evidence. Source/input identity joins the fixed
+manifest; Perl identity joins the independent fixed golden. The checker
+recomputes all joins and raw byte comparisons. A regenerated result or
+attestation cannot update an accepted category. The synthetic 26 are 16 exact,
 two serialization, two origin adaptations, one security correction and five
 explicit Unsupported outcomes. The native-derived 384 are 249 exact, 15
 serialization, 27 origin adaptations, 13 security corrections and 80 explicit
-Unsupported outcomes. Each nonexact row retains its own input/Perl/TypeScript
-digests, a named cause and evidence; the byte differences are not normalized.
+Unsupported outcomes. Each nonexact row retains its expected TypeScript digest,
+a named cause and evidence; the byte differences are not normalized.
+
+`attest-corpus-run.mjs` emits into ignored `artifacts/attestation`, or a fresh
+owned `--output DIR` under `artifacts/` or `/tmp`. Creation performs a fresh
+locked TypeScript emit into scoped temporary directories and refuses stale
+`dist` bytes. The default mode is Node-only and records the 410 comparisons;
+`--entry` also runs the existing compiled Entry test once and records all 62
+raw reports. The Entry semantic checker requires `--entry` for final acceptance.
+Each checker rehashes the run and fixed expectations; `--attestation DIR` selects
+an explicit root. A changed source, result or fixed corpus requires a new run
+attestation, while permanent expectations remain unchanged.
 
 `native-browser-cases.json` independently pins all 208 admitted XSS-derived
 records plus the other admitted native nonexact records: 219 case IDs grouped
-into 72 identical input/Perl/TypeScript triples. The grouping keeps distinct
-raw source and retained output even when many cases share the same sanitized
-HTML. Each group fixes its only permitted image URL and request count; all
+into 72 groups. Each member independently joins the same fixed input, Perl
+and expected TypeScript identity; the grouping keeps distinct raw source and
+retained output even when many cases share sanitized HTML. Each group fixes
+its only permitted image URL and request count; all
 other requests abort. The browser tool reparses every group as a document and
 as `div.entry-content` in Chromium, Firefox and WebKit with JavaScript on and
 off. It runs active raw script/image/WebSocket controls, inert-anchor click and
@@ -238,20 +248,20 @@ cut-widget check.
 
 ## Slice 5: Recent regression and full-entry context
 
-`slice5-recent-binding.json` pins the reviewed full-entry content source
-`8fc8928659b761cb4f15228059a2c6b2bfd42d75`, its compiled JavaScript
-inventory and lock digest, plus the hashes of both unchanged Slice 4 accepted
-ledgers. The separate checker replays all 26 synthetic and 384 native-derived
-Recent inputs and requires every previous outcome, refusal, byte digest and
-category to remain exactly the same. It never rewrites a Slice 4 ledger.
-Run from `src/content` after the content build:
+`slice5-recent-binding.json` pins the fixed expectation and golden hashes,
+including the Phase 1 native manifest digest. The separate checker requires
+all 26 synthetic and 384 native-derived Recent outcomes, refusals, byte
+digests and categories to remain the same. It never rewrites a ledger.
+Run from `src/content` after both TypeScript builds and corpus preparation:
 
 ```sh
-CONTENT_SHA=8fc8928659b761cb4f15228059a2c6b2bfd42d75
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
-    dist/index.js "$CONTENT_SHA" synthetic > /tmp/slice5-recent-synthetic.json
+    dist/index.js current synthetic > /tmp/slice5-recent-synthetic.json
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
-    dist/index.js "$CONTENT_SHA" native > /tmp/slice5-recent-native.json
+    dist/index.js current native > /tmp/slice5-recent-native.json
+/opt/dw-node24/bin/node tools/attest-corpus-run.mjs \
+    --synthetic /tmp/slice5-recent-synthetic.json \
+    --native /tmp/slice5-recent-native.json --entry
 /opt/dw-node24/bin/node tools/check-slice5-recent-regression.mjs \
     corpus/slice5-recent-binding.json /tmp/slice5-recent-synthetic.json \
     /tmp/slice5-recent-native.json
@@ -271,9 +281,10 @@ source-name and div-wrapper cases are among the 52; the component test also
 checks raw output-as-input behavior for the div-wrapper exception. No Entry
 result is relabeled as a Recent replay.
 
-After the full S2 TypeScript emit, this command reruns the retained Perl helper
-and reviewed cleaner, checks the source/build binding and all 62 pinned records,
-and applies the stock renderer's actual final OpenGraph transform:
+The attester's `--entry` run invokes the existing compiled test to produce
+the raw helper reports. This checker verifies those attested reports against
+all 62 permanent records and applies the stock renderer's final OpenGraph
+transform. It does not invoke Perl or regenerate reports itself:
 
 ```sh
 /opt/dw-node24/bin/node tools/check-slice5-entry-ledger.mjs
