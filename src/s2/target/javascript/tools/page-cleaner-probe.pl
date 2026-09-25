@@ -36,8 +36,15 @@ my @input = (
     '<a href="javascript:x()">x</a>',
     '<link rel="stylesheet" href="http://localhost/~s2js_slice2/res/6/stylesheet?1">',
     '<span style="font-size: smaller;">x</span>',
+    '<a title="&#65;">x</a>',
+    '<a title="&#x41;">x</a>',
+    '<a href="java script:x()">',
+    '<a href="javascript&#58;x()">',
+    '<a href="jav&#x09;ascript:x()">',
+    '<br/>',
+    '<img src="/x"/>',
 );
-my %unsupported = map { $_ => 1 } (7, 8, 9, 10, 11);
+my %unsupported = map { $_ => 1 } (7, 8, 9, 10, 11, 14, 15, 16, 17, 18);
 my $absolute_stylesheet = $input[12] =~ /href="([^"]+)"/ ? $1 : '';
 my $allow = LJ::valid_stylesheet_url($absolute_stylesheet);
 die "Expected retained absolute stylesheet allow decision\n" unless $allow eq '1';
