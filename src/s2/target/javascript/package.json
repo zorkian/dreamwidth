@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "tsc --noEmit && tsc && node dist/tools/selftest.js && node dist/tools/run.js"
+    "check": "tsc --noEmit && tsc && node dist/tools/selftest.js && node dist/tools/run.js",
+    "check:page": "tsc --noEmit && tsc && node dist/tools/check-page.js"
   },
   "devDependencies": {
     "@types/node": "22.15.30",

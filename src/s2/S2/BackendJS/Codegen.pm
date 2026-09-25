@@ -9,7 +9,7 @@ package S2::Node;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->tabwriteln("--[[-- ${this}::asJS not implemented --]]");
+    die ref($this) . " has no JavaScript code generator";
 }
 
 # This should really be in S2::NodeExpr, but the compiler has
@@ -203,9 +203,6 @@ package S2::NodeForeachStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    die "Hash and string foreach are outside the JavaScript slice"
-        if $this->{'isHash'} || $this->{'isString'};
-
     $o->tabwrite("for (");
     if ($this->{'vardecl'}) {
         $o->write("let " . $bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
@@ -213,11 +210,61 @@ sub asJS {
         $this->{'varref'}->asJS($bp, $o);
     }
     $o->write(" of ");
+    if ($this->{'isHash'}) {
+        $o->write("s2.runtime.hashKeys(");
+    } elsif ($this->{'isString'}) {
+        $o->write("s2.runtime.characters(");
+    } else {
+        $o->write("s2.runtime.asArray(");
+    }
     $this->{'listexpr'}->asJS($bp, $o);
+    $o->write(")");
     $o->write(") ");
 
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
+}
+
+package S2::NodeBranchStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    my $keyword = $this->{type} == $S2::TokenKeyword::BREAK ? "break" : "continue";
+    $o->tabwriteln("$keyword;");
+}
+
+package S2::NodeInstanceOf;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->write($this->{exact} ? "s2.runtime.objectInstanceOf(" : "ctx.objectIsa(");
+    $this->{expr}->asJS($bp, $o);
+    $o->write(", " . $bp->quoteString($this->{qClass}) . ")");
+}
+
+package S2::NodeTypeCastOp;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    if ($this->{downcast}) {
+        $o->write("ctx.downcastObject(");
+    }
+    $this->{expr}->asJS($bp, $o);
+    if ($this->{downcast}) {
+        $o->write(", " . $bp->quoteString($this->{toClass}) .
+                  ", $bp->{layerid}, " . ($this->{opline} + 0) . ")");
+    }
+}
+
+package S2::NodePushStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->tabwrite("");
+    $this->{lhs}->asJS($bp, $o);
+    $o->write($this->{expr}{_is_array} ? ".push(..." : ".push(");
+    $this->{expr}->asJS($bp, $o);
+    $o->writeln(");");
 }
 
 package S2::NodeForStmt;
@@ -345,6 +392,9 @@ package S2::NodeIncExpr;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    die "Increment target is not a variable reference"
+        unless $this->{'expr'}{'var'};
+    local $this->{'expr'}{'var'}{'varReturnType'} = undef;
     
     my $plus = $this->{'op'}->getPunct() eq $S2::TokenPunct::INCR->getPunct();
     
@@ -660,6 +710,13 @@ sub asJS {
             $this->{'subExpr'}->asJS($bp, $o);
             $o->write(")");
         }
+        return;
+    }
+
+    if ($type == $POPFUNC) {
+        $o->write("(");
+        $this->{'subExpr'}->asJS($bp, $o);
+        $o->write(").pop()");
         return;
     }
 
