@@ -27,6 +27,8 @@ export type PublicSettingName =
     | "use_journalstyle_entry_page" | "use_journalstyle_icons_page";
 
 // Every key exists. Absent persisted property is null, not an omitted query.
+// Construct publicSettings and log props as null-prototype own-property records;
+// data-driven names must never resolve inherited keys or invoke prototype setters.
 export type PublicSettings = Readonly<Record<PublicSettingName, string | null>>;
 
 export interface RawUser {
@@ -115,7 +117,10 @@ export interface RawRecentRepository {
     // filtering, one primary cross-schema read-only consistent snapshot. Reject
     // >200, missing rows/fields (including NULL log2 eventtime/logtime/replycount),
     // invalid bytes, duplicate ids, unsupported engines or nonlocal topology.
-    // Fingerprint includes mapping, count, all source rows and original raw bytes.
+    // Fingerprint includes owner, identity mapping, settings, bio, style, complete
+    // layers and timestamps, posters, candidate count/rows, original text bytes,
+    // decoded text, props/status/security, and each separate feature count.
+    // RepositoryError distinguishes unsupported input/state from unavailable I/O.
     loadRawSnapshot(username: string): Promise<RawJournalSnapshot | null>;
     // Fresh independent primary snapshot AFTER render; false includes removal,
     // any relevant change or now unsupported state. Query failures reject.
@@ -134,6 +139,8 @@ export interface LocalSecret {
 export interface LocalSecretSource {
     // Never included in RawJournalSnapshot, renderer inputs, logs or errors.
     // Latest existing whole-hour secret <= current hour, within maxAgeSeconds. No writes.
+    // null means no usable key; policy returns unavailable. Throw RepositoryError
+    // for malformed local source data (unsupported) or I/O failures (unavailable).
     loadLatestSecret(nowSeconds: number, maxAgeSeconds: number): Promise<LocalSecret | null>;
 }
 
@@ -150,8 +157,97 @@ export type LiveResult =
     | { readonly ok: true; readonly html: string; readonly setCookie: string | null };
 
 export interface AnonymousRecentService {
+    // HEAD performs the same authorization/render/recheck as GET. Server strips
+    // the body and preserves status/headers, including the private cache policy.
     serve(request: AnonymousRecentRequest): Promise<LiveResult>;
+    // Stop new renders and close active renderer children. Repository lifetime
+    // remains server-owned; this does not close the repository or secret source.
+    close(): Promise<void>;
 }
+
+// Data-boundary errors have safe fixed messages without SQL, rows or secrets.
+// Decode/null/overflow/topology failures are unsupported; I/O/timeouts unavailable.
+// Both repository and secret source throw this shape. Policy maps unknown errors
+// to unavailable and never discloses error.message to HTTP clients.
+export interface RepositoryError extends Error {
+    readonly name: "RepositoryError";
+    readonly kind: "unsupported" | "unavailable";
+}
+
+// Public values only, validated at startup. Origins are explicit loopback URLs
+// with distinct ports and no path/query/credentials; both use the same hostname
+// so ljuniq reaches retained app controls. siteRoot/prefixes retain local config
+// values (empty, root-relative, or canonical-origin URL), never derived from
+// untrusted Host. Page markup retains natural prefixes; allowed HTTP redirects
+// target canonicalAppOrigin, never proxying or processing retained-app controls.
+export interface PublicAppConfig {
+    readonly canonicalAppOrigin: string;
+    readonly listenOrigin: string;
+    readonly siteRoot: string;
+    readonly statPrefix: string;
+    readonly imgPrefix: string;
+    readonly palImgRoot: string;
+    readonly userpicRoot: string;
+    readonly siteName: string;
+    readonly siteNameShort: string;
+    readonly siteNameAbbrev: string;
+    readonly appleTouchIcon: string;
+    readonly facebookPreviewIcon: string;
+    // Must be verified from the owning local app configuration before serving,
+    // including absence of CAPTCHA_HCAPTCHA_SITEKEY; never an unchecked default.
+    readonly anonymousCaptchaDisabled: true;
+}
+
+export interface CompiledStockArtifact {
+    // Local source-derived artifact, read/validated once at service creation;
+    // contains only pinned code + declared metadata, never prepared render data.
+    readonly path: string;
+}
+
+export interface RenderLimits {
+    readonly timeoutMs: number; // positive, <=10000
+    readonly maxOutputBytes: number; // positive, <=2097152
+    readonly maxHeapMiB: number; // positive, <=128
+}
+
+export interface AnonymousRecentServiceDeps {
+    readonly repository: RawRecentRepository;
+    readonly secretSource: LocalSecretSource;
+    readonly artifact: CompiledStockArtifact;
+    readonly config: PublicAppConfig;
+    readonly limits: RenderLimits;
+    // Disallow injected/frozen entropy in the ordinary factory, even via spread.
+    readonly clock?: never;
+    readonly random?: never;
+    readonly comparison?: never;
+}
+
+export interface ComparisonClock {
+    nowSeconds(): number;
+}
+
+export interface ComparisonRandom {
+    randomBytes(length: number): Uint8Array;
+}
+
+export interface PerlComparisonInputs {
+    readonly purpose: "offline-perl-comparison";
+    readonly clock: ComparisonClock;
+    readonly random: ComparisonRandom;
+}
+
+// Astra policy/service.ts exports createAnonymousRecentService with this type.
+// It always obtains clock and cryptographic entropy internally from live system
+// sources. Sol's ordinary server imports only this factory; no comparison flag,
+// environment toggle, HTTP parameter or config value selects a frozen source.
+export type CreateAnonymousRecentService =
+    (deps: AnonymousRecentServiceDeps) => Promise<AnonymousRecentService>;
+
+// Astra policy/comparison.ts exports createComparisonRecentService with this
+// type. Only offline check-live harness imports that separate entrypoint.
+export type CreateComparisonRecentService =
+    (deps: AnonymousRecentServiceDeps, inputs: PerlComparisonInputs) =>
+        Promise<AnonymousRecentService>;
 
 // Renderer types live in render/, not this data/domain contract. Inputs must be
 // new approved objects: no RawUser/RawEntry spread, raw props, bio, fingerprint,
