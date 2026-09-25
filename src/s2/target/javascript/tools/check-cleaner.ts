@@ -135,6 +135,26 @@ async function main(): Promise<void> {
                     for (const image of ["pixel.png", "map.png", "bg.png"]) {
                         assert.ok(html.includes("https://asset.slice4.invalid/" + image));
                     }
+                    const ditemid = Number(state.jitemid) * 256 + Number(state.anum);
+                    assert.ok(Number.isSafeInteger(ditemid) && ditemid > 0);
+                    assert.ok(html.includes("span-cuttag_s2js_slice3_" + ditemid + "_1"));
+                    const rpc = await fetch("http://localhost:8081/__rpc_cuttag?" +
+                        "journal=s2js_slice3&ditemid=" + ditemid + "&cutid=1", {
+                        redirect: "manual", signal: AbortSignal.timeout(20000),
+                    });
+                    const rpcBody = Buffer.from(await rpc.arrayBuffer());
+                    assert.equal(rpc.status, 400);
+                    assert.equal(rpc.headers.get("content-type"), "text/plain; charset=utf-8");
+                    assert.equal(rpc.headers.get("cache-control"), "private, no-store");
+                    assert.equal(rpc.headers.get("content-length"), String(rpcBody.length));
+                    assert.equal(rpc.headers.get("set-cookie"), null);
+                    assert.equal(rpc.headers.get("location"), null);
+                    assert.equal(rpcBody.toString("utf8"), "Unsupported request\n");
+                    assert.ok(!rpcBody.includes(Buffer.from(marker)) &&
+                        !rpcBody.includes(Buffer.from("HIDDEN-")) &&
+                        !rpcBody.includes(Buffer.from("<html")));
+                    assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                        snapshot.fingerprint, "cut RPC refusal wrote journal data");
                     writeFileSync(path.join(artifacts, "slice4-rich-page.html"), body);
                 } else if (variant === "edited") {
                     assert.ok(html.includes("Edited rich café 😀"));
@@ -176,8 +196,8 @@ async function main(): Promise<void> {
         if (app) await app.close();
         await store.close();
     }
-    process.stdout.write("real marked rich post/edit variants, read-only HTTP and " +
-        "exact normal-helper restoration: pass\n");
+    process.stdout.write("real marked rich post/edit variants, cut RPC refusal, " +
+        "read-only HTTP and exact normal-helper restoration: pass\n");
 }
 
 void main().catch(error => {
