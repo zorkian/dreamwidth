@@ -13,7 +13,7 @@
 //
 
 import {createHash} from "node:crypto";
-import type {CleanerLimits, EntryContentInput} from "../contracts";
+import type {CleanerLimits, EntryContentInput, EntryMetadataInput} from "../contracts";
 import {UnsupportedContent} from "./errors";
 
 function record(value: unknown, names: readonly string[]): Record<string, unknown> {
@@ -83,7 +83,8 @@ export function validateInput(value: EntryContentInput, limits: CleanerLimits): 
     const context = record(input.context, ["policy", "insertionContext", "documentUrl", "entryUrl",
         "journalUsername", "journalId", "entryId", "reader", "imagePlaceholder", "cuts", "urls"]);
     if (context.policy !== "dreamwidth-entry-html-raw0-v1" ||
-        context.insertionContext !== "html-div-flow" || context.cuts !== "source-compatible-recent") {
+        context.insertionContext !== "html-div-flow" ||
+        context.cuts !== "source-compatible-recent" && context.cuts !== "source-compatible-entry") {
         throw new UnsupportedContent();
     }
     publicUrl(context.documentUrl);
@@ -116,6 +117,23 @@ export function validateInput(value: EntryContentInput, limits: CleanerLimits): 
     hosts(urls.knownHttpsSites);
     hosts(urls.formDomainBanned);
     if (urls.imageProxy !== "not-configured" && urls.imageProxy !== "host-resolved") {
+        throw new UnsupportedContent();
+    }
+}
+
+export function validateMetadataInput(value: EntryMetadataInput, limits: CleanerLimits): void {
+    const input = record(value, ["subject", "entry"]);
+    text(input.subject, 1024);
+    // Same existing plain-subject cohort; empty remains unsupported rather than
+    // silently expanding to the broader source's no-subject fallback.
+    if (!input.subject || /[<>"'\x00-\x1f\x7f]|&(?:#\w+|[A-Za-z][A-Za-z0-9]+);/.test(input.subject)) {
+        throw new UnsupportedContent();
+    }
+    validateInput(input.entry as EntryContentInput, limits);
+    if ((input.entry as EntryContentInput).context.cuts !== "source-compatible-entry") {
+        throw new UnsupportedContent();
+    }
+    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test((input.entry as EntryContentInput).body)) {
         throw new UnsupportedContent();
     }
 }

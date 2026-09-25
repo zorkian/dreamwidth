@@ -43,6 +43,7 @@ const cutParents = new Set([
 // Return only generated ID values for final sanitation, never hidden cut text.
 export function replaceCuts(
     root: Element, context: EntryContentContext, locate: LocateNode, maxCuts: number,
+    metadata = false,
 ): ReadonlySet<string> {
     const candidates = [...root.querySelectorAll("*")].filter(isCut);
     if (candidates.length > maxCuts) throw new UnsupportedContent();
@@ -94,6 +95,22 @@ export function replaceCuts(
     intervals.forEach(({ element }, index) => {
         const document = root.ownerDocument;
         const number = index + 1;
+        if (context.cuts === "source-compatible-entry") {
+            // clean_event without cuturl includes all descendants. Its textonly
+            // helper omits both generated anchor and the special cut wrapper.
+            // Names remain inert, including source collisions; IDs are separate.
+            if (metadata) { element.replaceWith(...element.childNodes); return; }
+            const anchor = document.createElement("a");
+            anchor.setAttribute("name", "cutid" + number);
+            if (element.localName === "div") {
+                const full = document.createElement("div");
+                full.className = "ljcut";
+                full.setAttribute("text", element.getAttribute("text") || "Read more...");
+                full.append(...element.childNodes);
+                element.replaceWith(anchor, full);
+            } else element.replaceWith(anchor, ...element.childNodes);
+            return;
+        }
         const suffix = `${context.journalUsername}_${context.entryId}_${number}`;
         const wrapper = document.createElement("span");
         wrapper.className = "cut-wrapper";
