@@ -137,6 +137,48 @@ function validatePreviousStage(root) {
             file.path === 'app/node_modules/@dreamwidth/content/dist/index.js')) {
         fail('existing stage inventory differs from its manifest');
     }
+    assertOwner(root);
+}
+
+function assertOwner(root) {
+    const expected = process.getuid();
+    const walk = filename => {
+        const stat = fs.lstatSync(filename);
+        if (stat.uid !== expected || stat.isSymbolicLink() ||
+            (!stat.isDirectory() && !stat.isFile()) ||
+            (stat.mode & 0o777) !== (stat.isDirectory() ? 0o555 : 0o444)) {
+            fail(`stage ownership or member type differs: ${filename}`);
+        }
+        if (stat.isDirectory()) {
+            for (const name of fs.readdirSync(filename)) walk(path.join(filename, name));
+        }
+    };
+    walk(root);
+}
+
+function removeOwnedTree(root) {
+    if (!fs.existsSync(root)) return;
+    // The prior stage has already passed full inventory validation. Restore
+    // write permission only on directories owned by this staging process so
+    // non-root rebuilds can unlink immutable 0444 files without touching them.
+    const prepare = directory => {
+        const stat = fs.lstatSync(directory);
+        if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid()) {
+            fail(`cannot remove unowned stage directory: ${directory}`);
+        }
+        fs.chmodSync(directory, 0o700);
+        for (const name of fs.readdirSync(directory)) {
+            const filename = path.join(directory, name);
+            const child = fs.lstatSync(filename);
+            if (child.uid !== process.getuid() || child.isSymbolicLink()) {
+                fail(`cannot remove unowned stage member: ${filename}`);
+            }
+            if (child.isDirectory()) prepare(filename);
+            else if (!child.isFile()) fail(`cannot remove non-file stage member: ${filename}`);
+        }
+    };
+    prepare(root);
+    fs.rmSync(root, { recursive: true, force: true });
 }
 
 function removeNpmMetadata(app) {
@@ -149,6 +191,9 @@ function removeNpmMetadata(app) {
         }
     }
     fs.rmSync(path.join(app, 'package-lock.json'));
+    // npm may rewrite ownership of the input package inode. This output file
+    // is synthetic and belongs to the staging process, so create a fresh inode.
+    fs.rmSync(path.join(app, 'package.json'));
     fs.writeFileSync(path.join(app, 'package.json'),
         JSON.stringify({ name: 'dreamwidth-content-render-worker', private: true,
             type: 'commonjs' }) + '\n');
@@ -242,6 +287,7 @@ export function stageRuntime(artifact, sources = {}) {
         fs.renameSync(path.join(tempRoot, 'manifest.json.tmp'),
             path.join(tempRoot, 'manifest.json'));
         fs.chmodSync(tempRoot, 0o555);
+        assertOwner(tempRoot);
         if (fs.existsSync(finalRoot)) {
             validatePreviousStage(finalRoot);
             backupRoot = `${finalRoot}.old-${process.pid}`;
@@ -254,13 +300,13 @@ export function stageRuntime(artifact, sources = {}) {
             backupRoot = undefined;
             throw error;
         }
-        if (backupRoot) fs.rmSync(backupRoot, { recursive: true, force: true });
+        if (backupRoot) removeOwnedTree(backupRoot);
         console.log(JSON.stringify({ manifest: path.join(finalRoot, 'manifest.json'),
             files: files.length, workerModules: modules.length,
             contentModules: contentModules.length,
             artifactSha256, contentLockSha256 }));
     } finally {
-        fs.rmSync(tempRoot, { recursive: true, force: true });
+        removeOwnedTree(tempRoot);
     }
 }
 
