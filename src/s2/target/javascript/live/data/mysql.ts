@@ -53,7 +53,8 @@ const GLOBAL_TABLES = [
     "s2compiled", "s2source_inno", "logproplist", "secrets",
 ] as const;
 const CLUSTER_TABLES = [
-    "userbio", "userproplite2", "s2stylelayers2", "log2", "logtext2", "logprop2",
+    "userbio", "userproplite2", "userpropblob", "s2stylelayers2",
+    "log2", "logtext2", "logprop2",
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
     "links", "userpic2", "talk2",
 ] as const;
@@ -98,11 +99,33 @@ function sortedRecord(record: Readonly<Record<string, string | null>>): [string,
     return Object.keys(record).sort().map(key => [key, record[key] ?? null]);
 }
 
+type RawField = readonly [key: string, storedHex: string, originalHex: string];
+
+function decodedColumn(
+    row: Row, field: string, key: string, rawFields: RawField[],
+    maxBytes: number, nullable: boolean, binary = false,
+): string | null {
+    const stored = row[field + "_stored"];
+    const original = binary ? stored : row[field + "_original"];
+    const roundtrip = binary ? stored : row[field + "_roundtrip"];
+    if (stored === null && original === null && roundtrip === null) {
+        if (!nullable) unsupported();
+        rawFields.push([key, "<NULL>", "<NULL>"]);
+        return null;
+    }
+    const decoded = decodeLegacyText(stored, original, roundtrip, maxBytes, maxBytes, false);
+    rawFields.push([
+        key, decoded.storedBytes.toString("hex"), decoded.originalBytes.toString("hex"),
+    ]);
+    return decoded.text;
+}
+
 function fingerprint(
     owner: RawUser, posters: readonly RawUser[], style: RawStyle | null,
     entries: readonly RawEntry[], features: RawFeatureCounts,
     rawText: ReadonlyMap<number, readonly [string, string, string, string]>,
     mapping: readonly [number, string],
+    rawFields: readonly RawField[],
 ): string {
     const userValue = (user: RawUser) => [
         user.userid, user.user, user.clusterid, user.status, user.statusvis,
@@ -120,6 +143,7 @@ function fingerprint(
     const payload = [
         1, mapping, userValue(owner), posters.map(userValue), style,
         entries.length, entries.map(entryValue), features,
+        [...rawFields].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
     ];
     return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
@@ -272,7 +296,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         const itemIds = logRows.map(row => number(row.jitemid, 1));
         if (new Set(itemIds).size !== itemIds.length) unsupported();
         const posterIds = [...new Set([ownerId, ...logRows.map(row => number(row.posterid, 1))])];
-        const users = await this.loadUsers(connection, posterIds);
+        const rawFields: RawField[] = [];
+        const users = await this.loadUsers(connection, posterIds, rawFields);
         const owner = users.get(ownerId);
         if (!owner || owner.clusterid !== 1) unsupported();
         const posters = posterIds.sort((a, b) => a - b).map(id => {
@@ -280,19 +305,31 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
             if (!user || user.clusterid !== 1) unsupported();
             return user;
         });
-        const style = await this.loadStyle(connection, owner);
-        const { entries, rawText } = await this.loadEntries(connection, ownerId, logRows, itemIds);
+        const style = await this.loadStyle(connection, owner, rawFields);
+        const { entries, rawText } = await this.loadEntries(
+            connection, ownerId, logRows, itemIds, rawFields,
+        );
         const features = await this.loadFeatures(connection, ownerId);
+        const rawFieldBytes = rawFields.reduce((sum, field) =>
+            sum + (field[1].length + field[2].length) / 2, 0);
+        if (rawFieldBytes > 2097152) unsupported();
         const mapping: [number, string] = [ownerId, username];
         return {
             owner, posters, style, entries, features,
-            fingerprint: fingerprint(owner, posters, style, entries, features, rawText, mapping),
+            fingerprint: fingerprint(
+                owner, posters, style, entries, features, rawText, mapping, rawFields,
+            ),
         };
     }
 
-    private async loadUsers(connection: Connection, ids: readonly number[]): Promise<Map<number, UserRecord>> {
+    private async loadUsers(
+        connection: Connection, ids: readonly number[], rawFields: RawField[],
+    ): Promise<Map<number, UserRecord>> {
         const users = (await sql<Row>`
-            SELECT userid, user, clusterid, status, statusvis, journaltype, name,
+            SELECT userid, user, clusterid, status, statusvis, journaltype,
+                HEX(name) AS name_stored,
+                HEX(CONVERT(name USING latin1)) AS name_original,
+                HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
                 opt_showtalklinks, opt_whocanreply, opt_forcemoodtheme,
                 moodthemeid, defaultpicid, dversion, CAST(caps AS CHAR) AS caps,
                 has_bio
@@ -300,25 +337,44 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         `.execute(connection)).rows;
         if (users.length !== ids.length) unsupported();
         const bios = (await sql<Row>`
-            SELECT userid, bio FROM dw_cluster01.userbio
+            SELECT userid,
+                HEX(bio) AS bio_stored,
+                HEX(CONVERT(bio USING latin1)) AS bio_original,
+                HEX(CONVERT(CONVERT(bio USING latin1) USING utf8mb4)) AS bio_roundtrip
+            FROM dw_cluster01.userbio
             WHERE userid IN (${sql.join(ids)})
         `.execute(connection)).rows;
         const bioById = new Map<number, string | null>();
         for (const row of bios) {
             const id = number(row.userid, 1);
-            if (bioById.has(id) || (row.bio !== null && typeof row.bio !== "string")) unsupported();
-            bioById.set(id, row.bio as string | null);
+            if (bioById.has(id) || !ids.includes(id)) unsupported();
+            bioById.set(id, decodedColumn(
+                row, "bio", "user:" + id + ":bio", rawFields, 65536, true,
+            ));
         }
         const globalProps = (await sql<Row>`
-            SELECT p.userid, names.name, p.value
+            SELECT p.userid, names.name,
+                HEX(p.value) AS value_stored,
+                HEX(CONVERT(p.value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
             FROM dw_global.userprop AS p
             JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
             WHERE p.userid IN (${sql.join(ids)})
                 AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
         `.execute(connection)).rows;
         const clusterProps = (await sql<Row>`
-            SELECT p.userid, names.name, p.value
+            SELECT p.userid, names.name,
+                HEX(p.value) AS value_stored,
+                HEX(CONVERT(p.value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
             FROM dw_cluster01.userproplite2 AS p
+            JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
+            WHERE p.userid IN (${sql.join(ids)})
+                AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
+        `.execute(connection)).rows;
+        const blobProps = (await sql<Row>`
+            SELECT p.userid, names.name, HEX(p.value) AS value_stored
+            FROM dw_cluster01.userpropblob AS p
             JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
             WHERE p.userid IN (${sql.join(ids)})
                 AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
@@ -327,15 +383,18 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         for (const id of ids) propsById.set(id, nullRecord(PUBLIC_SETTINGS));
         const allowed = new Set<string>(PUBLIC_SETTINGS);
         const seen = new Set<string>();
-        for (const row of [...globalProps, ...clusterProps]) {
+        for (const row of [...globalProps, ...clusterProps, ...blobProps]) {
             const id = number(row.userid, 1);
             const name = requiredString(row.name);
-            if (!propsById.has(id) || !allowed.has(name) ||
-                (row.value !== null && typeof row.value !== "string")) unsupported();
+            if (!propsById.has(id) || !allowed.has(name)) unsupported();
             const key = `${id}/${name}`;
             if (seen.has(key)) unsupported();
             seen.add(key);
-            propsById.get(id)![name as PublicSettingName] = row.value as string | null;
+            propsById.get(id)![name as PublicSettingName] = decodedColumn(
+                row, "value", "user:" + id + ":prop:" + name, rawFields,
+                row.value_original === undefined ? 65536 : 8192, true,
+                row.value_original === undefined,
+            );
         }
         const result = new Map<number, UserRecord>();
         for (const row of users) {
@@ -350,7 +409,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
                 status: requiredString(row.status),
                 statusvis: requiredString(row.statusvis),
                 journaltype: requiredString(row.journaltype),
-                name: requiredString(row.name),
+                name: decodedColumn(
+                    row, "name", "user:" + id + ":name", rawFields, 1024, false,
+                )!,
                 optShowTalkLinks: requiredString(row.opt_showtalklinks),
                 optWhocanReply: requiredString(row.opt_whocanreply),
                 optForceMoodtheme: requiredString(row.opt_forcemoodtheme),
@@ -366,12 +427,18 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         return result;
     }
 
-    private async loadStyle(connection: Connection, owner: RawUser): Promise<RawStyle | null> {
+    private async loadStyle(
+        connection: Connection, owner: RawUser, rawFields: RawField[],
+    ): Promise<RawStyle | null> {
         const styleValue = owner.publicSettings.s2_style;
         if (styleValue === null) return null;
         const styleId = number(styleValue, 1);
         const rows = (await sql<Row>`
-            SELECT styleid, userid, name, modtime
+            SELECT styleid, userid,
+                HEX(name) AS name_stored,
+                HEX(CONVERT(name USING latin1)) AS name_original,
+                HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
+                modtime
             FROM dw_global.s2styles WHERE styleid = ${styleId}
         `.execute(connection)).rows;
         if (rows.length !== 1) unsupported();
@@ -392,7 +459,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         if (layerRows.length > 8) unsupported();
         return {
             styleid: number(row.styleid, 1), ownerid: number(row.userid, 1),
-            name: requiredString(row.name), modtime: number(row.modtime),
+            name: decodedColumn(
+                row, "name", "style:" + styleId + ":name", rawFields, 1024, false,
+            )!, modtime: number(row.modtime),
             layers: layerRows.map(layer => ({
                 type: requiredString(layer.type),
                 s2lid: number(layer.s2lid, 1),
@@ -406,7 +475,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
 
     private async loadEntries(
         connection: Connection, ownerId: number, logRows: readonly Row[],
-        itemIds: readonly number[],
+        itemIds: readonly number[], rawFields: RawField[],
     ): Promise<{
         entries: EntryRecord[];
         rawText: Map<number, readonly [string, string, string, string]>;
@@ -472,7 +541,10 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
             ]);
         }
         const propRows = (await sql<Row>`
-            SELECT p.jitemid, names.name, p.value
+            SELECT p.jitemid, names.name,
+                HEX(p.value) AS value_stored,
+                HEX(CONVERT(p.value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
             FROM dw_cluster01.logprop2 AS p
             LEFT JOIN dw_global.logproplist AS names ON names.propid = p.propid
             WHERE p.journalid = ${ownerId}
@@ -486,9 +558,11 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
             const id = number(row.jitemid, 1);
             const name = requiredString(row.name);
             const props = propsById.get(id);
-            if (!props || Object.hasOwn(props, name) ||
-                (row.value !== null && typeof row.value !== "string")) unsupported();
-            props[name] = row.value as string | null;
+            if (!props || Object.hasOwn(props, name)) unsupported();
+            props[name] = decodedColumn(
+                row, "value", "entry:" + id + ":prop:" + name,
+                rawFields, 8192, true,
+            );
         }
         for (const row of logRows) {
             const id = number(row.jitemid, 1);
