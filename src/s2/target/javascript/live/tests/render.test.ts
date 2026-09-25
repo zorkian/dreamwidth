@@ -17,7 +17,9 @@ import assert from "node:assert/strict";
 import {readFileSync, openSync, closeSync} from "node:fs";
 import {resolve} from "node:path";
 import {spawnSync} from "node:child_process";
-import {validateArtifact} from "../render/artifact";
+import {validateArtifact, instantiate} from "../render/artifact";
+import {Context} from "../../runtime/s2runtime";
+import {prepare} from "../render/prepare";
 import {Renderer, childArguments} from "../render/child";
 import {loadResourceTimes} from "../render/resources";
 import {approveSnapshot} from "../policy/cohort";
@@ -162,4 +164,48 @@ test("explicit skip zero preserves canonical request echoes without changing sel
             assert.ok(result.html.includes('Live sample 2'));
         }
     } finally {await service.close();}
+});
+
+test("retained page80/loader79 clamps preserve mixed-public selection and request echoes", async () => {
+    const data = snapshot();
+    const rows = Array.from({length: 180}, (_, i) => {
+        const n = i + 1;
+        const time = new Date((now - 86400 + n) * 1000).toISOString().slice(0, 19).replace("T", " ");
+        return {...data.entries[0]!, jitemid: n, anum: 0, eventtime: time, logtime: time,
+            revttime: 2147483647 - (now - 86400 + n), security: n % 3 === 0 ? "private" : "public",
+            subjectText: `Row ${n}`, eventText: n % 3 === 0 ? "PRIVATE_SENTINEL" : `Public ${n}`};
+    });
+    const journal = approveSnapshot({...data, entries: rows});
+    assert.equal(journal.entries.length, 120);
+    for (const skip of [79, 80, 81, 200]) {
+        const input = {journal, config, skip, skipPresent: true, nowSeconds: now,
+            formChallenge: "public-test", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
+        const page = prepare(input, new Context(instantiate(artifact), () => {}));
+        assert.equal(page.entries.length, 20);
+        assert.equal(page.entries[0].itemid, 61 * 256);
+        assert.equal(page.entries[19].itemid, 32 * 256);
+        assert.equal(page.nav.skip, skip === 79 ? 79 : 80);
+        assert.equal(page.nav._forward_url, `http://localhost:8080/~s2js_slice3/?skip=${skip === 79 ? 59 : 60}`);
+        assert.equal(page.nav._backward_url, skip === 79
+            ? "http://localhost:8080/~s2js_slice3/?skip=99"
+            : "http://localhost:8080/~s2js_slice3/2026/09/24");
+        const renderer = new Renderer(artifact, path + ".sandbox", limits);
+        try {
+            const html = await renderer.render(input);
+            assert.ok(html.includes(`value="http://localhost:8080/users/s2js_slice3/?skip=${skip}"`));
+            assert.ok(!html.includes("PRIVATE_SENTINEL"));
+        } finally {await renderer.close();}
+    }
+});
+
+test("exactly full final page retains the empty previous-link corner", () => {
+    const data = snapshot();
+    const journal = approveSnapshot({...data, entries: Array.from({length: 20}, (_, i) => ({
+        ...data.entries[0]!, jitemid: i + 1,
+    }))});
+    const page = prepare({journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+        formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()},
+        new Context(instantiate(artifact), () => {}));
+    assert.equal(page.nav._backward_count, 20);
+    assert.equal(page.nav._backward_url, undefined);
 });
