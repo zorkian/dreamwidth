@@ -37,7 +37,7 @@ function secondaryScreen(value: string): boolean {
             .replace(/\\/g, ""));
 }
 
-function resource(value: string, context: EntryContentContext): string {
+function resource(value: string, context: EntryContentContext, adaptUrls: boolean): string {
     const clean = retainedAttributeValue(value);
     if (clean === null || /[\x00-\x1f\x7f\\]/.test(clean)) throw new UnsupportedContent();
     const resolved = resolveDocumentUrl(clean, context.documentUrl);
@@ -46,11 +46,11 @@ function resource(value: string, context: EntryContentContext): string {
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
         throw new UnsupportedContent();
     }
-    return resolved;
+    return adaptUrls ? resolved : clean;
 }
 
 export function cleanStyle(value: string, context: EntryContentContext,
-    limits: CleanerLimits, budget: CssBudget): string | null {
+    limits: CleanerLimits, budget: CssBudget, adaptUrls = true): string | null {
     budget.bytes += Buffer.byteLength(value);
     if (budget.bytes > limits.maxCssBytes) throw new UnsupportedContent();
     // CleanHTML.pm769 transforms the value itself before all later processing.
@@ -93,7 +93,7 @@ export function cleanStyle(value: string, context: EntryContentContext,
                 if (parsed.type !== "Value" || parsed.children.size !== 1 ||
                     parsed.children.first?.type !== "Url" || !item) throw new UnsupportedContent();
                 const replacement = parsed.children.first;
-                replacement.value = resource(replacement.value, context);
+                replacement.value = resource(replacement.value, context, adaptUrls);
                 item.data = replacement;
                 modified = true;
                 return tree.walk.skip;
@@ -101,7 +101,7 @@ export function cleanStyle(value: string, context: EntryContentContext,
             if (["image-set", "-webkit-image-set", "image"].includes(decoded)) {
                 node.children.forEach(child => {
                     if (child.type === "String") {
-                        const next = resource(child.value, context);
+                        const next = resource(child.value, context, adaptUrls);
                         modified ||= next !== child.value;
                         child.value = next;
                     }
@@ -118,7 +118,7 @@ export function cleanStyle(value: string, context: EntryContentContext,
             if (decoded === "attr" || decoded === "src") throw new UnsupportedContent();
         }
         if (node.type === "Url") {
-            const next = resource(node.value, context);
+            const next = resource(node.value, context, adaptUrls);
             modified ||= next !== node.value;
             node.value = next;
         }

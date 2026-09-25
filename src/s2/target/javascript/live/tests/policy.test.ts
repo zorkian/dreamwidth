@@ -54,9 +54,12 @@ test("unmarked, nonvisible, external authors, unsupported style and feature stat
         {clusterid: 2}, {caps: "9007199254740993"}, {defaultpicid: 1}, {optWhocanReply: "friends"}]) {
         assert.throws(() => approveSnapshot({...data, owner: {...data.owner, ...change}}));
     }
-    for (const key of Object.keys(data.features)) assert.throws(() => approveSnapshot({
+    for (const key of Object.keys(data.features).filter(key => key !== "spamreportBans")) assert.throws(() => approveSnapshot({
         ...data, features: {...data.features, [key]: 1},
     }));
+    // This new primary fact gates EntryPage only; preserve Recent admission.
+    assert.deepEqual(approveSnapshot({...data, features: {...data.features, spamreportBans: 1}}),
+        approveSnapshot(data));
     assert.throws(() => approveSnapshot({...data, features: {} as RawJournalSnapshot["features"]}));
     assert.throws(() => approveSnapshot({...data, style: {...data.style!,
         layers: [...data.style!.layers, {...data.style!.layers[0]!, type: "user"}]}}));
