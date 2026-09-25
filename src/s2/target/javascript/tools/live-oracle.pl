@@ -29,10 +29,28 @@ use HTTP::Request::Common;
 use JSON::PP;
 use Plack::Test;
 
-my ($origin, $outdir, $mode, $cookie_value) = @ARGV;
-my $comparison = defined $mode && $mode eq '--comparison';
-die "Usage: perl tools/live-oracle.pl http://localhost:<app-port> <output-dir> [--comparison <ljuniq-value>]\n"
-    unless (@ARGV == 2 || (@ARGV == 4 && $comparison))
+my ($origin, $outdir, @options) = @ARGV;
+my ($comparison, $cookie_value, $skip, $cohort_variant);
+while (@options) {
+    my $option = shift @options;
+    if ($option eq '--comparison' && !$comparison && @options) {
+        $comparison = 1;
+        $cookie_value = shift @options;
+    }
+    elsif ($option eq '--skip' && !defined $skip && @options) {
+        $skip = shift @options;
+        die "Invalid bounded skip\n"
+            unless $skip =~ /^(?:0|[1-9][0-9]{0,2})$/ && $skip <= 200;
+    }
+    elsif ($option eq '--cohort-variant' && !$cohort_variant) {
+        $cohort_variant = 1;
+    }
+    else {
+        die "Invalid oracle option\n";
+    }
+}
+die "Usage: perl tools/live-oracle.pl http://localhost:<app-port> <existing-output-dir> [--comparison <ljuniq-value>] [--skip 0..200] [--cohort-variant]\n"
+    unless defined $origin && defined $outdir
     && $origin =~ m!^http://localhost:\d{1,5}$! && -d $outdir;
 my ($comparison_uniq) = $comparison
     ? ($cookie_value =~ /^([A-Za-z0-9]{15}):1790294400:[A-Za-z0-9]+$/)
@@ -48,6 +66,8 @@ my $u = LJ::load_user('s2js_slice3') or die "Missing marked journal\n";
 die "Unmarked journal\n" unless ($u->bio(1) // '') eq 's2-js-slice3 live dev v1';
 my $app = do "$ENV{LJHOME}/app.psgi";
 die "Cannot load real Plack app: $@\n" unless ref $app eq 'CODE';
+my $page_url = "$origin/users/s2js_slice3/"
+    . (defined $skip ? "?skip=$skip" : '');
 
 my $response;
 if ($comparison) {
@@ -68,7 +88,7 @@ if ($comparison) {
         };
         test_psgi $app, sub {
             my $callback = shift;
-            $response = $callback->(GET "$origin/users/s2js_slice3/",
+            $response = $callback->(GET $page_url,
                 Cookie => "ljuniq=$cookie_value");
         };
         my ($challenge) = ($response ? $response->content : '')
@@ -83,14 +103,19 @@ if ($comparison) {
 else {
     test_psgi $app, sub {
         my $callback = shift;
-        $response = $callback->(GET "$origin/users/s2js_slice3/");
+        $response = $callback->(GET $page_url);
     };
 }
 die "Real Perl journal HTTP route failed\n" unless $response && $response->code == 200;
 my $body = $response->content;
 $body = Encode::encode('UTF-8', $body) if Encode::is_utf8($body);
-die "Expected both owned entries in real HTTP response\n"
-    unless $body =~ /Live sample 1/ && $body =~ /Live sample 2/;
+die "Unexpected marked journal HTTP response\n"
+    unless $body =~ /S2 slice 3 fixture/;
+if (!$cohort_variant && !defined $skip) {
+    die "Baseline seed entries absent from retained HTTP response\n"
+        unless $body =~ /Live sample 1 caf\xC3\xA9/
+        && $body =~ /Live sample 2 \xF0\x9F\x98\x80/;
+}
 my $public = {
     canonicalAppOrigin => $origin,
     listenOrigin => 'http://localhost:8081',
@@ -117,6 +142,9 @@ my $metadata = {
     response_headers => \@headers,
     bytes => length($body), sha256 => sha256_hex($body),
     comparison => $comparison ? JSON::PP::true : JSON::PP::false,
+    skip_present => defined $skip ? JSON::PP::true : JSON::PP::false,
+    skip => defined $skip ? 0 + $skip : 0,
+    cohort_variant => $cohort_variant ? JSON::PP::true : JSON::PP::false,
 };
 if ($comparison) {
     $metadata->{comparison_time} = 1790294400;

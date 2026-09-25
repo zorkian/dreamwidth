@@ -1,3 +1,18 @@
+<!--
+SLICE-3.md
+
+Local live stock S2 journal guide.
+
+Authors:
+    Dreamwidth contributors
+
+Copyright (c) 2026 by Dreamwidth Studios, LLC.
+
+This program is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself. For a copy of the license, please reference
+'perldoc perlartistic' or 'perldoc perlgpl'.
+-->
+
 # S2 JavaScript slice 3: local live journal
 
 This slice serves one anonymous recent page for the dedicated s2js_slice3
@@ -99,6 +114,48 @@ perl src/s2/target/javascript/tools/live-mutate.pl --restore
 perl src/s2/target/javascript/tools/live-mutate.pl --restore-text
 ~~~
 
+## Runtime boundaries and admitted cohort
+
+The data layer alone uses Kysely/mysql2 and qualified MySQL tables. Frozen
+UserRecord and EntryRecord classes carry decoded values; property access has
+no SQL or network I/O. The policy layer checks the exact marked personal
+journal, stock layer source hashes and dynamic system owner username, owner
+and poster state, every candidate entry's security/status, and unsupported
+feature counts before preparing public data. It filters private and usemask
+entries before the renderer sees them. Suspended public entries and unknown
+features fail the whole request. The finite anonymous route and navigation
+redirect admission are policy owned; Fastify only applies their decisions.
+
+Public body content is limited to bounded UTF-8 text and balanced lowercase
+p/strong/em/b/i/br elements, without attributes or URLs. Only amp/lt/gt/quot
+entities are admitted. A subject is nonempty plain text without markup,
+entities, quotes or controls. Malformed HTML, script, URL attributes, legacy
+encodings, tags, links, userpics, comments, sticky entries, custom layers
+and unsupported settings are refused with a fixed response. This is a
+development cohort, not a general journal compatibility claim.
+
+The offline compiler derives schema 1 / ABI 1 source/hash/variable/code
+records from the unchanged core2 and core2base/layout files. It does not
+serialize a prepared page. On each request the renderer initializes stock
+defaults and executes real Page.print in a bounded child. The owning
+Linux x86_64 devcontainer uses a small seccomp launcher, Node permission
+mode, no credential-bearing environment or database access, two children
+maximum, 10-second deadline, 2MiB output and 128MiB heap. This isolates
+trusted pinned stock code; it is not an arbitrary JavaScript hosting
+sandbox. Restart the TS service after recompiling stock code or rebuilding
+static resources, since the artifact and resource times load at startup.
+
+The HTTP server maps malformed/unadmitted requests to fixed 400, absent
+admitted data to 404, unsupported state to 422, changed final fingerprint
+to 409, and unavailable work to 503. Every response uses private,no-store;
+this transport cache policy deliberately differs from retained Perl's
+private,proxy-revalidate. The HTML body is compared byte for byte under
+recorded comparison inputs, while Date and transport header sets are not
+required to match. HEAD runs the same authorization/render/recheck as GET,
+keeps its Content-Length, and sends no body. POST control redirects happen
+before body parsing; no form body, session cookie or credential enters the
+recent renderer.
+
 ## Perl comparison oracle
 
 After the first TypeScript request, the real retained app page may be
@@ -110,11 +167,18 @@ For byte comparison, set Perl hash order before process startup and provide
 the fixed anonymous ljuniq cookie:
 
 ~~~sh
+mkdir -p <output-directory>
 PERL_HASH_SEED=0 PERL_PERTURB_KEYS=0 perl \
   src/s2/target/javascript/tools/live-oracle.pl \
   http://localhost:8080 <output-directory> \
   --comparison AAAAAAAAAAAAAAA:1790294400:x
 ~~~
+
+The ordinary root oracle still requires both original seed subjects. The
+bounded --cohort-variant switch is used only while the recorded empty or
+mixed post probes are active; --skip 0..200 selects an explicit recent-page
+query without changing the HTML. These switches never replay exported
+content or normalize a response.
 
 Comparison mode freezes only that GET at 2026-09-25 00:00:00 UTC and maps
 the ten random form characters to aaaaaaaaaa. The real challenge is signed
@@ -126,3 +190,150 @@ comparison headers. The oracle records clock, cookie, hash settings, all
 response headers, byte length, and SHA-256. A Perl process with another
 hash seed can serialize some object keys and attributes in a different
 order; byte parity is asserted only under the recorded conditions.
+
+## Live HTTP route and comparison
+
+From src/s2/target/javascript in the owning devcontainer:
+
+~~~sh
+npx tsc
+export S2_LIVE_TEST_ARTIFACT="$PWD/artifacts/live/stock.json"
+node dist/tools/check-live.js first
+node dist/tools/check-live.js compare
+node dist/tools/check-live.js update
+node dist/tools/check-live.js recovery
+node dist/tools/check-live.js pagination
+node dist/tools/check-live.js empty
+node dist/tools/check-live.js entry-states
+node dist/tools/check-live.js content-refusal
+node dist/tools/check-live.js missing
+node dist/tools/check-live.js cross-journal
+node dist/tools/check-live.js recheck
+node dist/tools/check-live.js no-perl
+node dist/live/tests/privacy-db.js
+node --test dist/live/tests/*.test.js
+node dist/live/server/main.js
+~~~
+
+The setup in first or any later check-live mode compiles that ignored
+stock.json and its sibling sandbox launcher. Set S2_LIVE_TEST_ARTIFACT
+before the component tests; their /tmp fallback requires an artifact at
+that exact path and is not created by the tests.
+
+Run first only once on a fresh marked journal before any live-oracle.pl GET.
+It performs the offline seed, config, scoped grant, and stock compilation;
+checks all three customtext fields are absent; starts the real loopback
+Fastify server; requests its recent route; and verifies that the independent
+raw snapshot did not change. It records ignored artifacts/live/first-live.json.
+On a database where retained Perl has already initialized customtext, use
+compare directly.
+
+Compare runs two independent real Perl HTTP GETs under the recorded frozen
+comparison conditions, checks they are byte identical, then requests the
+TypeScript HTTP route with the same clock/random/cookie through the separate
+offline comparison factory. It writes the unmodified outputs to
+artifacts/live/oracle-one/page-oracle.html and artifacts/live/page-ts.html.
+It compares the full bytes with no normalization. The ordinary server imports
+only the live factory and uses live clock and cryptographic randomness.
+
+Update posts and edits one exactly marked temporary entry with normal Perl
+helpers, checks the next ordinary TS HTTP GET shows each change without an
+export or artifact regeneration, then fully removes only that recorded entry.
+Recovery kills the normal helper only after its committed-post handshake,
+once for a single post and once during a mixed batch. The harness invokes
+the separate exact-owner restore in finally and verifies both original
+seed IDs remain.
+Pagination creates 22 marked public posts plus one private and one usemask post.
+It checks the raw snapshot sees all 26 candidates while anonymous HTML never
+contains the two hidden posts, then compares real Perl and TS full HTML bytes
+for absent skip and explicit 0, 20, 79, 80, 81, and 200. It restores every
+recorded probe and verifies the two original seed entry IDs remain. These
+normal app helpers may enqueue local feed and notification tasks; the test
+does not reset queues or unrelated records. An interrupted run can be
+recovered before another seed or page check with:
+
+~~~sh
+perl src/s2/target/javascript/tools/live-probes.pl --restore
+~~~
+
+The reviewed privacy suite separately checks real HTTP refusal and restoration
+for owner visibility/status and unsupported account settings/style; it does
+not change entries. Run it sequentially after setup, never concurrently with
+the entry probes. Its exact interrupted-run recovery is:
+
+~~~sh
+node dist/live/tests/privacy-db.js --recover
+~~~
+
+Empty temporarily makes only the two exact seed posts private through normal
+edit helpers, proves no entry or calendar date leaks, compares the complete
+empty HTML with real Perl, and restores the original IDs, content, date and
+public security. Normal edit revision counters may advance. If interrupted:
+
+~~~sh
+perl src/s2/target/javascript/tools/live-empty.pl --restore
+~~~
+
+Entry-states posts one recorded entry on a distinct date, then checks public,
+private, usemask, restored public and fully deleted transitions against the
+real HTTP route and day link. Content-refusal posts three separately recorded
+invalid bodies (unbalanced markup, a URL attribute and script), verifies
+fixed 422 with no content or cookie, and fully deletes each. Recheck changes
+the marked owner's display name through the normal helper just before the
+real independent primary check; the buffered page is discarded as fixed 409,
+the next request sees the new name, then the name is restored. These checks
+reuse the same exact probe restoration commands above.
+
+Missing checks the primary repository returns null for an absent username,
+while the unadmitted HTTP journal path returns fixed 400. Cross-journal
+uses only LJ::alloc_user_counter on each marked account to align their
+monotonic L counters, with at most 512 allocations and no padding posts.
+It records intent before posting one marked entry in the primary account,
+captures its fingerprint and deterministic HTTP body, then posts one
+marked entry with the same jitemid in the second account. The primary
+fingerprint and full body must remain unchanged, and the foreign journal
+route remains unadmitted. Both exact rows are fully deleted. Counter gaps
+are normal permanent local test side effects; no allocator is reset.
+Recover an interrupted pair with:
+
+~~~sh
+perl src/s2/target/javascript/tools/live-other-probe.pl --restore
+~~~
+
+No-perl first verifies the retained app is available, then stops only the
+owning container's Starman workers. The actual TS recent route must still
+return 200 from MySQL and compiled JavaScript. Its finally block restarts
+the app with the documented .devcontainer/start.sh. If the harness itself
+is killed before finally runs, restart the app manually inside that
+devcontainer:
+
+~~~sh
+bash .devcontainer/start.sh
+~~~
+
+The service listens only on 127.0.0.1:8081 inside its own devcontainer; the
+retained Perl app remains on 8080. Its only rendered route is
+http://localhost:8081/users/s2js_slice3/. Inventoried relative controls and
+resources receive finite redirects to the canonical retained app origin.
+The TypeScript server neither calls Perl nor proxies those responses while
+rendering the recent page. To view it from a host browser, forward both
+container loopback ports 8081 and 8080 through the editor/devcontainer port
+forwarding UI; do not take over the Perl port or change container publication.
+
+After starting the TS server, capture and inspect its actual route in the
+owning container with the existing dev screenshot Chrome installation:
+
+~~~sh
+node dist/tools/live-screenshot.js
+~~~
+
+The resulting ignored PNG is artifacts/live/ts-recent.png. The helper uses
+the exact TS URL because bin/dev/screenshot hardcodes the Perl app port.
+
+The HTTP failure matrix in live/tests/http-failure.test.ts exercises the
+real Fastify handler, service, and child with an injected typed repository:
+fixed 404 for absent data, 503 for load/recheck unavailability, 409 for
+changed recheck, and 422 for unsupported data, including safe body and
+header checks. This is not an actual MySQL outage test. The live privacy,
+entry, pagination, cross-journal and no-Perl modes above use the real
+local database and HTTP listener.
