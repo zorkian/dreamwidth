@@ -19,6 +19,7 @@ export interface FormattingCase {
     readonly classification: "exact" | "serialization" | "unsupported";
     readonly html?: string;
     readonly reason?: string;
+    readonly emptyParagraphDifference?: boolean;
 }
 
 export const formattingCases: readonly FormattingCase[] = [
@@ -705,7 +706,8 @@ export const formattingCases: readonly FormattingCase[] = [
         "id": "extra/paragraph-explicit-format-close",
         "raw": "<p><b>one</b><p>two</p>tail",
         "perl": "<p><b>one</b><p>two</p>tail</p>",
-        "classification": "unsupported",
-        "reason": "unproved implicit closure or adoption/source rearrangement"
+        "classification": "serialization",
+        "html": "<p><b>one</b></p><p>two</p>tail",
+        "emptyParagraphDifference": true
     }
 ];

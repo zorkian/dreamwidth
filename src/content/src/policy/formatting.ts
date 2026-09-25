@@ -17,7 +17,7 @@
 
 import {UnsupportedContent} from "./errors";
 import type {LocateNode, SourceLocation} from "./cuts";
-import {eatenTags} from "./inventory";
+import {eatenTags, removedTags} from "./inventory";
 
 // HTML active-formatting elements, including legacy presentation tags. Parser
 // reconstruction copies the original start-tag location; adoption can instead
@@ -34,31 +34,30 @@ export function repairFormatting(root: Element, locate: LocateNode): void {
         }
         return true;
     });
+    // HTML5 can keep descendant text inside an element after its explicit
+    // source close (notably form). Merged text may straddle the boundary, so
+    // checking only start offsets misses the retained visible-scope difference.
+    for (const ancestor of elements) {
+        const ending = locate(ancestor)?.endTag;
+        if (!ending || removedTags.has(ancestor.localName) ||
+            ["html", "head", "body"].includes(ancestor.localName) || ancestor.closest("table")) continue;
+        const check = (node: Node): void => {
+            if (node.nodeType === 1 && ((node as Element).namespaceURI !== "http://www.w3.org/1999/xhtml" ||
+                eatenTags.has((node as Element).localName))) return;
+            const location = locate(node);
+            if (location && location.endOffset > ending.startOffset) throw new UnsupportedContent();
+            for (const child of node.childNodes) check(child);
+        };
+        for (const child of ancestor.childNodes) check(child);
+    }
     const tables = elements.filter(element => element.localName === "table")
         .sort((a, b) => (locate(b)?.startOffset ?? 0) - (locate(a)?.startOffset ?? 0));
-    const implicitBoundaries = new Map<string, Set<number>>();
-    for (const element of elements) {
-        if (!["p", "li"].includes(element.localName)) continue;
-        const start = locate(element)?.startTag?.startOffset;
-        if (start !== undefined) {
-            const offsets = implicitBoundaries.get(element.localName) ?? new Set<number>();
-            offsets.add(start);
-            implicitBoundaries.set(element.localName, offsets);
-        }
-    }
     const groups = new Map<string, Element[]>();
     const key = (element: Element): string | null => {
         const span = locate(element)?.startTag;
         return span ? `${element.localName}:${span.startOffset}:${span.endOffset}` : null;
     };
     for (const element of elements) {
-        const location = locate(element);
-        // A new p/li can implicitly close its predecessor without any duplicate
-        // formatting node. The retained stack does not make that same repair.
-        if (["p", "li"].includes(element.localName) && location && !location.endTag &&
-            !element.closest("table") && implicitBoundaries.get(element.localName)?.has(location.endOffset)) {
-            throw new UnsupportedContent();
-        }
         if (!formatting.has(element.localName)) continue;
         const identity = key(element);
         if (!identity) throw new UnsupportedContent();
@@ -93,6 +92,9 @@ export function repairFormatting(root: Element, locate: LocateNode): void {
         let boundary: SourceLocation["endTag"];
         for (let ancestor = original.parentElement; ancestor && ancestor !== root;
             ancestor = ancestor.parentElement) {
+            // Source-removed wrappers never enter the retained tag stack.
+            // Parser document scaffolding likewise supplies no close proof.
+            if (removedTags.has(ancestor.localName) || ["html", "head", "body"].includes(ancestor.localName)) continue;
             const location = locate(ancestor);
             if (location?.startTag && location.endTag &&
                 location.startTag.endOffset <= originalLocation.startOffset &&

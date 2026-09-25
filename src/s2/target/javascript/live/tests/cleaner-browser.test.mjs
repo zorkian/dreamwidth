@@ -157,9 +157,12 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
                         const parent = node.parentElement;
                         const style = getComputedStyle(parent);
                         const href = parent.closest('a')?.getAttribute('href') ?? null;
+                        const range = document.createRange();
+                        range.selectNodeContents(node);
+                        const rect = range.getBoundingClientRect().toJSON();
                         for (const text of node.textContent) textScopes.push({text, href,
                             weight: style.fontWeight, font: style.fontFamily, size: style.fontSize,
-                            italic: style.fontStyle, color: style.color});
+                            italic: style.fontStyle, color: style.color, rect});
                     }
                     return {html: element.innerHTML, visible: element.innerText, textScopes};
                 });
@@ -173,8 +176,37 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
                 assert.equal(result.kind, 'ok', row.id);
                 assert.equal(result.fragment.html, row.html, row.id);
                 const measured = await inspect(result.fragment.html);
-                assert.deepEqual(measured, await inspect(row.perl), `${row.id}; JS=${javaScriptEnabled}`);
+                const nativeMeasured = await inspect(row.perl);
+                if (row.emptyParagraphDifference) {
+                    // Retained nested p serialization reparses with a trailing
+                    // empty p. Record that actual difference without normalizing
+                    // either HTML string; visible text and scopes must agree.
+                    assert.notEqual(measured.html, nativeMeasured.html);
+                    assert.ok(nativeMeasured.html.includes('tail<p></p>'));
+                    assert.equal(measured.visible, nativeMeasured.visible);
+                    assert.deepEqual(measured.textScopes, nativeMeasured.textScopes);
+                } else assert.deepEqual(measured, nativeMeasured, `${row.id}; JS=${javaScriptEnabled}`);
                 assert.deepEqual(await inspect(measured.html), measured, `${row.id}; assembled reparse`);
+            }
+            const ordinary = ['<p>one<p>two', '<p>one<p>two</p>', '<ul><li>one<li>two</ul>',
+                '<ol><li>a<li>b<li>c</ol><p>after</p>',
+                '<select><option>hello</option><option>bye</option></select>'];
+            const nativeOrdinary = spawnSync('perl', [resolve(here, 'cleaner-retained.pl')],
+                {input: JSON.stringify(ordinary), encoding: 'utf8', timeout: 10000});
+            assert.equal(nativeOrdinary.status, 0);
+            const ordinaryOutput = JSON.parse(nativeOrdinary.stdout);
+            for (const [index, body] of ordinary.entries()) {
+                const clean = cleaner.clean({body, format: 'html_raw0', context});
+                assert.equal(clean.kind, 'ok');
+                const measured = await inspect(clean.fragment.html);
+                const retained = await inspect(ordinaryOutput[index]);
+                assert.equal(measured.visible, retained.visible);
+                assert.deepEqual(measured.textScopes, retained.textScopes,
+                    'actual text-node positions and font/link scope agree');
+                if (index < 2) {
+                    assert.notEqual(measured.html, retained.html);
+                    assert.ok(retained.html.includes('<p></p>'));
+                } else assert.equal(measured.html, retained.html);
             }
             const boundary = formattingCases.find(row => row.id === 'b/across-p');
             assert.notDeepEqual((await inspect(boundary.raw)).textScopes,
