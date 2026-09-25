@@ -30,11 +30,13 @@ const stageRoot = `${artifact}.runtime`;
 const fileHash = filename => createHash('sha256').update(fs.readFileSync(filename)).digest('hex');
 
 try {
+    // The staged root must remain traversable from an ordinary non-root user.
+    fs.chmodSync(temporary, 0o755);
     fs.writeFileSync(artifact, '{"schema":1}\n');
     fs.mkdirSync(path.join(workerDist, 'live/render'), { recursive: true });
     fs.mkdirSync(contentDist);
     fs.writeFileSync(path.join(workerDist, 'live/render/worker.js'),
-        "process.stdout.write(require('@dreamwidth/content').value);\n");
+        "process.stdout.write(require('@dreamwidth/content').value + ':' + process.getuid());\n");
     fs.writeFileSync(path.join(contentDist, 'index.js'),
         "exports.value = 'synthetic-closed-stage';\n");
     fs.writeFileSync(path.join(contentDist, 'contracts.js'), '"use strict";\n');
@@ -53,6 +55,16 @@ try {
     const names = manifest.files.map(file => file.path);
     assert.equal(new Set(names).size, names.length);
     assert.deepEqual(names, [...names].sort());
+    const checkModes = directory => {
+        assert.equal(fs.lstatSync(directory).mode & 0o777, 0o555, directory);
+        for (const name of fs.readdirSync(directory)) {
+            const filename = path.join(directory, name);
+            const stat = fs.lstatSync(filename);
+            if (stat.isDirectory()) checkModes(filename);
+            else assert.equal(stat.mode & 0o777, 0o444, filename);
+        }
+    };
+    checkModes(stageRoot);
     for (const file of manifest.files) {
         assert.ok(!path.isAbsolute(file.path) && !file.path.startsWith('../'));
         const filename = path.join(stageRoot, file.path);
@@ -63,13 +75,18 @@ try {
         assert.ok(!file.path.endsWith('.node'));
         assert.ok(!file.path.includes('playwright') && !file.path.includes('/canvas/'));
     }
-    const worker = spawnSync(sandbox, ['/opt/dw-node24/bin/node', '--permission',
+    const workerArguments = ['/opt/dw-node24/bin/node', '--permission',
         '--no-addons', '--disable-proto=throw', '--max-old-space-size=128',
-        `--allow-fs-read=${stageRoot}`, path.join(stageRoot, manifest.entryPath)],
-        { env: { LANG: 'C.UTF-8', TZ: 'UTC' }, cwd: stageRoot,
-            encoding: 'utf8', timeout: 10000 });
+        `--allow-fs-read=${stageRoot}`, path.join(stageRoot, manifest.entryPath)];
+    const workerOptions = { env: { LANG: 'C.UTF-8', TZ: 'UTC' }, cwd: stageRoot,
+        encoding: 'utf8', timeout: 10000 };
+    const worker = spawnSync(sandbox, workerArguments, workerOptions);
     assert.equal(worker.status, 0, worker.stderr || String(worker.error));
-    assert.equal(worker.stdout, 'synthetic-closed-stage');
+    assert.equal(worker.stdout, 'synthetic-closed-stage:0');
+    const nonRoot = spawnSync('/usr/bin/setpriv', ['--reuid=65534', '--regid=65534',
+        '--clear-groups', sandbox, ...workerArguments], workerOptions);
+    assert.equal(nonRoot.status, 0, nonRoot.stderr || String(nonRoot.error));
+    assert.equal(nonRoot.stdout, 'synthetic-closed-stage:65534');
 
     // Rebuilding an intact managed stage is allowed and deterministic.
     build();
@@ -82,6 +99,7 @@ try {
     assert.throws(build, /symlink in closure/);
     assert.equal(fs.lstatSync(extra).isSymbolicLink(), true);
     console.log(JSON.stringify({ syntheticWorker: worker.stdout,
+        nonRootWorker: nonRoot.stdout, directoryMode: '0555', fileMode: '0444',
         files: manifest.files.length, repeat: 'identical', tamperedReplacement: 'rejected' }));
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
