@@ -50,10 +50,14 @@ export function approveSnapshot(snapshot: RawJournalSnapshot): ApprovedJournal {
     // captcha, custom picture/comment behavior or search features behind it.
     if (![null, "", "N"].includes(p.opt_usesharedpic) ||
         ![null, "", "N"].includes(p.opt_no_quickreply)) throw new Unsupported();
+    // LJ/S2.pm calls use_journalstyle_entry_page even for recent requests and
+    // persists Y from the stock core2 default. Its switch affects entry/reply
+    // only; admit that normal derived value without writing absent defaults.
+    if (![null, "", "Y"].includes(p.use_journalstyle_entry_page)) throw new Unsupported();
     for (const key of ["opt_allowsearchby", "opt_blockglobalsearch", "opt_ctxpopup",
         "opt_show_captcha_to", "opt_whoscreened", "opt_usermsg", "opt_tagpermissions",
         "opt_embedplaceholders", "opt_imagelinks", "opt_imageundef", "opt_maxpicheight",
-        "opt_maxpicwidth", "timezone", "exclude_from_own_stats", "use_journalstyle_entry_page",
+        "opt_maxpicwidth", "timezone", "exclude_from_own_stats",
         "use_journalstyle_icons_page"] as const) {
         if (p[key] !== null && p[key] !== "") throw new Unsupported();
     }
