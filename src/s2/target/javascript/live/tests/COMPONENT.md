@@ -67,8 +67,11 @@ post/edit/private pagination and adversaries; actual recent endpoint with Perl
 app unavailable; required repository regressions/static/screenshot; independent
 full-range Opus CLEAR. A green component suite does not establish those claims.
 
-Known pre-parity correction: preserve both RecentPage skip clamp (80) and
-loader skip clamp (79) with default MAX_SCROLLBACK_LASTN100/itemshow20, including
-requests79/80/81/200 and exact-full-page backward-link corners. Original request
-skip/presence must remain in returnto/script fields. The local setup probe must
-assert MAX_SCROLLBACK_LASTN100; arbitrary site limits are outside this cohort.
+Followup component checks now pass18 tests. Pagination uses the retained two
+clamps (page80, loader79), preserves request echoes for79/80/81/200, and retains
+the exact-full-page empty-prev-link corner. The local setup probe must assert
+MAX_SCROLLBACK_LASTN100; arbitrary site limits are outside this cohort. Full
+real-DB differential remains outstanding. Cookie admission now accepts the one
+CGI::Cookie colon escape %3A (once), rejects double escapes, and emits a compatible
+encoded anonymous cookie with SameSite=Lax. An offline CGI::Cookie constructor
+confirmed the wire representation without requesting a journal page.

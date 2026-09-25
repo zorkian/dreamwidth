@@ -117,9 +117,10 @@ test("real protocol signature uses current age and renews stale anonymous cookie
     assert.equal(token.setCookie, null);
     const renewed = await formToken(source, {randomBytes: n => new Uint8Array(n)}, now,
         "AAAAAAAAAAAAAAA:1790000000");
-    assert.ok(renewed.setCookie?.startsWith("ljuniq=AAAAAAAAAAAAAAA:1790294400;"));
+    assert.ok(renewed.setCookie?.startsWith("ljuniq=AAAAAAAAAAAAAAA%3A1790294400;"));
     assert.equal(parseUniqCookie(null), null);
-    for (const cookie of ["ljuniq=short:1", "ljuniq=AAAAAAAAAAAAAAA%3A1", "session=1"]) {
+    assert.equal(parseUniqCookie("ljuniq=AAAAAAAAAAAAAAA%3A1790294400"), "AAAAAAAAAAAAAAA:1790294400");
+    for (const cookie of ["ljuniq=short:1", "ljuniq=AAAAAAAAAAAAAAA%253A1", "session=1"]) {
         assert.throws(() => parseUniqCookie(cookie));
     }
     for (const stime of [now + 3600, now - 90000, now - 1]) {
