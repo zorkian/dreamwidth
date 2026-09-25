@@ -96,7 +96,8 @@ test("one actual isolated worker cleans raw rich text before stock rendering and
             assert.ok(!rich.includes(marker), marker);
         }
         for (const value of ['<video>unsupported</video>', '<div>'.repeat(17) + 'deep' + '</div>'.repeat(17),
-            '<br>'.repeat(4097)]) {
+            '<br>'.repeat(4097), '<head><p>HEAD_PRIVATE_SENTINEL</p>',
+            '<p>visible</p><head title="<td>decoy</td>"><p>HEAD_PRIVATE_SENTINEL</p>']) {
             await assert.rejects(renderer.render(withBody(value)), Unsupported);
             assert.ok((await renderer.render(withBody('<p>recovery</p>'))).includes('<p>recovery</p>'));
         }
