@@ -126,13 +126,11 @@ entries before the renderer sees them. Suspended public entries and unknown
 features fail the whole request. The finite anonymous route and navigation
 redirect admission are policy owned; Fastify only applies their decisions.
 
-Public body content is limited to bounded UTF-8 text and balanced lowercase
-p/strong/em/b/i/br elements, without attributes or URLs. Only amp/lt/gt/quot
-entities are admitted. A subject is nonempty plain text without markup,
-entities, quotes or controls. Malformed HTML, script, URL attributes, legacy
-encodings, tags, links, userpics, comments, sticky entries, custom layers
-and unsupported settings are refused with a fixed response. This is a
-development cohort, not a general journal compatibility claim.
+At the end of Slice 3, public body content used a six-element, no-URL grammar.
+Slice 4 replaced that historical body boundary with a reusable cleaner for
+bounded html_raw0 entry markup; see [SLICE-4.md](SLICE-4.md) for the current
+build, body policy and live checks. Subjects retain their separate plain-text
+limit. Account, style, privacy and consistency checks in this guide still apply.
 
 The offline compiler derives schema 1 / ABI 1 source/hash/variable/code
 records from the unchanged core2 and core2base/layout files. It does not
@@ -217,7 +215,9 @@ node dist/live/server/main.js
 ~~~
 
 The setup in first or any later check-live mode compiles that ignored
-stock.json and its sibling sandbox launcher. Set S2_LIVE_TEST_ARTIFACT
+stock.json and its sibling sandbox launcher, then stages and verifies its
+closed `.runtime` worker. Build the content package first as described in
+[SLICE-4.md](SLICE-4.md). Set S2_LIVE_TEST_ARTIFACT
 before the component tests; their /tmp fallback requires an artifact at
 that exact path and is not created by the tests.
 
@@ -293,12 +293,13 @@ Entry.set_prop(statusvis) helper after recording intent. The fresh
 fingerprint changes, the entire page becomes a fixed 422 without HTML,
 cookie, Location or marker, and restoring the original property returns
 200 with the marker. Recovery can find the exact recorded ID even when
-recent enumeration omits a suspended entry. Content-refusal posts three
-separately recorded invalid bodies (unbalanced markup, a URL attribute and
-script), verifies
-fixed 422 with no content or cookie, and fully deletes each. Recheck changes
-the marked owner's display name through the normal helper just before the
-real independent primary check; the buffered page is discarded as fixed 409,
+recent enumeration omits a suspended entry. The historical content-refusal
+mode now posts three separately recorded bodies that Slice 3 rejected.
+Slice 4 safely repairs or sanitizes each and requires HTTP 200 with the exact
+expected entry fragment, no unsafe active markup, read-only GET and complete
+normal-helper cleanup. Its actual pages undergo six-mode stock browser checks.
+Recheck changes the marked owner's display name through the normal helper
+just before the real independent primary check; the buffered page is discarded as fixed 409,
 the next request sees the new name, then the name is restored. These checks
 reuse the same exact probe restoration commands above.
 
