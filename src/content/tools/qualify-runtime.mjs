@@ -77,7 +77,7 @@ const { JSDOM } = require('jsdom');
 const createDOMPurify = require('dompurify');
 const cssTree = require('css-tree');
 const dom = new JSDOM('<!doctype html><body></body>',
-    { url: 'https://synthetic.invalid/page', runScripts: 'outside-only' });
+    { url: 'https://synthetic.invalid/page' });
 const clean = createDOMPurify(dom.window).sanitize('<p class="ok">rich <b>body</b></p><script>bad()</script>');
 assert.equal(clean, '<p class="ok">rich <b>body</b></p>');
 const ast = cssTree.parse('color:red;--x:var(--y);background:url(https://synthetic.invalid/x)',
@@ -91,10 +91,33 @@ dom.window.close();
 console.log('locked DOMPurify/jsdom/CSS Tree load and credential/write denial PASS');
 `);
     const minimalEnv = { LANG: 'C.UTF-8', TZ: 'UTC' };
-    const original = spawnSync(sandbox, [node, '--permission', '--no-addons',
+    const originalArguments = [node, '--permission', '--no-addons',
         '--disable-proto=throw', '--max-old-space-size=128',
-        `--allow-fs-read=${originalProbe}`, originalProbe],
-        { env: minimalEnv, cwd: temp, encoding: 'utf8', timeout: 10000 });
+        `--allow-fs-read=${originalProbe}`, originalProbe];
+    const fdControl = path.join(temp, 'fd-control.cjs');
+    fs.writeFileSync(fdControl, `const assert = require('node:assert/strict');
+const fs = require('node:fs');
+assert.equal(fs.fstatSync(3).isFile(), false);
+`);
+    const offeredFd = fs.openSync('/etc/hostname', 'r');
+    assert.equal(fs.fstatSync(offeredFd).isFile(), true);
+    let original;
+    let unsandboxed;
+    let control;
+    try {
+        const options = { env: minimalEnv, cwd: temp, encoding: 'utf8', timeout: 10000,
+            stdio: ['ignore', 'pipe', 'pipe', offeredFd] };
+        original = spawnSync(sandbox, originalArguments, options);
+        unsandboxed = spawnSync(node, originalArguments.slice(1), options);
+        control = spawnSync(node, ['--permission', '--no-addons',
+            `--allow-fs-read=${fdControl}`, fdControl], options);
+    } finally {
+        fs.closeSync(offeredFd);
+    }
+    assert.equal(unsandboxed.status, 1, unsandboxed.stderr || String(unsandboxed.error));
+    assert.equal(control.status, 1, control.stderr || String(control.error));
+    assert.match(control.stderr, /AssertionError[\s\S]*true !== false/,
+        'direct unsandboxed control must witness the offered regular fd3');
     assert.equal(original.status, 0, original.stderr || String(original.error));
     assert.match(original.stdout, /credential\/file\/child\/worker\/TCP\/Unix\/listen\/UDP denied/);
     const libraries = spawnSync(sandbox, [node, '--permission', '--no-addons',
@@ -104,6 +127,7 @@ console.log('locked DOMPurify/jsdom/CSS Tree load and credential/write denial PA
     assert.equal(libraries.status, 0, libraries.stderr || String(libraries.error));
     assert.match(libraries.stdout, /locked DOMPurify\/jsdom\/CSS Tree load/);
     console.log(JSON.stringify({ node: process.version, originalDenials: original.stdout.trim(),
+        unsandboxedFdControl: 'failed on regular fd3 as required',
         libraryLoad: libraries.stdout.trim(), productionPackageCount:
             fs.readdirSync(path.join(temp, 'node_modules')).length }));
 } finally {

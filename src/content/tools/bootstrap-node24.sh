@@ -21,14 +21,35 @@ binary_sha=7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c
 keyring_sha=610b8d249da3d5733f5a128def2dd0294dbbf5b5713e6ca2529db8db419dee00
 destination=/opt/dw-node24
 
+trusted_file() {
+    local file=$1
+    [[ ! -L "$file" && -f "$file" ]] || return 1
+    [[ "$(stat -c %u "$file")" == 0 ]] || return 1
+    local mode
+    mode=$(stat -c %a "$file")
+    (( (8#$mode & 022) == 0 ))
+}
+
+trusted_directory() {
+    local dir=$1
+    [[ ! -L "$dir" && -d "$dir" ]] || return 1
+    [[ "$(stat -c %u "$dir")" == 0 ]] || return 1
+    local mode
+    mode=$(stat -c %a "$dir")
+    (( (8#$mode & 022) == 0 ))
+}
+
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
     echo 'Node 24 bootstrap requires the pinned Linux x64 devcontainer' >&2
     exit 1
 fi
 if [[ -e "$destination" ]]; then
-    [[ ! -L "$destination" && -f "$destination/bin/node" ]] || exit 1
-    [[ "$("$destination/bin/node" --version)" == "$version" ]] || exit 1
+    trusted_directory "$destination" || exit 1
+    trusted_directory "$destination/bin" || exit 1
+    trusted_file "$destination/bin/node" || exit 1
     echo "$binary_sha  $destination/bin/node" | sha256sum -c -
+    chmod 0755 "$destination"
+    [[ "$("$destination/bin/node" --version)" == "$version" ]] || exit 1
     exit 0
 fi
 
@@ -58,6 +79,7 @@ tar -xJf "$download_dir/$archive" -C "$staged_destination" \
 echo "$binary_sha  $staged_destination/bin/node" | sha256sum -c -
 "$staged_destination/bin/node" --version
 chmod -R go-w "$staged_destination"
+chmod 0755 "$staged_destination"
 mv "$staged_destination" "$destination"
 trap 'rm -rf "$download_dir"' EXIT
 echo "Installed verified Node $version at $destination"
