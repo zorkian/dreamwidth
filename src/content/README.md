@@ -32,7 +32,8 @@ PATH=/opt/dw-node24/bin:$PATH npm run build
 The S2 TypeScript package consumes only the built content contracts while
 compiling. Its local development dependency resolves this package through the
 checked-in relative path; the render worker receives a separate closed runtime
-from `stage-runtime.mjs`. From the repository root, build in this order:
+from `stage-runtime.mjs`. From the repository root, install and build the
+content contracts before checking S2 package resolution:
 
 ```sh
 cd src/content
@@ -40,8 +41,21 @@ PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
 PATH=/opt/dw-node24/bin:$PATH npm run build
 cd ../s2/target/javascript
 PATH=/opt/dw-node24/bin:$PATH npm ci --ignore-scripts --no-audit --no-fund
+PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc \
+  --strict --target ES2022 --module Node16 --moduleResolution Node16 \
+  --types node --noEmit --esModuleInterop --noUncheckedIndexedAccess \
+  live/contracts.ts live/server/app.test.ts
+```
+
+That targeted check qualifies the real package declaration and subpath import
+before the shared cleaner and S2 fixtures have both cleared review. After the
+reviewed cleaner, adapter and `live/tests/fixtures.ts` are assembled, run the
+full package build and page checks from the S2 package directory:
+
+```sh
 PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc --noEmit
 PATH=/opt/dw-node24/bin:$PATH ./node_modules/.bin/tsc
+PATH=/opt/dw-node24/bin:$PATH npm run check:page
 ```
 
 The bootstrap pins the official release keyring, signed release checksum,
