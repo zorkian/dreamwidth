@@ -220,3 +220,55 @@ navigation, foreign nodes or DOM API clobbering. The report records exact
 resource requests and every covered case ID through the fixed manifest. This
 browser matrix does not substitute for the actual stock rich-entry route and
 cut-widget check.
+
+## Slice 5: Recent regression and full-entry context
+
+`slice5-recent-binding.json` pins the reviewed full-entry content source
+`8fc8928659b761cb4f15228059a2c6b2bfd42d75`, its compiled JavaScript
+inventory and lock digest, plus the hashes of both unchanged Slice 4 accepted
+ledgers. The separate checker replays all 26 synthetic and 384 native-derived
+Recent inputs and requires every previous outcome, refusal, byte digest and
+category to remain exactly the same. It never rewrites a Slice 4 ledger.
+Run from `src/content` after the content build:
+
+```sh
+CONTENT_SHA=8fc8928659b761cb4f15228059a2c6b2bfd42d75
+/opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
+    dist/index.js "$CONTENT_SHA" synthetic > /tmp/slice5-recent-synthetic.json
+/opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
+    dist/index.js "$CONTENT_SHA" native > /tmp/slice5-recent-native.json
+/opt/dw-node24/bin/node tools/check-slice5-recent-regression.mjs \
+    corpus/slice5-recent-binding.json /tmp/slice5-recent-synthetic.json \
+    /tmp/slice5-recent-native.json
+```
+
+`slice5-entry-ledger.json` is a separate full-entry and inert metadata context.
+Its 52 named raw sources pin retained Perl helper, final OpenGraph and full-body
+strings, plus the reviewed cleaner output and a reason for each body difference.
+The body classifications are 28 exact, seven serialization, ten HTML5 whitespace
+transformations, two document-context adaptations, three canonical entry URL
+adaptations, one table repair and one explicit Unsupported refusal. Six ordinary
+omitted paragraph/list/table ends are separately pinned as metadata-visible
+adaptations, including literal helper strings and their changed 300-scalar final
+OpenGraph values. Four ambiguous initial pre/textarea newline or entity cases
+pin the exact retained source-location proof and typed refusal. Full-cut alias,
+source-name and div-wrapper cases are among the 52; the component test also
+checks raw output-as-input behavior for the div-wrapper exception. No Entry
+result is relabeled as a Recent replay.
+
+After the full S2 TypeScript emit, this command reruns the retained Perl helper
+and reviewed cleaner, checks the source/build binding and all 62 pinned records,
+and applies the stock renderer's actual final OpenGraph transform:
+
+```sh
+/opt/dw-node24/bin/node tools/check-slice5-entry-ledger.mjs
+```
+
+The browser reparse tool accepts actual captured TypeScript EntryPage HTML and
+a resource map whose page hash, retained public assets and three named inert
+fixture images are checked. Use `--require-full-entry-seed`,
+`--require-full-entry-rich` or `--require-full-entry-forged` to require the full
+cut, inert forged control and anonymous Reply fallback under the unchanged stock
+scripts in all six Chromium/Firefox/WebKit JavaScript modes. Its report labels
+the supplied page as a caller-provided assembly; the real route, normal-helper
+cleanup and page hash are established by the separate live harness.
