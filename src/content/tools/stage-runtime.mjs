@@ -223,9 +223,13 @@ export function stageRuntime(artifact, sources = {}) {
                 const filename = path.join(dir, name);
                 const stat = fs.lstatSync(filename);
                 if (stat.isSymbolicLink()) fail(`symlink in closure: ${filename}`);
-                if (stat.isDirectory()) chmodTree(filename);
-                else if (!stat.isFile()) fail(`non-regular closure member: ${filename}`);
-                fs.chmodSync(filename, 0o444);
+                if (stat.isDirectory()) {
+                    chmodTree(filename);
+                } else if (stat.isFile()) {
+                    fs.chmodSync(filename, 0o444);
+                } else {
+                    fail(`non-regular closure member: ${filename}`);
+                }
             }
             fs.chmodSync(dir, 0o555);
         };
