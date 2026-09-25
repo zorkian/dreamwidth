@@ -24,6 +24,7 @@
   "include": [],
   "files": [
     "../render/worker.ts", "./render.test.ts", "./sandbox-probe.ts",
-    "./config.test.ts", "./manifest.test.ts", "./policy.test.ts", "./http-failure.test.ts"
+    "./config.test.ts", "./manifest.test.ts", "./policy.test.ts", "./http-failure.test.ts",
+    "./entry-policy.test.ts", "./entry-render.test.ts", "./entry-http.test.ts", "./privacy-db.ts"
   ]
 }
