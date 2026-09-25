@@ -33,6 +33,16 @@ const config: PublicAppConfig = {
     appleTouchIcon: "",
     facebookPreviewIcon: "",
     anonymousCaptchaDisabled: true,
+    entryContent: {
+        imagePlaceholder: {
+            src: "/img/imageplaceholder2.png", width: 35, height: 35,
+            alt: "Image", title: "Image",
+        },
+        urls: {
+            siteDomain: "", knownHttpsSites: [], formDomainBanned: [],
+            imageProxy: "not-configured",
+        },
+    },
 };
 const path = "/users/s2js_slice3/";
 const html = "<html>café 😀</html>";
