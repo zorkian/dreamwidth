@@ -44,6 +44,10 @@ export interface EntryContentContext {
     readonly urls: {
         readonly siteDomain: string;
         readonly knownHttpsSites: readonly string[];
+        // Exact lowercased host keys from FORM_DOMAIN_BANNED. Validate form
+        // action/formaction before relative URL adaptation; absent/relative
+        // action is not made admissible by first resolving it to an absolute URL.
+        readonly formDomainBanned: readonly string[];
         readonly imageProxy: "not-configured" | "host-resolved";
     };
 }
