@@ -279,3 +279,24 @@ test("future-only current-year calendar retains the source month-zero edge", () 
     assert.equal(month.url, base + "/2026/00/");
     assert.equal(month._next_url, base + "/2026/11/");
 });
+
+
+test("48KiB of discarded wrapper starts produces typed refusal before worker deadline", async t => {
+    const data = snapshot();
+    const body = '<body>'.repeat(8000);
+    assert.equal(Buffer.byteLength(body), 48000);
+    const journal = approveSnapshot({...data, entries: [{...data.entries[0]!, eventText: body}]});
+    const input = {journal, config, skip: 0, skipPresent: false, nowSeconds: now,
+        formChallenge: "public-test-challenge", uniq: "AAAAAAAAAAAAAAA", resourceTimes: loadResourceTimes()};
+    const renderer = new Renderer(artifact, path + ".sandbox", limits, runtime);
+    const started = performance.now();
+    try {
+        // Timeout/output/protocol failures are Error, not Unsupported. Merely
+        // killing this expensive job at its deadline cannot satisfy this test.
+        await assert.rejects(renderer.render(input), Unsupported);
+        t.diagnostic(`typed wrapper-work refusal in ${Math.round(performance.now() - started)}ms`);
+        const recovered = await renderer.render({...input, journal: {...journal,
+            entries: [{...journal.entries[0]!, rawBody: '<p>after bounded refusal</p>'}]}});
+        assert.ok(recovered.includes('<p>after bounded refusal</p>'));
+    } finally { await renderer.close(); }
+});
