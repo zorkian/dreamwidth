@@ -69,6 +69,36 @@ test("one actual child prepares full selected body and independent inert OG meta
     } finally {await child.close();}
 });
 
+test("Entry and Recent body URLs use the canonical journal base while metadata stays literal", async () => {
+    const child = renderer();
+    const raw = '<p class="origin-probe"><a href="notes">notes</a>' +
+        '<a href="../archive">archive</a><img src="pic.png">' +
+        '<a href="#local">local</a></p>';
+    try {
+        for (const page of [{kind: "entry", ditemid: 384}, {kind: "recent"}] as const) {
+            const dom = new JSDOM(await child.render({...input(raw), page}));
+            try {
+                const document = dom.window.document;
+                const body = document.querySelector('.entry-content .origin-probe');
+                assert.ok(body, page.kind);
+                assert.deepEqual([...body.querySelectorAll('a')].map((a: Element) => a.getAttribute('href')), [
+                    'http://localhost:8080/~s2js_slice3/notes',
+                    'http://localhost:8080/archive', '#local',
+                ], page.kind);
+                assert.equal(body.querySelector('img').getAttribute('src'),
+                    'http://localhost:8080/~s2js_slice3/pic.png', page.kind);
+                if (page.kind === "entry") {
+                    const metadata = document.querySelector('meta[property="og:description"]').content;
+                    for (const literal of ['href="notes"', 'href="../archive"', 'src="pic.png"', 'href="#local"']) {
+                        assert.ok(metadata.includes(literal), literal);
+                    }
+                    assert.ok(!metadata.includes(config.canonicalAppOrigin));
+                }
+            } finally {dom.window.close();}
+        }
+    } finally {await child.close();}
+});
+
 test("body or metadata refusal sends no partial page and next actual child request recovers", async () => {
     const child = renderer();
     try {

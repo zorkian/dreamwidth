@@ -54,7 +54,10 @@ process.stdin.on("end", () => {
             throw new Unsupported();
         }
         const documentUrl = request.page.kind === "entry" ?
-            `${request.config.canonicalAppOrigin}/users/${request.journal.username}/${request.page.ditemid}.html` :
+            // Match entry->url / the stock permalink, rather than the local
+            // /users transport alias. Body URL adaptation uses this base;
+            // independently derived metadata retains literal helper URLs.
+            `${request.config.canonicalAppOrigin}/~${request.journal.username}/${request.page.ditemid}.html` :
             `${request.config.canonicalAppOrigin}/~${request.journal.username}/` +
                 (request.skipPresent ? `?skip=${request.skip}` : "");
         const contentInput = (entry: ApprovedEntry, entryUrl: string): EntryContentInput => {
