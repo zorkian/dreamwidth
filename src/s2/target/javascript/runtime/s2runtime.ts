@@ -171,7 +171,10 @@ export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesh
                     tag += "&#39;";
                 } else if (char === "&") {
                     const rest = input.slice(cursor);
-                    const entity = /^&(?:amp|quot|lt|gt|#[0-9]+|#x[0-9a-fA-F]+);/.exec(rest);
+                    if (rest.startsWith("&#")) {
+                        throw new Error("Unsupported numeric safe HTML attribute entity");
+                    }
+                    const entity = /^&(?:amp|quot|lt|gt);/.exec(rest);
                     if (entity) {
                         tag += entity[0];
                         cursor += entity[0].length - 1;
@@ -228,8 +231,12 @@ export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesh
                 throw new Error(`Unsupported safe HTML attribute ${key}`);
             }
             const value = match[3]!;
-            if (/(?:java|vb)script\s*:|about\s*:/i.test(value)) {
+            if (/((?:java|vb)script|about):/i.test(value.replace(/[\s\0]/g, ""))) {
                 throw new Error("Unsupported safe HTML attribute URL");
+            }
+            if ((key === "href" || key === "src") &&
+                (/[\s\0]/.test(value) || /&(?:#[^;]*|[A-Za-z][A-Za-z0-9]*);/.test(value))) {
+                throw new Error("Unsupported safe HTML URL whitespace or entity");
             }
             attributes[key] = value;
             remaining = remaining.slice(match[0].length);
@@ -246,7 +253,11 @@ export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesh
             }
         }
         tag = tag.replace(/^<[A-Za-z][A-Za-z0-9:-]*/, `<${name}`);
-        if (/^<[A-Za-z]/.test(tag) && !tag.endsWith("/")) tag = tag.trimEnd();
+        if (tag.endsWith("/")) {
+            tag = tag.slice(0, -1).trimEnd() + " /";
+        } else {
+            tag = tag.trimEnd();
+        }
         output += tag + ">";
         index = cursor + 1;
     }
