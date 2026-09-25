@@ -28,6 +28,7 @@ import {replaceCuts, type LocateNode} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
 import {metadataText} from "./policy/metadata";
+import {initialNewlines} from "./policy/newlines";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
 import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext, discardedHeadTags,
     ordinaryAttribute, externalControlAttributes} from "./policy/inventory";
@@ -231,6 +232,8 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 auditSource(dom.window.document, input.body, input.context.documentUrl,
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 inventoryHead(dom.window.document.head);
+                const restoreNewlines = initialNewlines(root, input.body,
+                    node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 removeSourceComments(root);
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
                 // Source body wrappers are removed by clean_event, including all
@@ -240,6 +243,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
                 transform(root, input, bounds, images, ids, node => dom!.nodeLocation(node) ?? null);
+                restoreNewlines();
                 images.finish();
                 if (images.requests.length && !resolutions) {
                     return {kind: "image-resolution-required", images: {inputSha256: hash, requests: images.requests}};
