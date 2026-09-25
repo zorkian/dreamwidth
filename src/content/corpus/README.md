@@ -190,13 +190,17 @@ lockfile, fixed corpus and result bytes:
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
     dist/index.js current native \
     > /tmp/slice4-native-results.json
+SLICE4_CORPUS_ATTESTATION=$(mktemp -d /tmp/dw-slice4-corpus-attest.XXXXXX)
 /opt/dw-node24/bin/node tools/attest-corpus-run.mjs \
     --synthetic /tmp/slice4-synthetic-results.json \
-    --native /tmp/slice4-native-results.json --entry
+    --native /tmp/slice4-native-results.json --entry \
+    --output "$SLICE4_CORPUS_ATTESTATION"
 /opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
-    /tmp/slice4-synthetic-results.json corpus/accepted-synthetic-ledger.json
+    /tmp/slice4-synthetic-results.json corpus/accepted-synthetic-ledger.json \
+    --attestation "$SLICE4_CORPUS_ATTESTATION"
 /opt/dw-node24/bin/node tools/check-difference-ledger.mjs \
-    /tmp/slice4-native-results.json corpus/accepted-native-ledger.json
+    /tmp/slice4-native-results.json corpus/accepted-native-ledger.json \
+    --attestation "$SLICE4_CORPUS_ATTESTATION"
 ```
 
 The permanent ledgers pin case IDs, outcomes, expected TypeScript bytes,
@@ -234,8 +238,11 @@ retained Perl output. Unsafe foreign Perl markup is comparison evidence only;
 typed Unsupported cases have no fragment to load. Run from `src/content`:
 
 ```sh
+: "${SLICE4_CORPUS_ATTESTATION:?run the comparison block above in this shell}"
 /opt/dw-node24/bin/node tools/browser-native-entry-matrix.mjs \
-    /tmp/slice4-native-results.json > /tmp/slice4-native-browser-report.json
+    /tmp/slice4-native-results.json \
+    --attestation "$SLICE4_CORPUS_ATTESTATION" \
+    > /tmp/slice4-native-browser-report.json
 ```
 
 The reviewed run produced 1,098 observations: 864 cleaner reparses, 228 safe
@@ -259,12 +266,15 @@ Run from `src/content` after both TypeScript builds and corpus preparation:
     dist/index.js current synthetic > /tmp/slice5-recent-synthetic.json
 /opt/dw-node24/bin/node tools/compare-entry-replays.mjs \
     dist/index.js current native > /tmp/slice5-recent-native.json
+SLICE5_CORPUS_ATTESTATION=$(mktemp -d /tmp/dw-slice5-corpus-attest.XXXXXX)
 /opt/dw-node24/bin/node tools/attest-corpus-run.mjs \
     --synthetic /tmp/slice5-recent-synthetic.json \
-    --native /tmp/slice5-recent-native.json --entry
+    --native /tmp/slice5-recent-native.json --entry \
+    --output "$SLICE5_CORPUS_ATTESTATION"
 /opt/dw-node24/bin/node tools/check-slice5-recent-regression.mjs \
     corpus/slice5-recent-binding.json /tmp/slice5-recent-synthetic.json \
-    /tmp/slice5-recent-native.json
+    /tmp/slice5-recent-native.json \
+    --attestation "$SLICE5_CORPUS_ATTESTATION"
 ```
 
 `slice5-entry-ledger.json` is a separate full-entry and inert metadata context.
@@ -287,7 +297,9 @@ all 62 permanent records and applies the stock renderer's final OpenGraph
 transform. It does not invoke Perl or regenerate reports itself:
 
 ```sh
-/opt/dw-node24/bin/node tools/check-slice5-entry-ledger.mjs
+: "${SLICE5_CORPUS_ATTESTATION:?run the Slice 5 comparison block above in this shell}"
+/opt/dw-node24/bin/node tools/check-slice5-entry-ledger.mjs \
+    --attestation "$SLICE5_CORPUS_ATTESTATION"
 ```
 
 The browser reparse tool accepts actual captured TypeScript EntryPage HTML and
