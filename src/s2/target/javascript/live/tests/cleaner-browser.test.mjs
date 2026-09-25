@@ -129,11 +129,14 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
         process.env.S2_LIVE_TEST_ARTIFACT || '/tmp/slice3-stock.json', 'utf8')));
     const data = fixture.snapshot();
     const journal = approveSnapshot({...data, entries: [data.entries[0]]});
-    const stockInput = {journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
+    const stockInput = {page: {kind: 'recent'}, journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
         formChallenge: 'public-test-challenge', uniq: 'AAAAAAAAAAAAAAA', resourceTimes: loadResourceTimes()};
     // Offline assembly exercises unchanged prop_init/modules_init/Page.print.
     // It is deliberately separate from the real isolated-worker qualification.
-    const assemble = fragment => renderStock(artifact, stockInput, 2097152, () => fragment);
+    const assemble = fragment => renderStock(artifact, stockInput, 2097152, {
+        body: () => fragment,
+        metadata: () => { throw new Error('Recent formatting probe must not prepare entry metadata'); },
+    });
     const retained = spawnSync('perl', [resolve(here, 'cleaner-retained.pl')],
         {input: JSON.stringify(formattingCases.map(row => row.raw)), encoding: 'utf8', timeout: 10000,
             env: {...process.env, PERL_HASH_SEED: '0', PERL_PERTURB_KEYS: '0'}});
