@@ -7,6 +7,7 @@
     "check:page": "tsc --noEmit && tsc && node dist/tools/check-page.js"
   },
   "devDependencies": {
+    "@dreamwidth/content": "file:../../../content",
     "@types/node": "22.15.30",
     "typescript": "5.8.3"
   },
