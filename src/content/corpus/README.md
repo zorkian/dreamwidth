@@ -186,3 +186,37 @@ digest, exact TypeScript bytes and digest, outcome and category. A regenerated
 result cannot update its own accepted category. Nonexact cases need an explicit
 case rationale and browser/security evidence; a temporary machine-generated
 classification is never an accepted ledger.
+
+The ledgers pin the reviewed cleaner source
+`71211caa1c95b38b115bb8bd7230a4b183298656`, the compiled JavaScript
+closure digest, and the content lock digest. The synthetic 26 are 16 exact,
+two serialization, two origin adaptations, one security correction and five
+explicit Unsupported outcomes. The native-derived 384 are 249 exact, 15
+serialization, 27 origin adaptations, 13 security corrections and 80 explicit
+Unsupported outcomes. Each nonexact row retains its own input/Perl/TypeScript
+digests, a named cause and evidence; the byte differences are not normalized.
+
+`native-browser-cases.json` independently pins all 208 admitted XSS-derived
+records plus the other admitted native nonexact records: 219 case IDs grouped
+into 72 identical input/Perl/TypeScript triples. The grouping keeps distinct
+raw source and retained output even when many cases share the same sanitized
+HTML. Each group fixes its only permitted image URL and request count; all
+other requests abort. The browser tool reparses every group as a document and
+as `div.entry-content` in Chromium, Firefox and WebKit with JavaScript on and
+off. It runs active raw script/image/WebSocket controls, inert-anchor click and
+details-toggle controls, and pairs safe serialization/origin differences with
+retained Perl output. Unsafe foreign Perl markup is comparison evidence only;
+typed Unsupported cases have no fragment to load. Run from `src/content`:
+
+```sh
+/opt/dw-node24/bin/node tools/browser-native-entry-matrix.mjs \
+    /tmp/slice4-native-results.json > /tmp/slice4-native-browser-report.json
+```
+
+The reviewed run produced 1,098 observations: 864 cleaner reparses, 228 safe
+Perl comparisons and six active raw controls. All admitted cleaner probes had
+zero forbidden requests, page errors, popups, dialogs, active handlers, unsafe
+navigation, foreign nodes or DOM API clobbering. The report records exact
+resource requests and every covered case ID through the fixed manifest. This
+browser matrix does not substitute for the actual stock rich-entry route and
+cut-widget check.
