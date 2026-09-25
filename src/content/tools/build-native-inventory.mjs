@@ -19,7 +19,8 @@ import { fileURLToPath } from 'node:url';
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(contentRoot, '../..');
 const logsRoot = path.join(contentRoot, 'corpus/native-logs');
-const destination = path.join(contentRoot, 'corpus/native-inventory.json');
+const callsRoot = process.argv[2] || path.join(contentRoot, 'corpus/native-calls');
+const destination = process.argv[3] || path.join(contentRoot, 'corpus/native-inventory.json');
 const suites = [
     ['cleaner-comment.t', 'comment', 28],
     ['cleaner-email.t', 'email', 17],
@@ -36,6 +37,21 @@ const suites = [
     ['cleaner-tables.t', 'entry tables', 9],
     ['cleaner-xss.t', 'XSS surface matrix and oracle', 757],
 ];
+const expectedCalls = new Map([
+    ['cleaner-comment.t', 28], ['cleaner-embed.t', 109],
+    ['cleaner-event-embed.t', 1], ['cleaner-event.t', 42],
+    ['cleaner-forms.t', 6], ['cleaner-invalid.t', 4],
+    ['cleaner-ljtags.t', 12], ['cleaner-markdown.t', 28],
+    ['cleaner-resource-loading.t', 10], ['cleaner-subject.t', 2],
+    ['cleaner-tables.t', 9], ['cleaner-xss.t', 811],
+]);
+const expectedTraceFiles = [...expectedCalls.keys()]
+    .map(name => `${name}.calls.jsonl`).sort();
+const actualTraceFiles = fs.readdirSync(callsRoot)
+    .filter(name => name.endsWith('.calls.jsonl')).sort();
+if (JSON.stringify(actualTraceFiles) !== JSON.stringify(expectedTraceFiles)) {
+    throw new Error('Native call trace set mismatch');
+}
 
 function sha(bytes) {
     return createHash('sha256').update(bytes).digest('hex');
@@ -102,17 +118,35 @@ for (const [filename, context, expected] of suites) {
     const sourceSha256 = sha(source);
     const logSha256 = sha(log);
     const callsPath = `native-calls/${filename}.calls.jsonl`;
-    const callsFile = path.join(contentRoot, 'corpus', callsPath);
+    const callsFile = path.join(callsRoot, `${filename}.calls.jsonl`);
     let capturedCalls = null;
     const callByTap = new Map();
-    if (fs.existsSync(callsFile)) {
+    if (expectedCalls.has(filename)) {
         const callBytes = fs.readFileSync(callsFile);
-        const records = callBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse);
+        const text = callBytes.toString('utf8');
+        if (!text.endsWith('\n') || text.trimEnd() !== text.slice(0, -1)) {
+            throw new Error(`Native call trace truncated in ${callsPath}`);
+        }
+        const records = text.slice(0, -1).split('\n').map(JSON.parse);
+        if (records.length !== expectedCalls.get(filename)) {
+            throw new Error(`Native call count mismatch in ${callsPath}`);
+        }
         for (let index = 0; index < records.length; index++) {
             const call = records[index];
             if (call.suite !== filename || call.source !== sourcePath ||
                 call.callOrdinal !== index + 1 || !Number.isSafeInteger(call.beforeTap) ||
-                call.beforeTap < 0 || call.beforeTap > expected) {
+                call.beforeTap < 0 || call.beforeTap > expected ||
+                !Number.isSafeInteger(call.sourceLine) || call.sourceLine < 1 ||
+                call.sourceLine > sourceLines.length ||
+                !Number.isSafeInteger(call.directCallerLine) ||
+                !Number.isSafeInteger(call.depth) || call.depth < 0 ||
+                !Number.isSafeInteger(call.entryOrdinal) ||
+                (call.depth === 0 ? call.parentOrdinal !== null :
+                    !Number.isSafeInteger(call.parentOrdinal)) ||
+                !Array.isArray(call.positionalArgs) ||
+                typeof call.directCallerFile !== 'string' ||
+                !(call.directCallerFile === sourcePath ||
+                    call.directCallerFile.startsWith('cgi-bin/'))) {
                 throw new Error(`Native call provenance mismatch in ${callsPath}`);
             }
             for (const field of ['input', 'output']) {
@@ -149,7 +183,7 @@ for (const [filename, context, expected] of suites) {
             sourceLocationKind: ref.kind, nativeContext: caseContext(filename, name),
             nativePredicate: status, description: name, todo: todo || null,
             nativeTapLine: assertions[index][0], nativeLog: logPath,
-            nativeCallOrdinals: callByTap.get(index + 1) || [],
+            nativeCallsSincePreviousTap: callByTap.get(index + 1) || [],
             replayContext: 'native-only-until-explicit-entry-html_raw0-replay' });
     }
 }
