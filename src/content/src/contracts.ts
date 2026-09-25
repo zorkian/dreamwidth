@@ -30,17 +30,19 @@ export interface ImagePlaceholder {
     readonly alt: string;
     readonly title: string;
 }
+export type EntryCutContext = "source-compatible-recent" | "source-compatible-entry";
+
 export interface EntryContentContext {
     readonly policy: EntryPolicyId;
     readonly insertionContext: "html-div-flow";
-    readonly documentUrl: string; // canonical retained recent URL, including explicit canonical skip
+    readonly documentUrl: string; // canonical retained document URL, including admitted query
     readonly entryUrl: string; // retained entry permalink for cut links; distinct from documentUrl
     readonly journalUsername: string;
     readonly journalId: number;
     readonly entryId: number;
     readonly reader: EntryReaderOptions;
     readonly imagePlaceholder: ImagePlaceholder;
-    readonly cuts: "source-compatible-recent"; // full retained link/placeholder markup, no hidden body
+    readonly cuts: EntryCutContext; // recent omits cut bodies; entry cleans and displays them fully
     readonly urls: {
         readonly siteDomain: string;
         readonly knownHttpsSites: readonly string[];
@@ -113,11 +115,29 @@ export type EntryContentResult =
     | { readonly kind: "ok"; readonly fragment: BodyFragment; readonly provenance: ContentProvenance }
     | { readonly kind: "image-resolution-required"; readonly images: ImageRequestSet }
     | { readonly kind: "failure"; readonly reason: "unsupported" | "unavailable" };
+// These source-helper strings are inert data, even when they contain serialized
+// markup or entities. They are never BodyFragment or safe HTML. Only the child
+// OG helper consumes them, applying source collapse/trim and attribute escaping.
+export interface InertEntryMetadata {
+    readonly kind: "inert-entry-metadata";
+    readonly subjectText: string;
+    readonly eventText: string;
+}
+export interface EntryMetadataInput {
+    readonly subject: string; // raw subject under the existing plain-subject gate
+    readonly entry: EntryContentInput; // raw body; requires source-compatible-entry cuts
+}
+export type EntryMetadataResult =
+    | { readonly kind: "ok"; readonly metadata: InertEntryMetadata }
+    | { readonly kind: "failure"; readonly reason: "unsupported" | "unavailable" };
 export interface EntryCleaner {
     // Runs ONLY in a credential-free bounded worker. No caller DOM or hooks.
     // When needed, a second call uses the exact same input plus host resolutions.
     // DOM/CSS transforms precede final DOMPurify; no output string patching.
     clean(input: EntryContentInput, images?: ImageResolutionSet): EntryContentResult;
+    // Derive directly from raw data inside the same bounded worker, independently
+    // of displayed HTML. No DOM textContent substitute, body reuse or parent IPC.
+    metadata(input: EntryMetadataInput): EntryMetadataResult;
     close(): void;
 }
 export type CreateEntryCleaner = (limits: CleanerLimits) => EntryCleaner;
@@ -127,9 +147,13 @@ export type CreateEntryCleaner = (limits: CleanerLimits) => EntryCleaner;
 // These are resource limits, not CSS property or formatting allowlists.
 // Cuts admit explicitly closed flat lj-cut/cut/div[class=ljcut] in ordinary
 // flow. Nested/crossing/unclosed/rawtext/table/foreign or ambiguously repaired
-// boundaries are unsupported. Hidden body is absent; retained wrappers, labels,
-// generated cut IDs and entryUrl links remain. Source IDs are removed first;
-// ordinary classes and safe named anchors are preserved. No expansion endpoint
+// boundaries are unsupported. Recent mode omits hidden bodies and keeps retained
+// wrappers/labels/generated IDs and entryUrl links. Entry mode cleans the full
+// body, emits name=cutidN anchors and retains div.ljcut wrappers. Source IDs are
+// removed first; names never confer generated widget or ID authority. Native
+// div.ljcut full output gains another anchor on raw re-entry; this is an explicit
+// generated-cut transform exception, not a claim of byte idempotence.
+// Ordinary classes and safe named anchors are preserved. No expansion endpoint
 // is supplied by this package. Subjects use a separate existing plain gate.
 
 // Export declarations through @dreamwidth/content/contracts. Host imports are

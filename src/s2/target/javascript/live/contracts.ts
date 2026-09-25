@@ -96,6 +96,11 @@ export interface RawEntry {
 }
 
 export interface RawFeatureCounts {
+    // All primary sysban rows with byte-exact what="spamreport" and value equal
+    // to the marked username, without status/date filtering. Count only: no ban
+    // rows/notes enter the snapshot or child. Include in the full fingerprint.
+    // EntryPage requires zero; RecentPage admission does not gate on this count.
+    readonly spamreportBans: number;
     readonly usertags: number;
     readonly userkeywords: number;
     readonly logtags: number;
@@ -155,6 +160,17 @@ export interface AnonymousRecentRequest {
     readonly uniqCookie: string | null; // only parsed ljuniq value; no other cookies
 }
 
+// Exact /users/s2js_slice3/<canonical decimal>.html, GET/HEAD, no query or alias.
+export interface AnonymousEntryRequest {
+    readonly method: "GET" | "HEAD";
+    readonly username: string;
+    // log2 jitemid is MEDIUMINT UNSIGNED and anum TINYINT: 1..4294967295.
+    // Select using floor(ditemid / 256) and ditemid % 256, never JS bitwise math.
+    // Positive IDs below 256 select no row and return the fixed not-found result.
+    readonly ditemid: number;
+    readonly uniqCookie: string | null; // only parsed ljuniq; no other cookies
+}
+
 export type LiveFailure = "not-found" | "unsupported" | "changed" | "unavailable";
 export type LiveResult =
     | { readonly ok: false; readonly reason: LiveFailure }
@@ -164,6 +180,10 @@ export interface AnonymousRecentService {
     // HEAD performs the same authorization/render/recheck as GET. Server strips
     // the body and preserves status/headers, including the private cache policy.
     serve(request: AnonymousRecentRequest): Promise<LiveResult>;
+    // Same HEAD/recheck semantics. For a successfully loaded snapshot, missing,
+    // wrong-anum and private/usemask targets return not-found before cohort
+    // preparation; an exact public target still requires the entire cohort.
+    serveEntry(request: AnonymousEntryRequest): Promise<LiveResult>;
     // Stop new renders and close active renderer children. Repository lifetime
     // remains server-owned; this does not close the repository or secret source.
     close(): Promise<void>;
@@ -221,18 +241,19 @@ export interface RedirectAdmissionRequest {
 
 export type RedirectAdmissionDecision =
     | { readonly kind: "recent"; readonly request: AnonymousRecentRequest }
+    | { readonly kind: "entry"; readonly request: AnonymousEntryRequest }
     | { readonly kind: "reject" } // fixed safe response; no Location
     | { readonly kind: "redirect"; readonly status: 302 | 307; readonly location: string };
 
-// Pure synchronous admission of the finite method/path/query inventory observed
-// in the pinned slice3 page. The admission policy validates Host/Origin/cookie/
+// Pure synchronous admission of the finite method/path/query inventory emitted
+// by the admitted stock pages. The admission policy validates Host/Origin/cookie/
 // auth/forwarded headers and rejects ambiguous paths,
 // arbitrary destinations and unknown requests. Location uses canonicalAppOrigin
-// and admitted path/query only. The exact recent route continues ordinary policy,
-// and is never redirected as a rendering fallback.
+// and admitted path/query only. Exact recent/entry routes continue ordinary policy
+// and are never redirected as a rendering fallback.
 // The server calls this before body parsing/logging and only applies the decision.
-// For recent, the server passes request unchanged to service.serve; admission alone
-// parses and validates cookies, query and method. The server never reparses them.
+// The server passes request unchanged to service.serve or service.serveEntry;
+// admission alone parses cookies, query, method and ID. The server never reparses.
 // POST controls require 307; no request body, local signing/DB secrets, I/O or
 // proxy enter this seam. Incoming cookies are untrusted admission input only.
 // Recheck the observed inventory after seeding before implementing either side.
