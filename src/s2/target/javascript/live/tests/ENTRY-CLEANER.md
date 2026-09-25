@@ -9,6 +9,7 @@ cd /workspaces/dreamwidth/src/s2/target/javascript
 /opt/dw-node24/bin/node node_modules/typescript/bin/tsc -p live/tests/entry-cleaner.tsconfig.json
 SLICE5_METADATA_REPORT=/tmp/entry-metadata.json /opt/dw-node24/bin/node --test dist/live/tests/entry-cleaner.test.js
 /opt/dw-node24/bin/node --test live/tests/entry-cleaner-browser.test.mjs
+SLICE5_NEWLINES_REPORT=/tmp/entry-newlines.json /opt/dw-node24/bin/node --test live/tests/entry-newlines.test.mjs
 ```
 
 The optional report records raw source, retained Perl helper output, candidate
@@ -20,7 +21,37 @@ The Perl oracle is an offline test driver. Serving does not execute it.
 These tests cover the shared content component. They do not establish an actual
 EntryPage route, repository privacy, the staged render worker or full application
 acceptance. Existing `cleaner.tsconfig.json` / `cleaner.test.js` checks must also
-pass to establish that Recent behavior remains unchanged.
+pass to establish Recent compatibility apart from the explicitly corrected
+preformatted initial-newline serialization below.
+
+## Displayed preformatted newlines
+
+HTML parsing consumes one initial LF in pre/textarea, while DOM serialization
+does not restore it. Without a correction, the next browser parse can discard
+another LF, removing a visible blank line or changing a textarea value. Both
+Recent and full Entry restore that one serialized LF as a Text node **before**
+final BODY-node sanitation. The source-located start tag must be followed by a
+literal LF/CR/CRLF, or an exact maintained-parser first gap/extent and an inert
+RCDATA decode must prove the missing LF. Decoder output is proof only. Comment
+and eaten-element removal cannot turn a later surviving LF into initial-LF proof.
+Omitted Recent cut bodies do not acquire additional proof requirements.
+
+The body-only representation differences are explicit: CR/CRLF serialize as LF,
+and HTML character references serialize through their parsed character values.
+The newline report keeps raw/native/candidate bytes and digests, exact source
+locations, actual second-clean byte equality, and Chromium JS-on/off text,
+textarea value and following-block geometry. It compares the unchanged output
+strings in `div.entry-content` with controlled preformatted line metrics; it does
+not normalize strings or claim arbitrary browser `innerHTML` serialization
+restores an initial LF. Positive controls reproduce the original visible loss.
+Listing remains unsupported.
+
+The proof decodes at most twice the input byte limit. A bounded ambiguous case,
+`<pre>&#10;&amp;x</b>y</pre>`, has a broken first-entity location plus an unlocated
+ignored close; neither exact gap nor full first extent proves the lost LF, so it
+refuses. Its adjacent `<pre>&#10;x</b>y</pre>` has an exact gap and stays supported.
+The newline report's `.refusals.json` preserves the native bytes and location.
+This mechanism does not change the independent metadata proof or its refusals.
 
 ## Full cuts
 
@@ -70,12 +101,13 @@ cases. An exact single LF/CRLF gap between the located start tag and first child
 or end tag is restored once. If the first text extent includes it instead, only
 the consistency comparison may omit that one initial LF/CRLF; output retains the
 raw bytes. No later child, intervening markup, bare CR, encoded newline or general
-mismatch is normalized. Displayed body handling is unchanged.
+mismatch is normalized. This metadata rule is separate from body serialization.
 The locked parser reports an inconsistent text start inside `&amp;` for
 `<pre>\n&amp; &#10; one</pre>`; the decoder proof detects this and the metadata
 operation explicitly refuses. The `.refusals.json` report retains that raw case
 and native helper result, alongside unqualified bare-CR/entity-initial-newline
-cases. This limitation does not rewrite stored content or widen source offsets.
+cases and the initial-LF/literal-tag textarea location mismatch. This limitation
+does not rewrite stored content or widen source offsets.
 
 Three named families retain modern DOM serialization in inert metadata:
 ordinary omitted p ends, omitted li ends, and previously admitted table/cell

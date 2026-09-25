@@ -225,7 +225,8 @@ test("metadata refuses contextual unsupported helpers, never plain email or iner
 
 test("unprovable initial newline/entity locations refuse with retained raw evidence", () => {
     const cleaner = createEntryCleaner(limits);
-    const bodies = ['<pre>\n&amp; &#10; one</pre>', '<pre>\rone</pre>', '<textarea>&#10;one</textarea>'];
+    const bodies = ['<pre>\n&amp; &#10; one</pre>', '<pre>\rone</pre>', '<textarea>&#10;one</textarea>',
+        '<textarea>\n<b>t</b></textarea>'];
     const native = retained(bodies);
     try {
         const rows = bodies.map((raw, index) => {
