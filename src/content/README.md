@@ -67,10 +67,13 @@ through literal CommonJS relative imports. Unexpected bare or dynamic imports
 fail staging. Every regular staged file is hashed in sorted manifest order;
 the previous stage may be replaced only when its entire inventory and owner
 still match. The stager recreates its own synthetic package file after npm's
-install step, so every staged member has the invoking UID. It removes only a
-validated, renamed previous stage or its own unfinished temporary stage;
-readonly directories are made writable by their owner for this cleanup. The
-published stage remains `0555`/`0444`. The CLI takes only the absolute artifact
+install step, so every published member has the invoking UID. It removes only a
+validated, renamed previous stage or its own unfinished temporary stage. The
+private temporary root must remain owned by the invoker; npm may have changed
+the ownership of files within it before a failed install. Cleanup never follows
+symlinks or masks the original install failure. Readonly directories are made
+writable for this bounded cleanup. The published stage remains `0555`/`0444`.
+The CLI takes only the absolute artifact
 path, never a caller supplied runtime root or source override.
 
 The synthetic mechanics test runs before the real worker source is available:

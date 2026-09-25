@@ -156,27 +156,35 @@ function assertOwner(root) {
     walk(root);
 }
 
-function removeOwnedTree(root) {
+function removeOwnedTree(root, privateTemp = false) {
     if (!fs.existsSync(root)) return;
-    // The prior stage has already passed full inventory validation. Restore
-    // write permission only on directories owned by this staging process so
-    // non-root rebuilds can unlink immutable 0444 files without touching them.
+    // A previous stage has passed full inventory and UID validation. npm may
+    // chown files within this invocation's private temp tree before failing;
+    // that tree has a separately checked owned root and no published identity.
     const prepare = directory => {
         const stat = fs.lstatSync(directory);
-        if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid()) {
+        if (!stat.isDirectory() || stat.isSymbolicLink() ||
+            (!privateTemp && stat.uid !== process.getuid())) {
             fail(`cannot remove unowned stage directory: ${directory}`);
         }
         fs.chmodSync(directory, 0o700);
         for (const name of fs.readdirSync(directory)) {
             const filename = path.join(directory, name);
             const child = fs.lstatSync(filename);
-            if (child.uid !== process.getuid() || child.isSymbolicLink()) {
+            if (!privateTemp && (child.uid !== process.getuid() || child.isSymbolicLink())) {
                 fail(`cannot remove unowned stage member: ${filename}`);
             }
             if (child.isDirectory()) prepare(filename);
-            else if (!child.isFile()) fail(`cannot remove non-file stage member: ${filename}`);
+            else if (!child.isFile() && !(privateTemp && child.isSymbolicLink())) {
+                fail(`cannot remove non-file stage member: ${filename}`);
+            }
         }
     };
+    const rootStat = fs.lstatSync(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() ||
+        rootStat.uid !== process.getuid()) {
+        fail(`cannot remove unowned stage root: ${root}`);
+    }
     prepare(root);
     fs.rmSync(root, { recursive: true, force: true });
 }
@@ -223,6 +231,7 @@ export function stageRuntime(artifact, sources = {}) {
     const tempRoot = fs.mkdtempSync(`${finalRoot}.${artifactSha256.slice(0, 12)}.` +
         `${contentLockSha256.slice(0, 12)}.tmp-`);
     let backupRoot;
+    let primaryError;
     try {
         const app = path.join(tempRoot, 'app');
         fs.mkdirSync(app);
@@ -305,8 +314,15 @@ export function stageRuntime(artifact, sources = {}) {
             files: files.length, workerModules: modules.length,
             contentModules: contentModules.length,
             artifactSha256, contentLockSha256 }));
+    } catch (error) {
+        primaryError = error;
+        throw error;
     } finally {
-        removeOwnedTree(tempRoot);
+        try { removeOwnedTree(tempRoot, true); }
+        catch (cleanupError) {
+            if (!primaryError) throw cleanupError;
+            console.error(`Private staging cleanup failed: ${String(cleanupError)}`);
+        }
     }
 }
 

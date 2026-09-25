@@ -99,6 +99,31 @@ try {
         createHash('sha256').update(JSON.stringify(manifest, null, 2) + '\n').digest('hex'));
     assert.ok(!fs.readdirSync(temporary).some(name => name.includes('.runtime.old-')));
 
+    // A failed npm fetch must keep the original error and remove only this
+    // invocation's private temp tree, even if npm chowned input package files.
+    const originalManifestHash = fileHash(path.join(stageRoot, 'manifest.json'));
+    const previousOffline = process.env.npm_config_offline;
+    const previousCache = process.env.npm_config_cache;
+    const emptyCache = path.join(temporary, 'empty-npm-cache');
+    fs.mkdirSync(emptyCache);
+    try {
+        process.env.npm_config_offline = 'true';
+        process.env.npm_config_cache = emptyCache;
+        assert.throws(build, error => {
+            assert.match(error.message, /production npm ci failed/);
+            assert.doesNotMatch(error.message, /cannot remove|cleanup failed/);
+            return true;
+        });
+    } finally {
+        if (previousOffline === undefined) delete process.env.npm_config_offline;
+        else process.env.npm_config_offline = previousOffline;
+        if (previousCache === undefined) delete process.env.npm_config_cache;
+        else process.env.npm_config_cache = previousCache;
+    }
+    assert.equal(fileHash(path.join(stageRoot, 'manifest.json')), originalManifestHash);
+    assert.ok(!fs.readdirSync(temporary).some(name => name.includes('.runtime.') &&
+        name.includes('.tmp-')), 'failed npm build left no private temp tree');
+
     // Build the same closed tree twice as an ordinary user. The old stage's
     // readonly directory permissions must not prevent its validated removal.
     const ordinary = path.join(temporary, 'ordinary');
@@ -152,6 +177,7 @@ try {
     console.log(JSON.stringify({ syntheticWorker: worker.stdout,
         nonRootWorker: nonRoot.stdout, directoryMode: '0555', fileMode: '0444',
         files: manifest.files.length, repeat: 'root and uid65534',
+        npmFailure: 'original error and no temp tree',
         tamperedOwnership: 'rejected', tamperedReplacement: 'rejected' }));
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
