@@ -39,11 +39,13 @@ export function calendar(input: RenderInput, base: string, monday: boolean): S2O
     const year = years.at(-1) ?? now.getUTCFullYear();
     const months = [...new Set(input.journal.entries.filter(e => e.year === year).map(e => e.month))]
         .filter(m => year < now.getUTCFullYear() || m <= now.getUTCMonth() + 1).sort((a, b) => a - b);
-    const month = months.at(-1) ?? now.getUTCMonth() + 1;
+    // Retained get_latest_month assigns undef (numeric0), not the current
+    // month, when the newest eligible year contains only future months.
+    const month = years.length ? months.at(-1) ?? 0 : now.getUTCMonth() + 1;
     const pad = (n: number) => String(n).padStart(2, "0");
     const weeks: S2Object[] = [];
     let week: S2Object | undefined;
-    const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const days = month ? new Date(Date.UTC(year, month, 0)).getUTCDate() : 0;
     for (let day = 1; day <= days; day++) {
         const d = date(`${year}-${pad(month)}-${pad(day)} 00:00:00`);
         if (!week) {

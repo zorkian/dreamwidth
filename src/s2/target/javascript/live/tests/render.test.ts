@@ -20,6 +20,7 @@ import {spawnSync} from "node:child_process";
 import {validateArtifact, instantiate} from "../render/artifact";
 import {Context} from "../../runtime/s2runtime";
 import {prepare} from "../render/prepare";
+import {calendar} from "../render/calendar";
 import {Renderer, childArguments} from "../render/child";
 import {loadResourceTimes} from "../render/resources";
 import {approveSnapshot} from "../policy/cohort";
@@ -208,4 +209,20 @@ test("exactly full final page retains the empty previous-link corner", () => {
         new Context(instantiate(artifact), () => {}));
     assert.equal(page.nav._backward_count, 20);
     assert.equal(page.nav._backward_url, undefined);
+});
+
+test("future-only current-year calendar retains the source month-zero edge", () => {
+    const journal = approveSnapshot(snapshot());
+    const future = {...journal, entries: journal.entries.map(e => ({...e,
+        eventtime: "2026-11-01 00:00:00", year: 2026, month: 11, day: 1}))};
+    const base = "http://localhost:8080/~s2js_slice3";
+    const month = calendar({journal: future, config, skip: 0, skipPresent: false, nowSeconds: now,
+        formChallenge: "", uniq: "AAAAAAAAAAAAAAA", resourceTimes: {}}, base, false);
+    // Independently probed S2::Builtin::LJ::Page__get_latest_month + YearMonth
+    // with synthetic November counts and the September comparison clock.
+    assert.equal(month.year, 2026);
+    assert.equal(month.month, 0);
+    assert.equal(month.weeks.length, 0);
+    assert.equal(month.url, base + "/2026/00/");
+    assert.equal(month._next_url, base + "/2026/11/");
 });
