@@ -25,9 +25,28 @@
 
 
 import type { Context } from "../../runtime/s2runtime";
-import type { RenderContentPreparation, RenderInput, ApprovedUserpic } from "./types";
+import type { RenderContentPreparation, RenderInput, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
+
+export function prepareTag(tag: ApprovedTag, base: string): S2Object {
+    // Tags.pm tag_url/TextUtil eurl operate on native UTF8 database bytes.
+    const bytes=Buffer.from(tag.name,"utf8");let encoded="";
+    for(const byte of bytes){const char=String.fromCharCode(byte);
+        encoded+=/[a-zA-Z0-9_,\-.\/\\: ]/.test(char)?char:"%"+byte.toString(16).toUpperCase().padStart(2,"0");}
+    encoded=encoded.replaceAll(" ","+");
+    return object("Tag",{_id:tag.id,name:escapeHtml(tag.name),
+        url:base+(encoded.includes("/")||encoded.includes("\\")||encoded.includes("%2B")?"?tag=":"/tag/")+encoded});
+}
+export function prepareTagDetail(tag: ApprovedTagDetail, base: string): S2Object {
+    const simple=prepareTag(tag,base);
+    return object("TagDetail",{_id:tag.id,name:simple.name,url:simple.url,visibility:"public",use_count:tag.count,
+        security_counts:{public:tag.count}});
+}
+export function prepareEntryTags(tags: readonly ApprovedTag[],base:string): S2Object[] {
+    return tags.map(tag=>prepareTag(tag,base)).sort((a,b)=>
+        Buffer.compare(Buffer.from(String(a.name)),Buffer.from(String(b.name))));
+}
 
 export function prepareUserpic(input: RenderInput, picture: ApprovedUserpic | null, ctx?: Context): S2Object {
     if (!picture || ctx?.prop._userpics_position === "none") return nullObject("Image");
@@ -73,7 +92,7 @@ export function prepare(input: RenderInput, ctx: Context,
         return object("Entry", {subject: e.subject, text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url,
-            itemid: e.id, tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
+            itemid: e.id, tags: prepareEntryTags(e.tags,base), metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
             dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"]});
     });
@@ -139,7 +158,7 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         subject: e.subject, text: content.body(e, url), journal: user, poster: user,
         time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
         comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url, itemid: e.id,
-        tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
+        tags: prepareEntryTags(e.tags,base), metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
         dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
         link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",
             "watch_comments", "unwatch_comments"],

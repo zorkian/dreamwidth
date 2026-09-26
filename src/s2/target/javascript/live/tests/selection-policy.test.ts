@@ -56,8 +56,12 @@ test("nonmarker journals/cluster/caps/storage version and default style keep rea
         assert.throws(() => approve(owner(data, change)), Unsupported);
     }
     assert.equal(approve(owner(data, {defaultpicid: 1})).defaultUserpic?.picid, 1);
-    for (const field of ["usertags", "logtags", "logtagsrecent", "logkwsum", "links", "comments"]) {
+    for (const field of ["usertags", "logkwsum", "links", "comments"]) {
         assert.throws(() => approve({...data, features: {...data.features, [field]: 1}}), Unsupported);
+    }
+    for (const field of ["logtags", "logtagsrecent"]) {
+        // Associations outside the selected public body set remain count-only.
+        assert.doesNotThrow(() => approve({...data,features:{...data.features,[field]:1}}));
     }
     assert.throws(() => approve({...data, style: {...data.style!, layers: data.style!.layers.map(layer =>
         ({...layer, sourceHash: "0".repeat(64)}))}}), Unsupported);

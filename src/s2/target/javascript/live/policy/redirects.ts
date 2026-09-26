@@ -100,8 +100,13 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
                 const returnto = control?.startsWith("/openid/?returnto=") ? control.slice("/openid/?returnto=".length) : "";
                 const safeReturn = returnto.startsWith(config.canonicalAppOrigin + "/") &&
                     page(returnto.slice(config.canonicalAppOrigin.length)) !== null;
-                const go = control && /^\/go\?dir=(prev|next)&itemid=([1-9][0-9]{0,9})&journal=([a-z0-9_]{1,25})$/.exec(control);
-                const safeGo = go && validEntryId(Number(go[2])) && canonical(go[3]!);
+                const go = control && /^\/go\?dir=(prev|next)&itemid=([1-9][0-9]{0,9})&journal=([a-z0-9_]{1,25})(?:&redir_key=([^&]{1,4096}))?$/.exec(control);
+                const safeGo = go && validEntryId(Number(go[2])) && canonical(go[3]!) &&
+                    (go[4]===undefined || (()=>{
+                        const key=decodeURIComponent(go[4]!);
+                        return Buffer.byteLength(key)<=4096 && !/[\x00-\x1f\x7f]/.test(key) &&
+                            encodeURIComponent(key)===go[4];
+                    })());
                 if (!(control && GET_PATHS.has(control)) && !safeMemories && !safeItem && !safeReturn && !safeGo &&
                     !datePath(raw) && !asset(raw, prefixes)) return REJECT;
             }

@@ -181,6 +181,7 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
         "package LJ::Hooks::Slice6Fixture; use LJ::Hooks; " +
         "LJ::Hooks::register_hook('check_cap_s2viewentry', sub {1}); " +
         "LJ::Hooks::register_hook('journal_base', sub {'https://custom.example'}); " +
+        "LJ::Hooks::register_hook('augment_s2_tag_list', sub {die 'must-not-execute'}); " +
         "LJ::Hooks::register_hook('construct_userpic_url', sub {die 'must-not-execute'}); 1;\n");
     const output = path.join(base, "site.json");
     const positive = exportSite(home, output);
@@ -189,6 +190,8 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
     assert.equal(config.capabilities.s2ViewEntry.hookConfigured, true);
     assert.equal(config.app.journalUrls.hookConfigured, true);
     assert.equal(config.app.userpicUrlHookConfigured, true);
+    assert.equal(config.app.tagListHookConfigured,true);
+    assert.equal(config.app.tagsEnabled,true);
     assert.deepEqual(config.placeholder.descriptor,
         {src: "https://app.example.test/img/custom.png", width: 45, height: 21, altKey: "custom.placeholder"});
     writeFileSync(path.join(hooks, "Slice6Fixture.pm"),
@@ -258,5 +261,14 @@ test("private file/CLI shape failures have fixed safe diagnostics", () => tempor
         assert.throws(() => parseStartupArgs(args), error => {
             assert.ok(error instanceof StartupConfigError && !error.message.includes(secret)); return true;
         });
+    }
+}));
+
+test("tag enable fact preserves native scalar and no-argument callback configuration",()=>temporary(dir=>{
+    for(const [id,source,enabled] of [["scalar","$DISABLED{tags}=1;",false],
+        ["callback","$DISABLED{tags}=sub {1};",false],["false","$DISABLED{tags}='0';",true]] as const){
+        const base=path.join(dir,id);mkdirSync(base);const home=fixture(base,source),out=path.join(base,"site.json");
+        const result=exportSite(home,out);assert.equal(result.status,0,result.stderr);
+        const value=readStartupConfig(out);assert.equal(value.app.tagsEnabled,enabled);assert.equal(value.app.tagListHookConfigured,false);
     }
 }));

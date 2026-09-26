@@ -130,3 +130,5 @@ for page in recent entry; do
 Use Bash for these array commands. Comparison signing preparation follows the
 existing local oracle helper; no signing secret is exported. The wrapper clock
 is compiled before native helpers. Ordinary live serving has no frozen clock.
+
+Ordinary public/selected entry tags follow in [SLICE-9.md](SLICE-9.md).
