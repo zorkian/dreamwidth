@@ -12,7 +12,8 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import type {RawJournalSnapshot} from "../contracts";
+import type {RawJournalSnapshot, PublicAppConfig} from "../contracts";
+import type {SourceCapabilities} from "../startup-types";
 import type {ApprovedJournal} from "../render/types";
 import {approveSnapshot} from "./cohort";
 import {Unsupported} from "./content";
@@ -24,19 +25,19 @@ export function validEntryId(value: unknown): value is number {
         value >= 1 && value <= 4294967295;
 }
 
-export function approveEntrySnapshot(snapshot: RawJournalSnapshot, ditemid: number): ApprovedJournal | null {
-    if (!validEntryId(ditemid)) throw new Unsupported();
-    const selected = snapshot.entries.find(entry => entry.jitemid === Math.floor(ditemid / 256));
-    // Perform identity and anonymous visibility before inspecting any target
-    // rendering data or applying unsupported-cohort rules. Private/usemask and
-    // wrong-anum requests remain indistinguishable from missing rows.
-    if (!selected || selected.anum !== ditemid % 256 ||
+export function approveEntrySnapshot(snapshot: RawJournalSnapshot, ditemid: number,
+    config: PublicAppConfig, capabilities: SourceCapabilities): ApprovedJournal | null {
+    if (!validEntryId(ditemid) || snapshot.selection.kind !== "entry" ||
+        snapshot.request.page.kind !== "entry" || snapshot.selection.ditemid !== ditemid ||
+        snapshot.request.page.ditemid !== ditemid) throw new Unsupported();
+    const selected = snapshot.selection.target;
+    // Exact identity/privacy before settings, body inspection or helper gates.
+    // A real store returns null before fetching body bytes for these targets.
+    if (selected.jitemid !== Math.floor(ditemid / 256) || selected.anum !== ditemid % 256 ||
         selected.security === "private" || selected.security === "usemask") return null;
-    if (selected.security !== "public") throw new Unsupported();
+    if (selected.security !== "public" || selected.journalid !== snapshot.owner.userid) throw new Unsupported();
     if (snapshot.features.spamreportBans !== 0) throw new Unsupported();
-    // Preserve all journal-wide gates, including other suspended public rows,
-    // actual talk2 count and replycount. Only public approved bytes reach child.
-    const approved = approveSnapshot(snapshot);
-    if (!approved.entries.some(entry => entry.id === ditemid)) throw new Unsupported();
+    const approved = approveSnapshot(snapshot, config, capabilities);
+    if (approved.entries.length !== 1 || approved.entries[0]!.id !== ditemid) throw new Unsupported();
     return approved;
 }
