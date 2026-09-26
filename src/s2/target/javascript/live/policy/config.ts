@@ -15,17 +15,17 @@
 import type { PublicAppConfig, RenderLimits } from "../contracts";
 import { Unsupported } from "./content";
 
-function exactRecord(value: unknown, keys: readonly string[]): Record<string, unknown> {
+function exactRecord(value: unknown, keys?: readonly string[]): Record<string, unknown> {
     if (!value || typeof value !== "object" || Array.isArray(value) ||
         ![Object.prototype, null].includes(Object.getPrototypeOf(value)) ||
-        Object.keys(value).length !== keys.length ||
-        keys.some(key => !Object.prototype.hasOwnProperty.call(value, key))) throw new Unsupported();
+        keys && (Object.keys(value).length !== keys.length ||
+        keys.some(key => !Object.prototype.hasOwnProperty.call(value, key)))) throw new Unsupported();
     return value as Record<string, unknown>;
 }
 
 function hostKey(value: unknown): value is string {
     if (typeof value !== "string" || !value || value.length > 320 ||
-        value !== value.toLowerCase() || /[\s%@/?#\\]/.test(value)) return false;
+        /[\s%@/?#\\]/.test(value)) return false;
     try {
         const url = new URL("http://" + value + "/");
         return !!url.hostname && !url.username && !url.password && url.pathname === "/";
@@ -71,23 +71,57 @@ function validateEntryConfig(config: PublicAppConfig): void {
 }
 
 export function validateConfig(config: PublicAppConfig): void {
-    const origins = [config.listenOrigin, config.canonicalAppOrigin].map(value => {
-        const url = new URL(value);
-        if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
-            !url.port || url.origin !== value || url.username || url.password) throw new Unsupported();
-        return url;
-    });
-    if (origins[0]!.hostname !== origins[1]!.hostname || origins[0]!.port === origins[1]!.port ||
-        config.anonymousCaptchaDisabled !== true) throw new Unsupported();
+    exactRecord(config, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot", "statPrefix",
+        "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback", "imgPrefix",
+        "palImgRoot", "userpicRoot", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
+        "facebookPreviewIcon"]);
+    for (const value of [config.listenOrigin, config.canonicalAppOrigin]) {
+        let url;
+        try { url = new URL(value); } catch { throw new Unsupported(); }
+        if (!["http:", "https:"].includes(url.protocol) || url.origin !== value ||
+            url.username || url.password || url.search || url.hash) throw new Unsupported();
+    }
     for (const value of [config.siteRoot, config.statPrefix, config.imgPrefix, config.palImgRoot,
-        config.userpicRoot, config.appleTouchIcon, config.facebookPreviewIcon]) {
-        if (typeof value !== "string" || /[\x00-\x20"'<>\\]/.test(value) ||
-            (value !== "" && !/^\/(?!\/)/.test(value) &&
-             !value.startsWith(config.canonicalAppOrigin + "/") &&
-             value !== config.canonicalAppOrigin)) throw new Unsupported();
+        config.jsPrefix, config.userpicRoot, config.appleTouchIcon, config.facebookPreviewIcon]) {
+        if (typeof value !== "string" || value.length > 4096 || /[\x00-\x20"'<>\\]/.test(value)) {
+            throw new Unsupported();
+        }
+        if (!value) continue;
+        if (!value.startsWith("/") && !/^https?:\/\//.test(value)) throw new Unsupported();
+        let url;
+        try { url = new URL(value, config.canonicalAppOrigin); } catch { throw new Unsupported(); }
+        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash) {
+            throw new Unsupported();
+        }
     }
     for (const value of [config.siteName, config.siteNameShort, config.siteNameAbbrev]) {
-        if (!value || value.length > 100 || /[<>"'&\x00-\x1f]/.test(value)) throw new Unsupported();
+        if (typeof value !== "string" || !value || value.length > 100 || /[<>"'&\x00-\x1f]/.test(value)) {
+            throw new Unsupported();
+        }
+    }
+    if ((config.userDomain !== "" && !hostKey(config.userDomain)) ||
+        !Number.isSafeInteger(config.usernameMaxLength) || config.usernameMaxLength < 1 ||
+        config.usernameMaxLength > 255 || !Number.isSafeInteger(config.maxScrollback) ||
+        config.maxScrollback < 1) throw new Unsupported();
+    const journal = exactRecord(config.journalUrls,
+        ["protocol", "domain", "isDevServer", "subdomainRules", "hookConfigured"]);
+    if (!["http", "https"].includes(journal.protocol as string) ||
+        (journal.domain !== "" && !hostKey(journal.domain)) ||
+        typeof journal.isDevServer !== "boolean" || journal.hookConfigured !== false) throw new Unsupported();
+    const rules = exactRecord(journal.subdomainRules);
+    if (!Object.hasOwn(rules, "P") || Object.keys(rules).length > 64) throw new Unsupported();
+    for (const [kind, rule] of Object.entries(rules)) {
+        if (!/^[A-Z]$/.test(kind) || !Array.isArray(rule) || rule.length !== 2 ||
+            typeof rule[0] !== "boolean" || typeof rule[1] !== "string" ||
+            rule[1].length > 4096 || /[\x00-\x20"'<>\\?#@]/.test(rule[1])) throw new Unsupported();
+        if (rule[0] && !journal.domain) throw new Unsupported();
+        if (!rule[0] && !rule[1] && !journal.isDevServer) throw new Unsupported();
+        if (rule[1]) {
+            let url;
+            try { url = new URL(journal.protocol + "://" + rule[1] + "/username"); }
+            catch { throw new Unsupported(); }
+            if (!url.hostname || url.username || url.password || url.hash || url.search) throw new Unsupported();
+        }
     }
     validateEntryConfig(config);
 }
