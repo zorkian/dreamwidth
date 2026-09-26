@@ -33,7 +33,9 @@ A missing mood name/theme/icon does not discard an existing metadata key.
 and parents, the selected account's theme name, and reachable theme pictures.
 The loader reads only selected public-entry chains, not unrelated vocabulary or
 other accounts' themes. Theme `is_public` is not an authorization filter in the
-native selected-account helper. Missing or Perl-false theme name yields no icon.
+native selected-account helper. Missing or Perl-false theme name yields no icon
+in this DB-only viewer. The native false-theme probe assumes successful cache set;
+native cache-failure behavior is not reproduced by the deferred-cache viewer.
 Names, parent links, theme presence/name, picture URL/dimensions and raw text-byte
 proofs are included in the fingerprint and independent final request reread.
 Required tables use the existing configured-primary InnoDB/read-only qualification.
@@ -43,6 +45,8 @@ atomicity or arbitrary ABA claim.
 The first reachable picture wins. Relative `/img` prefix is removed before
 prepending configured `imgPrefix`; other leading paths are simply prepended.
 Native invalid HTTP URL becomes `#invalid`; zero width/height remain native fields.
+The viewer's strict end and JavaScript whitespace safety check also makes icon URLs
+with trailing LF or NBSP `#invalid`, differing from native byte-regex acceptance.
 The exact retained HTTP/last-two-label regex and exported case-sensitive
 `siteDomain`/`knownHttpsSites` control HTTPS upgrades. When native would proxy an
 otherwise safe original URL, this private viewer keeps that URL: no signing,
