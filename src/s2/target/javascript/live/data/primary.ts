@@ -49,7 +49,7 @@ readonly ConfiguredDatabaseSource[] {
             typeof source.password !== "string" || source.password.length > 65536 ||
             !record(source.roles)) invalid();
         ids.add(source.id);
-        if (source.host !== null && !text(source.host, 1024)) invalid();
+        if (source.host !== null && !text(source.host, 1024, true)) invalid();
         if (source.port !== null && (typeof source.port !== "number" || !Number.isInteger(source.port) ||
             source.port < 1 || source.port > 65535)) invalid();
         if (source.socketPath !== null && (!text(source.socketPath, 4096) ||
@@ -87,7 +87,7 @@ readonly ConfiguredDatabaseSource[] {
 // An unresolved native local default requires an explicit startup socket path.
 export function primaryTransport(source: Pick<ConfiguredDatabaseSource, "host" | "port" | "socketPath">):
 {socketPath: string} | {host: string; port?: number} {
-    if (source.host === null || source.host === "localhost") {
+    if (source.host === null || source.host === "" || source.host === "localhost") {
         if (source.socketPath === null) invalid();
         return {socketPath: source.socketPath};
     }
