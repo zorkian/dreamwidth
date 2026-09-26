@@ -125,6 +125,10 @@ export function approveComments(snapshot:import('../contracts').RawJournalSnapsh
     config:PublicAppConfig,capabilities:import('../startup-types').SourceCapabilities):
     import('../render/types').ApprovedComments|undefined {
     const raw=snapshot.comments;if(!raw)return undefined;
+    const entry=snapshot.entries[0];
+    const truth=(value:string|null|undefined)=>!!value&&value!=='0';
+    if(snapshot.owner.optShowTalkLinks!=='Y'||!entry||truth(entry.props.opt_nocomments)||
+        truth(entry.props.opt_nocomments_maintainer))return undefined;
     const fail=():never=>{throw new SnapshotError('unsupported');};
     if(snapshot.request.page.kind!=='entry'||!config.commentSettings)return fail();
     const expandAllowed=commentCapability(capabilities.threadExpandAll,snapshot.owner.caps);
