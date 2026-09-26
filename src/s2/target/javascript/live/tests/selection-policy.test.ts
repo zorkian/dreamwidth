@@ -52,10 +52,11 @@ test("nonmarker journals/cluster/caps/storage version and default style keep rea
     assert.equal(approve({...defaultStyle, style: {...data.style!, origin: "default", styleid: 0,
         ownerid: null, name: "informational only"}}).styleid, 0);
     for (const change of [{status: "D"}, {statusvis: "S"}, {statusvis: "D"}, {statusvis: "X"},
-        {clusterid: 0}, {journaltype: "C"}, {caps: "32768"}, {caps: "65536"}, {defaultpicid: 1}]) {
+        {clusterid: 0}, {journaltype: "C"}, {caps: "32768"}, {caps: "65536"}]) {
         assert.throws(() => approve(owner(data, change)), Unsupported);
     }
-    for (const field of ["usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum", "links", "userpics", "comments"]) {
+    assert.equal(approve(owner(data, {defaultpicid: 1})).defaultUserpic?.picid, 1);
+    for (const field of ["usertags", "logtags", "logtagsrecent", "logkwsum", "links", "comments"]) {
         assert.throws(() => approve({...data, features: {...data.features, [field]: 1}}), Unsupported);
     }
     assert.throws(() => approve({...data, style: {...data.style!, layers: data.style!.layers.map(layer =>

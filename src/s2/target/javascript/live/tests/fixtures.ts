@@ -27,7 +27,7 @@ export const config: PublicAppConfig = {
     siteRoot: "", statPrefix: "/stc", jsPrefix: "/js", userDomain: "",
     journalUrls: {protocol: "http", domain: "", isDevServer: true,
         subdomainRules: {P: [false, ""]}, hookConfigured: false},
-    usernameMaxLength: 25, maxScrollback: 100, imgPrefix: "/img", palImgRoot: "/palimg", userpicRoot: "/userpic",
+    usernameMaxLength: 25, maxScrollback: 100, imgPrefix: "/img", palImgRoot: "/palimg", userpicUrlHookConfigured: false, userpicRoot: "/userpic",
     siteName: "DW Devcontainer", siteNameShort: "DWDev", siteNameAbbrev: "DW",
     appleTouchIcon: "", facebookPreviewIcon: "",
 };
@@ -50,7 +50,7 @@ export function snapshot(page: RawPageRequest["page"] = {kind: "recent", skip: 0
         journaltype: "P", name: "S2 slice 3 fixture", optShowTalkLinks: "Y", optWhocanReply: "all",
         optForceMoodtheme: "N", moodthemeid: 1, defaultpicid: 0, dversion: 10, caps: "2",
         publicSettings: settings as PublicSettings};
-    const data = {owner, posters: [owner], fingerprint: "opaque-test-primary-generation-1",
+    const data = {userpics: {pictures: [],mappings: []},owner, posters: [owner], fingerprint: "opaque-test-primary-generation-1",
         style: {origin: "persisted" as const, styleid: 6, ownerid: 6, name: "Fixture style", modtime: now,
             layers: SOURCE_HASHES.map((hash, i) => ({type: i ? "layout" : "core", s2lid: i + 1,
                 ownerid: 91, ownerUsername: "system", compiledTime: now, sourceHash: hash}))},
@@ -74,12 +74,12 @@ export function entryHeader(entry: RawEntry): RawEntryHeader {
     return header;
 }
 export function selectFixture(
-    data: Pick<RawJournalSnapshot, "owner" | "posters" | "style" | "entries" | "features" | "fingerprint">,
+    data: Pick<RawJournalSnapshot, "owner" | "posters" | "style" | "entries" | "features" | "fingerprint"> & {userpics?: RawJournalSnapshot["userpics"]},
     page: RawPageRequest["page"] = {kind: "recent", skip: 0, itemshow: 20},
     maxScrollback = 100,
 ): RawJournalSnapshot {
     const request: RawPageRequest = {username: data.owner.user, calendarNow: {year: 2026, month: 9}, page};
-    const common = {...data, request, calendar: {
+    const common = {...data, userpics: data.userpics ?? {pictures: [],mappings: []}, request, calendar: {
         current: {year: 2026, month: 9}, days: [{day: 24, count: 2}], previous: null, next: null,
         entryStatusCounts: [{statusvis: null, count: 2}], otherPosterCount: 0,
     }};

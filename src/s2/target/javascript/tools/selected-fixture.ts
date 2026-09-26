@@ -37,7 +37,7 @@ export interface SelectedFixture {
 const globalTables = ["user","useridmap","userprop","userproplist","s2styles","s2layers",
     "s2compiled","s2source_inno","s2info","logproplist","sysban","secrets"];
 const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","log2","logtext2","logprop2",
-    "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","talk2"];
+    "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","userpicmap2","userpicmap3","talk2"];
 
 export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>): Promise<void> {
     assert.equal(process.env.LJHOME,"/workspaces/dreamwidth");
@@ -97,7 +97,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
                 VALUES (900001,44,?,?)`,[row.type,row.s2lid]);
         }
         const [logDefinitions] = await admin.query<mysql.RowDataPacket[]>(`SELECT propid,name FROM ${table(g,"logproplist")}
-            WHERE name IN ('editor','statusvis')`);
+            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword')`);
         const logProp = (name:string) => Number(logDefinitions.find(row => row.name===name)!.propid);
         const insertEntry = async (schema:string,journal:number,id:number,security:string,eventTime:string,
             event:string|Buffer) => {

@@ -25,9 +25,25 @@
 
 
 import type { Context } from "../../runtime/s2runtime";
-import type { RenderContentPreparation, RenderInput } from "./types";
+import type { RenderContentPreparation, RenderInput, ApprovedUserpic } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
+
+export function prepareUserpic(input: RenderInput, picture: ApprovedUserpic | null, ctx?: Context): S2Object {
+    if (!picture || ctx?.prop._userpics_position === "none") return nullObject("Image");
+    const {journal,config} = input;
+    const keyword = picture.keyword;
+    const description = picture.description !== "0" ? picture.description : "";
+    const alt = journal.username + ":" + (description ? " " + description : "") +
+        (keyword !== null ? " (" + keyword + ")" : " (Default)");
+    const title = journal.username + ":" + (keyword !== null ? " " + keyword : " (Default)") +
+        (description ? " (" + description + ")" : "");
+    const factor = ctx?.prop._entry_userpic_style === "small" ? 0.75 :
+        ctx?.prop._entry_userpic_style === "smaller" ? 0.5 : 1;
+    return object("Image",{url:`${config.userpicRoot}/${picture.picid}/${journal.userid}`,
+        width:picture.width*factor,height:picture.height*factor,
+        alttext:escapeHtml(alt),extra:{title:escapeHtml(title)}});
+}
 
 export function prepare(input: RenderInput, ctx: Context,
     content: RenderContentPreparation): S2Object {
@@ -36,7 +52,7 @@ export function prepare(input: RenderInput, ctx: Context,
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
         journal_type: "P", userpic_listing_url: `${base}/icons`, host_userid: j.userid,
         link_keyseq: ["manage_membership", "trust", "watch", "post_entry", "track", "message", "tell_friend"],
-        default_pic: nullObject("Image"), website_url: "", website_name: ""});
+        default_pic: prepareUserpic(input,j.defaultUserpic), website_url: "", website_name: ""});
     if (input.page.kind === "entry") return prepareEntry(input, ctx, content, user, base);
     // The primary loader has already applied the public SQL window, source
     // buffer ordering and lookahead removal. Preserve approved entry identity
@@ -56,7 +72,7 @@ export function prepare(input: RenderInput, ctx: Context,
             comments_disabled_maintainer: 0});
         return object("Entry", {subject: e.subject, text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
-            end_day: Number(newday), comments, userpic: nullObject("Image"), permalink_url: url,
+            end_day: Number(newday), comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url,
             itemid: e.id, tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
             dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"]});
@@ -121,7 +137,7 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
     const entry = object("Entry", {
         subject: e.subject, text: content.body(e, url), journal: user, poster: user,
         time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
-        comments, userpic: nullObject("Image"), permalink_url: url, itemid: e.id,
+        comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url, itemid: e.id,
         tags: [], metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
         dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
         link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",

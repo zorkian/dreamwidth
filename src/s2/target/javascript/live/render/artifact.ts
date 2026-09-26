@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import { Layer, s2 } from "../../runtime/s2runtime";
 import type { Artifact } from "./types";
-import { SOURCE_HASHES } from "../policy/cohort";
+import { SOURCE_HASHES } from "./source-hashes";
 
 export class StockLayer extends Layer {
     readonly metadata = new Map<string, { type: string; attributes: Record<string, string> }>();

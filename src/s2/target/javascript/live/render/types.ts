@@ -15,6 +15,14 @@
 import type { InertEntryMetadata } from "@dreamwidth/content/contracts";
 import type { PublicAppConfig } from "../contracts";
 
+export interface ApprovedUserpic {
+    readonly picid: number;
+    readonly width: number;
+    readonly height: number;
+    readonly description: string;
+    readonly keyword: string | null;
+}
+
 export interface ApprovedEntry {
     readonly id: number;
     readonly subject: string;
@@ -26,6 +34,7 @@ export interface ApprovedEntry {
     readonly month: number;
     readonly day: number;
     readonly commentsEnabled: boolean;
+    readonly userpic: ApprovedUserpic | null;
 }
 export interface ApprovedJournal {
     readonly userid: number;
@@ -41,6 +50,7 @@ export interface ApprovedJournal {
     readonly blockRobots: boolean;
     readonly entries: readonly ApprovedEntry[];
     readonly calendar: ApprovedCalendar;
+    readonly defaultUserpic: ApprovedUserpic | null;
 }
 export interface ApprovedCalendar {
     readonly year: number;
