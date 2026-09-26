@@ -25,7 +25,7 @@
 
 
 import type { Context } from "../../runtime/s2runtime";
-import type { RenderContentPreparation, RenderInput, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
+import type { RenderContentPreparation, RenderInput, ApprovedEntry, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
 
@@ -89,10 +89,10 @@ export function prepare(input: RenderInput, ctx: Context,
             screened: 0, screened_count: 0, show_readlink: 0,
             show_readlink_hidden: Number(e.commentsEnabled), show_postlink: Number(e.commentsEnabled),
             comments_disabled_maintainer: 0});
-        return object("Entry", {subject: e.subject, text: content.body(e, url), journal: user, poster: user,
+        return object("Entry", {...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url,
-            itemid: e.id, tags: prepareEntryTags(e.tags,base), metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
+            itemid: e.id, tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: nullObject("Image"), depth: 0, timeformat24: 0, admin_post: 0,
             dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"]});
     });
@@ -137,6 +137,18 @@ export function prepare(input: RenderInput, ctx: Context,
         entries, filter_active: 0, filter_name: "", filter_tags: 0, nav});
 }
 
+function subjectFields(content: RenderContentPreparation, entry: ApprovedEntry, url: string): Record<string,unknown> {
+    const subject = content.subject(entry,url);
+    return {subject:subject.html,_subject_recent:subject.recentHtml,_subject_all:subject.all};
+}
+function currentFields(content: RenderContentPreparation, entry: ApprovedEntry, url: string): Record<string,unknown> {
+    const result: Record<string,unknown> = {};
+    for (const [name,raw] of Object.entries(entry.currents ?? {})) {
+        result[name] = content.subject(entry,url,raw).html;
+    }
+    return result;
+}
+
 function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPreparation,
     user: S2Object, base: string): S2Object {
     if (input.page.kind !== "entry" || input.skip !== 0 || input.skipPresent) {
@@ -155,10 +167,10 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         show_readlink: 0, show_readlink_hidden: enabled, show_postlink: enabled,
         comments_disabled_maintainer: 0});
     const entry = object("Entry", {
-        subject: e.subject, text: content.body(e, url), journal: user, poster: user,
+        ...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
         time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
         comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url, itemid: e.id,
-        tags: prepareEntryTags(e.tags,base), metadata: {}, depth: 0, timeformat24: 0, admin_post: 0,
+        tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: nullObject("Image"), depth: 0, timeformat24: 0, admin_post: 0,
         dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
         link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",
             "watch_comments", "unwatch_comments"],

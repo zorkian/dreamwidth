@@ -20,6 +20,7 @@ import createDOMPurify from "dompurify";
 import {createHash} from "node:crypto";
 import type {BodyFragment, CleanerLimits, EntryCleaner, EntryContentInput,
     EntryContentResult, EntryMetadataInput, EntryMetadataResult, ImageResolutionSet} from "./contracts";
+import {prepareSubject} from "./policy/subject";
 import {UnsupportedContent} from "./policy/errors";
 import {validateCleanerLimits, validateInput, validateMetadataInput, inputHash} from "./policy/validation";
 import {auditSource} from "./policy/source";
@@ -290,6 +291,10 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
             } finally { dom?.window.close(); }
         },
+        subject(input) {
+            if (closed) return {kind: "failure", reason: "unavailable"};
+            return prepareSubject(input, bounds);
+        },
         metadata(input: EntryMetadataInput): EntryMetadataResult {
             if (closed) return {kind: "failure", reason: "unavailable"};
             let dom: JSDOM | undefined;
@@ -312,7 +317,11 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 replaceCuts(root, entry.context, node => dom!.nodeLocation(node) ?? null,
                     bounds.maxCuts, true);
                 return {kind: "ok", metadata: {kind: "inert-entry-metadata",
-                    subjectText: input.subject,
+                    subjectText: (() => {
+                        const result = prepareSubject({source: input.subject, context: entry.context}, bounds);
+                        if (result.kind !== "ok") throw new UnsupportedContent();
+                        return result.subject.all;
+                    })(),
                     eventText: metadataText(root, entry, bounds, node => dom!.nodeLocation(node) ?? null)}};
             } catch (error) {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};

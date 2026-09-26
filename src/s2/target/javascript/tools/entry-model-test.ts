@@ -73,6 +73,13 @@ function render(page: RenderInput["page"], recentJournal: ApprovedJournal = jour
         }};
     }
     const content: RenderContentPreparation = {
+        subject(entry,entryUrl,source=entry.subject) {
+            assert.ok(selectedJournal.entries.includes(entry));
+            const result = cleaner.subject({source,context:contentInput(entry,entryUrl).context});
+            assert.equal(result.kind,"ok");
+            if(result.kind!=="ok")throw new Error("Subject preparation failed");
+            return result.subject;
+        },
         body(entry, entryUrl) {
             assert.ok(selectedJournal.entries.includes(entry), "Body callback must receive the approved entry");
             bodyCalls++;

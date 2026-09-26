@@ -12,7 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import type { InertEntryMetadata } from "@dreamwidth/content/contracts";
+import type { InertEntryMetadata, SubjectPreparation } from "@dreamwidth/content/contracts";
 import type { PublicAppConfig } from "../contracts";
 
 export interface ApprovedUserpic {
@@ -34,6 +34,7 @@ export interface ApprovedTagDetail extends ApprovedTag {
 export interface ApprovedEntry {
     readonly id: number;
     readonly subject: string;
+    readonly currents?: Readonly<Record<string,string>>; // RAW textual currents, child-only preparation
     readonly rawBody: string; // tainted; only child cleaner may prepare entry text
     readonly eventtime: string;
     readonly logtime: string;
@@ -93,6 +94,7 @@ export type RenderPage =
 // consumes body HTML in body context and inert metadata at the escaped OG
 // attribute boundary. Neither fragment nor helper string returns to the parent.
 export interface RenderContentPreparation {
+    subject(entry: ApprovedEntry, entryUrl: string, source?: string): SubjectPreparation;
     body(entry: ApprovedEntry, entryUrl: string): string;
     metadata(entry: ApprovedEntry, entryUrl: string): InertEntryMetadata;
 }
