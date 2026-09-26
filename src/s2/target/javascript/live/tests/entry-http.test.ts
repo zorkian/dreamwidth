@@ -34,7 +34,7 @@ test("entry GET/HEAD HTTP failures withhold complete HTML, cookies and private e
         {name: "wrong-anum", status: 404}, {name: "private-before-cohort", status: 404},
         {name: "usemask-before-cohort", status: 404}, {name: "unknown-security", status: 422},
         {name: "selected-suspended", status: 422}, {name: "shown-calendar-suspended", status: 422},
-        {name: "owner-suspended", status: 422}, {name: "talk2-positive", status: 422},
+        {name: "owner-suspended", status: 422}, {name: "comments-config-missing", status: 422},
         {name: "replycount-positive", status: 422}, {name: "spamreport-positive", status: 422},
         {name: "load-unavailable", status: 503}, {name: "load-unsupported", status: 422},
         {name: "recheck-unavailable", status: 503}, {name: "changed", status: 409},
@@ -65,7 +65,8 @@ test("entry GET/HEAD HTTP failures withhold complete HTML, cookies and private e
                 // contributors remain privacy-sensitive even off the page.
                 if (row.name === "shown-calendar-suspended") return {...data, calendar: {...data.calendar,
                     entryStatusCounts: [{statusvis: "S", count: 2}]}};
-                if (row.name === "talk2-positive") return {...data, features: {...data.features, comments: 1}};
+                if (row.name === "comments-config-missing") return {...data, comments: {headers: [{jtalkid: 1, parenttalkid: 0, posterid: 0, state: "A",
+                    datepost: "2026-09-26 00:00:00"}], authors: [], texts: [{jtalkid: 1, subject: "Public", body: "Public", props: {}}]}};
                 if (row.name === "spamreport-positive") return {...data, features: {...data.features, spamreportBans: 1}};
                 if (row.name === "replycount-positive") return {...data, entries: [
                     {...data.entries[0]!, replycount: 1},

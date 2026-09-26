@@ -56,17 +56,20 @@ test("private candidates never reach renderer; suspended public refuses whole pa
 test("nonvisible, external authors, unsupported style and feature states fail closed", () => {
     const data = snapshot();
     for (const change of [{statusvis: "S"}, {status: "D"}, {journaltype: "C"},
-        {clusterid: 0}, {caps: "9007199254740993"}, {optWhocanReply: "friends"}]) {
+        {clusterid: 0}, {caps: "9007199254740993"}]) {
         assert.throws(() => approveSnapshot({...data, owner: {...data.owner, ...change}}));
     }
-    for (const key of Object.keys(data.features).filter(key => !["spamreportBans", "userpics", "userkeywords", "logtags", "logtagsrecent"].includes(key))) assert.throws(() => approveSnapshot({
+    for (const key of Object.keys(data.features).filter(key => !["spamreportBans", "userpics", "userkeywords", "logtags", "logtagsrecent", "comments"].includes(key))) assert.throws(() => approveSnapshot({
         ...data, features: {...data.features, [key]: 1},
     }));
-    for (const key of ["logtags", "logtagsrecent"]) assert.doesNotThrow(() => approveSnapshot({
+    for (const key of ["logtags", "logtagsrecent", "comments"]) assert.doesNotThrow(() => approveSnapshot({
         ...data,features:{...data.features,[key]:1},
     })); // Unselected/private association inventory is not a displayed feature.
     assert.equal(approveSnapshot({...data, owner: {...data.owner, defaultpicid: 1}})
         .defaultUserpic?.picid, 1); // Native missing-row default skeleton.
+    for (const reply of ["all", "reg", "friends"]) assert.doesNotThrow(() => approveSnapshot({
+        ...data, owner: {...data.owner, optWhocanReply: reply},
+    }));
     // This new primary fact gates EntryPage only; preserve Recent admission.
     assert.deepEqual(approveSnapshot({...data, features: {...data.features, spamreportBans: 1}}),
         approveSnapshot(data));

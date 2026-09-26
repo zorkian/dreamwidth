@@ -211,10 +211,15 @@ test("selected nonrecent entry mutation during actual child render blocks releas
             const request = {method: "GET" as const, username: "s2js_slice3", ditemid: target,
                 uniqCookie: "AAAAAAAAAAAAAAA:1790294400:x"};
             assert.deepEqual(await service.serveEntry(request), {ok: false, reason: "changed"}, change);
-            assert.deepEqual(await service.serveEntry(request), {ok: false,
+            const second = await service.serveEntry(request);
+            if (change === "talk2") {
+                // Unrelated header inventory now supports ordinary comments;
+                // the first persistent dependency change still revoked output.
+                assert.equal(second.ok, true);
+            } else assert.deepEqual(second, {ok: false,
                 reason: change === "security" || change === "anum" ? "not-found" : "unsupported"}, change);
-            assert.equal(rechecks, 1, change);
-            assert.equal(secrets, 1, change);
+            assert.equal(rechecks, change === "talk2" ? 2 : 1, change);
+            assert.equal(secrets, change === "talk2" ? 2 : 1, change);
         } finally {await service.close();}
     }
 });
