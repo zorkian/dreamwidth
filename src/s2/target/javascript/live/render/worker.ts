@@ -42,7 +42,7 @@ process.stdin.on("end", () => {
             message.maxBytes > 2097152) throw new Unsupported();
         const request = message.input;
         if (!request.page || !["recent", "entry"].includes(request.page.kind) ||
-            !Number.isSafeInteger(request.skip) || request.skip < 0 || request.skip > 200 ||
+            !Number.isSafeInteger(request.skip) || request.skip < 0 ||
             typeof request.skipPresent !== "boolean" || (!request.skipPresent && request.skip !== 0)) {
             throw new Unsupported();
         }
@@ -50,18 +50,32 @@ process.stdin.on("end", () => {
         if (request.page.kind === "entry" && (request.skip !== 0 || request.skipPresent ||
             !Number.isSafeInteger(request.page.ditemid) || request.page.ditemid < 1 ||
             request.page.ditemid > 4294967295 ||
-            !request.journal.entries.some(entry => request.page.kind === "entry" && entry.id === request.page.ditemid))) {
+            request.journal.entries.length !== 1 ||
+            request.journal.entries[0]!.id !== request.page.ditemid)) {
+            throw new Unsupported();
+        }
+        if (request.page.kind === "recent" && (request.page.itemshow !== 20 ||
+            !Number.isSafeInteger(request.page.maxScrollback) || request.page.maxScrollback < 21 ||
+            request.page.maxScrollback !== request.config.maxScrollback ||
+            request.page.pageSkip !== Math.min(request.skip, request.page.maxScrollback - request.page.itemshow) ||
+            typeof request.page.hasPrevious !== "boolean" || request.journal.entries.length > request.page.itemshow)) {
+            throw new Unsupported();
+        }
+        const base = request.journal.baseUrl;
+        const parsedBase = new URL(base);
+        if (!["http:", "https:"].includes(parsedBase.protocol) || parsedBase.username || parsedBase.password ||
+            parsedBase.search || parsedBase.hash || /[\x00-\x20"'<>\\]/.test(base) || base.endsWith("/")) {
             throw new Unsupported();
         }
         const documentUrl = request.page.kind === "entry" ?
             // Match entry->url / the stock permalink, rather than the local
             // /users transport alias. Body URL adaptation uses this base;
             // independently derived metadata retains literal helper URLs.
-            `${request.config.canonicalAppOrigin}/~${request.journal.username}/${request.page.ditemid}.html` :
-            `${request.config.canonicalAppOrigin}/~${request.journal.username}/` +
+            `${base}/${request.page.ditemid}.html` :
+            `${base}/` +
                 (request.skipPresent ? `?skip=${request.skip}` : "");
         const contentInput = (entry: ApprovedEntry, entryUrl: string): EntryContentInput => {
-            if (!request.journal.entries.includes(entry) ||
+            if (!request.journal.entries.includes(entry) || entryUrl !== `${base}/${entry.id}.html` ||
                 (request.page.kind === "entry" && entry.id !== request.page.ditemid)) throw new Unsupported();
             return {body: entry.rawBody, format: "html_raw0", context: {
                 policy: "dreamwidth-entry-html-raw0-v1", insertionContext: "html-div-flow", documentUrl,
@@ -80,8 +94,8 @@ process.stdin.on("end", () => {
                     if (result.reason === "unsupported") throw new Unsupported();
                     throw new Error("Cleaner unavailable");
                 }
-                // Ordinary live configuration is proxy-absent. Configured
-                // qualification remains a separate public image exchange test;
+                // This private viewer defers proxying even on a configured
+                // site. Unsafe URLs and declared known-HTTPS rules remain;
                 // no signing service or key reaches this worker.
                 if (result.kind !== "ok") throw new Unsupported();
                 return result.fragment.html;

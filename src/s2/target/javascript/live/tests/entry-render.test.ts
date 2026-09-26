@@ -20,20 +20,24 @@ import {Renderer} from "../render/child";
 import {verifyRuntime} from "../render/manifest";
 import {validateArtifact} from "../render/artifact";
 import {loadResourceTimes} from "../render/resources";
-import {approveSnapshot} from "../policy/cohort";
+import {approveSnapshot as approveRawSnapshot} from "../policy/cohort";
 import {Unsupported} from "../policy/content";
 import {createComparisonRecentService} from "../policy/comparison";
-import type {RenderInput} from "../render/types";
+import type {RenderInput, RenderPage} from "../render/types";
 import type {RawJournalSnapshot} from "../contracts";
-import {snapshot, config, limits, now} from "./fixtures";
+import {snapshot, selectFixture, config, capabilities, limits, now} from "./fixtures";
 
+const approveSnapshot = (data: RawJournalSnapshot) =>
+    approveRawSnapshot(selectFixture(data, data.request.page), config, capabilities);
+const recentPage: RenderPage = {kind: "recent", pageSkip: 0, itemshow: 20, maxScrollback: 100, hasPrevious: false};
 const {JSDOM} = require(resolve(__dirname, "../../../../../../content/node_modules/jsdom"));
 const path = process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice5-stock.json";
 const runtime = verifyRuntime(path);
 const artifact = validateArtifact(JSON.parse(readFileSync(path, "utf8")));
-const input = (body: string): RenderInput => {
+const input = (body: string, page: RenderPage = {kind: "entry", ditemid: 384}): RenderInput => {
     const data = snapshot();
-    return {page: {kind: "entry", ditemid: 384}, journal: approveSnapshot({...data, entries: [
+    return {page, journal: approveSnapshot({...data, request: {...data.request, page: page.kind === "entry" ? page :
+        {kind: "recent", skip: 0, itemshow: 20}}, entries: [
         {...data.entries[0]!, subjectText: "Selected café 😀", eventText: body},
         {...data.entries[1]!, subjectText: "OTHER_PUBLIC_SUBJECT", eventText: "OTHER_PUBLIC_BODY"},
     ]}), config, skip: 0, skipPresent: false, nowSeconds: now,
@@ -62,7 +66,7 @@ test("one actual child prepares full selected body and independent inert OG meta
             assert.ok(html.includes('LJ_cmtinfo'));
             assert.ok(!html.includes('OTHER_PUBLIC_SUBJECT') && !html.includes('OTHER_PUBLIC_BODY'));
         } finally {dom.window.close();}
-        const recent = await child.render({...input(raw), page: {kind: "recent"}});
+        const recent = await child.render(input(raw, recentPage));
         assert.ok(!recent.includes('CUT_BODY'));
         assert.ok(recent.includes('OTHER_PUBLIC_SUBJECT'));
         assert.ok(recent.includes('cut-wrapper'));
@@ -75,8 +79,8 @@ test("Entry and Recent body URLs use the canonical journal base while metadata s
         '<a href="../archive">archive</a><img src="pic.png">' +
         '<a href="#local">local</a></p>';
     try {
-        for (const page of [{kind: "entry", ditemid: 384}, {kind: "recent"}] as const) {
-            const dom = new JSDOM(await child.render({...input(raw), page}));
+        for (const page of [{kind: "entry", ditemid: 384}, recentPage] as const) {
+            const dom = new JSDOM(await child.render(input(raw, page)));
             try {
                 const document = dom.window.document;
                 const body = document.querySelector('.entry-content .origin-probe');
@@ -111,7 +115,7 @@ test("body or metadata refusal sends no partial page and next actual child reque
             assert.ok(recovered.includes('<p>RECOVERED</p>'));
         }
         // The metadata-only mention limitation must not narrow html_raw0 Recent.
-        assert.ok((await child.render({...input('Hello @person'), page: {kind: "recent"}})).includes('Hello @person'));
+        assert.ok((await child.render(input('Hello @person', recentPage))).includes('Hello @person'));
         const safe = await child.render(input('<p>&lt;/meta&gt;&lt;script&gt;OG_INERT&lt;/script&gt;</p>'));
         const dom = new JSDOM(safe);
         try {
@@ -140,9 +144,11 @@ test("positive typed spamreport count refuses entry before render and leaves act
     const data = snapshot();
     const withBan = {...data, features: {...data.features, spamreportBans: 1}};
     let secrets = 0, rechecks = 0;
-    const service = await createComparisonRecentService({config, limits, artifact: {path},
-        repository: {async loadRawSnapshot() {return withBan;},
-            async revalidateFingerprint(loaded) {rechecks++; assert.equal(loaded, withBan); return true;},
+    let loadedSnapshot: RawJournalSnapshot | null = null;
+    const service = await createComparisonRecentService({config, capabilities, limits, artifact: {path},
+        repository: {async loadRawSnapshot(request) {
+                loadedSnapshot = {...selectFixture(withBan, request.page), request}; return loadedSnapshot;},
+            async revalidateFingerprint(loaded) {rechecks++; assert.equal(loaded, loadedSnapshot); return true;},
             async close() {}},
         secretSource: {async loadLatestSecret() {secrets++; return {stime: now,
             secret: Buffer.from("0123456789abcdefghijklmnopqrstuv")};}},
@@ -166,16 +172,18 @@ test("selected nonrecent entry mutation during actual child render blocks releas
     const baseline: RawJournalSnapshot = {...data, entries: Array.from({length: 80}, (_, i) => ({...data.entries[0]!,
         jitemid: i + 1, revttime: data.entries[0]!.revttime + i, subjectText: `Public ${i + 1}`}))};
     const target = 80 * 256 + data.entries[0]!.anum;
-    assert.ok(!approveSnapshot(baseline).entries.slice(0, 20).some(entry => entry.id === target));
+    assert.ok(!approveSnapshot(baseline).entries.some(entry => entry.id === target));
     // Real child and service; repository generations are injected. Actual DB
     // status mutations and HTTP checks are separate acceptance evidence.
     for (const change of ["security", "anum", "cohort", "talk2", "replycount", "spamreport"] as const) {
         let current = baseline;
         let mutated = false, rechecks = 0, secrets = 0;
-        const service = await createComparisonRecentService({config, limits, artifact: {path},
+        const service = await createComparisonRecentService({config, capabilities, limits, artifact: {path},
             repository: {
-                async loadRawSnapshot() {
-                    const loaded = structuredClone(current);
+                async loadRawSnapshot(request) {
+                    const selected = selectFixture(current, request.page);
+                    if (selected.entries.length === 0) return null;
+                    const loaded = structuredClone({...selected, request});
                     if (!mutated) setImmediate(() => {
                         if (change === "cohort") current = {...current, owner: {...current.owner, statusvis: "S"}};
                         else if (change === "talk2") current = {...current, features: {...current.features, comments: 1}};
@@ -190,8 +198,8 @@ test("selected nonrecent entry mutation during actual child render blocks releas
                 async revalidateFingerprint(loaded) {
                     rechecks++;
                     assert.equal(mutated, true);
-                    assert.equal(loaded.entries.length, 80);
-                    return JSON.stringify(loaded) === JSON.stringify(current);
+                    assert.equal(loaded.entries.length, 1);
+                    return JSON.stringify(loaded) === JSON.stringify({...selectFixture(current, loaded.request.page), request: loaded.request});
                 },
                 async close() {},
             },
@@ -209,4 +217,35 @@ test("selected nonrecent entry mutation during actual child render blocks releas
             assert.equal(secrets, 1, change);
         } finally {await service.close();}
     }
+});
+
+test("configured journal base governs child body URLs without exposing private startup facts", async () => {
+    const child = renderer();
+    const raw = '<p class="configured-origin"><a href="notes">notes</a>' +
+        '<a href="../archive">archive</a><img src="pic.png"><a href="#local">local</a></p>';
+    const pages: readonly RenderPage[] = [{kind: "entry", ditemid: 384}, recentPage];
+    try {
+        for (const baseUrl of ["https://ordinary.example.test", "https://app.example.test/users/_real"]) {
+            for (const page of pages) {
+                const original = input(raw, page);
+                const username = baseUrl.includes("_real") ? "_real" : "ordinary";
+                const html = await child.render({...original, journal: {...original.journal, username, baseUrl}});
+                const dom = new JSDOM(html);
+                try {
+                    const body = dom.window.document.querySelector('.entry-content .configured-origin');
+                    assert.ok(body);
+                    const documentUrl: string = baseUrl + (page.kind === "entry" ? "/384.html" : "/");
+                    assert.deepEqual([...body.querySelectorAll('a')].map((node: Element) => node.getAttribute('href')),
+                        [new URL("notes", documentUrl).href, new URL("../archive", documentUrl).href, "#local"]);
+                    assert.equal(body.querySelector('img').getAttribute('src'), new URL("pic.png", documentUrl).href);
+                    if (page.kind === "entry") {
+                        const description = dom.window.document.querySelector('meta[property="og:description"]').content;
+                        assert.ok(description.includes('href="notes"') && !description.includes(baseUrl));
+                    }
+                    for (const forbidden of ["moveInProgressMask", "clusterPairActive", "saltFilePath", "password"])
+                        assert.ok(!body.innerHTML.includes(forbidden));
+                } finally {dom.window.close();}
+            }
+        }
+    } finally {await child.close();}
 });
