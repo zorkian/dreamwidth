@@ -37,10 +37,11 @@ use JSON::PP;
 
     package SyntheticEntry;
     our @ISA = ('LJ::Entry');
-    sub prop        { $_[0]{props}{ $_[1] } }
-    sub props       { $_[0]{props} }
-    sub url         { 'http://app.invalid/~synthetic/10759.html' }
-    sub reply_count { exists $_[0]{replycount} ? $_[0]{replycount} : 5 }
+    sub prop         { $_[0]{props}{ $_[1] } }
+    sub props        { $_[0]{props} }
+    sub url          { 'http://app.invalid/~synthetic/10759.html' }
+    sub logtime_unix { $_[0]{logtime_unix} }
+    sub reply_count  { exists $_[0]{replycount} ? $_[0]{replycount} : 5 }
 }
 {
 
@@ -66,6 +67,48 @@ if ( @ARGV == 1 && $ARGV[0] eq '--threshold' ) {
             };
     }
     print JSON::PP->new->canonical->utf8->encode( \@rows );
+    exit;
+}
+if ( @ARGV == 1 && $ARGV[0] eq '--presentation' ) {
+    no warnings 'redefine';
+    open my $fh, '<', "$ENV{LJHOME}/cgi-bin/LJ/S2/EntryPage.pm" or die $!;
+    my $source = do { local $/; <$fh> };
+    close $fh;
+    my ($expression) = $source =~
+        /(my \$seconds_since_entry = \$com->\{'datepost_unix'\} - \$entry->logtime_unix;)/;
+    die 'comment time source missing' unless $expression;
+    $expression =~ s/^my //;
+    my $seconds_since_entry;
+    my $com   = { datepost_unix => 4000 };
+    my $entry = bless { logtime_unix => 2500, eventtime_unix => 1000 }, 'SyntheticEntry';
+    eval $expression;
+    die $@ if $@;
+    my $ctx = [];
+    $ctx->[S2::PROPS] = {
+        text_comment_hide   => 'Hide 1 comment // Hide # comments',
+        text_comment_unhide => 'Show 1 comment // Show # comments'
+    };
+    local *S2::run_function = sub { $_[2] == 1 ? 0 : 1 };    # fixed English plural mapping
+    my @captions;
+
+    for my $count ( 1, 2 ) {
+        my $comment = {
+            talkid            => 384,
+            showable_children => $count,
+            expand_url        => 'http://app.invalid/~synthetic/384.html?thread=384#cmt384'
+        };
+        for my $kind ( 'hide', 'unhide' ) {
+            my $html = '';
+            local $S2::pout = sub { $html .= $_[0] };
+            if ( $kind eq 'hide' ) {
+                S2::Builtin::LJ::Comment__print_hide_link( $ctx, $comment, {} );
+            }
+            else { S2::Builtin::LJ::Comment__print_unhide_link( $ctx, $comment, {} ) }
+            push @captions, { kind => $kind, count => $count, html => $html };
+        }
+    }
+    print JSON::PP->new->canonical->utf8->encode(
+        { seconds_since_entry => $seconds_since_entry, captions => \@captions } );
     exit;
 }
 my %users = (
