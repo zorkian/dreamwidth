@@ -79,7 +79,7 @@ from `src/s2/target/javascript` inside the owning container:
 
 ```sh
 ./node_modules/.bin/tsc
-node dist/live/tests/privacy-db.js
+S2_SITE_CONFIG=/path/to/private/site-config.json node dist/live/tests/privacy-db.js
 ```
 
 Run sequentially, with no other mutations of the marked journal. This uses the
@@ -88,9 +88,11 @@ socket. An offline Perl driver changes only the marked owner's visibility,
 activation status, reply/adult/analytics/custom-content settings and style
 selection through normal `update_self` / `set_prop` helpers between requests.
 It does not invoke account deletion/cancellation hooks, alter style records or
-change entries. Each case must revoke the original fingerprint, return the exact
-fixed HTTP 422 refusal without HTML or cookies, then restore the full raw
-fingerprint and HTTP 200. Unsupported custom content is never reflected.
+change entries. Each case must revoke the original fingerprint and then restore the full raw
+fingerprint and HTTP 200. Unsupported settings return the exact fixed HTTP 422
+refusal without HTML or cookies. Legacy or missing style selection uses the
+exported DEFAULT_STYLE: the default core1 remains unsupported, while qualified
+core2/core2base defaults return HTTP 200. Unsupported custom content is never reflected.
 
 The driver records the primary baseline and mutation intent in the ignored,
 mode-0600 `artifacts/live/privacy-state.json` before changing anything. Existing
@@ -99,11 +101,12 @@ restores the baseline and removes this state only after fingerprint verification
 If interrupted, use the same scoped recovery path:
 
 ```sh
-node dist/live/tests/privacy-db.js --recover
+S2_SITE_CONFIG=/path/to/private/site-config.json node dist/live/tests/privacy-db.js --recover
 ```
 
-Recovery verifies the marked identity, restores only recorded test fields and
-checks the saved complete primary fingerprint before closing its state. If an
+Use the same private config for recovery. Recovery verifies the marked identity,
+restores only recorded test fields and checks the saved request-specific primary
+fingerprint using its original calendar boundary before closing its state. If an
 unrelated change prevents verification, the recovery state is retained for
 inspection; never reset the database or clear it to bypass the check. No Perl
 driver runs in the product request path. Entry mutations, pagination, crossjournal

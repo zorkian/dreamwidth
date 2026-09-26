@@ -76,8 +76,13 @@ if ($action eq '--begin') {
         && ($baseline{s2_style} // '') =~ /^[1-9][0-9]*$/
         && !defined $baseline{customtext_content} && !defined $baseline{ga4_analytics}
         && (!defined $baseline{adult_content} || $baseline{adult_content} eq 'none');
+    my $calendar = $primary->{calendarNow};
+    die "Missing primary calendar boundary\n" unless ref $calendar eq 'HASH'
+        && ($calendar->{year} // '') =~ /^\d{1,4}$/ && $calendar->{year} >= 1
+        && ($calendar->{month} // '') =~ /^\d{1,2}$/ && $calendar->{month} >= 1
+        && $calendar->{month} <= 12;
     $save->({userid => 0 + $u->userid, baseline => \%baseline,
-        fingerprint => $primary->{fingerprint}, active => undef});
+        fingerprint => $primary->{fingerprint}, calendarNow => $calendar, active => undef});
     print "Marked privacy baseline recorded\n";
     exit 0;
 }

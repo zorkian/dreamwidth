@@ -17,10 +17,12 @@ import {execFileSync} from "node:child_process";
 import {readFileSync} from "node:fs";
 import {get, type IncomingHttpHeaders} from "node:http";
 import {resolve} from "node:path";
-import type {PublicAppConfig, AnonymousRecentService} from "../contracts";
+import type {AnonymousRecentService} from "../contracts";
 import {MysqlLiveStore} from "../data/mysql";
 import {createAnonymousRecentService} from "../policy/service";
 import {createLiveApp} from "../server/app";
+import {readStartupConfig} from "../server/startup-config";
+import {recentRequest, regressionConfig, regressionConfigPath} from "../../tools/regression-config";
 
 const cases = ["suspended", "deleted", "locked", "unvalidated", "reply_setting",
     "adult_setting", "custom_blob", "analytics", "legacy_style", "missing_style"] as const;
@@ -33,10 +35,10 @@ function helper(args: readonly string[], input?: string): void {
     });
 }
 interface Response {status: number; body: string; headers: IncomingHttpHeaders;}
-function request(port: number, target = "/users/s2js_slice3/", method: "GET" | "HEAD" = "GET"): Promise<Response> {
+function request(port: number, host: string, target = "/users/s2js_slice3/", method: "GET" | "HEAD" = "GET"): Promise<Response> {
     return new Promise((resolveResponse, reject) => {
         const req = get({hostname: "127.0.0.1", port, path: target, method,
-            headers: {Host: "localhost:8081"}}, response => {
+            headers: {Host: host}}, response => {
             const parts: Buffer[] = [];
             response.on("data", part => parts.push(part));
             response.on("error", reject);
@@ -60,31 +62,47 @@ function accepted(response: Response, head = false): void {
 async function main(): Promise<void> {
     assert.ok(process.argv.length === 2 || (process.argv.length === 3 &&
         ["--recover", "--entry"].includes(process.argv[2]!)));
-    const entryMode = process.argv[2] === "--entry";
-    const config = JSON.parse(readFileSync("artifacts/live/public-config.json", "utf8")) as PublicAppConfig;
-    const store = await MysqlLiveStore.open(JSON.parse(readFileSync("artifacts/live/mysql-readonly.json", "utf8")));
+    const mode = process.argv[2];
+    const project = resolve(".");
+    const startup = readStartupConfig(regressionConfigPath(project));
+    const resolved = await regressionConfig(project);
+    const entryMode = mode === "--entry";
+    const store = await MysqlLiveStore.open(resolved.credential);
+    const rawRequest = recentRequest("s2js_slice3");
     let service: AnonymousRecentService | undefined;
     let app: ReturnType<typeof createLiveApp> | undefined;
     let begun = false;
     let baseline: Awaited<ReturnType<typeof store.loadRawSnapshot>> = null;
     try {
-        if (process.argv[2] === "--recover") {
+        if (mode === "--recover") {
             helper(["--restore"]);
-            const saved = JSON.parse(readFileSync("artifacts/live/privacy-state.json", "utf8")) as {fingerprint: string};
-            const restored = await store.loadRawSnapshot("s2js_slice3");
+            const saved = JSON.parse(readFileSync("artifacts/live/privacy-state.json", "utf8")) as {
+                fingerprint: string; calendarNow: {year: number; month: number}};
+            assert.ok(Number.isSafeInteger(saved.calendarNow?.year) && saved.calendarNow.year >= 1 &&
+                saved.calendarNow.year <= 9999 && Number.isSafeInteger(saved.calendarNow.month) &&
+                saved.calendarNow.month >= 1 && saved.calendarNow.month <= 12, "Saved calendar boundary required");
+            const restored = await store.loadRawSnapshot({...rawRequest, calendarNow: saved.calendarNow});
             assert.equal(restored?.fingerprint, saved.fingerprint, "Recovery exact primary fingerprint");
             helper(["--finish"]);
             console.log("real privacy recovery: exact baseline " + saved.fingerprint);
             return;
         }
-        baseline = await store.loadRawSnapshot("s2js_slice3");
+        baseline = await store.loadRawSnapshot(rawRequest);
         assert.ok(baseline, "Seeded marked owner required");
         const selected = baseline.entries.find(entry => entry.security === "public");
         if (entryMode) assert.ok(selected, "Public entry required");
         const target = entryMode ? `/users/s2js_slice3/${selected!.jitemid * 256 + selected!.anum}.html` :
             "/users/s2js_slice3/";
+        // Native non-S2/missing-style dispatch uses configured DEFAULT_STYLE.
+        // The default dev core1 is unsupported; a qualified stock core2 default
+        // is supported without changing the journal's persisted properties.
+        const supportedDefault = startup.styles.defaultStyle.core === "core2" &&
+            startup.styles.defaultStyle.layout === "core2base/layout";
+        const config = resolved.public;
+        const host = new URL(config.listenOrigin).host;
         service = await createAnonymousRecentService({repository: store, secretSource: store,
-            artifact: {path: resolve(process.env.S2_LIVE_TEST_ARTIFACT || "artifacts/live/stock.json")}, config,
+            capabilities: startup.capabilities,
+            artifact: {path: resolve(process.env.S2_LIVE_TEST_ARTIFACT || startup.artifactPath)}, config,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128}});
         app = createLiveApp(config, service);
         // Ephemeral loopback socket avoids colliding with an ordinary listener;
@@ -94,11 +112,12 @@ async function main(): Promise<void> {
         assert.ok(address && typeof address !== "string");
         const methods: readonly ("GET" | "HEAD")[] = entryMode ? ["GET", "HEAD"] : ["GET"];
         const checkAccepted = async (): Promise<void> => {
-            for (const method of methods) accepted(await request(address.port, target, method), method === "HEAD");
+            for (const method of methods) accepted(await request(address.port, host, target, method), method === "HEAD");
         };
         await checkAccepted();
         const owner = baseline.owner;
         const primary = JSON.stringify({userid: owner.userid, fingerprint: baseline.fingerprint,
+            calendarNow: baseline.request.calendarNow,
             fields: {status: owner.status, statusvis: owner.statusvis,
             opt_whocanreply: owner.optWhocanReply,
             ...Object.fromEntries(["adult_content", "customtext_content", "ga4_analytics", "stylesys", "s2_style"]
@@ -111,8 +130,12 @@ async function main(): Promise<void> {
                 helper(["--case", name]);
                 assert.equal(await store.revalidateFingerprint(baseline), false, name + " revokes baseline");
                 for (const method of methods) {
-                    const response = await request(address.port, target, method);
+                    const response = await request(address.port, host, target, method);
                     const label = name + ":" + method;
+                    if (supportedDefault && (name === "legacy_style" || name === "missing_style")) {
+                        accepted(response, method === "HEAD");
+                        continue;
+                    }
                     assert.equal(response.status, 422, label);
                     assert.equal(response.body, method === "HEAD" ? "" : "Unsupported journal state\n", label);
                     assert.equal(response.headers["content-type"], "text/plain; charset=utf-8", label);
@@ -127,7 +150,7 @@ async function main(): Promise<void> {
             }
             assert.equal(await store.revalidateFingerprint(baseline), true, name + " restores exact raw baseline");
             await checkAccepted();
-            console.log("real HTTP privacy refusal and restoration: " + (entryMode ? "entry:" : "") + name);
+            console.log("real HTTP policy decision and restoration: " + (entryMode ? "entry:" : "") + name);
         }
         // Emulate an interrupted test between mutation and the next HTTP call;
         // invoke the same explicit recovery command documented for operators.
