@@ -97,7 +97,7 @@ export function selectFixture(
     const reordered: RawEntry[] = [];
     for (let start = 0; start < window.length;) {
         let end = start + 1;
-        while (end < window.length && window[end]!.eventtime.slice(0, 16) === window[start]!.eventtime.slice(0, 16)) end++;
+        while (end < window.length && window[end]!.eventtime === window[start]!.eventtime) end++;
         reordered.push(...window.slice(start, end).sort((a, b) => b.jitemid - a.jitemid));
         start = end;
     }
