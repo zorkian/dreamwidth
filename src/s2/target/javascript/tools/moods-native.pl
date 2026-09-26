@@ -37,6 +37,7 @@ local $LJ::PROXY_URL='';
 for my $case (
  ['tiepositive','0.03125,1.0',''],['tienegative','-0.03125,-1.0',''],
  ['signed', '12.34567,-45.67891',''],['hemisphere','12.34567 S,45.67891 E',''],
+ ['signed-final-lf', "1.0,2.0\n",''],['hemisphere-final-lf',"1.0N,2.0E\n",'Text'],
  ['hemispherezero','0.0 S,0.0 W',''],['hemispherezeromixed','0.0 N,0.0 W',''],
  ['zero','0.0,0.0',''],['negzero','-0.0,-0.0',''],
  ['roundednegzero','-0.00001,1.0',''],['roundedposzero','0.00001,-1.0',''],

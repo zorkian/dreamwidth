@@ -98,7 +98,7 @@ S2_SELECTED_FIXTURE=1 S2_LIVE_TEST_ARTIFACT="$S11_RUN/stock.json" \
 ```
 
 The compact native probe uses actual retained helpers with synthetic reader rows,
-a write tripwire and no actual database access. Its 29 cases include inherited,
+a write tripwire and no actual database access. Its 31 cases include inherited,
 missing/false themes, cleaned-empty custom fallback, invalid/relative icons,
 coordinate failure/key presence, decimal/negative zero and exact positive/negative
 ties. A one-second temporary native alarm demonstrates the unbounded cycle; it is
