@@ -23,6 +23,14 @@ export interface ApprovedUserpic {
     readonly keyword: string | null;
 }
 
+export interface ApprovedTag {
+    readonly id: number;
+    readonly name: string;
+}
+export interface ApprovedTagDetail extends ApprovedTag {
+    readonly count: number;
+}
+
 export interface ApprovedEntry {
     readonly id: number;
     readonly subject: string;
@@ -34,6 +42,7 @@ export interface ApprovedEntry {
     readonly month: number;
     readonly day: number;
     readonly commentsEnabled: boolean;
+    readonly tags: readonly ApprovedTag[];
     readonly userpic: ApprovedUserpic | null;
 }
 export interface ApprovedLink {
@@ -61,6 +70,7 @@ export interface ApprovedJournal {
     readonly websiteUrl: string;
     readonly websiteName: string;
     readonly links: readonly ApprovedLink[];
+    readonly sidebarTags: readonly ApprovedTagDetail[];
 }
 export interface ApprovedCalendar {
     readonly year: number;
