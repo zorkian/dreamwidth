@@ -21,6 +21,17 @@ export interface LegacyText {
     readonly text: string;
 }
 
+export function decodeLegacyBytes(storedHex: unknown, recoveredHex: unknown,
+    roundtripHex: unknown, maxStoredBytes: number, maxOriginalBytes: number):
+    {storedBytes: Buffer; originalBytes: Buffer} {
+    const storedBytes = hexBytes(storedHex, maxStoredBytes);
+    const originalBytes = hexBytes(recoveredHex, maxOriginalBytes);
+    if (!storedBytes.equals(hexBytes(roundtripHex, maxStoredBytes))) {
+        throw new SnapshotError("unsupported");
+    }
+    return {storedBytes, originalBytes};
+}
+
 function hexBytes(hex: unknown, maxBytes: number): Buffer {
     if (typeof hex !== "string" || hex.length % 2 !== 0 ||
         hex.length > maxBytes * 2 || !/^[0-9A-F]*$/i.test(hex)) {
@@ -41,12 +52,8 @@ export function decodeLegacyText(
     maxDecodedBytes: number,
     mayBeGzip: boolean,
 ): LegacyText {
-    const storedBytes = hexBytes(storedHex, maxStoredBytes);
-    const originalBytes = hexBytes(recoveredHex, maxStoredBytes);
-    const roundtripBytes = hexBytes(roundtripHex, maxStoredBytes);
-    if (!storedBytes.equals(roundtripBytes)) {
-        throw new SnapshotError("unsupported");
-    }
+    const {storedBytes, originalBytes} = decodeLegacyBytes(
+        storedHex, recoveredHex, roundtripHex, maxStoredBytes, maxStoredBytes);
     let decodedBytes = originalBytes;
     if (mayBeGzip && originalBytes.length >= 2 &&
         originalBytes[0] === 0x1f && originalBytes[1] === 0x8b) {

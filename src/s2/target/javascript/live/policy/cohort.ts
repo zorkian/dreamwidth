@@ -29,6 +29,7 @@ import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 
 import {moodSelection} from "../domain/moods";
 import {locationCurrent} from "../domain/location";
+import {approveCrosspostUrls,opaqueCrosspostBytes} from "../domain/crossposts";
 
 import {UserpicSelection} from "../domain/userpics";
 
@@ -267,6 +268,13 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         bytes += Buffer.byteLength(entry.subjectText) + Buffer.byteLength(entry.eventText);
         if (bytes > 2097152) throw new Unsupported();
         const props = entry.props;
+        if (entry.xpostOpaque) {
+            if(entry.xpostOpaque.encoding!=="opaque-bytes")throw new Unsupported();
+            opaqueCrosspostBytes(entry.xpostOpaque.base64);
+        }
+        if(entry.xpostDetail && entry.xpostDetail.encoding!=="storable-network-2.11")throw new Unsupported();
+        const crosspostUrls=entry.xpostDetail ? approveCrosspostUrls(entry.xpostDetail.base64,
+            `${journalBase(u.user,config)}/${entry.jitemid*256+entry.anum}.html`) : undefined;
         const allowed = new Set(["editor", "opt_preformatted", "opt_backdated", "opt_nocomments",
             "opt_nocomments_maintainer", "revnum", "revtime", "interface", "useragent",
             "opt_noemail", "opt_screening", "statusvis", "picture_mapid", "picture_keyword",
@@ -304,7 +312,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         entries.push({
             id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
             subject: plainSubject(entry.subjectText), currents,
-            moodName:numericMood?.name, moodIcon:numericMood?.icon, rawBody: rawBody(entry.eventText),
+            moodName:numericMood?.name, moodIcon:numericMood?.icon, crosspostUrls, rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             userpic: pictures.forEntry(props),

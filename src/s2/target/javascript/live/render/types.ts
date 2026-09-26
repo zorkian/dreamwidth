@@ -35,6 +35,7 @@ export interface ApprovedEntry {
     readonly id: number;
     readonly subject: string;
     readonly moodName?: string; // numeric fallback after child custom-mood preparation
+    readonly crosspostUrls?: readonly string[]; // approved URL data; never source HTML/binary
     readonly moodIcon?: {readonly url:string; readonly width:number; readonly height:number};
     readonly currents?: Readonly<Record<string,string>>; // RAW textual currents, child-only preparation
     readonly rawBody: string; // tainted; only child cleaner may prepare entry text

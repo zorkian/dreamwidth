@@ -97,7 +97,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
                 VALUES (900001,44,?,?)`,[row.type,row.s2lid]);
         }
         const [logDefinitions] = await admin.query<mysql.RowDataPacket[]>(`SELECT propid,name FROM ${table(g,"logproplist")}
-            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location')`);
+            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location','xpost','xpostdetail')`);
         const logProp = (name:string) => Number(logDefinitions.find(row => row.name===name)!.propid);
         const insertEntry = async (schema:string,journal:number,id:number,security:string,eventTime:string,
             event:string|Buffer) => {
