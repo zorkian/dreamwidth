@@ -81,7 +81,7 @@ function bundle(input: RenderInput, prefix: string, files: readonly string[]): s
         if (!Number.isSafeInteger(time) || time! <= 0) throw new Error("Missing resource metadata");
         return time!;
     }));
-    const urlPrefix = prefix === "stc" ? input.config.statPrefix : input.config.siteRoot + "/js";
+    const urlPrefix = prefix === "stc" ? input.config.statPrefix : input.config.jsPrefix;
     return `${urlPrefix}/??${files.join(",")}?v=${max}`;
 }
 export function resourceHead(input: RenderInput, base: string): string {
@@ -90,7 +90,7 @@ export function resourceHead(input: RenderInput, base: string): string {
     // PERL_PERTURB_KEYS=0 oracle. Values are live source-derived public fields;
     // another Perl hash seed can serialize these same fields in another order.
     const site = {
-        cmax_comment: 16000, statprefix: c.statPrefix, user_domain: "",
+        cmax_comment: 16000, statprefix: c.statPrefix, user_domain: c.userDomain,
         currentJournal: input.journal.username, iconprefix: c.userpicRoot, ctx_popup: 1,
         imgprefix: c.imgPrefix, esn_async: 1, ctx_popup_userhead: 1, ctx_popup_icons: 1,
         media_embed_enabled: 1, inbox_update_poll: 1, siteroot: c.siteRoot,
