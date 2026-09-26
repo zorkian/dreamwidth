@@ -72,7 +72,12 @@ test('approved tree never exposes hidden source, identity, unknown or private ta
 
 import {Renderer} from '../render/child';
 import {verifyRuntime} from '../render/manifest';
-import {validateArtifact} from '../render/artifact';
+import {validateArtifact,instantiate} from '../render/artifact';
+import {prepareComments} from '../render/comment-model';
+import {callbacks} from '../render/builtins';
+import {object} from '../render/objects';
+import {spawnSync} from 'node:child_process';
+import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {approveSnapshot} from '../policy/cohort';
 import {loadResourceTimes} from '../render/resources';
@@ -185,4 +190,31 @@ test('edge-depth1000 projects and crosses actual IPC;1001 refuses before recursi
     assert.throws(()=>run(1,5,true,true));
     assert.throws(()=>approveSnapshot({...data,entries:[{...data.entries[0]!,replycount:1}]},cfg,capabilities));
     assert.equal(approveSnapshot(data,cfg,capabilities).entries[0]!.commentsAtMax,false);
+});
+
+test('native logtime-relative seconds and one/two-child plural captions',()=>{
+    const root=path.resolve(__dirname,'../../../../../../..');
+    const native=spawnSync('perl',[path.join(root,'src/s2/target/javascript/tools/native-comments.pl'),'--presentation'],
+        {cwd:root,env:{...process.env,LJHOME:root},timeout:10000,maxBuffer:524288,encoding:'utf8'});
+    assert.equal(native.status,0,native.stderr);
+    const expected=JSON.parse(native.stdout) as {seconds_since_entry:number;captions:{kind:string;count:number;html:string}[]};
+    const data=snapshot({kind:'entry',ditemid:384});
+    const journal=approveSnapshot({...data,comments:{headers:[{...header(1),datepost:'1970-01-01 01:06:40'}],authors:[],
+        texts:[{jtalkid:1,subject:'Public',body:'Public',props:{}}]}},cfg,caps);
+    // Model-only time tuple: native datepost4000/logtime2500/eventtime1000.
+    const input:RenderInput={page:{kind:'entry',ditemid:384},journal:{...journal,
+        entries:journal.entries.map(e=>({...e,eventtime:'1970-01-01 00:16:40',logtime:'1970-01-01 00:41:40'}))},
+        config:cfg,skip:0,skipPresent:false,nowSeconds:now,formChallenge:'public',uniq:'AAAAAAAAAAAAAAA',resourceTimes:loadResourceTimes()};
+    const artifact=validateArtifact(JSON.parse(readFileSync(process.env.S2_LIVE_TEST_ARTIFACT||'/tmp/slice14-stock.json','utf8')));
+    let printed='';const funcs=callbacks({},{});
+    const ctx=new Context(instantiate(artifact),text=>{printed+=text;},{},funcs);
+    const content:RenderContentPreparation={body:()=>'',comment:()=>'',subject:e=>({html:e.subject,recentHtml:e.subject,all:e.subject}) as import('@dreamwidth/content/contracts').SubjectPreparation,metadata:()=>({kind:'inert-entry-metadata',subjectText:'',eventText:''})};
+    const comment=prepareComments(input,ctx,content,object('UserLite'),journal.baseUrl+'/384.html').comments[0]!;
+    assert.equal(comment.seconds_since_entry,expected.seconds_since_entry);
+    comment.expand_url='http://app.invalid/~synthetic/384.html?thread=384#cmt384';
+    for(const row of expected.captions) {
+        comment.showable_children=row.count;printed='';
+        funcs['_Comment__print_'+row.kind+'_link']!(ctx,comment,{});
+        assert.equal(/>([^<]*)<\/a>/.exec(printed)![1],/>([^<]*)<\/a>/.exec(row.html)![1],row.kind+row.count);
+    }
 });

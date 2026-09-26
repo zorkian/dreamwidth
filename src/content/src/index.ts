@@ -225,7 +225,7 @@ function commentStyle(value:string):string {
 
 // CleanHTML::clean_comment deny-mode allow/eat policy, after bounded URL/CSS
 // preparation and before the unchanged final DOMPurify boundary.
-function commentTransform(root:Element,anonymous:boolean):void {
+function commentTransform(root:Element,anonymous:boolean,links:ReadonlyMap<Element,string>):void {
     const allow=new Set(('table tr td th tbody tfoot thead colgroup caption col a sub sup xmp bdo q span '+
         'b i u tt s strike big small font abbr acronym cite code dfn em kbd samp strong var del ins '+
         'h1 h2 h3 h4 h5 h6 div blockquote address pre center ul ol li dl dt dd area map form textarea '+
@@ -239,9 +239,9 @@ function commentTransform(root:Element,anonymous:boolean):void {
         if(!element.classList.contains('ljimgplaceholder'))element.removeAttribute('class');
         if(anonymous)element.removeAttribute('style');
         if(anonymous&&element.localName==='a'&&!element.classList.contains('ljimgplaceholder')) {
-            const href=element.getAttribute('href');
+            const href=links.get(element)??'';
             const bold=root.ownerDocument.createElement('b');bold.append(...element.childNodes);
-            element.replaceWith(bold,...(href?[root.ownerDocument.createTextNode(' ('+href+')')]:[]));
+            element.replaceWith(bold,root.ownerDocument.createTextNode(' ('+href+')'));
         }
     }
 }
@@ -337,10 +337,16 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 if(comment)for(const element of root.querySelectorAll("[class]"))element.removeAttribute("class");
                 if(comment?.anonymous)for(const element of root.querySelectorAll("[style]"))element.removeAttribute("style");
+                // Anonymous extraction displays the screened original scalar,
+                // not the document-resolved navigation URL. Keep missing href
+                // distinct from absent extraction: native still prints ().
+                const commentLinks=new Map<Element,string>();
+                if(comment?.anonymous)for(const anchor of root.querySelectorAll('a'))
+                    commentLinks.set(anchor,(retainedAttributeValue(anchor.getAttribute('href')??'')??'').trim());
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
                 transform(root, input, bounds, images, ids, node => dom!.nodeLocation(node) ?? null,!!comment);
                 restoreNewlines();
-                if(comment)commentTransform(root,comment.anonymous);
+                if(comment)commentTransform(root,comment.anonymous,commentLinks);
                 images.finish();
                 if (images.requests.length && !resolutions) {
                     return {kind: "image-resolution-required", images: {inputSha256: hash, requests: images.requests}};

@@ -59,7 +59,7 @@ export function prepareComments(input:RenderInput,ctx:Context,content:RenderCont
             screened:Number(node.state==='S'),screened_noshow:Number(node.state==='S'),frozen:Number(node.state==='F'),
             deleted:Number(node.state==='D'),fromsuspended:Number(node.suspended),link_keyseq:['delete_comment','screen_comment','freeze_thread','watch_thread','unwatch_thread','watching_parent'],
             anchor:`cmt${id}`,dom_id:`cmt${id}`,comment_posted:0,edited:0,time_remote:nullObject('DateTime'),time_poster:timePoster,
-            seconds_since_entry:Math.floor(Date.parse(node.datepost.replace(' ','T')+'Z')/1000)-Math.floor(Date.parse(input.journal.entries[0]!.eventtime.replace(' ','T')+'Z')/1000),
+            seconds_since_entry:Math.floor(Date.parse(node.datepost.replace(' ','T')+'Z')/1000)-Math.floor(Date.parse(input.journal.entries[0]!.logtime.replace(' ','T')+'Z')/1000),
             edittime_remote:nullObject('DateTime'),edittime_poster:nullObject('DateTime'),edit_url:'',timeformat24:0,
             showable_children:node.showableChildren,hide_children:0,hidden_child:0,echi:'',admin_post:Number(!!node.props.admin_post&&node.props.admin_post!=='0'),
             metadata:node.props.imported_from&&node.props.imported_from!=='0'?{imported_from:escapeHtml(node.props.imported_from)}:{},

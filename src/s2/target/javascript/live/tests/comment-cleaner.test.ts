@@ -38,6 +38,9 @@ const cases:readonly {body:string;formatting:CommentContentInput['formatting'];a
     {body:'<font>Gone</font><table><tr><td>Gone</td></tr></table>Kept',formatting:'html_raw0',anonymous:true},
     {body:'<b style="color:red;position:relative">Text</b>',formatting:'html_raw0',anonymous:false},
     {body:'<b style="color:red;margin:5px;height:10px">Text</b>',formatting:'html_raw0',anonymous:false},
+    {body:'<a href="  /rel  ">Relative</a>',formatting:'html_raw0',anonymous:true},
+    {body:'<a>Missing</a>',formatting:'html_raw0',anonymous:true},
+    {body:'<a href="javascript:bad()">Screened</a>',formatting:'html_raw0',anonymous:true},
 ];
 
 test('comment context retains native trust, breaks, strong CSS and anonymous extraction',()=>{
