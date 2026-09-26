@@ -29,8 +29,6 @@ export class UserRecord implements RawUser {
     readonly defaultpicid!: number;
     readonly dversion!: number;
     readonly caps!: string;
-    readonly hasBio!: string;
-    readonly bio!: string | null;
     readonly publicSettings!: PublicSettings;
 
     constructor(data: RawUser) {
