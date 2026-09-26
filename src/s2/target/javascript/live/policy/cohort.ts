@@ -24,6 +24,7 @@ import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
+import {readPropertyLayer} from "../domain/property-layer";
 import {approveTags} from "../domain/tags";
 import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 
@@ -202,11 +203,9 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         !["N", "Y"].includes(u.optForceMoodtheme) || !integer(u.moodthemeid) ||
         !Number.isSafeInteger(u.userid) || u.userid <= 0) throw new Unsupported();
     const empty = ["adult_content_reason", "sticky_entry", "icbm",
-        "google_analytics", "ga4_analytics", "renamedto", "customtext_content",
-        "customtext_url"] as const;
+        "google_analytics", "ga4_analytics", "renamedto"] as const;
     if (empty.some(key => p[key] !== null && p[key] !== "") ||
         ![null, "", "none"].includes(p.adult_content) ||
-        ![null, "", "Custom Text"].includes(p.customtext_title) ||
         ![null, "", "N", "Y"].includes(p.opt_blockrobots) ||
         ![null, "", "dark", "light"].includes(p.control_strip_color) ||
         ![null, "", "off", "off:dark", "dark"].includes(p.show_control_strip) ||
@@ -226,7 +225,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         if (p[key] !== null && p[key] !== "") throw new Unsupported();
     }
     const style = snapshot.style;
-    if (!style || style.layers.length !== 2 || !integer(style.modtime) ||
+    if (!style || ![2,3].includes(style.layers.length) || !integer(style.modtime) ||
         (style.origin === "persisted" ? (style.ownerid !== u.userid ||
             !/^0*2$/.test(p.stylesys ?? "") || !/^[0-9]+$/.test(p.s2_style ?? "") ||
             Number(p.s2_style) !== style.styleid || !integer(style.styleid, 1)) :
@@ -240,6 +239,28 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
     }
+    const userLayer=style.layers.find(layer=>layer.type==='user');
+    let customtextProperties;
+    if(userLayer) {
+        const layout=style.layers.find(layer=>layer.type==='layout')!;
+        if(style.layers.length!==3 || userLayer.ownerid!==u.userid || userLayer.ownerUsername!==u.user ||
+            userLayer.nativeType!=='user' || userLayer.parentId!==layout.s2lid ||
+            !integer(userLayer.compiledTime)||!userLayer.propertyCompiled)throw new Unsupported();
+        customtextProperties=readPropertyLayer(userLayer.propertyCompiled,userLayer.s2lid);
+    } else if(style.layers.length!==2)throw new Unsupported();
+    const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
+    for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {
+        if(value && value!=='0') {
+            if(String(value).includes('"'))throw new Unsupported();
+            const raw=String(value);
+            for(const entity of raw.match(/&(?:#[^;]*;|[A-Za-z][A-Za-z0-9]*;)/g)??[]) {
+                if(!['&amp;','&quot;','&lt;','&gt;','&#39;'].includes(entity))throw new Unsupported();
+            }
+            navigationUrl(raw.replace(/&(?:amp|quot|lt|gt|#39);/g,entity=>
+                ({'&amp;':'&','&quot;':'"','&lt;':'<','&gt;':'>','&#39;':"'"})[entity]!));
+        }
+    }
+    for(const value of Object.values(customtextStored))if(value!==null&&Buffer.byteLength(value)>65536)throw new Unsupported();
     if (["comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
         snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
             poster.userid !== u.userid || poster.user !== u.user || poster.clusterid !== u.clusterid ||
@@ -340,6 +361,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
         websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
-        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar,
+        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, customtextProperties,customtextStored,
     };
 }

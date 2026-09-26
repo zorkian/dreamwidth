@@ -31,7 +31,7 @@ import { prepare } from "./prepare";
 import { head, hostData } from "./host";
 import type { Artifact, RenderContentPreparation, RenderInput } from "./types";
 
-function escapeProperties(ctx: Context, layers: StockLayer[]): void {
+function escapeProperties(ctx: Context, layers: StockLayer[], content:RenderContentPreparation): void {
     function escape(value: unknown, mode: string): unknown {
         if (Array.isArray(value)) return value.map(item => escape(item, mode));
         if (value && typeof value === "object") {
@@ -40,6 +40,7 @@ function escapeProperties(ctx: Context, layers: StockLayer[]): void {
         if (typeof value !== "string") return value;
         // Stock non-plain HTML/CSS properties are empty. Refuse any expansion
         // of that domain rather than silently substitute a different cleaner.
+        if (mode === "html" && content.customtext) return content.customtext(value);
         if (mode !== "plain" && value) throw new Error("Unsupported stock property cleaner");
         return value.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\n", "<br />");
     }
@@ -51,7 +52,22 @@ function escapeProperties(ctx: Context, layers: StockLayer[]): void {
 
 export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: number,
     content: RenderContentPreparation): string {
+    const finalized=new Set<string>();
+    const cleaned=new Set<string>();
+    const originalContent=content;
+    content={...originalContent,...(originalContent.customtext?{customtext(source:string) {
+        const value=originalContent.customtext!(source);cleaned.add(value);return value;
+    }}:{})};
     const layers = instantiate(artifact);
+    if(input.journal.customtextProperties) {
+        const data=new StockLayer();
+        for(const [name,value] of Object.entries(input.journal.customtextProperties)) {
+            const metadata=layers.map(layer=>layer.metadata.get('_'+name)).find(Boolean);
+            if(!metadata||typeof value!==(metadata.type==='string'?'string':'number'))throw new Error('Invalid property type');
+            data.setProperty('_'+name,value);
+        }
+        layers.push(data);
+    }
     let printing = false;
     let html = "";
     let bytes = 0;
@@ -68,7 +84,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         SITEROOT: c.siteRoot, PALIMGROOT: c.palImgRoot, SITENAME: c.siteName,
         SITENAMESHORT: c.siteNameShort, SITENAMEABBREV: c.siteNameAbbrev,
         IMGDIR: c.imgPrefix, STYLES_IMGDIR: c.imgPrefix + "/styles", STATDIR: c.statPrefix,
-    }, callbacks(page, host), text => cleanTrustedSafeChunk(text, {
+    }, callbacks(page, host), text => finalized.has(text)?text:cleanTrustedSafeChunk(text, {
         href: String(page._stylesheet_url), decision: 1,
     }));
     // The pinned core2 stack has no core1 renamed properties. Group overrides
@@ -82,19 +98,34 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     // empty containers from live source defaults, then execute the unchanged
     // function which decides placement and order itself.
     const sections: Record<string, unknown[]> = Object.create(null);
+    const section=():unknown[]=>new Proxy([], {set(target,key,value) {
+        if(typeof key==='string'&&/^-?[0-9]+$/.test(key)) {
+            let index=Number(key);
+            if(!Number.isSafeInteger(index)||Math.abs(index)>10000)throw new Error('Module index limit');
+            if(index<0)index+=target.length;
+            if(index<0)throw new Error('Non-creatable module index');
+            return Reflect.set(target,String(index),value);
+        }
+        return Reflect.set(target,key,value);
+    }});
     for (const [key, value] of Object.entries(ctx.prop)) {
-        if (/^_module_.*_section$/.test(key) && typeof value === "string") sections[value] = [];
+        if (/^_module_.*_section$/.test(key) && typeof value === "string") sections[value] ??= section();
     }
-    for (const value of (ctx.prop._module_layout_sections ?? []) as string[]) sections[value] ??= [];
+    for (const value of (ctx.prop._module_layout_sections ?? []) as string[]) sections[value] ??= section();
     ctx.prop._module_sections = sections;
     ctx.runFunction("modules_init()");
     for (const values of Object.values(sections)) {
         for (let i = 0; i < values.length; i++) values[i] ??= [];
     }
-    escapeProperties(ctx, layers);
+    escapeProperties(ctx, layers,content);
     // Preserve accessor aliases on the Page, because both generated S2 and
     // source-derived host helpers update/read the same underlying fields.
-    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepare(input, ctx, content)));
+    const prepared=prepare(input, ctx, content);
+    const customtextHtml=prepared._customtext_content;
+    // Only a completed child-cleaner result is registered. Later Page mutations
+    // cannot redefine membership, and other safe chunks retain the stock filter.
+    if(typeof customtextHtml==='string'&&cleaned.has(customtextHtml))finalized.add(customtextHtml);
+    Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepared));
     Object.assign(host, hostData(input, page, ctx.prop._reg_firstdayofweek === "monday"));
     let metadata: ReturnType<RenderContentPreparation["metadata"]> | undefined;
     if (input.page.kind === "entry") {

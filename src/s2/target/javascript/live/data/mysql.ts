@@ -20,6 +20,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {gunzipSync} from "node:zlib";
 import { createHash } from "node:crypto";
 import { sql } from "kysely";
 import { PrimaryDatabases, type ReadConnection, type SqlRow } from "./primary";
@@ -335,7 +336,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const style = await this.loadStyle(connection, owner, plan, raw);
             return {facts, style, raw};
         });
-        const selected = await this.databases.snapshot(clusterId, CLUSTER_TABLES, async connection => {
+        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...CLUSTER_TABLES,"s2compiled2"] : CLUSTER_TABLES, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
@@ -352,7 +353,27 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const userpics = await this.loadUserpics(connection, ownerId, number(before.facts.owner.dversion), raw);
             const links = await this.loadLinks(connection, ownerId, raw);
             const tags = await this.loadTags(connection,ownerId,loaded.entries.map(entry=>entry.jitemid),raw);
-            return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, raw};
+            const userLayer = before.style?.layers.find(layer=>layer.type==='user');
+            let compiled: {text:string;time:number}|null=null;
+            if(userLayer) {
+                // Only a selected owner user layer adds this engine dependency.
+                const rows=(await sql<Row>`SELECT comptime,
+                    CASE WHEN OCTET_LENGTH(compdata)<=65536 THEN HEX(compdata) ELSE NULL END AS code_hex
+                    FROM s2compiled2 WHERE userid=${ownerId} AND s2lid=${userLayer.s2lid} LIMIT 2`.execute(connection)).rows;
+                if(rows.length!==1)unsupported();
+                const hex=requiredString(rows[0]!.code_hex);
+                if(!/^(?:[A-F0-9]{2})*$/.test(hex)||hex.length>131072)unsupported();
+                const original=Buffer.from(hex,'hex');
+                let decoded=original;
+                try {if(original[0]===31&&original[1]===139)decoded=gunzipSync(original,{maxOutputLength:65537});}
+                catch {unsupported();}
+                if(decoded.length>65536)unsupported();
+                let text:string;
+                try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(decoded);}catch{unsupported();}
+                raw.push(['userlayer:'+userLayer.s2lid,hex,decoded.toString('hex').toUpperCase()]);
+                compiled={text:text!,time:number(rows[0]!.comptime)};
+            }
+            return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, compiled, raw};
         });
         if (!selected) return null;
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
@@ -367,13 +388,15 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
             return {owner, style, posters, moods, raw};
         });
+        const effectiveStyle = after.style && selected.compiled ? {...after.style,layers:after.style.layers.map(layer=>
+            layer.type==='user'?{...layer,compiledTime:selected.compiled!.time,propertyCompiled:selected.compiled!.text}:layer)} : after.style;
         const rawFields = [...after.raw, ...selected.raw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities, after.moods];
         return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
-            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
-            fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
+            style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
+            fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
@@ -426,7 +449,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         if (layerIds.length > 8 || new Set(layerIds.map(layer => layer.type)).size !== layerIds.length) unsupported();
         const ids = [...new Set(layerIds.map(layer => layer.s2lid))];
         const definitions = (await sql<Row>`SELECT source.s2lid,source.userid AS ownerid,
-            layer_owner.user AS owner_username, compiled.comptime AS compiled_time,
+            layer_owner.user AS owner_username, source.b2lid AS parent_id,
+            (SELECT value FROM s2info WHERE s2lid=source.s2lid AND infokey='type') AS native_type,
+            compiled.comptime AS compiled_time,
             SHA2(text.s2code,256) AS source_hash
             FROM s2layers source
             LEFT JOIN user layer_owner ON layer_owner.userid = source.userid
@@ -445,7 +470,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 const definition = byId.get(layer.s2lid)!;
                 return {type: layer.type, s2lid: layer.s2lid, ownerid: number(definition.ownerid, 1),
                     ownerUsername: requiredString(definition.owner_username),
-                    compiledTime: number(definition.compiled_time),
+                    compiledTime: layer.type === "user" ? 0 : number(definition.compiled_time),
+                    ...(layer.type === "user" ? {parentId:number(definition.parent_id),
+                        nativeType:requiredString(definition.native_type)} : {}),
                     sourceHash: requiredString(definition.source_hash).toLowerCase()};
             })};
     }
