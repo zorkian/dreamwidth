@@ -29,15 +29,16 @@ export interface SelectedFixture {
     readonly other: string;
     readonly table: (schema: string,name: string) => string;
     readonly request: (username?: string,page?: RawPageRequest["page"]) => RawPageRequest;
+    readonly talkProp:(name:string)=>number;
     readonly logProp: (name: string) => number;
     readonly prop: (name: string) => number;
     readonly startup: LiveStoreConfig;
 }
 
 const globalTables = ["user","useridmap","userprop","userproplist","s2styles","s2layers",
-    "s2compiled","s2source_inno","s2info","logproplist","sysban","secrets","moods","moodthemes","moodthemedata"];
+    "s2compiled","s2source_inno","s2info","logproplist","talkproplist","sysban","secrets","moods","moodthemes","moodthemedata"];
 const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","s2compiled2","log2","logtext2","logprop2",
-    "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","userpicmap2","userpicmap3","talk2"];
+    "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","userpicmap2","userpicmap3","talk2","talktext2","talkprop2"];
 
 export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>): Promise<void> {
     assert.equal(process.env.LJHOME,"/workspaces/dreamwidth");
@@ -61,7 +62,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
             }
         }
         const g = schemas[0]!, c = schemas[1]!, other = schemas[2]!;
-        for (const name of ["userproplist","logproplist"]) {
+        for (const name of ["userproplist","logproplist","talkproplist"]) {
             await admin.query(`INSERT INTO ${table(g,name)} SELECT * FROM \`dw_global\`.\`${name}\``);
         }
         const [layers] = await admin.query<mysql.RowDataPacket[]>(
@@ -85,7 +86,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
         await admin.query(`INSERT INTO ${table(g,"s2compiled")} (s2lid,comptime)
             SELECT s2lid,comptime FROM dw_global.s2compiled WHERE s2lid IN (${ids})`);
         const [defs] = await admin.query<mysql.RowDataPacket[]>(`SELECT upropid,name FROM ${table(g,"userproplist")}
-            WHERE name IN ('stylesys','s2_style','journaltitle')`);
+            WHERE name IN ('stylesys','s2_style','journaltitle','timezone')`);
         const prop = (name:string) => Number(defs.find(row => row.name===name)!.upropid);
         await admin.query(`INSERT INTO ${table(g,"s2styles")} (styleid,userid,name,modtime)
             VALUES (44,900001,'Ordinary style without a fixture name',1)`);
@@ -97,7 +98,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
                 VALUES (900001,44,?,?)`,[row.type,row.s2lid]);
         }
         const [logDefinitions] = await admin.query<mysql.RowDataPacket[]>(`SELECT propid,name FROM ${table(g,"logproplist")}
-            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location','xpost','xpostdetail')`);
+            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location','xpost','xpostdetail','opt_nocomments','opt_nocomments_maintainer')`);
         const logProp = (name:string) => Number(logDefinitions.find(row => row.name===name)!.propid);
         const insertEntry = async (schema:string,journal:number,id:number,security:string,eventTime:string,
             event:string|Buffer) => {
@@ -124,17 +125,21 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
         await insertEntry(other,900002,300,"public","2026-12-01 00:00:00","Foreign same ID");
         const source = (id:string,database:string,roles:Record<string,number>={}) => ({
             id,database,roles,host:null,port:null,socketPath:"/var/run/mysqld/mysqld.sock",user:"root",password:""});
+        const [talkDefs]=await admin.query<mysql.RowDataPacket[]>(`SELECT tpropid,name FROM ${table(g,"talkproplist")}`);
+        const talkProp=(name:string):number=>{const row=talkDefs.find(row=>row.name===name);assert.ok(row);return Number(row.tpropid);};
         const startup: LiveStoreConfig = {database:{defaultDatabase:"livejournal",
             sources:[source("master",g),source("arbitrarySeven",c,{cluster7:3}),
                 source("arbitraryActive",other,{cluster19b:1}),source("inactive",c,{cluster19a:100})],
             clusters:[7,19],clusterPairActive:{"19":"b"}},styles:{defaultStyle:{core:"core2",layout:"core2base/layout"},
-                layerRemap:{}},maxScrollback:100,capabilities};
+                layerRemap:{}},commentSettings:{pageSize:25,threadPoint:50,maxSubjects:200},maxScrollback:100,capabilities:{...capabilities,threadExpander:{defaultValue:1,byBit:[],hookConfigured:false},
+                threadExpandAll:{defaultValue:1,byBit:[],hookConfigured:false},
+                maxComments:{defaultValue:5000,byBit:[],hookConfigured:false}}};
         store = await MysqlLiveStore.open(startup);
         const request = (username="ordinary6",page:RawPageRequest["page"]={kind:"recent",skip:0,itemshow:20}):RawPageRequest =>
             ({username,calendarNow:{year:2026,month:9},page});
         await admin.query(`INSERT INTO ${table(g,"secrets")} (stime,secret) VALUES (?,?)`,
             [Math.floor(Date.now()/3600000)*3600,"A".repeat(32)]);
-        await run({store,admin,g,c,other,table,request,logProp,prop,startup});
+        await run({store,admin,g,c,other,table,request,logProp,talkProp,prop,startup});
     } finally {
         await store?.close();
         for (const schema of created.reverse()) await admin.query(`DROP DATABASE \`${schema}\``);

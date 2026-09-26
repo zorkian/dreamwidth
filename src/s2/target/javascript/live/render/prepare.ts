@@ -27,6 +27,7 @@
 import type { Context } from "../../runtime/s2runtime";
 import type { RenderContentPreparation, RenderInput, ApprovedEntry, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
+import {prepareComments} from "./comment-model";
 import { escapeHtml } from "./builtins";
 
 function customtext(input:RenderInput,ctx:Context,content:RenderContentPreparation):Record<string,string> {
@@ -59,17 +60,18 @@ export function prepareEntryTags(tags: readonly ApprovedTag[],base:string): S2Ob
         Buffer.compare(Buffer.from(String(a.name)),Buffer.from(String(b.name))));
 }
 
-export function prepareUserpic(input: RenderInput, picture: ApprovedUserpic | null, ctx?: Context): S2Object {
+export function prepareUserpic(input: RenderInput, picture: ApprovedUserpic | null, ctx?: Context, owner={username:input.journal.username,userid:input.journal.userid},comment=false): S2Object {
     if (!picture || ctx?.prop._userpics_position === "none") return nullObject("Image");
-    const {journal,config} = input;
+    const {config} = input;
+    const journal=owner;
     const keyword = picture.keyword;
     const description = picture.description !== "0" ? picture.description : "";
     const alt = journal.username + ":" + (description ? " " + description : "") +
         (keyword !== null ? " (" + keyword + ")" : " (Default)");
     const title = journal.username + ":" + (keyword !== null ? " " + keyword : " (Default)") +
         (description ? " (" + description + ")" : "");
-    const factor = ctx?.prop._entry_userpic_style === "small" ? 0.75 :
-        ctx?.prop._entry_userpic_style === "smaller" ? 0.5 : 1;
+    const style=ctx?.prop[comment?"_comment_userpic_style":"_entry_userpic_style"];
+    const factor = style === "small" ? 0.75 : style === "smaller" ? 0.5 : 1;
     return object("Image",{url:`${config.userpicRoot}/${picture.picid}/${journal.userid}`,
         width:picture.width*factor,height:picture.height*factor,
         alttext:escapeHtml(alt),extra:{title:escapeHtml(title)}});
@@ -95,11 +97,11 @@ export function prepare(input: RenderInput, ctx: Context,
         const url = `${base}/${e.id}.html`;
         const newday = lastday !== e.eventtime.slice(0, 10);
         lastday = e.eventtime.slice(0, 10);
-        const comments = object("CommentInfo", {count: 0, read_url: url, post_url: url + "?mode=reply",
-            permalink_url: url, enabled: Number(e.commentsEnabled), maxcomments: 0,
-            screened: 0, screened_count: 0, show_readlink: 0,
+        const comments = object("CommentInfo", {count: e.commentsEnabled?(e.replycount??0):0, read_url: url, post_url: url + "?mode=reply",
+            permalink_url: url, enabled: Number(e.commentsEnabled), maxcomments: Number(e.commentsAtMax??false),
+            screened: 0, screened_count: 0, show_readlink: e.commentsEnabled?(e.replycount??0):0,
             show_readlink_hidden: Number(e.commentsEnabled), show_postlink: Number(e.commentsEnabled),
-            comments_disabled_maintainer: 0});
+            comments_disabled_maintainer: Number(e.commentsDisabledMaintainer??false)});
         return object("Entry", {...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url,
@@ -178,11 +180,11 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
     const e = selected[0]!;
     const url = `${base}/${e.id}.html`;
     const enabled = Number(e.commentsEnabled);
-    const comments = object("CommentInfo", {count: 0, read_url: url,
+    const comments = object("CommentInfo", {count: e.commentsEnabled?(e.replycount??0):0, read_url: url,
         post_url: url + "?mode=reply", permalink_url: url, enabled,
-        maxcomments: 0, screened: 0, screened_count: 0,
-        show_readlink: 0, show_readlink_hidden: enabled, show_postlink: enabled,
-        comments_disabled_maintainer: 0});
+        maxcomments: Number(e.commentsAtMax??false), screened: 0, screened_count: 0,
+        show_readlink: e.commentsEnabled?(e.replycount??0):0, show_readlink_hidden: enabled, show_postlink: enabled,
+        comments_disabled_maintainer: Number(e.commentsDisabledMaintainer??false)});
     const entry = object("Entry", {
         ...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
         time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
@@ -192,12 +194,13 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",
             "watch_comments", "unwatch_comments"],
     });
-    const commentPages = object("ItemRange", {
+    const preparedComments=prepareComments(input,ctx,content,user,url);
+    const commentPages = preparedComments.pages??object("ItemRange", {
         all_subitems_displayed: 1, current: 1, from_subitem: 0,
         num_subitems_displayed: 0, to_subitem: 0, total: 1, total_subitems: 0,
         url_all: "",
     });
-    const commentNav = object("CommentNav", {view_mode: "threaded", url,
+    const commentNav = preparedComments.nav??object("CommentNav", {view_mode: "threaded", url,
         current_page: 1, show_expand_all: 0});
     const views = {
         recent: c.canonicalAppOrigin + "/", userinfo: base + "/profile",
@@ -217,7 +220,7 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         show_control_strip: Number(j.showControlStrip), head_content: "", is_canary: 0,
         data_link: {}, data_links_order: [], timeformat24: 0, include_meta_viewport: 1,
         session_msgs: [], has_activeentries: 0, activeentries: [], entry,
-        comments: [], comment_pages: commentPages, comment_nav: commentNav,
-        multiform_on: 0, viewing_thread: 0, _viewing_thread_id: 0,
+        comments: preparedComments.comments, comment_pages: commentPages, comment_nav: commentNav,
+        multiform_on: 0, viewing_thread: Number(!!input.page.comments?.thread), _viewing_thread_id: input.page.comments?.thread??0,
     });
 }
