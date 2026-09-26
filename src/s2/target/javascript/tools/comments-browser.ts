@@ -17,7 +17,7 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function commentsBrowser(html:string,port:number):Promise<void> {
+export async function commentsBrowser(html:string,port:number,fixtureImages:ReadonlyMap<string,Buffer>=new Map()):Promise<void> {
     const output=process.env.S2_COMMENTS_BROWSER_OUTPUT;
     if(!output) return;
     const appOrigin="http://localhost:8080";
@@ -33,6 +33,18 @@ export async function commentsBrowser(html:string,port:number):Promise<void> {
     const urls=[...html.matchAll(/<(?:link|script|img)\b[^>]*(?:href|src)=["']([^"']+)["']/g)]
         .filter(match=>!match[0].startsWith("<link") || /rel=["'](?:stylesheet|shortcut icon|icon|apple-touch-icon)["']/.test(match[0]))
         .map(match=>new URL(match[1]!.replaceAll("&amp;","&"),pageUrl));
+    assert.ok(fixtureImages.size<=1,"Only the declared fixture picture");
+    const imageUrls=new Set([...html.matchAll(/<img\b[^>]*src=["']([^"']+)["']/g)]
+        .map(match=>new URL(match[1]!.replaceAll("&amp;","&"),pageUrl).href));
+    for(const [url,body] of fixtureImages) {
+        const parsed=new URL(url);
+        assert.ok(parsed.href===url&&!parsed.username&&!parsed.password&&
+            [new URL(pageUrl).origin,appOrigin].includes(parsed.origin)&&imageUrls.has(url),
+            "Fixture picture must match an exact emitted configured URL");
+        assert.ok(body.length<=2048&&body.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),
+            "Declared inert fixture PNG");
+        assets.set(url,{body,type:"image/png",source:"declared inert fixture picture; no native binary route parity"});
+    }
     const queue=urls.filter(url=>!assets.has(url.href));
     const siteMatch=/Site = Object\.assign\(Site, (\{[^\n]*\})\);/.exec(html);
     assert.ok(siteMatch,'Unique emitted stock Site configuration');
@@ -91,6 +103,20 @@ export async function commentsBrowser(html:string,port:number):Promise<void> {
                 const page=await context.newPage();page.on('pageerror',(error:Error)=>failures.push(error.message));
                 assert.equal((await page.goto(pageUrl,{waitUntil:'networkidle'})).status(),200);
                 assert.equal(await page.locator('#qrform').count(),0);
+                if(fixtureImages.size) {
+                    const badge=page.locator('#cmt257 span.ljuser').first();
+                    assert.ok((await badge.evaluate((node:Element)=>getComputedStyle(node).textDecorationLine)).includes('line-through'));
+                    const icon=badge.locator('img').first();
+                    assert.ok((await icon.getAttribute('src')).endsWith('/silk/identity/user_staff.png'));
+                    assert.equal(await icon.getAttribute('width'),'17');assert.equal(await icon.getAttribute('height'),'17');
+                    for(const url of fixtureImages.keys()) {
+                        const dimensions=await page.locator('img').evaluateAll((images:HTMLImageElement[],source:string)=>{
+                            const image=images.find(node=>node.src===source);
+                            return image?[image.getAttribute('width'),image.getAttribute('height')]:null;
+                        },url);
+                        assert.deepEqual(dimensions,['40','30']);
+                    }
+                }
                 assert.ok(!(await page.locator('body').innerText()).includes('Public body 4'));
                 if(javaScriptEnabled) {
                     await page.locator('#cmt1025 a[onclick*="Expander.make"]').first().click();
@@ -128,6 +154,8 @@ export async function commentsBrowser(html:string,port:number):Promise<void> {
         }
         writeFileSync(path.join(output,'browser-report.json'),JSON.stringify({pageUrl,pageSource:'actual-isolated-fixture-HTTP',
             engine:browser.version(),stylesheetMapping:{fixture:expectedStyle[0],retained:retainedStyle[0]},
+            fixtureImages:[...fixtureImages].map(([url,body])=>({url,bytes:body.length,
+                sha256:createHash('sha256').update(body).digest('hex'),adaptation:'inert PNG; layout and URL selection only'})),
             htmlSha256:createHash('sha256').update(html).digest('hex'),reports,
             assets:[...assets].map(([url,asset])=>({url,source:asset.source,sha256:createHash('sha256').update(asset.body).digest('hex')})),
             requested:[...requested]},null,2)+'\n');

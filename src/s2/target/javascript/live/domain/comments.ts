@@ -117,6 +117,34 @@ export function commentCapability(cap:import('../startup-types').SourceCapabilit
     return !!commentCapabilityValue(cap,caps);
 }
 
+/** Source badge presentation, independent of journal-owner admission. */
+export function authorBadge(author:import('../contracts').RawCommentAuthor,config:PublicAppConfig,
+    caps:import('../startup-types').SourceCapabilities):{badgeKind:"personal"|"staff";badgeDeleted:boolean} {
+    if(config.headIconHookConfigured!==false)throw new SnapshotError('unsupported');
+    let readonly=false;
+    // Native visible/memorial/locked/read-only labels short-circuit get_cap.
+    if(!['V','M','L','O'].includes(author.statusvis)) {
+        const clusters=caps.authorReadonlyClusters;
+        if(!clusters||clusters.length>4096)throw new SnapshotError('unsupported');
+        const seen=new Set<number>();
+        for(const row of clusters) {
+            if(!Number.isSafeInteger(row.clusterId)||row.clusterId<0||seen.has(row.clusterId)||
+                typeof row.forced!=='boolean'||!['off','on','when-needed'].includes(row.advisory))
+                throw new SnapshotError('unsupported');
+            seen.add(row.clusterId);
+        }
+        const cluster=clusters.find(row=>row.clusterId===author.clusterid);
+        const override=!!cluster&&(cluster.forced||(cluster.advisory!=='off'&&
+            !commentCapability(caps.authorAvoidReadonly,author.caps)));
+        if(override) {
+            if(cluster!.advisory==='when-needed')throw new SnapshotError('unsupported');
+            readonly=true;
+        } else readonly=commentCapability(caps.authorReadonly,author.caps);
+    }
+    return {badgeKind:commentCapability(caps.authorStaffHeadicon,author.caps)?'staff':'personal',
+        badgeDeleted:!['V','M','L','O'].includes(author.statusvis)&&!readonly};
+}
+
 export const PUBLIC_COMMENT_PROPS=['editor','opt_preformatted','unknown8bit','import_source','imported_from',
     'edit_time','edit_reason','subjecticon','admin_post','picture_mapid','picture_keyword'] as const;
 
@@ -163,13 +191,16 @@ export function approveComments(snapshot:import('../contracts').RawJournalSnapsh
         } else if(visible&&required.has(h.jtalkid))fail();
         if(!visible&&texts.has(h.jtalkid))fail();
         if(visible&&author) {
-            if(author.journaltype!=='P'||author.status!=='A'||author.statusvis!=='V'||
+            if(author.journaltype!=='P'||! /^[A-Z]$/.test(author.status)||!['V','D','X','L','M','O'].includes(author.statusvis)||
                 !/^[a-z0-9_]{1,25}$/.test(author.user)||!/^\d+$/.test(author.caps)||
                 BigInt(author.caps)&BigInt(capabilities.moveInProgressMask))fail();
-            const picture=node.full?new UserpicSelection(author.pictures,author.userid,author.defaultpicid,author.dversion).forEntry(text?.props??{}):null;
+            const selectedPicture=node.full&&author.clusterid>0?new UserpicSelection(author.pictures,author.userid,author.defaultpicid,author.dversion).forEntry(text?.props??{}):null;
+            // EntryPage uses the loaded talk picture record, never an absent-row skeleton.
+            const picture=selectedPicture&&author.pictures.pictures.some(row=>row.picid===selectedPicture.picid)?selectedPicture:null;
             if(config.userpicUrlHookConfigured&&picture)fail();
             safeAuthor={userid:author.userid,username:author.user,name:author.name,
-                timezone:author.timezone,journalType:author.journaltype,userpic:picture};
+                timezone:author.timezone,journalType:author.journaltype,userpic:picture,
+                ...authorBadge(author,config,capabilities)};
         }
         const rawBody=visible&&node.full?text?.body:null;
         if(visible&&node.full&&rawBody===null)fail();

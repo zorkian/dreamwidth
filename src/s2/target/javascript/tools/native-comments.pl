@@ -69,6 +69,144 @@ if ( @ARGV == 1 && $ARGV[0] eq '--threshold' ) {
     print JSON::PP->new->canonical->utf8->encode( \@rows );
     exit;
 }
+if ( @ARGV == 1 && $ARGV[0] eq '--authors' ) {
+    no warnings 'redefine';
+    local *LJ::get_db_reader          = sub { die 'DB forbidden' };
+    local *LJ::get_db_writer          = sub { die 'DB forbidden' };
+    local *LJ::get_cluster_def_reader = sub { die 'cluster DB forbidden' };
+
+    local *LJ::User::journal_base = sub { 'https://app.invalid/~' . $_[0]->user };
+    local %LJ::CAP                = ();
+    local %LJ::CAP_DEF            = ( staff_headicon => 0, readonly => 0, avoid_readonly => 0 );
+    local %LJ::READONLY_CLUSTER   = ();
+    local %LJ::READONLY_CLUSTER_ADVISORY = ();
+    local *LJ::get_cluster_master        = sub { die 'dynamic primary forbidden' };
+    my $head     = 0;
+    my $cap_hook = '';
+    local *LJ::Hooks::are_hooks = sub { $_[0] eq 'head_icon' ? $head : $_[0] eq $cap_hook };
+    local *LJ::Hooks::run_hook =
+        sub { $_[0] eq 'head_icon' && $head ? ( 'custom.png', 16 ) : undef };
+    local @LJ::MEMCACHE_SERVERS = ();
+    open my $src, '<', "$ENV{LJHOME}/cgi-bin/LJ/S2/EntryPage.pm" or die $!;
+    my @lines = <$src>;
+    close $src;
+    my $redact = join( '', @lines[ 381 .. 390 ] );
+    die 'source redaction mismatch' unless $redact =~ /is_suspended/ && $redact =~ /fromsuspended/;
+    my @rows;
+
+    for my $case (
+        [ 'validated',     'A', 'V', 1 ],
+        [ 'unvalidated',   'N', 'V', 1 ],
+        [ 'emailV_scalar', 'V', 'V', 1 ],
+        [ 'deleted',       'A', 'D', 1 ],
+        [ 'expunged',      'A', 'X', 0 ],
+        [ 'suspended',     'A', 'S', 1 ],
+        [ 'locked',        'A', 'L', 1 ],
+        [ 'memorial',      'A', 'M', 1 ],
+        [ 'readonly',      'A', 'O', 1 ],
+        [ 'staff', 'A', 'V', 1, 1 ],
+        [ 'deleted_readonly', 'A', 'D', 1, 0, 1 ],
+        [ 'forced',   'A', 'D', 1, 0, 0, 1, 'off' ],
+        [ 'advisory', 'A', 'D', 1, 0, 0, 0, 'on' ],
+        [ 'avoid',       'A', 'D', 1, 0, 0, 0, 'on', 1 ],
+        [ 'when_needed', 'A', 'D', 1, 0, 0, 0, 'when_needed' ],
+        [ 'head_hook',           'A', 'V', 1, 0, 0, 0, 'off', 0, '', 1 ],
+        [ 'staff_hook',          'A', 'V', 1, 0, 0, 0, 'off', 0, 'check_cap_staff_headicon' ],
+        [ 'readonly_hook',       'A', 'D', 1, 0, 0, 0, 'off', 0, 'check_cap_readonly' ],
+        [ 'forced_shortcircuit', 'A', 'D', 1, 0, 0, 1, 'on',  0, 'check_cap_avoid_readonly' ]
+        )
+    {
+        my (
+            $id,     $status,   $vis,   $cluster, $staff, $readonly,
+            $forced, $advisory, $avoid, $hook,    $head_hook
+        ) = @$case;
+        $LJ::CAP_DEF{staff_headicon} = $staff    || 0;
+        $LJ::CAP_DEF{readonly}       = $readonly || 0;
+        $LJ::CAP_DEF{avoid_readonly} = $avoid    || 0;
+        %LJ::READONLY_CLUSTER = ( $cluster => $forced || 0 );
+        %LJ::READONLY_CLUSTER_ADVISORY =
+            ( $cluster => $advisory && $advisory ne 'off' ? $advisory : '' );
+        $head     = $head_hook || 0;
+        $cap_hook = $hook      || '';
+        my $u = bless {
+            userid       => 234,
+            user         => 'author',
+            name         => 'Public <name>',
+            status       => $status,
+            statusvis    => $vis,
+            clusterid    => $cluster,
+            journaltype  => 'P',
+            dversion     => 10,
+            defaultpicid => 77,
+            caps         => 0
+            },
+            'LJ::User';
+        $u->{timezone} = 'UTC' unless $vis eq 'X';
+        my $lite  = LJ::S2::UserLite($u);
+        my $badge = eval { LJ::ljuser( $u, {} ) };
+        my $error = $@;
+        my $tz    = LJ::S2::DateTime_tz( 1700000000, $u );
+        my $row   = {
+            id    => $id,
+            error => $error
+            ? ( $error =~ /dynamic primary forbidden/ ? 'dynamic' : 'unexpected' )
+            : undef,
+            source => {
+                staff    => $staff    || 0,
+                readonly => $readonly || 0,
+                forced   => $forced ? 1 : 0,
+                advisory => $advisory || 'off',
+                avoid    => $avoid || 0,
+                hook     => $hook || '',
+                head     => $head_hook ? 1 : 0
+            },
+            emailStatus => $status,
+            statusvis   => $vis,
+            cluster     => $cluster,
+            lite        => { map { $_ => $lite->{$_} } qw(user username name journal_type) },
+            badge       => $badge,
+            suspended   => $u->is_suspended ? 1 : 0,
+            timezone    => $tz
+        };
+
+        if ( $vis eq 'X' ) {
+            my $info  = $u->get_userpic_info;
+            my $picid = $u->get_picid_from_mapid(123);
+            my %pics;
+            LJ::Talk::load_userpics( \%pics, [ [ $u, $picid ] ] );
+            $row->{pictures} = {
+                info         => $info,
+                picid        => $picid,
+                keywordPicid => $u->get_picid_from_keyword('missing'),
+                loaded       => \%pics
+            };
+            $row->{timezoneProp} = $u->prop('timezone');
+        }
+        my $pu       = $u;
+        my $viewsome = 0;
+        my $s2com    = {
+            full          => 1,
+            poster        => $lite,
+            userpic       => { picid => 77 },
+            subject       => 'Public subject',
+            subject_icon  => { url => 'icon' },
+            text          => 'Public text',
+            screened      => 0,
+            fromsuspended => 0
+        };
+        eval $redact;
+        die $@ if $@;
+        $row->{entryProjection} =
+            { map { $_ => $s2com->{$_} } qw(full subject text fromsuspended) };
+        $row->{entryProjection}{posterPresent}  = defined( $s2com->{poster} )  ? 1 : 0;
+        $row->{entryProjection}{picturePresent} = defined( $s2com->{userpic} ) ? 1 : 0;
+        push @rows, $row;
+    }
+    print JSON::PP->new->canonical->encode( \@rows );
+    exit;
+
+}
+
 if ( @ARGV == 1 && $ARGV[0] eq '--presentation' ) {
     no warnings 'redefine';
     open my $fh, '<', "$ENV{LJHOME}/cgi-bin/LJ/S2/EntryPage.pm" or die $!;

@@ -393,6 +393,7 @@ export interface PublicAppConfig {
     readonly palImgRoot: string;
     readonly userpicRoot: string;
     readonly userpicUrlHookConfigured: boolean;
+    readonly headIconHookConfigured?: boolean; // required only for reached comment-author badges
     readonly tagsEnabled: boolean;
     readonly tagListHookConfigured: boolean;
     readonly siteName: string;
