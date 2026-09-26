@@ -39,6 +39,9 @@ does not authorize links or leave the parent.
 
 The finite decoder accepts network format2.11/header050b, plain root hash,
 account undef or REF followed by plain hash, and scalar `itemid`/`url` fields.
+Older stored network versions are explicitly unsupported; this does not provide
+automatic compatibility with ordinary historical crosspost records. A present
+empty-string `xpostdetail` also refuses, whereas native emits no Xpost key.
 It accepts small/network integers, undef and short/long byte/UTF8 strings.
 Source: [matching Perl5.34.0 Storable.xs](https://github.com/Perl/perl5/blob/v5.34.0/dist/Storable/Storable.xs),
 opcodes168-192, version1010-1025, lengths1072-1155, scalar2531-2561,
