@@ -68,8 +68,9 @@ test("native localhost uses an explicit socket; TCP hosts ignore socket facts", 
             row.socket ? {socketPath} : {host: row.host, port: 1234});
     }
     assert.deepEqual(primaryTransport({host: null, port: 1234, socketPath}), {socketPath});
+    assert.deepEqual(primaryTransport({host: "", port: 1234, socketPath}), {socketPath});
     assert.deepEqual(primaryTransport({host: "db.example", port: null, socketPath}), {host: "db.example"});
-    for (const host of [null, "localhost"]) {
+    for (const host of [null, "", "localhost"]) {
         assert.throws(() => primaryTransport({host, port: 3306, socketPath: null}),
             (error: unknown) => error instanceof SnapshotError && error.kind === "unsupported");
     }
