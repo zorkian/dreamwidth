@@ -56,9 +56,12 @@ test("nonvisible, external authors, unsupported style and feature states fail cl
         {clusterid: 0}, {caps: "9007199254740993"}, {optWhocanReply: "friends"}]) {
         assert.throws(() => approveSnapshot({...data, owner: {...data.owner, ...change}}));
     }
-    for (const key of Object.keys(data.features).filter(key => !["spamreportBans", "userpics", "userkeywords"].includes(key))) assert.throws(() => approveSnapshot({
+    for (const key of Object.keys(data.features).filter(key => !["spamreportBans", "userpics", "userkeywords", "logtags", "logtagsrecent"].includes(key))) assert.throws(() => approveSnapshot({
         ...data, features: {...data.features, [key]: 1},
     }));
+    for (const key of ["logtags", "logtagsrecent"]) assert.doesNotThrow(() => approveSnapshot({
+        ...data,features:{...data.features,[key]:1},
+    })); // Unselected/private association inventory is not a displayed feature.
     assert.equal(approveSnapshot({...data, owner: {...data.owner, defaultpicid: 1}})
         .defaultUserpic?.picid, 1); // Native missing-row default skeleton.
     // This new primary fact gates EntryPage only; preserve Recent admission.

@@ -24,6 +24,7 @@ import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
+import {approveTags} from "../domain/tags";
 import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 
 import {UserpicSelection} from "../domain/userpics";
@@ -235,12 +236,15 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
     }
-    if (["usertags", "logtags", "logtagsrecent", "logkwsum", "comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
+    if (["comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
         snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
             poster.userid !== u.userid || poster.user !== u.user || poster.clusterid !== u.clusterid ||
             poster.statusvis !== "V" || poster.status !== "A")) throw new Unsupported();
-    if (snapshot.features.links !== snapshot.links.length) throw new Unsupported();
+    if (snapshot.features.links !== snapshot.links.length || snapshot.features.usertags!==snapshot.tags.definitions.length ||
+        snapshot.features.logkwsum!==snapshot.tags.summaries.length || snapshot.features.logtags<snapshot.tags.associations.length) throw new Unsupported();
     const headers = selectedHeaders(snapshot, config);
+    if(config.tagListHookConfigured && headers.length)throw new Unsupported();
+    const tags=approveTags(snapshot.tags,headers.map(header=>header.jitemid),config.tagsEnabled);
     const calendar = approveCalendar(snapshot);
     const pictures = new UserpicSelection(snapshot.userpics,u.userid,u.defaultpicid,u.dversion);
     const defaultUserpic = pictures.defaultPicture();
@@ -283,7 +287,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             entry.month !== Number(entry.eventtime.slice(5, 7)) ||
             entry.day !== Number(entry.eventtime.slice(8, 10))) throw new Unsupported();
         entries.push({
-            id: entry.jitemid * 256 + entry.anum,
+            id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
             subject: plainSubject(entry.subjectText), rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
@@ -312,6 +316,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
         websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
-        links: approveLinks(snapshot.links),
+        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar,
     };
 }

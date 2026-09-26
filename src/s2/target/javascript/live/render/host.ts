@@ -43,6 +43,7 @@ import type { RenderContentPreparation, RenderInput } from "./types";
 import { S2Object, object } from "./objects";
 import { escapeHtml } from "./builtins";
 import { resourceBody, resourceHead } from "./resources";
+import {prepareTagDetail} from "./prepare";
 import { calendar } from "./calendar";
 
 // These ports follow the anonymous branches of views/journal/controlstrip.tt,
@@ -231,7 +232,7 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
         owner_user: input.journal.username, owner_userid: input.journal.userid,
         siteroot: c.siteRoot, app_origin: c.canonicalAppOrigin,
         control_strip_html: controlStrip(input), script_tags_html: resourceBody(input),
-        ljuser_html: badge(input), visible_tag_count: 0, user_links: userLinks, quickreply_div: "",
+        ljuser_html: badge(input), visible_tags: input.journal.sidebarTags.map(tag=>prepareTagDetail(tag,input.journal.baseUrl)), user_links: userLinks, quickreply_div: "",
         viewer_sees_control_strip: input.journal.showControlStrip,
         has_quickreply: true, s2quickreply: true, comments_need_access: false,
         memories_enabled: true, tellafriend_enabled: true,

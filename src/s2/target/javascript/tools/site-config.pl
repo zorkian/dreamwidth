@@ -136,6 +136,9 @@ sub export_config {
     my $entry_hook   = LJ::Hooks::are_hooks('check_cap_s2viewentry');
     my $journal_hook = LJ::Hooks::are_hooks('journal_base');
     my $userpic_hook = LJ::Hooks::are_hooks('construct_userpic_url');
+    my $tag_hook = LJ::Hooks::are_hooks('augment_s2_tag_list');
+    my $tags_disabled = $LJ::DISABLED{tags};
+    $tags_disabled = $tags_disabled->() if ref $tags_disabled eq 'CODE';
     fail('Hook discovery attempted a database connection') if $blocked_connections;
     my ( @sources, %pairs, %rules, @bits );
     for my $id ( sort keys %LJ::DBINFO ) {
@@ -225,6 +228,8 @@ sub export_config {
             palImgRoot          => string( $LJ::PALIMGROOT // '' ),
             userpicRoot         => string( $LJ::USERPIC_ROOT // '' ),
             userpicUrlHookConfigured => truth($userpic_hook),
+            tagsEnabled => truth(!$tags_disabled),
+            tagListHookConfigured => truth($tag_hook),
             siteName            => string( $LJ::SITENAME // '' ),
             siteNameShort       => string( $LJ::SITENAMESHORT // '' ),
             siteNameAbbrev      => string( $LJ::SITENAMEABBREV // '' ),

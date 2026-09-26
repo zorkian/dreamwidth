@@ -124,6 +124,13 @@ export interface RawUserpics {
     readonly mappings: readonly RawUserpicMap[];
 }
 
+export interface RawTags {
+    readonly definitions: readonly {readonly kwid: number; readonly parentkwid: number | null;
+        readonly display: boolean; readonly name: string}[];
+    readonly summaries: readonly {readonly kwid: number; readonly security: string; readonly count: number}[];
+    readonly associations: readonly {readonly jitemid: number; readonly kwid: number}[];
+}
+
 export interface RawFeatureCounts {
     // All primary sysban rows with byte-exact what="spamreport" and value equal
     // to the canonical journal username, without status/date filtering. Count only: no ban
@@ -205,6 +212,7 @@ export interface RawJournalSnapshot {
     readonly features: RawFeatureCounts;
     readonly userpics: RawUserpics;
     readonly links: readonly RawLink[];
+    readonly tags: RawTags;
     readonly fingerprint: string;
 }
 
@@ -339,6 +347,8 @@ export interface PublicAppConfig {
     readonly palImgRoot: string;
     readonly userpicRoot: string;
     readonly userpicUrlHookConfigured: boolean;
+    readonly tagsEnabled: boolean;
+    readonly tagListHookConfigured: boolean;
     readonly siteName: string;
     readonly siteNameShort: string;
     readonly siteNameAbbrev: string;

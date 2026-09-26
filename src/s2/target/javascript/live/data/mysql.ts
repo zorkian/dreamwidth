@@ -29,7 +29,7 @@ import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
     RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
-    PlaceholderResolutionSpec, RawUserpics, RawLink,
+    PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags,
 } from "../contracts";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
@@ -143,7 +143,7 @@ function fingerprint(
     mapping: readonly [number, string],
     rawFields: readonly RawField[],
     request: RawPageRequest, selection: RawPageSelection, calendar: RawCalendarSummary,
-    sourceFacts: unknown, userpics: RawUserpics, links: readonly RawLink[],
+    sourceFacts: unknown, userpics: RawUserpics, links: readonly RawLink[], tags: RawTags,
 ): string {
     const userValue = (user: RawUser) => [
         user.userid, user.user, user.clusterid, user.status, user.statusvis,
@@ -160,7 +160,7 @@ function fingerprint(
     ];
     const payload = [
         2, request, selection, calendar, sourceFacts, mapping, userValue(owner), posters.map(userValue), style,
-        entries.length, entries.map(entryValue), features, userpics, links,
+        entries.length, entries.map(entryValue), features, userpics, links, tags,
         [...rawFields].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
     ];
     return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -351,7 +351,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const features = await this.loadFeatures(connection, ownerId, before.facts.spamreportBans);
             const userpics = await this.loadUserpics(connection, ownerId, number(before.facts.owner.dversion), raw);
             const links = await this.loadLinks(connection, ownerId, raw);
-            return {...loaded, selection: window.selection, calendar, features, userpics, links, raw};
+            const tags = await this.loadTags(connection,ownerId,loaded.entries.map(entry=>entry.jitemid),raw);
+            return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, raw};
         });
         if (!selected) return null;
         const after = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
@@ -368,9 +369,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities];
         return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
-            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links,
+            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags,
             fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
-                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links)};
+                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
@@ -553,6 +554,27 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             previous,next, entryStatusCounts: statuses.map((row,index) => ({statusvis: decodedColumn(row, "status",
                 "calendar:status:" + index, raw, 8192, true), count: number(row.count,1)})), otherPosterCount: statuses.reduce((sum,row) => sum+number(row.foreign_count),0)};
     }
+    private async loadTags(connection: Connection, ownerId: number, selected: readonly number[],
+        raw: RawField[]): Promise<RawTags> {
+        const rows=(await sql<Row>`SELECT t.kwid,t.parentkwid,t.display,
+            HEX(k.keyword) AS name_stored,HEX(CONVERT(k.keyword USING latin1)) AS name_original,
+            HEX(CONVERT(CONVERT(k.keyword USING latin1) USING utf8mb4)) AS name_roundtrip
+            FROM usertags t LEFT JOIN userkeywords k ON k.userid=t.journalid AND k.kwid=t.kwid
+            WHERE t.journalid=${ownerId} ORDER BY t.kwid LIMIT 10001`.execute(connection)).rows;
+        const sums=(await sql<Row>`SELECT kwid,CAST(security AS CHAR) AS security,entryct
+            FROM logkwsum WHERE journalid=${ownerId} ORDER BY kwid,security LIMIT 10001`.execute(connection)).rows;
+        const tuples=selected.length?(await sql<Row>`SELECT jitemid,kwid FROM logtags
+            WHERE journalid=${ownerId} AND jitemid IN (${sql.join(selected)})
+            ORDER BY jitemid,kwid LIMIT 10001`.execute(connection)).rows:[];
+        if([rows,sums,tuples].some(value=>value.length>10000))unsupported();
+        return {definitions:rows.map(row=>({kwid:number(row.kwid,1),
+            parentkwid:row.parentkwid===null?null:number(row.parentkwid),
+            display:(()=>{const value=requiredString(row.display);if(value!=="0"&&value!=="1")unsupported();return value==="1";})(),
+            name:decodedColumn(row,"name",`tag:${ownerId}:${row.kwid}:name`,raw,4096,false)!})),
+            summaries:sums.map(row=>({kwid:number(row.kwid,1),security:requiredString(row.security),count:number(row.entryct)})),
+            associations:tuples.map(row=>({jitemid:number(row.jitemid,1),kwid:number(row.kwid,1)}))};
+    }
+
     private async loadLinks(connection: Connection, ownerId: number, raw: RawField[]): Promise<readonly RawLink[]> {
         // Native load_linkobj has no SQL ordering; stable numeric sorting later
         // preserves received order for ties. The schema has no unique ordernum.
