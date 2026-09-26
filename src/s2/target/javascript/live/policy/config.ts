@@ -73,8 +73,9 @@ function validateEntryConfig(config: PublicAppConfig): void {
 export function validateConfig(config: PublicAppConfig): void {
     exactRecord(config, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot", "statPrefix",
         "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback", "imgPrefix",
-        "palImgRoot", "userpicRoot", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
+        "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
         "facebookPreviewIcon"]);
+    if (typeof config.userpicUrlHookConfigured !== "boolean") throw new Unsupported();
     for (const value of [config.listenOrigin, config.canonicalAppOrigin]) {
         let url;
         try { url = new URL(value); } catch { throw new Unsupported(); }

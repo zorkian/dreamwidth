@@ -95,6 +95,27 @@ export interface RawEntry {
     readonly eventText: string;
 }
 
+export interface RawUserpic {
+    readonly userid: number;
+    readonly picid: number;
+    readonly width: number;
+    readonly height: number;
+    readonly state: string;
+    readonly description: string;
+}
+
+export interface RawUserpicMap {
+    readonly mapid: number | null;
+    readonly keyword: string | null;
+    readonly picid: number | null;
+    readonly redirectMapid: number | null;
+}
+
+export interface RawUserpics {
+    readonly pictures: readonly RawUserpic[];
+    readonly mappings: readonly RawUserpicMap[];
+}
+
 export interface RawFeatureCounts {
     // All primary sysban rows with byte-exact what="spamreport" and value equal
     // to the canonical journal username, without status/date filtering. Count only: no ban
@@ -174,6 +195,7 @@ export interface RawJournalSnapshot {
     readonly entries: readonly RawEntry[];
     readonly calendar: RawCalendarSummary;
     readonly features: RawFeatureCounts;
+    readonly userpics: RawUserpics;
     readonly fingerprint: string;
 }
 
@@ -307,6 +329,7 @@ export interface PublicAppConfig {
     readonly imgPrefix: string;
     readonly palImgRoot: string;
     readonly userpicRoot: string;
+    readonly userpicUrlHookConfigured: boolean;
     readonly siteName: string;
     readonly siteNameShort: string;
     readonly siteNameAbbrev: string;
