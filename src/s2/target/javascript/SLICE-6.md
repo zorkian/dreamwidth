@@ -30,8 +30,8 @@ Cache-only IP/uniq tempbans are not reproduced. Authentication-bearing requests
 are refused; no authenticated data is rendered. Journal/entry privacy, deleted
 and suspended state, configured move capability, identity mapping, adult-content
 policy and cross-journal isolation remain enforced. Unsupported styles, comments,
-userpics, tags, links and content/settings are refused rather than represented
-with the wrong stock artifact. Ordinary non2 `stylesys` ignores stale persisted
+tags, links and content/settings are refused rather than represented
+with the wrong stock artifact. Ordinary userpics are described in [Slice7](SLICE-7.md). Ordinary non2 `stylesys` ignores stale persisted
 S2 layer IDs and resolves the configured hash-qualified default. Malformed
 nondigit style-system values refuse explicitly; custom `force_s1` style-dispatch
 hooks are not reproduced and sites relying on them are unsupported. See [cleaner policy](live/tests/CLEANER-POLICY.md)

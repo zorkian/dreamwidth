@@ -68,7 +68,7 @@ else {
 my @global = qw(user useridmap userprop userproplist s2styles s2layers
     s2compiled s2source_inno logproplist secrets sysban);
 my @cluster = qw(userbio userproplite2 userpropblob s2stylelayers2 log2 logtext2 logprop2
-    usertags userkeywords logtags logtagsrecent logkwsum links userpic2 talk2);
+    usertags userkeywords logtags logtagsrecent logkwsum links userpic2 userpicmap2 userpicmap3 talk2);
 my @tables = (
     (map { "dw_global.$_" } @global),
     (map { "dw_cluster01.$_" } @cluster),

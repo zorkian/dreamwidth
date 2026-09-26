@@ -23,7 +23,7 @@ function config(): PublicAppConfig {
         canonicalAppOrigin: "https://app.example.test", listenOrigin: "http://viewer.example.test:9191",
         siteRoot: "https://app.example.test", statPrefix: "https://cdn.example.test/stc",
         jsPrefix: "//cdn.example.test/js", imgPrefix: "/img", palImgRoot: "/palimg",
-        userpicRoot: "/userpic", userDomain: "users.example.test", usernameMaxLength: 25,
+        userpicUrlHookConfigured: false, userpicRoot: "/userpic", userDomain: "users.example.test", usernameMaxLength: 25,
         maxScrollback: 100, siteName: "Configured site", siteNameShort: "Site", siteNameAbbrev: "S",
         appleTouchIcon: "", facebookPreviewIcon: "",
         journalUrls: {protocol: "https", domain: "journals.example.test", isDevServer: false,

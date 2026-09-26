@@ -26,7 +26,7 @@ const config: PublicAppConfig = {
     statPrefix: "/stc",
     imgPrefix: "/img",
     palImgRoot: "/palimg",
-    userpicRoot: "/userpic",
+    userpicUrlHookConfigured: false, userpicRoot: "/userpic",
     siteName: "DW Devcontainer",
     siteNameShort: "DWDev",
     siteNameAbbrev: "DW",

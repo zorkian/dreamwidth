@@ -311,6 +311,13 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         },
         _clean_css_classname: (_ctx, name) => String(name).includes("eval")
             ? `${name} ${String(name).replaceAll("eval", "ev-l")}` : name,
+        _htmlattr: (_ctx, name, value) => {
+            const text = String(value ?? "");
+            if (text === "") return "";
+            const attribute = String(name).toLowerCase();
+            if (/[^a-z]/.test(attribute)) return "";
+            return ` ${attribute}="${escape(text)}"`;
+        },
         _ehtml: (_ctx, text) => escape(text),
         _striphtml: (_ctx, text) => String(text).replace(/<.*?>/g, ""),
         _string__contains: (_ctx, text, part) => String(text).includes(String(part)),

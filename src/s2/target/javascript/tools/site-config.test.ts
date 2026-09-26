@@ -180,13 +180,15 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
     writeFileSync(path.join(hooks, "Slice6Fixture.pm"),
         "package LJ::Hooks::Slice6Fixture; use LJ::Hooks; " +
         "LJ::Hooks::register_hook('check_cap_s2viewentry', sub {1}); " +
-        "LJ::Hooks::register_hook('journal_base', sub {'https://custom.example'}); 1;\n");
+        "LJ::Hooks::register_hook('journal_base', sub {'https://custom.example'}); " +
+        "LJ::Hooks::register_hook('construct_userpic_url', sub {die 'must-not-execute'}); 1;\n");
     const output = path.join(base, "site.json");
     const positive = exportSite(home, output);
     assert.equal(positive.status, 0, positive.stderr);
     const config = readStartupConfig(output);
     assert.equal(config.capabilities.s2ViewEntry.hookConfigured, true);
     assert.equal(config.app.journalUrls.hookConfigured, true);
+    assert.equal(config.app.userpicUrlHookConfigured, true);
     assert.deepEqual(config.placeholder.descriptor,
         {src: "https://app.example.test/img/custom.png", width: 45, height: 21, altKey: "custom.placeholder"});
     writeFileSync(path.join(hooks, "Slice6Fixture.pm"),
