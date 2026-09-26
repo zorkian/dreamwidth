@@ -60,7 +60,7 @@ sub number {
 
 sub origin {
     my ($value) = @_;
-    my $u = URI->new( string($value) );
+    my $u = URI->new( string($value) )->canonical;
     fail('Provide an explicit HTTP(S) app/listen origin without path or credentials')
         unless $u->scheme
         && $u->scheme =~ /\Ahttps?\z/

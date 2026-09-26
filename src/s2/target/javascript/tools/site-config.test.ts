@@ -97,6 +97,33 @@ test("source configuration export preserves arbitrary endpoints, URL facts and p
     assert.deepEqual(readFileSync(output), before);
 }));
 
+test("exported origins round-trip through startup validation in canonical form", () => temporary(dir => {
+    const cases = [
+        {app: "https://app.example.test", listen: "http://Viewer.Example.test:9191",
+            expectedApp: "https://app.example.test", expectedListen: "http://viewer.example.test:9191"},
+        {app: "https://app.example.test", listen: "http://viewer.example.test:80",
+            expectedApp: "https://app.example.test", expectedListen: "http://viewer.example.test"},
+        {app: "https://app.example.test:443/", listen: "http://viewer.example.test:9191",
+            expectedApp: "https://app.example.test", expectedListen: "http://viewer.example.test:9191"},
+        {app: null, listen: "http://Viewer.Example.test:80/",
+            expectedApp: "https://app.example.test", expectedListen: "http://viewer.example.test"},
+    ];
+    for (const [index, value] of cases.entries()) {
+        const base = path.join(dir, String(index)); mkdirSync(base);
+        const home = fixture(base, "$SITEROOT='https://App.Example.test:443/';");
+        const output = path.join(base, "site.json");
+        const args = ["-I", path.join(repo, "cgi-bin"), exporter, "--output", output,
+            "--listen-origin", value.listen];
+        if (value.app !== null) args.push("--app-origin", value.app);
+        const result = spawnSync("perl", args,
+            {env: {...process.env, LJHOME: home}, encoding: "utf8", timeout: 15000, maxBuffer: 65536});
+        assert.equal(result.status, 0, result.stderr);
+        const config = readStartupConfig(output);
+        assert.equal(config.app.canonicalAppOrigin, value.expectedApp);
+        assert.equal(config.app.listenOrigin, value.expectedListen);
+    }
+}));
+
 test("config and hook connection attempts/errors cannot publish or leak credentials", () => temporary(dir => {
     for (const [id, extra] of [
         ["connect", `eval { DBI->connect('DBI:mysql:never-connect','fixture','${secret}') };`],
