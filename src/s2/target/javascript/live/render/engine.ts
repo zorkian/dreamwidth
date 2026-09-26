@@ -102,7 +102,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         const selected = input.journal.entries.filter(entry => entry.id === ditemid);
         if (selected.length !== 1) throw new Error("Missing entry metadata source");
         metadata = content.metadata(selected[0]!,
-            `${input.config.canonicalAppOrigin}/~${input.journal.username}/${ditemid}.html`);
+            `${input.journal.baseUrl}/${ditemid}.html`);
     }
     page._head_content = head(input, page, metadata);
     printing = true;
