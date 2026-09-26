@@ -71,9 +71,9 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     if (!text(root.artifactPath)) invalid();
     const app = record(root.app, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot",
         "statPrefix", "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback",
-        "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
+        "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
         "appleTouchIcon", "facebookPreviewIcon"]);
-    origin(app.canonicalAppOrigin); origin(app.listenOrigin); boolean(app.userpicUrlHookConfigured);
+    origin(app.canonicalAppOrigin); origin(app.listenOrigin); boolean(app.userpicUrlHookConfigured); boolean(app.tagsEnabled); boolean(app.tagListHookConfigured);
     for (const key of ["siteRoot", "statPrefix", "jsPrefix", "userDomain", "imgPrefix", "palImgRoot",
         "userpicRoot", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon", "facebookPreviewIcon"]) {
         text(app[key]);

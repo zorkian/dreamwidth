@@ -205,11 +205,18 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             return host.calendar_month;
         },
         _Page__visible_tag_list: (_ctx, currentPage, limit) => {
-            if (currentPage !== page || host.visible_tag_count !== 0 ||
-                (limit !== undefined && limit !== "" && !Number.isSafeInteger(Number(limit)))) {
-                throw new Error("Unsupported nonempty visible tag list");
-            }
-            return [];
+            if(currentPage!==page||!Array.isArray(host.visible_tags))throw new Error("Unsupported tag page");
+            const count=limit===undefined||limit===""?0:Number(limit);
+            if(!Number.isSafeInteger(count)||count<0)throw new Error("Unsupported tag limit");
+            const compare=(a:unknown,b:unknown):number=>{
+                const one=record(a,"tag"),two=record(b,"tag");
+                return Buffer.compare(Buffer.from(String(one.name)),Buffer.from(String(two.name)))||Number(one._id)-Number(two._id);
+            };
+            let tags=[...host.visible_tags];
+            // Native popularity cutoff ties depend on hash iteration. A byte
+            // name/kwid tie break makes this boundary deterministic explicitly.
+            if(count)tags=tags.sort((a,b)=>Number(record(b,"tag").use_count)-Number(record(a,"tag").use_count)||compare(a,b)).slice(0,count);
+            return tags.sort(compare);
         },
         _UserLite__equals: (_ctx, one, two) => {
             const left = record(one, "first S2 user");
@@ -302,6 +309,9 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         _viewer_has_access: anonymous, _viewer_is_subscribed: anonymous,
         _viewer_is_member: anonymous, _viewer_is_admin: anonymous,
         _viewer_is_moderator: anonymous, _viewer_can_search: anonymous,
+        // S2.pm viewer_can_manage_tags -> User/Login.pm get_authas_user:
+        // no remote returns undef before any account lookup.
+        _viewer_can_manage_tags: anonymous,
         _viewer_sees_control_strip: () => host.viewer_sees_control_strip,
         _alternate: (_ctx, one, two) => {
             const key = `${one}\0${two}`;
