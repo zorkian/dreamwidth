@@ -27,6 +27,9 @@ import { rawBody, plainSubject, Unsupported } from "./content";
 import {approveTags} from "../domain/tags";
 import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 
+import {moodSelection} from "../domain/moods";
+import {locationCurrent} from "../domain/location";
+
 import {UserpicSelection} from "../domain/userpics";
 
 import { SOURCE_HASHES } from "../render/source-hashes";
@@ -276,15 +279,16 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             if (![undefined, null, "", "0", "1"].includes(props[flag])) throw new Unsupported();
         }
         if (perlTrue(props.opt_nocomments_maintainer)) throw new Unsupported();
-        // Numeric mood still reaches theme/icon lookup even with custom text;
-        // coords can suppress/autovivify Location. These are separate features.
-        if (perlTrue(props.current_moodid) || perlTrue(props.current_coords)) throw new Unsupported();
         const currents: Record<string,string> = {};
-        for (const [property, name] of [["current_mood", "mood"], ["current_music", "music"],
-            ["current_location", "location"]] as const) {
-            const value = props[property];
-            if (perlTrue(value)) currents[name] = plainSubject(value!);
+        let numericMood: ReturnType<typeof moodSelection> | undefined;
+        if (perlTrue(props.current_moodid)) {
+            if (!/^(?:0|[1-9][0-9]*)$/.test(props.current_moodid!) || !integer(Number(props.current_moodid))) throw new Unsupported();
+            numericMood = moodSelection(snapshot.moods,Number(props.current_moodid),config);
         }
+        if (perlTrue(props.current_mood) || numericMood) currents.mood = plainSubject(perlTrue(props.current_mood) ? props.current_mood! : "");
+        if (perlTrue(props.current_music)) currents.music = plainSubject(props.current_music!);
+        const location = locationCurrent(props.current_coords,props.current_location);
+        if (location !== undefined) currents.location = plainSubject(location);
 
         for (const time of [entry.eventtime, entry.logtime]) {
             if (!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(time) ||
@@ -299,7 +303,8 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             entry.day !== Number(entry.eventtime.slice(8, 10))) throw new Unsupported();
         entries.push({
             id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
-            subject: plainSubject(entry.subjectText), currents, rawBody: rawBody(entry.eventText),
+            subject: plainSubject(entry.subjectText), currents,
+            moodName:numericMood?.name, moodIcon:numericMood?.icon, rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             userpic: pictures.forEntry(props),

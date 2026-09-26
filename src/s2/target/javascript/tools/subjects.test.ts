@@ -104,11 +104,12 @@ test("unported subject capabilities refuse only encountered input",()=>{
         assert.deepEqual(cleaner.subject({source,context}),{kind:"failure",reason:"unsupported"});
     }assert.equal(cleaner.subject({source:"ordinary",context}).kind,"ok");}finally{cleaner.close();}
 });
-test("textual currents retain raw key presence and numeric/coords still refuse",()=>{
+test("textual currents retain raw key presence with expanded numeric/coords semantics",()=>{
     for(const props of [{current_coords:"1,2",current_location:"text"},
         {current_moodid:"1",current_mood:"custom"}]){
         const data=snapshot();Object.assign(data.entries[0]!.props,props);
-        assert.throws(()=>approveSnapshot(data,config,capabilities));
+        const admitted=approveSnapshot(data,config,capabilities).entries.find(entry=>entry.id===data.entries[0]!.jitemid*256+data.entries[0]!.anum)!;
+        assert.deepEqual(admitted.currents,props.current_coords?{location:""}:{mood:"custom"});
     }
     const data=snapshot();for(const entry of data.entries)Object.assign(entry.props,{current_music:"<script>bad</script>",
         current_mood:"0",current_location:"",current_moodid:"0",current_coords:"0"});

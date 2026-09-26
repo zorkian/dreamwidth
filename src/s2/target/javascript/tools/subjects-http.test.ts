@@ -100,7 +100,8 @@ test("actual selected rich subject/currents, privacy, fresh child and mutation r
         assert.match(empty.body,/<div class="metadata bottom-metadata">\n<ul>\n<\/ul>/);
         for(const name of ["current_coords","current_moodid"]){
             await admin.query(`INSERT INTO ${table(c,"logprop2")} (journalid,jitemid,propid,value) VALUES (900001,300,?,'1')`,[prop(name)]);
-            assert.equal((await get(address.port,"/users/ordinary6/76801.html")).status,422);
+            assert.equal((await get(address.port,"/users/ordinary6/76801.html")).status,200,
+                "Slice11 expands absent numeric mood and caught malformed coords without removing key");
             await admin.query(`DELETE FROM ${table(c,"logprop2")} WHERE journalid=900001 AND jitemid=300 AND propid=?`,[prop(name)]);
         }
     }finally{capture.mock.restore();await app.close();await service.close();}

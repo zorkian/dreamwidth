@@ -27,7 +27,7 @@ import type { LiveStoreConfig } from "../startup-types";
 import {resolvePlaceholder} from "../domain/placeholder";
 import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
-    RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
+    RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
     PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags,
 } from "../contracts";
@@ -355,21 +355,24 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, raw};
         });
         if (!selected) return null;
-        const after = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
+        const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
+        const after = await this.databases.snapshot(undefined,
+            needsMoods ? [...GLOBAL_TABLES,"moods","moodthemes","moodthemedata"] : GLOBAL_TABLES, async connection => {
             const facts = await this.globalFacts(connection, request.username);
             if (!facts || digest(facts) !== digest(before.facts)) unsupported();
             const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
             const style = await this.loadStyle(connection, owner, plan, raw);
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
-            return {owner, style, posters, raw};
+            const moods = await this.loadMoods(connection,owner,selected.entries,raw);
+            return {owner, style, posters, moods, raw};
         });
         const rawFields = [...after.raw, ...selected.raw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
-            plan.layers, this.config.styles, this.config.capabilities];
+            plan.layers, this.config.styles, this.config.capabilities, after.moods];
         return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
-            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags,
+            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
     }
@@ -553,6 +556,52 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         return {current: {year,month}, days: days.map(row => ({day: number(row.day,1,31),count: number(row.count,1)})),
             previous,next, entryStatusCounts: statuses.map((row,index) => ({statusvis: decodedColumn(row, "status",
                 "calendar:status:" + index, raw, 8192, true), count: number(row.count,1)})), otherPosterCount: statuses.reduce((sum,row) => sum+number(row.foreign_count),0)};
+    }
+    private async loadMoods(connection: Connection, owner: RawUser, entries: readonly RawEntry[],
+        raw: RawField[]): Promise<RawMoods> {
+        const ids = new Set<number>();
+        for (const entry of entries) {
+            const value = entry.props.current_moodid;
+            if (!value || value === "0") continue;
+            if (!/^(?:0|[1-9][0-9]*)$/.test(value)) unsupported();
+            ids.add(number(value,0,4294967295));
+        }
+        if (!ids.size) return {moods:[],theme:null,pictures:[]};
+        const moods: RawMoods["moods"][number][] = [];
+        const visited = new Set<number>();
+        const pending = [...ids];
+        while (pending.length) {
+            const id = pending.pop()!;
+            if (!id || visited.has(id)) continue;
+            if (visited.size >= 10000) unsupported();
+            visited.add(id);
+            const rows = (await sql<Row>`SELECT moodid,parentmood,HEX(mood) AS name_stored,
+                HEX(CONVERT(mood USING latin1)) AS name_original,
+                HEX(CONVERT(CONVERT(mood USING latin1) USING utf8mb4)) AS name_roundtrip
+                FROM moods WHERE moodid=${id}`.execute(connection)).rows;
+            if (rows.length>1) unsupported();
+            if (!rows[0]) continue;
+            const row=rows[0], parent=number(row.parentmood,0,4294967295);
+            moods.push({id:number(row.moodid,1,4294967295),parent,
+                name:decodedColumn(row,"name","mood:"+id,raw,1024,true)});
+            if (parent) pending.push(parent);
+        }
+        const themeRows = owner.moodthemeid ? (await sql<Row>`SELECT moodthemeid,
+            HEX(name) AS name_stored,HEX(CONVERT(name USING latin1)) AS name_original,
+            HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip
+            FROM moodthemes WHERE moodthemeid=${owner.moodthemeid}`.execute(connection)).rows : [];
+        if (themeRows.length>1) unsupported();
+        const theme=themeRows[0]?{id:number(themeRows[0].moodthemeid,1),
+            name:decodedColumn(themeRows[0],"name","moodtheme:"+owner.moodthemeid,raw,1024,true)}:null;
+        const rows=theme && theme.name && theme.name!=="0" ? (await sql<Row>`SELECT moodid,width,height,
+            HEX(picurl) AS url_stored,HEX(CONVERT(picurl USING latin1)) AS url_original,
+            HEX(CONVERT(CONVERT(picurl USING latin1) USING utf8mb4)) AS url_roundtrip
+            FROM moodthemedata WHERE moodthemeid=${owner.moodthemeid} AND moodid IN
+                (${sql.join([...visited])}) ORDER BY moodid LIMIT 10001`.execute(connection)).rows:[];
+        if(rows.length>10000)unsupported();
+        return {moods:moods.sort((a,b)=>a.id-b.id),theme,pictures:rows.map(row=>({
+            moodid:number(row.moodid,0,4294967295),width:number(row.width,0,255),height:number(row.height,0,255),
+            url:decodedColumn(row,"url","moodpic:"+owner.moodthemeid+":"+row.moodid,raw,1024,true)}))};
     }
     private async loadTags(connection: Connection, ownerId: number, selected: readonly number[],
         raw: RawField[]): Promise<RawTags> {
