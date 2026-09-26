@@ -17,7 +17,7 @@ import type {EntryContentInput} from "@dreamwidth/content/contracts";
 import {renderStock} from "./engine";
 import {validateArtifact} from "./artifact";
 import {Unsupported} from "../policy/content";
-import type {ApprovedEntry, RenderContentPreparation, RenderInput, RendererHeader} from "./types";
+import type {ApprovedEntry, ApprovedComment, RenderContentPreparation, RenderInput, RendererHeader} from "./types";
 
 // Only stdin/stdout are inherited. One process performs content preparation,
 // stock prop_init/modules_init and Page.print under one parent deadline.
@@ -87,7 +87,25 @@ process.stdin.on("end", () => {
                     placeholderUndefinedImageSize: false, extractImages: false},
             }};
         };
+        const allowedComments=new Set<ApprovedComment>();
+        const addComments=(nodes:readonly ApprovedComment[]):void=>{for(const node of nodes){
+            allowedComments.add(node);addComments(node.replies);}};
+        addComments(request.journal.comments?.roots??[]);
         const content: RenderContentPreparation = {
+            comment(comment,entryUrl) {
+                if(!entryPage||!allowedComments.has(comment)||!comment.full||comment.rawBody===null||
+                    entryUrl!==documentUrl)throw new Unsupported();
+                const props=comment.props;
+                const truthy=(value:string|null|undefined):boolean=>!!value&&value!=='0';
+                const formatting=truthy(props.editor)?props.editor!:
+                    truthy(props.opt_preformatted)?'html_raw0':
+                    Object.hasOwn(props,'import_source')||comment.datepost<'2019-05'?'html_casual0':'html_casual1';
+                if(!['html_raw0','html_casual0','html_casual1'].includes(formatting))throw new Unsupported();
+                const result=cleaner.comment({body:comment.rawBody,formatting:formatting as 'html_raw0'|'html_casual0'|'html_casual1',
+                    anonymous:!comment.author,context:contentInput(request.journal.entries[0]!,entryUrl).context});
+                if(result.kind!=='ok')throw new Unsupported();
+                return result.html;
+            },
             customtext(source) {
                 const result=cleaner.customtext({source,context:{
                     policy:'dreamwidth-entry-html-raw0-v1',insertionContext:'html-div-flow',documentUrl,

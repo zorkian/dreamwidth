@@ -46,6 +46,9 @@ export interface ApprovedEntry {
     readonly month: number;
     readonly day: number;
     readonly commentsEnabled: boolean;
+    readonly commentsAtMax?: boolean;
+    readonly replycount?:number;
+    readonly commentsDisabledMaintainer?:boolean;
     readonly tags: readonly ApprovedTag[];
     readonly userpic: ApprovedUserpic | null;
 }
@@ -56,7 +59,25 @@ export interface ApprovedLink {
     readonly isHeading: boolean;
 }
 
+export interface ApprovedComment {
+    readonly id:number; readonly parentId:number; readonly state:"A"|"F"|"S"|"D";
+    readonly suspended:boolean; readonly full:boolean; readonly subjectOnly:boolean;
+    readonly subject:string; readonly rawBody:string|null; readonly datepost:string;
+    readonly author:{readonly userid:number;readonly username:string;readonly name:string;
+        readonly timezone:string|null;readonly journalType:string;readonly userpic:ApprovedUserpic|null}|null;
+    readonly props:Readonly<Record<string,string|null>>;
+    readonly replies:readonly ApprovedComment[];
+    readonly showableChildren:number;
+}
+export interface ApprovedComments {
+    readonly roots:readonly ApprovedComment[];
+    readonly page:number;readonly pages:number;readonly first:number;readonly last:number;
+    readonly items:number;readonly collapsed:boolean;readonly thread:number;
+    readonly expandAllowed:boolean;readonly expanderAllowed:boolean;
+}
+
 export interface ApprovedJournal {
+    readonly comments?:ApprovedComments;
     readonly customtextProperties?: import("../domain/property-layer").CustomtextProperties;
     readonly customtextStored?: {readonly title:string|null;readonly url:string|null;readonly content:string|null};
     readonly userid: number;
@@ -92,7 +113,7 @@ export type RenderPage =
         readonly itemshow: number;
         readonly maxScrollback: number;
         readonly hasPrevious: boolean }
-    | { readonly kind: "entry"; readonly ditemid: number };
+    | { readonly kind: "entry"; readonly ditemid: number; readonly comments?:import("../contracts").CommentQuery };
 
 // These callbacks/results exist only inside the credential-free render child.
 // The worker derives both independently from the approved raw entry. The engine
@@ -100,6 +121,7 @@ export type RenderPage =
 // attribute boundary. Neither fragment nor helper string returns to the parent.
 export interface RenderContentPreparation {
     customtext?(source:string):string;
+    comment?(comment:ApprovedComment,entryUrl:string):string;
     subject(entry: ApprovedEntry, entryUrl: string, source?: string): SubjectPreparation;
     body(entry: ApprovedEntry, entryUrl: string): string;
     metadata(entry: ApprovedEntry, entryUrl: string): InertEntryMetadata;

@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     const startup = readStartupConfig(parseStartupArgs(process.argv.slice(2)));
     const repository = await MysqlLiveStore.open({database: startup.database,
         capabilities: startup.capabilities, styles: startup.styles,
-        maxScrollback: startup.app.maxScrollback});
+        commentSettings:startup.app.commentSettings,maxScrollback: startup.app.maxScrollback});
     let service;
     try {
         // Public language text is a startup snapshot. This SELECT-only resolver

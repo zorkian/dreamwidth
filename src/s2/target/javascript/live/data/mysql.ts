@@ -30,8 +30,9 @@ import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
     RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
-    PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags,
+    PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags, RawComments, RawCommentHeader, RawCommentAuthor, RawCommentText,
 } from "../contracts";
+import {selectComments,commentCapability,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
 import { decodeLegacyText, decodeLegacyBytes } from "./legacy-text";
@@ -63,7 +64,7 @@ const CLUSTER_TABLES = [
     "userproplite2", "userpropblob", "s2stylelayers2",
     "log2", "logtext2", "logprop2",
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
-    "links", "userpic2", "userpicmap2", "userpicmap3", "talk2",
+    "links", "userpic2", "userpicmap2", "userpicmap3",
 ] as const;
 
 function unsupported(): never { throw new SnapshotError("unsupported"); }
@@ -314,6 +315,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
     async loadRawSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
         if (!/^[a-z0-9_]{1,25}$/.test(request.username)) unsupported();
         number(request.calendarNow.year, 1, 9999); number(request.calendarNow.month, 1, 12);
+        if(request.page.kind==='entry')validateCommentQuery(request.page.comments);
         const frozenRequest = structuredClone(request);
         const initial = await this.databases.snapshot(undefined, GLOBAL_TABLES,
             connection => this.globalFacts(connection, request.username));
@@ -376,6 +378,11 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, compiled, raw};
         });
         if (!selected) return null;
+        // EntryPage loads existing comments even when posting/read-link settings
+        // are disabled. Target public visibility was established above.
+        const comments=frozenRequest.page.kind==='entry' && selected.entries[0] ?
+            await this.loadComments(ownerId,clusterId,selected.entries[0]!.jitemid,frozenRequest,
+                unsigned(before.facts.owner.caps,16)) : undefined;
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
         const after = await this.databases.snapshot(undefined,
             needsMoods ? [...GLOBAL_TABLES,"moods","moodthemes","moodthemedata"] : GLOBAL_TABLES, async connection => {
@@ -392,9 +399,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             layer.type==='user'?{...layer,compiledTime:selected.compiled!.time,propertyCompiled:selected.compiled!.text}:layer)} : after.style;
         const rawFields = [...after.raw, ...selected.raw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
-        const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
+        const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities, after.moods];
-        return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
+        return {comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
@@ -712,7 +719,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             (SELECT COUNT(*) FROM logkwsum WHERE journalid = ${ownerId}) AS logkwsum,
             (SELECT COUNT(*) FROM links WHERE journalid = ${ownerId}) AS links,
             (SELECT COUNT(*) FROM userpic2 WHERE userid = ${ownerId}) AS userpics,
-            (SELECT COUNT(*) FROM talk2 WHERE journalid = ${ownerId}) AS comments`.execute(connection)).rows;
+            0 AS comments`.execute(connection)).rows;
         if (rows.length !== 1) unsupported();
         const row = rows[0]!;
         return {spamreportBans,usertags: number(row.usertags),userkeywords: number(row.userkeywords),
@@ -853,6 +860,134 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             }));
         }
         return { entries, rawText };
+    }
+
+    private async loadComments(ownerId:number,clusterId:number,nodeid:number,request:RawPageRequest,caps:string):Promise<{data:RawComments;fingerprint:string}|undefined> {
+        if(request.page.kind!=='entry')unsupported();
+        const readHeaders=async(connection:Connection):Promise<RawCommentHeader[]>=>{
+            const rows=(await sql<Row>`SELECT jtalkid,parenttalkid,posterid,state,datepost
+                FROM talk2 WHERE journalid=${ownerId} AND nodetype='L' AND nodeid=${nodeid}
+                ORDER BY jtalkid LIMIT 10001`.execute(connection)).rows;
+            if(rows.length>10000)unsupported();
+            return rows.map(row=>({jtalkid:number(row.jtalkid,1,4294967295),parenttalkid:number(row.parenttalkid,0,4294967295),
+                posterid:number(row.posterid),state:requiredString(row.state),datepost:civilTime(row.datepost)}));
+        };
+        const headers=await this.databases.snapshot(clusterId,['talk2'],readHeaders);
+        if(!headers.length)return undefined;
+        if(!this.config.commentSettings)unsupported();
+        const expand=commentCapability(this.config.capabilities.threadExpandAll,caps);
+        const selection=selectComments(headers,request.page.comments,this.config.commentSettings,expand);
+        const chosen=[] as import('../domain/comments').CommentNode[];
+        const queue=[...selection.roots];for(let i=0;i<queue.length;i++){chosen.push(queue[i]!);queue.push(...queue[i]!.children);}
+        const ids=[...new Set(chosen.filter(n=>n.show&&n.header.posterid).map(n=>n.header.posterid))];
+        const authorFacts=async(connection:Connection):Promise<Row[]>=>{
+            if(!ids.length)return [];
+            const rows=(await sql<Row>`SELECT userid,user,clusterid,status,statusvis,journaltype,
+                HEX(name) AS name_stored,HEX(CONVERT(name USING latin1)) AS name_original,
+                HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
+                CAST(caps AS CHAR) AS caps,defaultpicid,dversion
+                FROM user WHERE userid IN (${sql.join(ids)}) ORDER BY userid LIMIT 10001`.execute(connection)).rows;
+            if(rows.length!==ids.length)unsupported();
+            const maps=(await sql<Row>`SELECT userid,user FROM useridmap WHERE userid IN (${sql.join(ids)})
+                OR user IN (${sql.join(rows.map(row=>requiredString(row.user)))}) ORDER BY userid,user LIMIT 20001`.execute(connection)).rows;
+            if(maps.length!==rows.length||rows.some(row=>!maps.some(m=>m.userid===row.userid&&m.user===row.user)))unsupported();
+            return rows;
+        };
+        const global=await this.databases.snapshot(undefined,['user','useridmap','talkproplist','userproplist','userprop'],async connection=>{
+            const authors=await authorFacts(connection);
+            const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
+            if(names.length>4096)unsupported();
+            const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
+            const timezoneValues=ids.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
+                HEX(CONVERT(value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
+                FROM userprop WHERE userid IN (${sql.join(ids)}) AND upropid IN
+                (SELECT upropid FROM userproplist WHERE name='timezone') ORDER BY userid,upropid LIMIT 10001`.execute(connection)).rows:[];
+            if(timezone.length>1)unsupported();
+            return {authors,names,timezone,timezoneValues};
+        });
+        const byAuthor=new Map(global.authors.map(row=>[number(row.userid,1),row]));
+        const authorized=(id:number):boolean=>{const h=headers.find(h=>h.jtalkid===id)!;return !h.posterid||byAuthor.get(h.posterid)?.statusvis!=='S';};
+        const full=selection.fullIds.filter(authorized),subjects=selection.subjectIds.filter(authorized);
+        const selectedIds=[...full,...subjects];const raw:RawField[]=[];
+        const texts=await this.databases.snapshot(clusterId,['talk2','talktext2','talkprop2'],async connection=>{
+            if(digest(await readHeaders(connection))!==digest(headers))unsupported();
+            if(!selectedIds.length)return [] as RawCommentText[];
+            const rows=(await sql<Row>`SELECT jtalkid,
+                HEX(subject) AS subject_stored,HEX(CONVERT(subject USING latin1)) AS subject_original,
+                HEX(CONVERT(CONVERT(subject USING latin1) USING utf8mb4)) AS subject_roundtrip,
+                CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(body) ELSE NULL END AS body_stored,
+                CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(CONVERT(body USING latin1)) ELSE NULL END AS body_original,
+                CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(CONVERT(CONVERT(body USING latin1) USING utf8mb4)) ELSE NULL END AS body_roundtrip
+                FROM talktext2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(selectedIds)}) ORDER BY jtalkid`.execute(connection)).rows;
+            if(rows.length!==selectedIds.length)unsupported();
+            const props=(await sql<Row>`SELECT jtalkid,tpropid,HEX(value) AS value_stored,
+                HEX(CONVERT(value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
+                FROM talkprop2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(full.length?full:[0])}) ORDER BY jtalkid,tpropid LIMIT 20001`.execute(connection)).rows;
+            if(props.length>20000)unsupported();
+            const names=this.names(global.names,'tpropid'),values=new Map<number,Record<string,string|null>>();
+            for(const id of selectedIds)values.set(id,Object.create(null));
+            const seen=new Set<string>();
+            for(const row of props) {
+                const id=number(row.jtalkid,1),name=names.get(number(row.tpropid,1));
+                if(!name||seen.has(id+':'+name)||!values.has(id))unsupported();seen.add(id+':'+name);
+                // Unknown/manager-only values stay solely in parent fingerprint.
+                raw.push(['comment:'+id+':prop:'+name,String(row.value_stored),String(row.value_original)]);
+                if((PUBLIC_COMMENT_PROPS as readonly string[]).includes(name))values.get(id)![name]=decodedColumn(row,'value','comment:'+id+':'+name,raw,8192,true);
+            }
+            let total=0;
+            return rows.map(row=>{
+                const id=number(row.jtalkid,1),props=values.get(id)!;
+                if(props.unknown8bit&&props.unknown8bit!=='0')unsupported();
+                const subject=decodedColumn(row,'subject','comment:'+id+':subject',raw,8192,true)??'';
+                const body=full.includes(id)?decodedColumn(row,'body','comment:'+id+':body',raw,65536,false):null;
+                total+=Buffer.byteLength(subject)+Buffer.byteLength(body??'');if(total>2097152)unsupported();
+                return {jtalkid:id,subject,body,props:Object.freeze(props)};
+            });
+        });
+        const authors:RawCommentAuthor[]=[];let pictureRows=0;
+        for(const row of global.authors) {
+            const id=number(row.userid,1),suspended=row.statusvis==='S';
+            let timezone:string|null=null,pictures:RawUserpics={pictures:[],mappings:[]};
+            if(!suspended) {
+                const cluster=number(row.clusterid,1);
+                if(BigInt(unsigned(row.caps,16))&BigInt(this.config.capabilities.moveInProgressMask))unsupported();
+                const details=await this.databases.snapshot(cluster,['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'],async connection=>{
+                    const prop=global.timezone[0]?.upropid;
+                    if(prop!==undefined) {
+                        const rows=(await sql<Row>`SELECT HEX(value) AS value_stored,HEX(CONVERT(value USING latin1)) AS value_original,
+                            HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
+                            FROM userproplite2 WHERE userid=${id} AND upropid=${number(prop,1)} LIMIT 2`.execute(connection)).rows;
+                        const blobs=(await sql<Row>`SELECT HEX(value) AS value_stored FROM userpropblob
+                            WHERE userid=${id} AND upropid=${number(prop,1)} LIMIT 2`.execute(connection)).rows;
+                        const values=[...global.timezoneValues.filter(v=>number(v.userid,1)===id),...rows,...blobs];
+                        if(values.length>1)unsupported();
+                        if(values[0])timezone=decodedColumn(values[0],'value','comment-author:'+id+':timezone',raw,1024,true,values[0].value_original===undefined);
+                    }
+                    return this.loadUserpics(connection,id,number(row.dversion),raw);
+                });pictures=details;
+                pictureRows+=pictures.pictures.length+pictures.mappings.length;if(pictureRows>10000)unsupported();
+            }
+            authors.push({userid:id,user:suspended?'':requiredString(row.user),name:suspended?'':decodedColumn(row,'name','comment-author:'+id+':name',raw,1024,false)!,
+                clusterid:number(row.clusterid,1),status:requiredString(row.status),statusvis:requiredString(row.statusvis),
+                journaltype:requiredString(row.journaltype),caps:unsigned(row.caps,16),timezone,
+                defaultpicid:row.defaultpicid===null?0:number(row.defaultpicid),dversion:number(row.dversion),pictures});
+        }
+        const after=await this.databases.snapshot(undefined,['user','useridmap','talkproplist','userproplist','userprop'],async connection=>{
+            const authors=await authorFacts(connection);
+            const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
+            const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
+            const timezoneValues=ids.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
+                HEX(CONVERT(value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
+                FROM userprop WHERE userid IN (${sql.join(ids)}) AND upropid IN
+                (SELECT upropid FROM userproplist WHERE name='timezone') ORDER BY userid,upropid LIMIT 10001`.execute(connection)).rows:[];
+            return {authors,names,timezone,timezoneValues};
+        });
+        if(digest(after)!==digest(global))unsupported();
+        const data={headers,authors,texts};
+        return {data,fingerprint:digest([data,global,raw])};
     }
 
 

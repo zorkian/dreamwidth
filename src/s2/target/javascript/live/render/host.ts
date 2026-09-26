@@ -43,6 +43,7 @@ import type { RenderContentPreparation, RenderInput } from "./types";
 import { S2Object, object } from "./objects";
 import { escapeHtml } from "./builtins";
 import { resourceBody, resourceHead } from "./resources";
+import {journalBase} from "./journal-url";
 import {prepareTagDetail} from "./prepare";
 import { calendar } from "./calendar";
 
@@ -130,7 +131,7 @@ export function controlStrip(input: RenderInput): string {
 }
 export function head(input: RenderInput, page: S2Object,
     metadata?: ReturnType<RenderContentPreparation["metadata"]>): string {
-    if (input.page.kind === "entry") return entryHead(input, metadata);
+    if (input.page.kind === "entry") return entryHead(input, page, metadata);
     const { config: c, journal: j } = input;
     const base = j.baseUrl;
     let html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
@@ -168,7 +169,7 @@ export function entryOgDescription(eventText: string): string {
     return escapeHtml([...collapsed].slice(0, 300).join("").replace(/^ +| +$/g, ""));
 }
 
-function entryHead(input: RenderInput,
+function entryHead(input: RenderInput, page:S2Object,
     metadata?: ReturnType<RenderContentPreparation["metadata"]>): string {
     if (!metadata || metadata.kind !== "inert-entry-metadata" ||
         input.page.kind !== "entry") throw new Error("Missing inert entry metadata");
@@ -207,8 +208,17 @@ function entryHead(input: RenderInput,
     for (const dir of ["prev", "next"]) html +=
         `<link rel="${dir}" href="${c.canonicalAppOrigin}/go?dir=${dir}&itemid=${ditemid}&journal=${j.username}" />\n`;
     html += `<link rel="canonical" href="${url}" />\n`;
-    const cmtinfo = {journal: j.username, form_auth: input.formChallenge,
-        remote: "", canSpam: 1, canAdmin: null};
+    const cmtinfo:Record<string,unknown> = {journal: j.username, form_auth: input.formChallenge,
+        // Native null breaks getUnexpandedComments' scalar iteration. Keep
+        // anonymous authority false, and preserve no-comment native bytes.
+        remote: "", canSpam: 1, canAdmin: j.comments ? 0 : null};
+    const addCommentInfo=(comments:S2Object[]):void=>{for(const comment of comments){
+        cmtinfo[String(comment.talkid)]={rc:comment.replies.map((child:S2Object)=>child.talkid),
+            u:comment.poster?.username??'',parent:comment.parent_url?Number(/thread=([0-9]+)/.exec(comment.parent_url)?.[1]):null,
+            full:comment.full,deleted:comment.deleted,screened:comment.screened};
+        addCommentInfo(comment.replies);
+    }};
+    addCommentInfo(page.comments??[]);
     html += '<script>\n// don\'t crawl this.  read http://www.livejournal.com/developer/exporting\n' +
         `var LJ_cmtinfo = ${JSON.stringify(cmtinfo)}\n</script>`;
     return html + resourceHead(input, base);
@@ -218,6 +228,17 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
     const base = input.journal.baseUrl;
     const image = (path: string, alt: string) => object("Image", {
         url: `${c.imgPrefix}/${path}`, width: 16, height: 16, alttext: alt, extra: {}});
+    const userBadges:Record<string,string>={[input.journal.userid]:badge(input)};
+    const addBadges=(comments:readonly import('./types').ApprovedComment[]):void=>{for(const comment of comments){
+        const author=comment.author;
+        if(author) {
+            if(author.journalType!=='P')throw new Error('Unsupported comment profile type');
+            userBadges[String(author.userid)]=badge({...input,journal:{...input.journal,username:author.username,
+                userid:author.userid,baseUrl:journalBase(author.username,input.config)}});
+        }
+        addBadges(comment.replies);
+    }};
+    addBadges(input.journal.comments?.roots??[]);
     const disabled = (path: string, text: string, title: string) => ({
         image: `${c.imgPrefix}/silk/profile/${path}.png`, width: 20, height: 18, text, title, url: "",
     });
@@ -232,7 +253,7 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
         owner_user: input.journal.username, owner_userid: input.journal.userid,
         siteroot: c.siteRoot, app_origin: c.canonicalAppOrigin,
         control_strip_html: controlStrip(input), script_tags_html: resourceBody(input),
-        ljuser_html: badge(input), visible_tags: input.journal.sidebarTags.map(tag=>prepareTagDetail(tag,input.journal.baseUrl)), user_links: userLinks, quickreply_div: "",
+        ljuser_html: badge(input), user_badges:userBadges, visible_tags: input.journal.sidebarTags.map(tag=>prepareTagDetail(tag,input.journal.baseUrl)), user_links: userLinks, quickreply_div: "",
         viewer_sees_control_strip: input.journal.showControlStrip,
         has_quickreply: true, s2quickreply: true, comments_need_access: false,
         memories_enabled: true, tellafriend_enabled: true,

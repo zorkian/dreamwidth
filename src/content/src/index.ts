@@ -86,7 +86,7 @@ function navigation(value: string, input: EntryContentInput, href: boolean): str
 }
 
 function transform(root: Element, input: EntryContentInput, limits: CleanerLimits,
-    images: ImagePass, generatedIds: ReadonlySet<string>, locate: LocateNode): void {
+    images: ImagePass, generatedIds: ReadonlySet<string>, locate: LocateNode, comment=false): void {
     const cssBudget = {bytes: 0, nodes: 0};
     const document = root.ownerDocument;
     for (const element of [...root.querySelectorAll("*")]) {
@@ -135,7 +135,7 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
                 element.removeAttribute(name); continue;
             }
             if (name === "style") {
-                const style = cleanStyle(value, input.context, limits, cssBudget);
+                const style = cleanStyle(comment?commentStyle(value):value, input.context, limits, cssBudget);
                 if (style === null) element.removeAttribute(name);
                 else element.setAttribute(name, style);
                 continue;
@@ -209,6 +209,43 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
     }
 }
 
+// The native comment context enables strongcleancss/remove_positioning;
+// body CSS policy stays unchanged. The maintained CSS parser runs afterwards.
+function commentStyle(value:string):string {
+    let source=value.replace(/\\/g,'');
+    if(['/*','[','absolute','fixed','expression','eval','behavior','cookie','document','window','javascript','-moz-binding']
+        .some(word=>source.toLowerCase().includes(word)))return '';
+    if(/-moz-|absolute|relative|outline|z-index|(?<!-)(?:top|left|right|bottom)\s*:|filter|-webkit-/i.test(source))return '';
+    source=source.replace(/margin.*?(?:;|$)/gi,'').replace(/height\s*?:.*?(?:;|$)/gi,'')
+        .replace(/display\s*?:\s*none\s*;?/gi,'');
+    const tooLarge=[...source.matchAll(/padding.*?:\s*(.*?)(?:;|$)/gi)].some(match=>
+        match[1]!.split(/\s+/).some(value=>Number.parseInt(value,10)>500));
+    return tooLarge?source.replace(/padding.*?(?:;|$)/gi,''):source;
+}
+
+// CleanHTML::clean_comment deny-mode allow/eat policy, after bounded URL/CSS
+// preparation and before the unchanged final DOMPurify boundary.
+function commentTransform(root:Element,anonymous:boolean):void {
+    const allow=new Set(('table tr td th tbody tfoot thead colgroup caption col a sub sup xmp bdo q span '+
+        'b i u tt s strike big small font abbr acronym cite code dfn em kbd samp strong var del ins '+
+        'h1 h2 h3 h4 h5 h6 div blockquote address pre center ul ol li dl dt dd area map form textarea '+
+        'img br hr p summary details ruby rt rp').split(' '));
+    const eat=new Set(('head title style layer iframe applet object'+
+        (anonymous?' table tbody thead tfoot tr td th caption colgroup col font':'')).split(' '));
+    for(const element of [...root.querySelectorAll('*')]) {
+        if(!root.contains(element))continue;
+        if(eat.has(element.localName)){element.remove();continue;}
+        if(!allow.has(element.localName))throw new UnsupportedContent();
+        if(!element.classList.contains('ljimgplaceholder'))element.removeAttribute('class');
+        if(anonymous)element.removeAttribute('style');
+        if(anonymous&&element.localName==='a'&&!element.classList.contains('ljimgplaceholder')) {
+            const href=element.getAttribute('href');
+            const bold=root.ownerDocument.createElement('b');bold.append(...element.childNodes);
+            element.replaceWith(bold,...(href?[root.ownerDocument.createTextNode(' ('+href+')')]:[]));
+        }
+    }
+}
+
 // Native inputs are byte strings; keep ASCII word classes and escape-pair order.
 function casualMentions(value:string):string {
     if(/^@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value))throw new UnsupportedContent();
@@ -219,9 +256,9 @@ function casualMentions(value:string):string {
 }
 
 // html_casual1 autolinks and breaks are a distinct original-source operation.
-function casualText(root:Element,source:string):void {
-    if(/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
-    casualMentions(source);
+function casualText(root:Element,source:string,comment=false,mentions=true,autoLinks=true):void {
+    if(!comment&&/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
+    if(mentions)casualMentions(source);
     if(root.querySelector('lj-cut,lj-raw,lj,user,poll,site-embed'))throw new UnsupportedContent();
     for(const element of root.querySelectorAll('*'))for(const attribute of element.attributes) {
         if(/[\r\n]/.test(attribute.value))throw new UnsupportedContent();
@@ -233,13 +270,13 @@ function casualText(root:Element,source:string):void {
     for(const node of nodes) {
         let value=node.data;
         const parent=node.parentElement!;
-        if(!parent.closest('code,pre,textarea'))value=casualMentions(value);
+        if(mentions&&!parent.closest('code,pre,textarea'))value=casualMentions(value);
         const raw=parent.closest('pre,textarea');
         const table=parent.closest('table');
         const cell=parent.closest('td,th');
         if(raw || table && (!cell || !table.contains(cell))) {node.data=value;continue;}
         const fragment=document.createDocumentFragment();
-        const pattern=parent.closest('a')?/\r?\n/g:/https?:\/\/[^\s'"<>]+[a-zA-Z0-9_/&=\-]|\r?\n/g;
+        const pattern=parent.closest('a')||!autoLinks?/\r?\n/g:/https?:\/\/[^\s'"<>]+[a-zA-Z0-9_/&=\-]|\r?\n/g;
         let offset=0;
         for(const match of value.matchAll(pattern)) {
             fragment.append(document.createTextNode(value.slice(offset,match.index)));
@@ -256,7 +293,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
     validateCleanerLimits(limits);
     const bounds = Object.freeze({...limits});
     let closed = false;
-    const clean = (input: EntryContentInput, resolutions?: ImageResolutionSet, casual = false): EntryContentResult => {
+    const clean = (input: EntryContentInput, resolutions?: ImageResolutionSet, casual = false, comment?:{anonymous:boolean;formatting:string}): EntryContentResult => {
             if (closed) return {kind: "failure", reason: "unavailable"};
             let dom: JSDOM | undefined;
             try {
@@ -279,7 +316,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 removeSourceComments(root);
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
-                if(casual) {
+                if(casual||comment) {
                     // Full-document parsing discards a source-leading ASCII
                     // whitespace token. This context formats its LF visibly;
                     // it does not inherit the entry-body whitespace adaptation.
@@ -290,16 +327,20 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                         if(first&&(!location||location.startOffset<prefix.length))throw new UnsupportedContent();
                         root.insertBefore(dom.window.document.createTextNode(prefix),first);
                     }
-                    casualText(root,input.body);
+                    if(casual)casualText(root,input.body,!!comment,comment?.formatting!=="html_casual0",!comment?.anonymous);
                 }
                 // Source body wrappers are removed by clean_event, including all
                 // their attributes. The private BODY remains only as context.
                 for (const attribute of [...root.attributes]) root.removeAttribute(attribute.name);
                 for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
+                if(comment&&root.querySelector("lj-cut,lj-raw,lj,user,poll,site-embed"))throw new UnsupportedContent();
                 const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
+                if(comment)for(const element of root.querySelectorAll("[class]"))element.removeAttribute("class");
+                if(comment?.anonymous)for(const element of root.querySelectorAll("[style]"))element.removeAttribute("style");
                 const images = new ImagePass(input, hash, bounds, node => dom!.nodeLocation(node) ?? null, resolutions);
-                transform(root, input, bounds, images, ids, node => dom!.nodeLocation(node) ?? null);
+                transform(root, input, bounds, images, ids, node => dom!.nodeLocation(node) ?? null,!!comment);
                 restoreNewlines();
+                if(comment)commentTransform(root,comment.anonymous);
                 images.finish();
                 if (images.requests.length && !resolutions) {
                     return {kind: "image-resolution-required", images: {inputSha256: hash, requests: images.requests}};
@@ -338,7 +379,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     }
                     throw new UnsupportedContent();
                 }
-                if(casual) html=html.replaceAll("\n","<br />");
+                if(casual&&!comment) html=html.replaceAll("\n","<br />");
                 if (Buffer.byteLength(html) > bounds.maxOutputBytes) throw new UnsupportedContent();
                 return {kind: "ok", fragment: {context: "html-div-flow", html} as BodyFragment,
                     provenance: {policy: input.context.policy, inputSha256: hash,
@@ -349,6 +390,16 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
         };
     return {
         clean,
+        comment(input) {
+            if(typeof input.anonymous!=='boolean'||!['html_raw0','html_casual0','html_casual1'].includes(input.formatting))
+                return {kind:'failure',reason:'unsupported'};
+            const context={...input.context,reader:{...input.context.reader,extractImages:input.anonymous}};
+            const result=clean({body:input.body,format:'html_raw0',context},undefined,
+                input.formatting!=='html_raw0',{anonymous:input.anonymous,formatting:input.formatting});
+            if(result.kind==='ok')return {kind:'ok',html:result.fragment.html};
+            if(result.kind==='failure')return result;
+            return {kind:'failure',reason:'unsupported'};
+        },
         customtext(input) {
             const result=clean({body:input.source,format:'html_raw0',context:input.context},undefined,true);
             if(result.kind==='ok')return {kind:'ok',html:result.fragment.html};

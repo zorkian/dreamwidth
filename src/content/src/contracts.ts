@@ -66,6 +66,13 @@ export interface EntryContentInput {
     readonly format: "html_raw0";
     readonly context: EntryContentContext;
 }
+// A comment is original source with independently selected native trust/format.
+export interface CommentContentInput {
+    readonly body:string;
+    readonly context:EntryContentContext;
+    readonly formatting:"html_raw0"|"html_casual0"|"html_casual1";
+    readonly anonymous:boolean;
+}
 export interface CleanerLimits {
     readonly maxInputBytes: number;
     readonly maxOutputBytes: number;
@@ -151,6 +158,7 @@ export interface CustomtextInput {
 export type CustomtextResult = {readonly kind:'ok';readonly html:string} |
     {readonly kind:'failure';readonly reason:'unsupported'|'unavailable'};
 export interface EntryCleaner {
+    comment(input:CommentContentInput):CustomtextResult;
     // Separate html_casual1 operation, with native final LF conversion.
     customtext(input: CustomtextInput): CustomtextResult;
     subject(input: SubjectInput): SubjectResult;

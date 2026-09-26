@@ -58,7 +58,9 @@ export function formatPlainSubject(rawEntry: unknown, rawOptions: unknown,
     let className = String(options.class ?? "");
     if (subject === "") {
         const normal = String(props._text_nosubject ?? "");
-        subject = normal && (props._all_entrysubjects || view === "month") ? normal : "";
+        const show=item['.type']==='Comment'?(props._all_commentsubjects||!item.full):
+            (props._all_entrysubjects||view==='month');
+        subject = normal && show ? normal : "";
         if (!subject) {subject = String(props._text_nosubject_screenreader ?? ""); className += " invisible";}
         recent = subject; title = subject;
     }
@@ -162,7 +164,7 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         rawOptions: unknown): void {
         if (!host.has_quickreply) return;
         const item = record(rawEntry, "reply container entry");
-        const options = record(rawOptions, "reply container options");
+        const options = record(rawOptions??{}, "reply container options");
         const target = String(options.target || item.talkid || "");
         if (!/^[\w-]+$/.test(target)) return;
         const css = typeof options.class === "string" && /^[\w\s]+$/.test(options.class)
@@ -176,6 +178,40 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             ctx.print(host.quickreply_div);
             quickreplyPrinted = true;
         }
+    }
+    function commentLink(ctx:Context,raw:unknown,key:unknown):Data {
+        const comment=record(raw,'comment link');
+        if(!Number.isSafeInteger(comment.talkid)||!Array.isArray(comment.replies))throw new Error('Invalid comment link');
+        let show=false;
+        if(key==='expand_comments')show=!!comment._expander_allowed&&
+            ((!comment.full&&!comment.deleted)||comment.replies.some((child:Data)=>!child.full&&!child.deleted));
+        else if(key==='hide_comments'||key==='unhide_comments')show=comment.replies.length>0;
+        else if(!['delete_comment','screen_comment','unscreen_comment','unscreen_to_reply','freeze_thread','unfreeze_thread',
+            'watch_thread','unwatch_thread','watching_parent','edit_comment'].includes(String(key)))throw new Error('Unknown comment link');
+        return show?s2Object('Link',{url:'#',caption:ctx.prop[key==='expand_comments'?'_text_comment_expand':
+            key==='hide_comments'?'_text_comment_hide':'_text_comment_unhide'],icon:{'.type':'Image','.isnull':true},extra:{}}):
+            {'.type':'Link','.isnull':true,_url:''};
+    }
+    function commentReadLink(ctx:Context,raw:unknown,rawOptions:unknown,kind:'expand'|'hide'|'unhide'):string {
+        const comment=record(raw,'comment control'),options=rawOptions?record(rawOptions,'comment control options'):{};
+        const caption=escape(options.text||ctx.prop['_text_comment_'+kind]);
+        const attrs=(options.title?` title='${escape(options.title)}'`:'')+(options.class?` class='${escape(options.class)}'`:'');
+        let text=caption;
+        if(options.img_url) {
+            const url=String(options.img_url);
+            if(!/^https?:\/\/[^\s'"<>]+$/.test(url)&&!/^\/(?!\/)[^\s'"<>]*$/.test(url))throw new Error('Unsupported comment control image');
+            const sizes=['width','height','border'].map(key=>options['img_'+key]!==undefined&&/^\d+$/.test(String(options['img_'+key]))?
+                ` ${key}="${options['img_'+key]}"`:'').join('');
+            const align=options.img_align&&/^\w+$/.test(String(options.img_align))?` align="${escape(options.img_align)}"`:'';
+            text=`<img src="${escape(url)}"${sizes}${align} title="${escape(options.img_title||caption)}" alt="${escape(options.img_alt||caption)}" />`+
+                (options.text?escape(options.text):'');
+        }
+        const id=comment.talkid;
+        if(!Number.isSafeInteger(id)||id<1||id>1099511627775)throw new Error('Invalid comment control id');
+        const href=kind==='hide'?`#cmt${id}`:comment.expand_url;
+        const action=kind==='expand'?`Expander.make(this,'${comment.js_expand_url}','${id}'); return false;`:
+            `Expander.${kind==='hide'?'hideComments':'unhideComments'}(this, '${id}'); return false;`;
+        return `<a href='${escape(href)}'${attrs} onClick="${escape(action)}">${text}</a>`;
     }
     return {
         _get_page: () => page,
@@ -239,7 +275,7 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         },
         _UserLite__get_link: (ctx, user, key) => {
             const person = record(user, "S2 link user");
-            if (person.user !== host.owner_user) throw new Error("Unknown user link target");
+            if(person.user!==host.owner_user)return {".type":"Link",".isnull":true,_url:""};
             const links = record(host.user_links, "render app user links");
             const raw = links[String(key)];
             if (raw === undefined) return { ".type": "Link", ".isnull": true, _url: "" };
@@ -259,12 +295,36 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         },
         _UserLite__ljuser: (_ctx, user, color) => {
             const person = record(user, "S2 ljuser");
-            if (person.user !== host.owner_user || person.host_userid !== host.owner_userid ||
+            if (!host.user_badges?.[String(person.host_userid)] ||
                 (color && typeof color === "object" && !(color as Data)[".isnull"])) {
                 throw new Error("Unsupported S2 ljuser variant");
             }
             if (typeof host.ljuser_html !== "string") throw new Error("Missing app user tag");
-            return host.ljuser_html;
+            return host.user_badges[String(person.host_userid)];
+        },
+        _EntryPage__print_multiform_start:()=>{if(page.multiform_on)throw new Error('Authenticated multiform unsupported');},
+        _EntryPage__print_multiform_end:()=>{if(page.multiform_on)throw new Error('Authenticated multiform unsupported');},
+        _EntryPage__print_multiform_actionline:()=>{if(page.multiform_on)throw new Error('Authenticated multiform unsupported');},
+        _Comment__get_link:commentLink,
+        _Comment__formatted_subject:(ctx,item,options)=>formatPlainSubject(item,options,ctx.prop,'entry'),
+        _Comment__get_plain_subject:(_ctx,item)=>record(item,'comment subject')._subject_all,
+        _Comment__print_multiform_check:()=>{},
+        _Comment__print_expand_link:(ctx,item,options)=>ctx.print(commentReadLink(ctx,item,options,'expand')),
+        _Comment__expand_link:(ctx,item,options)=>commentReadLink(ctx,item,options,'expand'),
+        _Comment__print_hide_link:(ctx,item,options)=>ctx.print(commentReadLink(ctx,item,options,'hide')),
+        _Comment__print_unhide_link:(ctx,item,options)=>ctx.print(commentReadLink(ctx,item,options,'unhide')),
+        _Comment__print_reply_container:printEntryReplyContainer,
+        _Comment__print_reply_link:(ctx,item,options)=>{
+            const comment=record(item,'comment reply'),opts=record(options??{},'comment reply options');
+            const target=String(opts.target||comment.talkid);
+            if(!/^\d+$/.test(target))throw new Error('Invalid comment reply target');
+            ctx.print(`<a onclick='return function(that) {return quickreply("${target}", 0, "",that)}(this)' href='${escape(comment.reply_url)}' `+
+                (opts.class?`class="${escape(opts.class)}"`:'')+`>${escape(opts.linktext??'')}</a>`);
+        },
+        _ItemRange__url_of:(_ctx,range,n)=>{
+            const value=Number(n),item=record(range,'comment range');
+            if(!Number.isSafeInteger(value)||!item._page_base)throw new Error('Unsupported comment page');
+            return `${item._page_base}?page=${value}`;
         },
         _Entry__get_link: (ctx, rawEntry, key) => {
             if (!["edit_entry", "edit_tags", "mem_add", "tell_friend", "nav_prev", "nav_next",

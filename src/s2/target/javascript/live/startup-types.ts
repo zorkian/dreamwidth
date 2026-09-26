@@ -32,7 +32,16 @@ export interface ConfiguredDatabase {
     readonly clusterPairActive: Readonly<Record<string, "a" | "b">>;
 }
 
+export interface SourceCapability {
+    readonly defaultValue:number|null;
+    readonly byBit:readonly {readonly bit:number;readonly value:number}[];
+    readonly hookConfigured:boolean;
+}
+
 export interface SourceCapabilities {
+    readonly threadExpander?:SourceCapability;
+    readonly threadExpandAll?:SourceCapability;
+    readonly maxComments?:SourceCapability;
     readonly moveInProgressMask: number; // configured class bits, BigInt operations
     readonly s2ViewEntry: {
         readonly defaultValue: number | null;
@@ -64,6 +73,7 @@ export interface StandaloneStartupConfig {
 // MysqlLiveStore.open owns primary role/topology validation. The server validates
 // JSON/CLI/file boundaries; it does not duplicate data/policy predicates.
 export interface LiveStoreConfig {
+    readonly commentSettings?:PublicAppConfig["commentSettings"];
     readonly database: ConfiguredDatabase;
     readonly styles: SourceStyleConfiguration;
     readonly maxScrollback: number;

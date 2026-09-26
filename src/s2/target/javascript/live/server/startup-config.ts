@@ -72,7 +72,11 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     const app = record(root.app, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot",
         "statPrefix", "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback",
         "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
-        "appleTouchIcon", "facebookPreviewIcon"]);
+        "appleTouchIcon", "facebookPreviewIcon", ...(Object.hasOwn(root.app as object,"commentSettings")?["commentSettings"]:[])]);
+    if(app.commentSettings!==undefined) {
+        const c=record(app.commentSettings,["pageSize","threadPoint","maxSubjects"]);
+        for(const n of Object.values(c))integer(n,1,10000);
+    }
     origin(app.canonicalAppOrigin); origin(app.listenOrigin); boolean(app.userpicUrlHookConfigured); boolean(app.tagsEnabled); boolean(app.tagListHookConfigured);
     for (const key of ["siteRoot", "statPrefix", "jsPrefix", "userDomain", "imgPrefix", "palImgRoot",
         "userpicRoot", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon", "facebookPreviewIcon"]) {
@@ -112,7 +116,13 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     });
     list(db.clusters, item => integer(item, 1));
     map(db.clusterPairActive, item => { if (item !== "a" && item !== "b") invalid(); });
-    const caps = record(root.capabilities, ["moveInProgressMask", "s2ViewEntry"]);
+    const caps = record(root.capabilities, ["moveInProgressMask", "s2ViewEntry",
+        ...["threadExpander","threadExpandAll","maxComments"].filter(key=>Object.hasOwn(root.capabilities as object,key))]);
+    for(const key of ["threadExpander","threadExpandAll","maxComments"])if(caps[key]!==undefined) {
+        const cap=record(caps[key],["defaultValue","byBit","hookConfigured"]);
+        nullable(cap.defaultValue,n=>integer(n,Number.MIN_SAFE_INTEGER));boolean(cap.hookConfigured);
+        list(cap.byBit,row=>{const b=record(row,["bit","value"]);integer(b.bit,0,31);integer(b.value,Number.MIN_SAFE_INTEGER);});
+    }
     integer(caps.moveInProgressMask, 0, 4294967295);
     const entry = record(caps.s2ViewEntry, ["defaultValue", "byBit", "hookConfigured"]);
     nullable(entry.defaultValue, item => integer(item, Number.MIN_SAFE_INTEGER)); boolean(entry.hookConfigured);

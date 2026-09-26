@@ -24,6 +24,7 @@ import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
+import {journalBase} from "../render/journal-url";
 import {readPropertyLayer} from "../domain/property-layer";
 import {approveTags} from "../domain/tags";
 import {approveLinks, navigationUrl, websiteName} from "../domain/links";
@@ -31,6 +32,8 @@ import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 import {moodSelection} from "../domain/moods";
 import {locationCurrent} from "../domain/location";
 import {approveCrosspostUrls,opaqueCrosspostBytes} from "../domain/crossposts";
+
+import {approveComments,commentCapabilityValue} from "../domain/comments";
 
 import {UserpicSelection} from "../domain/userpics";
 
@@ -48,25 +51,7 @@ export function canonicalUsername(value: string, maxLength: number): string | nu
         name.length <= Math.min(maxLength, 25) && /^[a-z0-9_]+$/.test(name) ? name : null;
 }
 
-export function journalBase(username: string, config: PublicAppConfig): string {
-    // LJ::journal_base (User/Account.pm): configured P rule for admitted personal
-    // journals. Dynamic hook URLs cannot be invented from a presence flag.
-    const rules = config.journalUrls;
-    if (rules.hookConfigured) throw new Unsupported();
-    const rule = rules.subdomainRules.P;
-    if (!rule) throw new Unsupported();
-    let base: string;
-    if (rule[0] && !username.startsWith("_") && !username.endsWith("_")) {
-        if (!rules.domain) throw new Unsupported();
-        base = `${rules.protocol}://${username.replace(/_/g, "-")}.${rules.domain}`;
-    } else if (!rule[1] && rules.isDevServer) {
-        base = `${rules.protocol}://${new URL(config.canonicalAppOrigin).host}/~${username}`;
-    } else base = `${rules.protocol}://${rule[1]}/${username}`;
-    const parsed = new URL(base);
-    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password ||
-        parsed.search || parsed.hash || /[\x00-\x20"'<>\\]/.test(base)) throw new Unsupported();
-    return base;
-}
+export {journalBase} from "../render/journal-url";
 
 function integer(value: number, min = 0, max = Number.MAX_SAFE_INTEGER): boolean {
     return Number.isSafeInteger(value) && value >= min && value <= max;
@@ -199,7 +184,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         BigInt(u.caps) > 65535n || !integer(capabilities.moveInProgressMask, 0, 65535) ||
         (BigInt(u.caps) & BigInt(capabilities.moveInProgressMask)) !== 0n || !integer(u.defaultpicid) ||
         !["Y", "N"].includes(u.optShowTalkLinks) ||
-        u.optWhocanReply !== "all" ||
+        !["all","reg","friends"].includes(u.optWhocanReply) ||
         !["N", "Y"].includes(u.optForceMoodtheme) || !integer(u.moodthemeid) ||
         !Number.isSafeInteger(u.userid) || u.userid <= 0) throw new Unsupported();
     const empty = ["adult_content_reason", "sticky_entry", "icbm",
@@ -219,11 +204,12 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
     if (snapshot.selection.kind === "entry" &&
         (p.use_journalstyle_entry_page === "N" || !supportsEntry(u.caps, capabilities))) throw new Unsupported();
     for (const key of ["opt_allowsearchby", "opt_blockglobalsearch", "opt_ctxpopup",
-        "opt_whoscreened", "opt_usermsg", "opt_tagpermissions",
+        "opt_usermsg", "opt_tagpermissions",
         "opt_embedplaceholders", "opt_imagelinks", "opt_imageundef", "opt_maxpicheight",
         "opt_maxpicwidth", "exclude_from_own_stats"] as const) {
         if (p[key] !== null && p[key] !== "") throw new Unsupported();
     }
+    if(![null,"","N","R","F","A"].includes(p.opt_whoscreened))throw new Unsupported();
     const style = snapshot.style;
     if (!style || ![2,3].includes(style.layers.length) || !integer(style.modtime) ||
         (style.origin === "persisted" ? (style.ownerid !== u.userid ||
@@ -261,8 +247,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         }
     }
     for(const value of Object.values(customtextStored))if(value!==null&&Buffer.byteLength(value)>65536)throw new Unsupported();
-    if (["comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
-        snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
+    if (snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
             poster.userid !== u.userid || poster.user !== u.user || poster.clusterid !== u.clusterid ||
             poster.statusvis !== "V" || poster.status !== "A")) throw new Unsupported();
     if (snapshot.features.links !== snapshot.links.length || snapshot.features.usertags!==snapshot.tags.definitions.length ||
@@ -283,7 +268,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !/^(0|[1-9][0-9]*)$/.test(entry.allowmask) || BigInt(entry.allowmask) > 18446744073709551615n ||
             !integer(entry.jitemid, 1, 16777215) || ids.has(entry.jitemid) ||
             !Number.isInteger(entry.anum) || entry.anum < 0 || entry.anum > 255 ||
-            entry.replycount !== 0) throw new Unsupported();
+            !integer(entry.replycount)) throw new Unsupported();
         ids.add(entry.jitemid);
         if (!snapshot.posters.some(poster => poster.userid === entry.posterid)) throw new Unsupported();
         bytes += Buffer.byteLength(entry.subjectText) + Buffer.byteLength(entry.eventText);
@@ -307,7 +292,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             "opt_nocomments_maintainer", "opt_noemail"] as const) {
             if (![undefined, null, "", "0", "1"].includes(props[flag])) throw new Unsupported();
         }
-        if (perlTrue(props.opt_nocomments_maintainer)) throw new Unsupported();
         const currents: Record<string,string> = {};
         let numericMood: ReturnType<typeof moodSelection> | undefined;
         if (perlTrue(props.current_moodid)) {
@@ -330,6 +314,14 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             entry.year !== Number(entry.eventtime.slice(0, 4)) ||
             entry.month !== Number(entry.eventtime.slice(5, 7)) ||
             entry.day !== Number(entry.eventtime.slice(8, 10))) throw new Unsupported();
+        const commentsEnabled = u.optShowTalkLinks === "Y" && !perlTrue(props.opt_nocomments) && !perlTrue(props.opt_nocomments_maintainer);
+        const effectiveCount = commentsEnabled ? entry.replycount : 0;
+        if (effectiveCount !== 0 && !capabilities.maxComments) throw new Unsupported();
+        // Undefined native caps compare numerically as zero; defined zero must
+        // not be replaced by a default. Legacy zero-comment config remains valid.
+        const commentsAtMax = capabilities.maxComments
+            ? effectiveCount >= (commentCapabilityValue(capabilities.maxComments, u.caps) ?? 0)
+            : false;
         entries.push({
             id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
             subject: plainSubject(entry.subjectText), currents,
@@ -337,7 +329,9 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             userpic: pictures.forEntry(props),
-            commentsEnabled: u.optShowTalkLinks === "Y" && !perlTrue(props.opt_nocomments),
+            commentsEnabled, commentsAtMax,
+            replycount:entry.replycount,
+            commentsDisabledMaintainer:perlTrue(props.opt_nocomments_maintainer),
         });
     }
     if (snapshot.selection.kind === "entry" && config.userpicUrlHookConfigured &&
@@ -351,6 +345,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         return value;
     };
     return {
+        comments:approveComments(snapshot,config,capabilities),
         userid: u.userid, username: u.user, name: text(u.name),
         baseUrl: journalBase(u.user, config), calendar,
         title: text(p.journaltitle || u.name), subtitle: text(p.journalsubtitle || ""),

@@ -55,16 +55,27 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
     const expectedHost = new URL(config.listenOrigin).host;
     const canonical = (name: string): boolean => canonicalUsername(name, config.usernameMaxLength) === name;
     const page = (raw: string): {username: string; kind: "recent"; skip: number; skipPresent: boolean} |
-        {username: string; kind: "entry"; ditemid: number} | null => {
+        {username: string; kind: "entry"; ditemid: number; comments?:import("../contracts").CommentQuery} | null => {
         const recent = /^\/users\/([a-z0-9_]{1,25})\/(?:\?skip=(0|[1-9][0-9]{0,15}))?$/.exec(raw);
         if (recent && canonical(recent[1]!)) {
             const skip = Number(recent[2] ?? 0);
             return Number.isSafeInteger(skip) ? {kind: "recent", username: recent[1]!, skip,
                 skipPresent: recent[2] !== undefined} : null;
         }
-        const entry = /^\/users\/([a-z0-9_]{1,25})\/([1-9][0-9]{0,9})\.html$/.exec(raw);
-        return entry && canonical(entry[1]!) && validEntryId(Number(entry[2])) ?
-            {kind: "entry", username: entry[1]!, ditemid: Number(entry[2])} : null;
+        const entry = /^\/users\/([a-z0-9_]{1,25})\/([1-9][0-9]{0,9})\.html(?:\?([^?]+))?$/.exec(raw);
+        if(!entry||!canonical(entry[1]!)||!validEntryId(Number(entry[2])))return null;
+        const comments:Record<string,number|boolean>=Object.create(null);
+        if(entry[3])for(const pair of entry[3].split('&')) {
+            const match=/^(page|thread|destination_thread|expand_all)=(0|[1-9][0-9]{0,12})$/.exec(pair);
+            if(!match)return null;
+            const key=match[1]==='destination_thread'?'destinationThread':match[1]!;
+            const value=Number(match[2]);
+            if(Object.hasOwn(comments,key==='expand_all'?'expandAll':key)||!Number.isSafeInteger(value)||
+                value>(key==='page'?4294967295:1099511627775)||key==='expand_all'&&value!==1)return null;
+            comments[key==='expand_all'?'expandAll':key]=key==='expand_all'?true:value;
+        }
+        return {kind:'entry',username:entry[1]!,ditemid:Number(entry[2]),
+            ...(entry[3]?{comments}: {})};
     };
     const controlRoot = config.siteRoot.startsWith("/") && !config.siteRoot.startsWith("//") ?
         config.siteRoot.replace(/\/$/, "") : "";
@@ -85,7 +96,7 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
                 const method = request.method as "GET" | "HEAD";
                 return selected.kind === "recent" ? {kind: "recent", request: {method,
                     username: selected.username, skip: selected.skip, skipPresent: selected.skipPresent, uniqCookie}} :
-                    {kind: "entry", request: {method, username: selected.username, ditemid: selected.ditemid, uniqCookie}};
+                    {kind: "entry", request: {method, username: selected.username, ditemid: selected.ditemid, ...(selected.comments?{comments:selected.comments}:{}), uniqCookie}};
             }
             const control = raw.startsWith(controlRoot + "/") ? raw.slice(controlRoot.length) : null;
             if (request.method === "POST") {
@@ -107,7 +118,10 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
                         return Buffer.byteLength(key)<=4096 && !/[\x00-\x1f\x7f]/.test(key) &&
                             encodeURIComponent(key)===go[4];
                     })());
-                if (!(control && GET_PATHS.has(control)) && !safeMemories && !safeItem && !safeReturn && !safeGo &&
+                const threadroot = control && /^\/go\?redir_type=threadroot&journal=([a-z0-9_]{1,25})&talkid=([1-9][0-9]{0,12})$/.exec(control);
+                const safeThreadroot = threadroot && canonical(threadroot[1]!) &&
+                    Number(threadroot[2])<=1099511627775;
+                if (!(control && GET_PATHS.has(control)) && !safeMemories && !safeItem && !safeReturn && !safeGo && !safeThreadroot &&
                     !datePath(raw) && !asset(raw, prefixes)) return REJECT;
             }
             return {kind: "redirect", status: 307, location: config.canonicalAppOrigin + raw};

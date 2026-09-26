@@ -75,8 +75,18 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     const page: Record<string, any> = {};
     const host: Record<string, any> = {};
     const c = input.config;
+    const expansion=input.page.kind==='entry'&&input.journal.comments?.expandAllowed&&input.journal.comments.collapsed?
+        (()=>{
+            const current=input.journal.comments!.page;
+            const suffix=`?expand_all=1${current>1?'&page='+current:''}#comments`;
+            return {original:`onClick="Expander.make(this,'${input.journal.baseUrl}/${input.page.kind==='entry'?input.page.ditemid:0}.html${suffix}',-1,false);return false;"`,
+                replacement:`onClick="Expander.make(this,'${c.listenOrigin}/users/${input.journal.username}/${input.page.kind==='entry'?input.page.ditemid:0}.html${suffix}',-1,false);return false;"`};
+        })():null;
     const ctx = new Context(layers, text => {
         if (!printing) return;
+        // Only the unchanged stock expand-all handler receives the named
+        // transport-origin adaptation. The fallback href stays canonical.
+        if(expansion)text=text.replaceAll(expansion.original,expansion.replacement);
         bytes += Buffer.byteLength(text);
         if (bytes > maxBytes) throw new Error("Render output limit");
         html += text;
@@ -127,6 +137,39 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     if(typeof customtextHtml==='string'&&cleaned.has(customtextHtml))finalized.add(customtextHtml);
     Object.defineProperties(page, Object.getOwnPropertyDescriptors(prepared));
     Object.assign(host, hostData(input, page, ctx.prop._reg_firstdayofweek === "monday"));
+    // core2 Comment::print_poster emits one complete safe chunk containing
+    // the trusted app badge. Capture that exact prepared public chunk before
+    // any printing; later mutable model strings cannot extend membership.
+    const registerPosters=(comments:Record<string,any>[]):void=>{for(const comment of comments){
+        if(comment._public_visible) {
+            const poster=comment.poster;
+            let label=poster&&!poster['.isnull']?host.user_badges[String(poster.host_userid)]:
+                `<span class="anonymous">${ctx.prop._text_poster_anonymous}</span>`;
+            if(typeof label!=='string')throw new Error('Missing trusted comment badge');
+            if(comment.metadata.imported_from)label=`<span class="imported-from">${label} (${ctx.prop._text_openid_from} ${comment.metadata.imported_from})</span>`;
+            finalized.add(`<span class="poster comment-poster"><span class="comment-from-text">${ctx.prop._text_comment_from}</span> ${label}`);
+        }
+        registerPosters(comment.replies);
+    }};
+    registerPosters(page.comments??[]);
+    // Only the Entry branch's complete stock page-summary LI is authorized.
+    // Evaluate unchanged helpers against the prepared roots now, so mutations
+    // during printing cannot grant new bytes or authorize other module lists.
+    if(input.page.kind==='entry')for(const comment of page.comments??[]) {
+        if(comment.deleted||comment.fromsuspended||comment.screened_noshow)continue;
+        const count=ctx.getFunction('print_module_pagesummary_comment_count(Comment)')(ctx,comment);
+        const display=ctx.getFunction('print_module_pagesummary_comments(string,int,string,string)')(
+            ctx,comment.subject,count,'text_read_comments_threads','');
+        const poster=comment.poster;
+        const label=poster&&!poster['.isnull']?host.user_badges[String(poster.host_userid)]:ctx.prop._text_poster_anonymous;
+        if(typeof label!=='string'||typeof display!=='string')throw new Error('Missing trusted comment summary');
+        let icon='';
+        if(comment.admin_post) {
+            const image=ctx.getFunction('get_image(string)')(ctx,'admin-post');
+            icon=String(ctx.getMethod(image,'as_string(string)',layers[0]!,0)(ctx,image,ctx.prop._text_icon_alt_admin_post));
+        }
+        finalized.add(`<li class="module-list-item"><span class="pagesummary-poster">${label}</span> - <span class="pagesummary-subject">${icon}<a href="#${comment.anchor}" ${display}</li>\n`);
+    }
     let metadata: ReturnType<RenderContentPreparation["metadata"]> | undefined;
     if (input.page.kind === "entry") {
         const ditemid = input.page.ditemid;
