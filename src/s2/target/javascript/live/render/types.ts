@@ -57,6 +57,8 @@ export interface ApprovedLink {
 }
 
 export interface ApprovedJournal {
+    readonly customtextProperties?: import("../domain/property-layer").CustomtextProperties;
+    readonly customtextStored?: {readonly title:string|null;readonly url:string|null;readonly content:string|null};
     readonly userid: number;
     readonly username: string;
     readonly name: string;
@@ -97,6 +99,7 @@ export type RenderPage =
 // consumes body HTML in body context and inert metadata at the escaped OG
 // attribute boundary. Neither fragment nor helper string returns to the parent.
 export interface RenderContentPreparation {
+    customtext?(source:string):string;
     subject(entry: ApprovedEntry, entryUrl: string, source?: string): SubjectPreparation;
     body(entry: ApprovedEntry, entryUrl: string): string;
     metadata(entry: ApprovedEntry, entryUrl: string): InertEntryMetadata;
