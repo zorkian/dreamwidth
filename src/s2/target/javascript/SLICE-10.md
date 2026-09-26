@@ -95,6 +95,11 @@ The compact fixed records additionally distinguish:
   capabilities refuse. No blanket installed-hook startup refusal is added.
   Source conditional embed hooks are not executed or guessed absent.
 
+Initial LF/CRLF or character-reference LF discarded by HTML5 pre/textarea/listing
+parsing is restored only with maintained source-location and decoded-text proof.
+Display serializes the LF; inert subject helpers keep original CRLF/entity spelling.
+Stray end tags without a provable original text extent explicitly refuse.
+
 Source gaps/merged tokens must pass the existing maintained location/source audit;
 unproved cases refuse instead of introducing another parser. Ordinary supported
 formatting is not downgraded to plain text. New contexts are not a general
