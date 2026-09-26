@@ -171,10 +171,10 @@ export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesh
                     tag += "&#39;";
                 } else if (char === "&") {
                     const rest = input.slice(cursor);
-                    if (rest.startsWith("&#")) {
+                    if (rest.startsWith("&#") && !rest.startsWith("&#39;")) {
                         throw new Error("Unsupported numeric safe HTML attribute entity");
                     }
-                    const entity = /^&(?:amp|quot|lt|gt);/.exec(rest);
+                    const entity = /^&(?:amp|quot|lt|gt|#39);/.exec(rest);
                     if (entity) {
                         tag += entity[0];
                         cursor += entity[0].length - 1;
@@ -230,13 +230,16 @@ export function cleanTrustedSafeChunk(input: string, stylesheet?: TrustedStylesh
                 key === "datafld" || key === "style" && match[3] !== "font-size: smaller;") {
                 throw new Error(`Unsupported safe HTML attribute ${key}`);
             }
-            const value = match[3]!;
+            // Only the reached ehtml encodings, decoded once. A literal source
+            // &amp; or &#39; remains entity-looking text after this pass.
+            const value = match[3]!.replace(/&(?:amp|quot|lt|gt|#39);/g, entity =>
+                ({"&amp;":"&", "&quot;":'"', "&lt;":"<", "&gt;":">", "&#39;":"'"})[entity]!);
             if (/((?:java|vb)script|about):/i.test(value.replace(/[\s\0]/g, ""))) {
                 throw new Error("Unsupported safe HTML attribute URL");
             }
             if ((key === "href" || key === "src") &&
-                (/[\s\0]/.test(value) || /&(?:#[^;]*|[A-Za-z][A-Za-z0-9]*);/.test(value))) {
-                throw new Error("Unsupported safe HTML URL whitespace or entity");
+                (/[\s\x00-\x1f\x7f]/.test(value) || /^(?:data|blob|file|filesystem):/i.test(value))) {
+                throw new Error("Unsupported safe HTML URL whitespace or active scheme");
             }
             attributes[key] = value;
             remaining = remaining.slice(match[0].length);

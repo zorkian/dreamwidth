@@ -36,6 +36,13 @@ export interface ApprovedEntry {
     readonly commentsEnabled: boolean;
     readonly userpic: ApprovedUserpic | null;
 }
+export interface ApprovedLink {
+    readonly title: string;
+    readonly url: string;
+    readonly hover: string;
+    readonly isHeading: boolean;
+}
+
 export interface ApprovedJournal {
     readonly userid: number;
     readonly username: string;
@@ -51,6 +58,9 @@ export interface ApprovedJournal {
     readonly entries: readonly ApprovedEntry[];
     readonly calendar: ApprovedCalendar;
     readonly defaultUserpic: ApprovedUserpic | null;
+    readonly websiteUrl: string;
+    readonly websiteName: string;
+    readonly links: readonly ApprovedLink[];
 }
 export interface ApprovedCalendar {
     readonly year: number;
