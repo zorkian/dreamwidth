@@ -46,6 +46,14 @@ test("language parser follows independent retained single/multiline/metadata ove
         assert.equal(placeholderFileValue(source, "img.placeholder"), JSON.parse(native.stdout));
     }
     assert.throws(() => placeholderFileValue("bogus format\n", "img.placeholder"), SnapshotError);
+    const nbspSource = "img.placeholder=X\n\u00a0\n";
+    const nbspFile = path.join(dir, "nbsp.dat"); writeFileSync(nbspFile, nbspSource);
+    const nativeNbsp = spawnSync("perl", ["-I", path.resolve(process.cwd(), "../../../../cgi-bin"),
+        "-MLJ::LangDatFile", "-e", 'LJ::LangDatFile->new($ARGV[0])', nbspFile],
+        {encoding: "utf8", timeout: 10000});
+    assert.notEqual(nativeNbsp.status, 0);
+    assert.match(nativeNbsp.stderr, /Bogus format/);
+    assert.throws(() => placeholderFileValue(nbspSource, "img.placeholder"), SnapshotError);
 }));
 
 test("startup file/DB precedence and Perl false/missing rules preserve public projection", () => temporary(dir => {
