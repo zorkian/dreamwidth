@@ -144,7 +144,15 @@ export interface SubjectInput {
 export type SubjectResult =
     | {readonly kind: "ok"; readonly subject: SubjectPreparation}
     | {readonly kind: "failure"; readonly reason: "unsupported" | "unavailable"};
+export interface CustomtextInput {
+    readonly source:string;
+    readonly context:EntryContentContext;
+}
+export type CustomtextResult = {readonly kind:'ok';readonly html:string} |
+    {readonly kind:'failure';readonly reason:'unsupported'|'unavailable'};
 export interface EntryCleaner {
+    // Separate html_casual1 operation, with native final LF conversion.
+    customtext(input: CustomtextInput): CustomtextResult;
     subject(input: SubjectInput): SubjectResult;
     // Runs ONLY in a credential-free bounded worker. No caller DOM or hooks.
     // When needed, a second call uses the exact same input plus host resolutions.

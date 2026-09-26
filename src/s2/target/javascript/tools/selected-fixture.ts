@@ -36,7 +36,7 @@ export interface SelectedFixture {
 
 const globalTables = ["user","useridmap","userprop","userproplist","s2styles","s2layers",
     "s2compiled","s2source_inno","s2info","logproplist","sysban","secrets","moods","moodthemes","moodthemedata"];
-const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","log2","logtext2","logprop2",
+const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","s2compiled2","log2","logtext2","logprop2",
     "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","userpicmap2","userpicmap3","talk2"];
 
 export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>): Promise<void> {
