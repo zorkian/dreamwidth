@@ -26,7 +26,7 @@ import {snapshot, selectFixture, config, capabilities, limits} from "./fixtures"
 
 const approveSnapshot = (data: RawJournalSnapshot) => approveRawSnapshot(data, config, capabilities);
 const approveEntrySnapshot = (data: RawJournalSnapshot, id: number) =>
-    approveRawEntrySnapshot(data, id, config, capabilities);
+    approveRawEntrySnapshot(data, id, config, {...capabilities,maxComments:{defaultValue:5000,byBit:[],hookConfigured:false}});
 
 const request: RedirectAdmissionRequest = {method: "GET", rawTarget: "/users/s2js_slice3/384.html",
     host: "localhost:8081", origin: null, hasForwardedHeaders: false,
@@ -45,8 +45,8 @@ test("entry admission owns exact canonical uint32 identity and finite controls",
         "/users/s2js_slice3/+384.html", "/users/s2js_slice3/3e2.html", "/users/s2js_slice3/4294967296.html",
         "/users/s2js_slice3/384.HTML", "/users/s2js_slice3/384.html/", "/~s2js_slice3/384.html",
         "/users/s2js_slice3/384.html?", "/users/s2js_slice3/384.html?mode=reply",
-        "/users/s2js_slice3/384.html?style=mine", "/users/s2js_slice3/384.html?thread=1",
-        "/users/s2js_slice3/384.html?viewall=1", "/users/s2js_slice3/384.html?page=1",
+        "/users/s2js_slice3/384.html?style=mine",
+        "/users/s2js_slice3/384.html?viewall=1",
         "/users/s2js_slice3/384.html?nohtml=1", "/users/s2js_slice3/384.html?skip=0",
         "/users/s2js_slice3/384.html?mode=reply&mode=reply", "/users/s2js_slice3/384.html??",
         "/users/s2js_slice3/%33%38%34.html", "/users/s2js_slice3/../384.html",
@@ -97,10 +97,11 @@ test("target privacy/identity404 precedes unsupported cohort; exact public keeps
         assert.deepEqual(approveSnapshot({...recent, features: {...recent.features, spamreportBans}}),
             approveSnapshot(recent));
     }
-    for (const changed of [{...data, features: {...data.features, comments: 1}},
-        {...data, entries: [{...data.entries[0]!, replycount: 1}]}]) {
-        assert.throws(() => approveEntrySnapshot(changed, 384));
-    }
+    // Comment presence is supported now; header/body identity must still agree.
+    assert.equal(approveEntrySnapshot({...data,features:{...data.features,comments:1}},384)?.entries[0]!.id,384);
+    assert.throws(()=>approveEntrySnapshot({...data,entries:[{...data.entries[0]!,replycount:1}]},384));
+    assert.equal(approveEntrySnapshot({...data,entries:[{...data.entries[0]!,replycount:1}],
+        selection:{...selection,target:{...selection.target,replycount:1}}},384)?.entries[0]!.id,384);
     assert.equal(approveEntrySnapshot(data, 384)?.entries[0]!.id, 384);
 });
 
