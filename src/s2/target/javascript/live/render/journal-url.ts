@@ -34,4 +34,3 @@ export function journalBase(username: string, config: PublicAppConfig): string {
         parsed.search || parsed.hash || /[\x00-\x20"'<>\\]/.test(base)) throw new Unsupported();
     return base;
 }
-
