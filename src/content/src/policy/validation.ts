@@ -51,11 +51,13 @@ function publicUrl(value: unknown): void {
         }
     } catch { throw new UnsupportedContent(); }
 }
+// Source configuration keys are exact bytes, not normalized hostnames.
+// Form lookup lowercases its operand; image https_url compares captured case.
 function hosts(value: unknown): void {
     if (!Array.isArray(value) || value.length > 4096) throw new UnsupportedContent();
     for (const [index, host] of value.entries()) {
         text(host, 320);
-        if (!host || host !== host.toLowerCase() || /[\s%@/?#\\]/.test(host) ||
+        if (!host || /[\s%@/?#\\]/.test(host) ||
             (index > 0 && value[index - 1] >= host)) throw new UnsupportedContent();
         try {
             const url = new URL("http://" + host + "/");
@@ -90,7 +92,7 @@ export function validateInput(value: EntryContentInput, limits: CleanerLimits): 
     publicUrl(context.documentUrl);
     publicUrl(context.entryUrl);
     text(context.journalUsername, 25);
-    if (!/^[a-z][a-z0-9_]{0,24}$/.test(context.journalUsername)) throw new UnsupportedContent();
+    if (!/^[a-z0-9_]{1,25}$/.test(context.journalUsername)) throw new UnsupportedContent();
     integer(context.journalId, 1, Number.MAX_SAFE_INTEGER);
     integer(context.entryId, 1, Number.MAX_SAFE_INTEGER);
     const reader = record(context.reader, ["removeColors", "removeSizes", "removeFonts",
