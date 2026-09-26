@@ -38,6 +38,9 @@ test("configured schemas select public windows and distant Entry without history
         // selects DEFAULT_STYLE, including incompatible stored layer IDs.
         const layoutId = first.style!.layers.find(layer=>layer.type==="layout")!.s2lid;
         try {
+            await admin.query(`UPDATE ${table(c,"userproplite2")} SET value='2abc'
+                WHERE userid=900001 AND upropid=?`,[prop("stylesys")]);
+            await assert.rejects(()=>store.loadRawSnapshot(request()),SnapshotError);
             await admin.query(`UPDATE ${table(c,"userproplite2")} SET value='1'
                 WHERE userid=900001 AND upropid=?`,[prop("stylesys")]);
             await admin.query(`UPDATE ${table(c,"s2stylelayers2")} SET s2lid=999999
