@@ -147,6 +147,8 @@ function currentFields(content: RenderContentPreparation, entry: ApprovedEntry, 
         result[name] = content.subject(entry,url,raw).html;
     }
     if (entry.moodName !== undefined && (!result.mood || result.mood === "0")) result.mood = entry.moodName;
+    if(entry.crosspostUrls?.length)result.xpost=entry.crosspostUrls.map(value=>
+        `<a href='${escapeHtml(new URL(value,url).href)}'>${escapeHtml(value)}</a>`).join(" ");
     return result;
 }
 function prepareMoodIcon(entry: ApprovedEntry): S2Object {

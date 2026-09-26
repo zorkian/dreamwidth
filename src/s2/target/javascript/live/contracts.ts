@@ -86,9 +86,11 @@ export interface RawEntry {
     readonly allowmask: string;
     readonly replycount: number;
     readonly compressed: string;
-    // All logprop names, including unsupported ones; policy rejects unsupported
-    // semantic props. Values such as useragent remain policy-only, never render.
+    // All text logprops, including unsupported ones; the two binary crosspost
+    // props are represented separately. Values such as useragent never render.
     readonly props: Readonly<Record<string, string | null>>;
+    readonly xpostOpaque?: {readonly encoding: "opaque-bytes"; readonly base64: string};
+    readonly xpostDetail?: {readonly encoding: "storable-network-2.11"; readonly base64: string};
     // Source bytes decoded strictly once, with bounded gzip event decompression.
     // Unknown8bit is refused before decoding, never guessed as UTF8.
     readonly subjectText: string;
