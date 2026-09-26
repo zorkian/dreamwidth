@@ -23,7 +23,7 @@ import {withSelectedFixture} from "./selected-fixture";
 
 test("configured schemas select public windows and distant Entry without history caps or marker enrollment", {
     skip: process.env.S2_SELECTED_FIXTURE !== "1",
-}, async () => withSelectedFixture(async ({store,admin,g,c,other,table,request,logProp}) => {
+}, async () => withSelectedFixture(async ({store,admin,g,c,other,table,request,logProp,prop}) => {
         const first = await store.loadRawSnapshot(request()); assert.ok(first);
         assert.equal(first.entries.length,20); assert.equal(first.selection.kind,"recent");
         if (first.selection.kind!=="recent") throw Error("Unexpected page");
@@ -34,6 +34,37 @@ test("configured schemas select public windows and distant Entry without history
         assert.equal(first.calendar.days[0]!.count,300);
         assert.equal(approveSnapshot(first,publicConfig,capabilities).entries.length,20);
         assert.equal(await store.revalidateFingerprint(first),true);
+        // Native dispatch ignores a stale persisted S2 style when stylesys1
+        // selects DEFAULT_STYLE, including incompatible stored layer IDs.
+        const layoutId = first.style!.layers.find(layer=>layer.type==="layout")!.s2lid;
+        try {
+            await admin.query(`UPDATE ${table(c,"userproplite2")} SET value='1'
+                WHERE userid=900001 AND upropid=?`,[prop("stylesys")]);
+            await admin.query(`UPDATE ${table(c,"s2stylelayers2")} SET s2lid=999999
+                WHERE userid=900001 AND styleid=44 AND type='layout'`);
+            const fallback = await store.loadRawSnapshot(request()); assert.ok(fallback);
+            assert.equal(fallback.owner.publicSettings.stylesys,"1");
+            assert.equal(fallback.owner.publicSettings.s2_style,"44");
+            assert.equal(fallback.style!.origin,"default");
+            assert.equal(fallback.style!.styleid,0);
+            approveSnapshot(fallback,publicConfig,capabilities);
+            assert.equal(await store.revalidateFingerprint(first),false);
+            await admin.query(`UPDATE ${table(c,"userproplite2")} SET value='2'
+                WHERE userid=900001 AND upropid=?`,[prop("stylesys")]);
+            await assert.rejects(()=>store.loadRawSnapshot(request()),SnapshotError);
+            await admin.query(`UPDATE ${table(c,"s2stylelayers2")} SET s2lid=?
+                WHERE userid=900001 AND styleid=44 AND type='layout'`,[layoutId]);
+            const persisted = await store.loadRawSnapshot(request()); assert.ok(persisted);
+            assert.equal(persisted.style!.origin,"persisted");
+            approveSnapshot(persisted,publicConfig,capabilities);
+            assert.equal(await store.revalidateFingerprint(fallback),false);
+            assert.equal(await store.revalidateFingerprint(first),true);
+        } finally {
+            await admin.query(`UPDATE ${table(c,"userproplite2")} SET value='2'
+                WHERE userid=900001 AND upropid=?`,[prop("stylesys")]);
+            await admin.query(`UPDATE ${table(c,"s2stylelayers2")} SET s2lid=?
+                WHERE userid=900001 AND styleid=44 AND type='layout'`,[layoutId]);
+        }
         for (const skip of [79,80,81,200,100000]) {
             const snapshot = await store.loadRawSnapshot(request("ordinary6",{kind:"recent",skip,itemshow:20})); assert.ok(snapshot);
             assert.equal(snapshot.selection.kind,"recent");
