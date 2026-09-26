@@ -44,7 +44,9 @@ const cases=["","0","Plain &amp; &#39; &unknown;","first\nsecond",
     '<a href="/relative?q=&quot;x&quot;">R</a>', '\n <b>prefix</b>', '<b>caf&#233; &amp; &#39;</b>',
     '<b style="color:r\\65 d">escaped red</b>', '<b style="position:\\66 ixed;top:0">escaped fixed</b>',
     'Plain "double" &amp;', '<b id="source-control" class="ordinary">named</b>',
-    '<style>b{color:red}</style>\n X<b>Y</b>'];
+    '<style>b{color:red}</style>\n X<b>Y</b>',
+    '<pre>\nX</pre>', '<textarea>\nX</textarea>', '<listing>\nX</listing>',
+    '<pre>\r\nX</pre>', 'a <pre>\nX</pre>', '<pre>&#10;X</pre>', '<pre>\n\nX</pre>'];
 interface Native {source:string;subject:string;all:string;og:string;recent:string;entry:string;currents:Record<string,string>}
 function prepared(item:SubjectPreparation):Record<string,unknown>{return {subject:item.html,
     _subject_recent:item.recentHtml,_subject_all:item.all,permalink_url:"https://journal.invalid/384.html"};}
@@ -81,6 +83,10 @@ test("fixed native subject/all/current/wrapper records and explicit context corr
                 "literal quote attribute safety correction; entities not double escaped");
         }else if(index===26){
             assert.equal(subject.html,'<b class="ordinary">named</b>',"stock-control ID containment, class preserved");
+        }else if(index>=28){
+            assert.equal(subject.html,row.subject.replaceAll("\r\n","\n").replaceAll("&#10;","\n"),
+                "source-proven discarded LF display serialization");
+            assert.equal(subject.recentHtml,subject.html);
         }else{
             assert.equal(subject.html,row.subject,source);
             assert.equal(formatPlainSubject(prepared(subject),{},props,"recent"),row.recent);

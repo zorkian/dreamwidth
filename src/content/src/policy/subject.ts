@@ -70,6 +70,31 @@ export function prepareSubject(input: SubjectInput, limits: CleanerLimits): Subj
         // Maintained RCDATA decoding is solely a consistency proof. A source
         // gap/merged token that cannot be proved refuses rather than guessing.
         const decoder = document.createElement("textarea");
+        // HTML5 discards one initial LF in these containers. Prove the
+        // complete first text extent against maintained RCDATA decoding; keep
+        // its original spelling for all, and restore decoded display text only
+        // after all has traversed the original nodes.
+        const restored = new Map<Node, string>();
+        const displayNewlines: Element[] = [];
+        for (const element of document.querySelectorAll("pre,textarea,listing")) {
+            const location = locate(element);
+            if (!location?.startTag) throw new UnsupportedContent();
+            const start = location.startTag.endOffset;
+            const first = element.firstChild;
+            const span = first ? locate(first) : null;
+            const end = span?.endOffset ?? location.endTag?.startOffset;
+            if (end === undefined || end < start) throw new UnsupportedContent();
+            const raw = input.source.slice(start, end);
+            decoder.innerHTML = raw;
+            const decoded = decoder.textContent ?? "";
+            if (decoded.startsWith("\n")) {
+                if (first && (first.nodeType !== 3 || !span)) throw new UnsupportedContent();
+                if (decoded !== "\n" + (first?.textContent ?? "")) throw new UnsupportedContent();
+                if (first) restored.set(first, raw);
+                else if (raw) throw new UnsupportedContent();
+                displayNewlines.push(element);
+            }
+        }
         const prefix = /^[\t\n\v\f\r ]*/.exec(input.source)![0];
         let all = prefix;
         function inert(node: Node): void {
@@ -77,9 +102,9 @@ export function prepareSubject(input: SubjectInput, limits: CleanerLimits): Subj
             if (node.nodeType === 3) {
                 const span = locate(node);
                 if (!span) throw new UnsupportedContent();
-                const raw = input.source.slice(span.startOffset, span.endOffset);
+                const raw = restored.get(node) ?? input.source.slice(span.startOffset, span.endOffset);
                 decoder.innerHTML = raw;
-                if (decoder.textContent !== node.textContent) throw new UnsupportedContent();
+                if (decoder.textContent !== (restored.has(node) ? "\n" : "") + node.textContent) throw new UnsupportedContent();
                 all += (span.startOffset < prefix.length ? raw.slice(prefix.length - span.startOffset) : raw)
                     .replaceAll("<", "&lt;").replaceAll(">", "&gt;");
                 return;
@@ -127,6 +152,7 @@ export function prepareSubject(input: SubjectInput, limits: CleanerLimits): Subj
                 if(decoder.textContent!==node.textContent)throw new UnsupportedContent();
                 return span.startOffset<prefix.length?raw.slice(prefix.length-span.startOffset):raw;
             }).join("") : "";
+        for (const element of displayNewlines) element.prepend(document.createTextNode("\n"));
         transform(document.body);
         if(headWhitespace)document.body.prepend(document.createTextNode(headWhitespace));
         // Full-document HTML5 parsing discards an initial ASCII whitespace
