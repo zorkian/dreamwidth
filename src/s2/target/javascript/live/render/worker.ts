@@ -77,7 +77,7 @@ process.stdin.on("end", () => {
         const contentInput = (entry: ApprovedEntry, entryUrl: string): EntryContentInput => {
             if (!request.journal.entries.includes(entry) || entryUrl !== `${base}/${entry.id}.html` ||
                 (request.page.kind === "entry" && entry.id !== request.page.ditemid)) throw new Unsupported();
-            return {body: entry.rawBody, format: "html_raw0", context: {
+            return {body: entry.rawBody, format: entry.bodyFormat, context: {
                 policy: "dreamwidth-entry-html-raw0-v1", insertionContext: "html-div-flow", documentUrl,
                 entryUrl, journalUsername: request.journal.username, journalId: request.journal.userid,
                 entryId: entry.id, cuts: entryPage ? "source-compatible-entry" : "source-compatible-recent",

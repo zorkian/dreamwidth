@@ -43,6 +43,23 @@ export { SOURCE_HASHES } from "../render/source-hashes";
 const perlTrue = (value: string | null | undefined): boolean =>
     value !== undefined && value !== null && value !== "" && value !== "0";
 
+// clean_event returns before format inference for Perl-false body text.
+export function entryBodyFormat(body: string, props: Readonly<Record<string,string|null|undefined>>,
+    logtime: string): "html_raw0" | "html_casual0" | "html_casual1" {
+    if (!perlTrue(body)) return "html_raw0";
+    if (perlTrue(props.editor)) {
+        if (props.editor === "rte0") return "html_casual1";
+        if (["html_raw0", "html_casual0", "html_casual1"].includes(props.editor!))
+            return props.editor as "html_raw0" | "html_casual0" | "html_casual1";
+        throw new Unsupported();
+    }
+    // Native input is a byte string: its source marker uses ASCII whitespace.
+    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test(body)) throw new Unsupported();
+    if (perlTrue(props.opt_preformatted)) return "html_raw0";
+    if (props.import_source !== undefined && props.import_source !== null) return "html_casual0";
+    return logtime && logtime < "2019-05" ? "html_casual0" : "html_casual1";
+}
+
 export function canonicalUsername(value: string, maxLength: number): string | null {
     // LJ::canonical_username: ASCII source domain; URL admission rejects encoded
     // or whitespace path spellings before reaching this scalar canonicalizer.
@@ -284,9 +301,9 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         const allowed = new Set(["editor", "opt_preformatted", "opt_backdated", "opt_nocomments",
             "opt_nocomments_maintainer", "revnum", "revtime", "interface", "useragent",
             "opt_noemail", "opt_screening", "statusvis", "picture_mapid", "picture_keyword",
-            "current_mood", "current_music", "current_location", "current_coords", "current_moodid"]);
+            "current_mood", "current_music", "current_location", "current_coords", "current_moodid", "import_source"]);
         if (Object.entries(props).some(([key, value]) => value && !allowed.has(key)) ||
-            props.editor !== "html_raw0" || ![undefined, null, "", "0", "1"].includes(props.opt_preformatted) ||
+            ![undefined, null, "", "0", "1"].includes(props.opt_preformatted) ||
             (props.statusvis && props.statusvis !== "V")) throw new Unsupported();
         for (const flag of ["opt_preformatted", "opt_backdated", "opt_nocomments",
             "opt_nocomments_maintainer", "opt_noemail"] as const) {
@@ -326,6 +343,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
             subject: plainSubject(entry.subjectText), currents,
             moodName:numericMood?.name, moodIcon:numericMood?.icon, crosspostUrls, rawBody: rawBody(entry.eventText),
+            bodyFormat: entryBodyFormat(entry.eventText,props,entry.logtime),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             userpic: pictures.forEntry(props),
