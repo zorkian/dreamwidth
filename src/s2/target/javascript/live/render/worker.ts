@@ -88,6 +88,18 @@ process.stdin.on("end", () => {
             }};
         };
         const content: RenderContentPreparation = {
+            subject(entry, entryUrl, source = entry.subject) {
+                const entryInput = contentInput(entry, entryUrl);
+                if (source !== entry.subject && !Object.values(entry.currents ?? {}).includes(source)) {
+                    throw new Unsupported();
+                }
+                const result = cleaner.subject({source, context: entryInput.context});
+                if (result.kind !== "ok") {
+                    if (result.reason === "unsupported") throw new Unsupported();
+                    throw new Error("Subject unavailable");
+                }
+                return result.subject;
+            },
             body(entry, entryUrl) {
                 const result = cleaner.clean(contentInput(entry, entryUrl));
                 if (result.kind === "failure") {

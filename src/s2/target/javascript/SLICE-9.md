@@ -135,3 +135,5 @@ are ignored evidence. This is not binary-resource route or full native
 positive-feature page parity. No-feature Recent/Entry native bytes, userpic/link
 regressions, existing runtime fixtures and immutable410/Entry62 remain separate
 regression gates; unchanged cleaner/browser evidence carries without a new matrix.
+
+Current rich subjects and textual entry currents: [SLICE-10.md](SLICE-10.md).

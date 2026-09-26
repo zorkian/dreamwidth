@@ -42,26 +42,37 @@ export function escapeHtml(value: unknown): string {
         .replaceAll("'", "&#39;");
 }
 
-export function formatPlainSubject(rawEntry: unknown, rawOptions: unknown): string {
+export function formatPlainSubject(rawEntry: unknown, rawOptions: unknown,
+    props: Data = {}, view = "recent"): string {
     const item = record(rawEntry, "entry subject");
     const options = record(rawOptions, "subject options");
-    const subject = item.subject;
     const format = options.format ?? "";
-    if (typeof subject !== "string" || subject === "" ||
-        /[<>"\r\n\t]|&(?:#[0-9]+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);/.test(subject) ||
-        (format !== "" && format !== "text") ||
+    if (!["", "text"].includes(String(format)) ||
         (options.class !== undefined && typeof options.class !== "string") ||
-        (options.style !== undefined && typeof options.style !== "string")) {
-        throw new Error("Unsupported formatted subject domain");
+        (options.style !== undefined && typeof options.style !== "string") ||
+        typeof item.subject !== "string" || typeof item._subject_recent !== "string" ||
+        typeof item._subject_all !== "string") throw new Error("Unsupported formatted subject domain");
+    let subject = item.subject;
+    let recent = item._subject_recent;
+    let title = item._subject_all;
+    let className = String(options.class ?? "");
+    if (subject === "") {
+        const normal = String(props._text_nosubject ?? "");
+        subject = normal && (props._all_entrysubjects || view === "month") ? normal : "";
+        if (!subject) {subject = String(props._text_nosubject_screenreader ?? ""); className += " invisible";}
+        recent = subject; title = subject;
     }
-    const cssClass = options.class ? ` class="${escapeHtml(options.class)}" ` : "";
+    const cssClass = className ? ` class="${escapeHtml(className)}" ` : "";
     const style = options.style ? ` style="${escapeHtml(options.style)}" ` : "";
-    if (format === "text") return `<span ${cssClass}${style}>${subject}</span>`;
-    if (typeof item.permalink_url !== "string" ||
-        !/^https?:\/\/[^/\s"<>]+\/\S*$/.test(item.permalink_url)) {
-        throw new Error("Unsupported entry permalink");
+    if (format === "text" || subject.includes("href") && (item.full || view === "entry" || view === "reply")) {
+        return `<span ${cssClass}${style}>${subject}</span>`;
     }
-    return `<a title="${subject}" href="${item.permalink_url}"${cssClass}${style}>${subject}</a>`;
+    if (typeof item.permalink_url !== "string" ||
+        !/^https?:\/\/[^/\s"<>]+\/\S*$/.test(item.permalink_url)) throw new Error("Unsupported entry permalink");
+    // Source helper preserves entity spelling; encode literal delimiters only,
+    // without decoding/re-encoding ampersands at this final attribute boundary.
+    const attribute = title.replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    return `<a title="${attribute}" href="${item.permalink_url}"${cssClass}${style}>${recent}</a>`;
 }
 
 export function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
@@ -187,13 +198,13 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             ctx.print(host.script_tags_html);
         },
         _EntryLite__formatted_subject: (_ctx, entry, rawOptions) =>
-            formatPlainSubject(entry, rawOptions),
+            formatPlainSubject(entry, rawOptions, _ctx.prop, String(page.view)),
         _Entry__get_plain_subject: (_ctx, rawEntry) => {
             const entry = record(rawEntry, "plain entry subject");
-            if (typeof entry.subject !== "string" || /[<>]/.test(entry.subject)) {
+            if (typeof entry._subject_all !== "string") {
                 throw new Error("Unsupported plain entry subject");
             }
-            return entry.subject;
+            return entry._subject_all;
         },
         _DateTime__date_format: (ctx, date, format, links) =>
             formatDate(ctx, date, format, "date", Boolean(links)),

@@ -125,3 +125,31 @@ export function cleanStyle(value: string, context: EntryContentContext,
     });
     return modified ? tree.generate(ast) : value;
 }
+
+// Subject opts do not enable the entry backslash transform. Decode ordinary
+// escaped CSS identifiers with the maintained tokenizer before applying the
+// same explicit containment/security screen; never strip source escape bytes
+// and silently change an ordinary color or resource destination.
+export function cleanSubjectStyle(value: string, context: EntryContentContext,
+    limits: CleanerLimits, budget: CssBudget): string | null {
+    if (value.includes("\\")) {
+        let ast: tree.CssNode;
+        try {
+            ast = tree.parse(value, {context:"declarationList",parseCustomProperty:true,
+                onParseError(){throw new UnsupportedContent();}});
+        } catch {throw new UnsupportedContent();}
+        let nodes=0;
+        tree.walk(ast,node=>{
+            if(++nodes>limits.maxCssNodes || node.type==="Raw")throw new UnsupportedContent();
+            const identifier=(text:string):string=>tree.ident.encode(tree.ident.decode(text));
+            if(node.type==="Declaration")node.property=identifier(node.property);
+            if(node.type==="Identifier"||node.type==="Function")node.name=identifier(node.name);
+        });
+        value=tree.generate(ast);
+        // Remaining escapes belong to strings/resources or names whose decoded
+        // spelling needs CSS escaping. Their source semantics are not proved by
+        // the identifier-only normalization; fail rather than corrupt them.
+        if(value.includes("\\"))throw new UnsupportedContent();
+    }
+    return cleanStyle(value,context,limits,budget);
+}
