@@ -39,6 +39,7 @@ export interface ApprovedEntry {
     readonly moodIcon?: {readonly url:string; readonly width:number; readonly height:number};
     readonly currents?: Readonly<Record<string,string>>; // RAW textual currents, child-only preparation
     readonly rawBody: string; // tainted; only child cleaner may prepare entry text
+    readonly bodyFormat: "html_raw0" | "html_casual0" | "html_casual1";
     readonly eventtime: string;
     readonly logtime: string;
     readonly reverseTime: number;
