@@ -32,7 +32,9 @@ const config: PublicAppConfig = {
     siteNameAbbrev: "DW",
     appleTouchIcon: "",
     facebookPreviewIcon: "",
-    anonymousCaptchaDisabled: true,
+    jsPrefix: "/js", userDomain: "", usernameMaxLength: 25, maxScrollback: 100,
+    journalUrls: {protocol: "http", domain: "", isDevServer: true,
+        subdomainRules: {P: [false, ""]}, hookConfigured: false},
     entryContent: {
         imagePlaceholder: {
             src: "/img/imageplaceholder2.png", width: 35, height: 35,
