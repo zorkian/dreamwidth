@@ -22,7 +22,7 @@ export function regressionConfigPath(project: string): string {
 }
 
 export async function regressionConfig(project: string): Promise<{
-    public: PublicAppConfig; credential: MysqlStoreConfig;
+    public: PublicAppConfig; credential: MysqlStoreConfig; artifactPath: string;
 }> {
     const startup = readStartupConfig(regressionConfigPath(project));
     const credential: MysqlStoreConfig = {database: startup.database,
@@ -32,7 +32,7 @@ export async function regressionConfig(project: string): Promise<{
     try {
         const labels = await store.resolvePlaceholder(startup.placeholder);
         const descriptor = startup.placeholder.descriptor;
-        return {credential, public: {...startup.app, entryContent: {
+        return {credential, artifactPath: startup.artifactPath, public: {...startup.app, entryContent: {
             urls: startup.app.entryContent.urls,
             imagePlaceholder: {src: descriptor.src, width: descriptor.width,
                 height: descriptor.height, alt: labels.alt, title: labels.title},
