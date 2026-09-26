@@ -27,11 +27,14 @@ export const config: PublicAppConfig = {
     siteRoot: "", statPrefix: "/stc", jsPrefix: "/js", userDomain: "",
     journalUrls: {protocol: "http", domain: "", isDevServer: true,
         subdomainRules: {P: [false, ""]}, hookConfigured: false},
-    usernameMaxLength: 25, maxScrollback: 100, imgPrefix: "/img", palImgRoot: "/palimg", userpicUrlHookConfigured: false, tagsEnabled: true, tagListHookConfigured: false, userpicRoot: "/userpic",
+    usernameMaxLength: 25, maxScrollback: 100, imgPrefix: "/img", palImgRoot: "/palimg", userpicUrlHookConfigured: false, headIconHookConfigured:false, tagsEnabled: true, tagListHookConfigured: false, userpicRoot: "/userpic",
     siteName: "DW Devcontainer", siteNameShort: "DWDev", siteNameAbbrev: "DW",
     appleTouchIcon: "", facebookPreviewIcon: "",
 };
 export const capabilities: SourceCapabilities = {moveInProgressMask: 32768,
+    authorStaffHeadicon:{defaultValue:0,byBit:[],hookConfigured:false},
+    authorReadonly:{defaultValue:0,byBit:[],hookConfigured:false},
+    authorAvoidReadonly:{defaultValue:0,byBit:[],hookConfigured:false},authorReadonlyClusters:[],
     s2ViewEntry: {defaultValue: 1, byBit: [], hookConfigured: false}};
 export const limits = {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128};
 export const now = 1790294400;

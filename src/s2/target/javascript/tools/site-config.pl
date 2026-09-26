@@ -206,9 +206,12 @@ sub export_config {
         ( "bin/upgrading/$LJ::DEFAULT_LANG.dat", 'bin/upgrading/en.dat' );
     my %comment_caps;
     for my $pair (
-        [ threadExpander  => 'thread_expander' ],
-        [ threadExpandAll => 'thread_expand_all' ],
-        [ maxComments     => 'maxcomments' ]
+        [ threadExpander      => 'thread_expander' ],
+        [ threadExpandAll     => 'thread_expand_all' ],
+        [ maxComments         => 'maxcomments' ],
+        [ authorStaffHeadicon => 'staff_headicon' ],
+        [ authorReadonly      => 'readonly' ],
+        [ authorAvoidReadonly => 'avoid_readonly' ]
         )
     {
         my ( $name, $native ) = @$pair;
@@ -221,6 +224,21 @@ sub export_config {
             hookConfigured => truth( LJ::Hooks::are_hooks("check_cap_$native") )
         };
     }
+    my %readonly_clusters = map { $_ => 1 }
+        grep { $LJ::READONLY_CLUSTER{$_} || $LJ::READONLY_CLUSTER_ADVISORY{$_} }
+        ( keys %LJ::READONLY_CLUSTER, keys %LJ::READONLY_CLUSTER_ADVISORY );
+    my @readonly_clusters = map {
+        my $id = $_;
+        fail('Invalid author readonly configuration') unless $id =~ /^(?:0|[1-9][0-9]*)$/;
+        {
+            clusterId => number($id),
+            forced    => truth( $LJ::READONLY_CLUSTER{$id} ),
+            advisory  => !$LJ::READONLY_CLUSTER_ADVISORY{$id} ? 'off'
+            : $LJ::READONLY_CLUSTER_ADVISORY{$id} eq 'when_needed' ? 'when-needed'
+            :                                                        'on'
+        }
+    } sort { $a <=> $b } keys %readonly_clusters;
+    fail('Too many author readonly clusters') if @readonly_clusters > 4096;
     my $config = {
         schema       => 1,
         listener     => { host => $host, port => 0 + $port },
@@ -252,6 +270,7 @@ sub export_config {
             palImgRoot  => string( $LJ::PALIMGROOT   // '' ),
             userpicRoot => string( $LJ::USERPIC_ROOT // '' ),
             userpicUrlHookConfigured => truth($userpic_hook),
+            headIconHookConfigured   => truth( LJ::Hooks::are_hooks('head_icon') ),
             tagsEnabled              => truth( !$tags_disabled ),
             tagListHookConfigured    => truth($tag_hook),
             siteName                 => string( $LJ::SITENAME // '' ),
@@ -290,7 +309,8 @@ sub export_config {
         capabilities => {
             moveInProgressMask => $move_mask,
             %comment_caps,
-            s2ViewEntry => {
+            authorReadonlyClusters => \@readonly_clusters,
+            s2ViewEntry            => {
                 defaultValue => defined $LJ::CAP_DEF{s2viewentry}
                 ? number( $LJ::CAP_DEF{s2viewentry} )
                 : undef,

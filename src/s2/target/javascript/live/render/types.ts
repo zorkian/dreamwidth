@@ -64,7 +64,8 @@ export interface ApprovedComment {
     readonly suspended:boolean; readonly full:boolean; readonly subjectOnly:boolean;
     readonly subject:string; readonly rawBody:string|null; readonly datepost:string;
     readonly author:{readonly userid:number;readonly username:string;readonly name:string;
-        readonly timezone:string|null;readonly journalType:string;readonly userpic:ApprovedUserpic|null}|null;
+        readonly timezone:string|null;readonly journalType:string;readonly userpic:ApprovedUserpic|null;
+        readonly badgeKind:"personal"|"staff";readonly badgeDeleted:boolean}|null;
     readonly props:Readonly<Record<string,string|null>>;
     readonly replies:readonly ApprovedComment[];
     readonly showableChildren:number;

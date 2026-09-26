@@ -903,10 +903,12 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             if(names.length>4096)unsupported();
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneValues=ids.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
+            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+                .map(row=>number(row.userid,1));
+            const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
                 HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
-                FROM userprop WHERE userid IN (${sql.join(ids)}) AND upropid IN
+                FROM userprop WHERE userid IN (${sql.join(timezoneIds)}) AND upropid IN
                 (SELECT upropid FROM userproplist WHERE name='timezone') ORDER BY userid,upropid LIMIT 10001`.execute(connection)).rows:[];
             if(timezone.length>1)unsupported();
             return {authors,names,timezone,timezoneValues};
@@ -954,13 +956,13 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const authors:RawCommentAuthor[]=[];let pictureRows=0;
         for(const row of global.authors) {
             const id=number(row.userid,1),suspended=row.statusvis==='S';
+            const cluster=number(row.clusterid,0),expunged=row.statusvis==='X'||cluster===0;
             let timezone:string|null=null,pictures:RawUserpics={pictures:[],mappings:[]};
-            if(!suspended) {
-                const cluster=number(row.clusterid,1);
+            if(!suspended&&cluster>0) {
                 if(BigInt(unsigned(row.caps,16))&BigInt(this.config.capabilities.moveInProgressMask))unsupported();
                 const details=await this.databases.snapshot(cluster,['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'],async connection=>{
                     const prop=global.timezone[0]?.upropid;
-                    if(prop!==undefined) {
+                    if(!expunged&&prop!==undefined) {
                         const rows=(await sql<Row>`SELECT HEX(value) AS value_stored,HEX(CONVERT(value USING latin1)) AS value_original,
                             HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
                             FROM userproplite2 WHERE userid=${id} AND upropid=${number(prop,1)} LIMIT 2`.execute(connection)).rows;
@@ -975,7 +977,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 pictureRows+=pictures.pictures.length+pictures.mappings.length;if(pictureRows>10000)unsupported();
             }
             authors.push({userid:id,user:suspended?'':requiredString(row.user),name:suspended?'':decodedColumn(row,'name','comment-author:'+id+':name',raw,1024,false)!,
-                clusterid:number(row.clusterid,1),status:requiredString(row.status),statusvis:requiredString(row.statusvis),
+                clusterid:cluster,status:requiredString(row.status),statusvis:requiredString(row.statusvis),
                 journaltype:requiredString(row.journaltype),caps:unsigned(row.caps,16),timezone,
                 defaultpicid:row.defaultpicid===null?0:number(row.defaultpicid),dversion:number(row.dversion),pictures});
         }
@@ -983,10 +985,12 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const authors=await authorFacts(connection);
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneValues=ids.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
+            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+                .map(row=>number(row.userid,1));
+            const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
                 HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
-                FROM userprop WHERE userid IN (${sql.join(ids)}) AND upropid IN
+                FROM userprop WHERE userid IN (${sql.join(timezoneIds)}) AND upropid IN
                 (SELECT upropid FROM userproplist WHERE name='timezone') ORDER BY userid,upropid LIMIT 10001`.execute(connection)).rows:[];
             return {authors,names,timezone,timezoneValues};
         });

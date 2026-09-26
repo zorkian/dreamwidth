@@ -72,7 +72,9 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     const app = record(root.app, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot",
         "statPrefix", "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback",
         "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
-        "appleTouchIcon", "facebookPreviewIcon", ...(Object.hasOwn(root.app as object,"commentSettings")?["commentSettings"]:[])]);
+        "appleTouchIcon", "facebookPreviewIcon", ...(Object.hasOwn(root.app as object,"commentSettings")?["commentSettings"]:[]),
+        ...(Object.hasOwn(root.app as object,"headIconHookConfigured")?["headIconHookConfigured"]:[])]);
+    if(app.headIconHookConfigured!==undefined)boolean(app.headIconHookConfigured);
     if(app.commentSettings!==undefined) {
         const c=record(app.commentSettings,["pageSize","threadPoint","maxSubjects"]);
         for(const n of Object.values(c))integer(n,1,10000);
@@ -117,11 +119,20 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     list(db.clusters, item => integer(item, 1));
     map(db.clusterPairActive, item => { if (item !== "a" && item !== "b") invalid(); });
     const caps = record(root.capabilities, ["moveInProgressMask", "s2ViewEntry",
-        ...["threadExpander","threadExpandAll","maxComments"].filter(key=>Object.hasOwn(root.capabilities as object,key))]);
-    for(const key of ["threadExpander","threadExpandAll","maxComments"])if(caps[key]!==undefined) {
+        ...["threadExpander","threadExpandAll","maxComments","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"].filter(key=>Object.hasOwn(root.capabilities as object,key)),
+        ...(Object.hasOwn(root.capabilities as object,"authorReadonlyClusters")?["authorReadonlyClusters"]:[])]);
+    for(const key of ["threadExpander","threadExpandAll","maxComments","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"])if(caps[key]!==undefined) {
         const cap=record(caps[key],["defaultValue","byBit","hookConfigured"]);
         nullable(cap.defaultValue,n=>integer(n,Number.MIN_SAFE_INTEGER));boolean(cap.hookConfigured);
         list(cap.byBit,row=>{const b=record(row,["bit","value"]);integer(b.bit,0,31);integer(b.value,Number.MIN_SAFE_INTEGER);});
+    }
+    if(caps.authorReadonlyClusters!==undefined) {
+        const seen=new Set<number>();
+        list(caps.authorReadonlyClusters,row=>{
+            const item=record(row,["clusterId","forced","advisory"]);
+            const id=integer(item.clusterId,0);if(seen.has(id))invalid();seen.add(id);
+            boolean(item.forced);if(!["off","on","when-needed"].includes(String(item.advisory)))invalid();
+        });
     }
     integer(caps.moveInProgressMask, 0, 4294967295);
     const entry = record(caps.s2ViewEntry, ["defaultValue", "byBit", "hookConfigured"]);
