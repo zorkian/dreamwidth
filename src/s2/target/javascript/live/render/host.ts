@@ -60,7 +60,7 @@ function hidden(name: string, value: string): string {
 }
 export function badge(input: RenderInput): string {
     const u = input.journal.username;
-    const base = input.config.canonicalAppOrigin + "/~" + u;
+    const base = input.journal.baseUrl;
     return `<span lj:user='${u}' style='white-space: nowrap;' class='ljuser'>` +
         `<a href='${base}/profile'><img src='${input.config.imgPrefix}/silk/identity/user.png' ` +
         "alt='[personal profile] ' width='17' height='17' " +
@@ -131,7 +131,7 @@ export function head(input: RenderInput, page: S2Object,
     metadata?: ReturnType<RenderContentPreparation["metadata"]>): string {
     if (input.page.kind === "entry") return entryHead(input, metadata);
     const { config: c, journal: j } = input;
-    const base = `${c.canonicalAppOrigin}/~${j.username}`;
+    const base = j.baseUrl;
     let html = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
     for (const type of ["rss", "atom"]) html +=
         `<link rel="alternate" type="application/${type === "rss" ? "rss+xml" : "atom+xml"}" ` +
@@ -173,7 +173,7 @@ function entryHead(input: RenderInput,
         input.page.kind !== "entry") throw new Error("Missing inert entry metadata");
     const {config: c, journal: j} = input;
     const ditemid = input.page.ditemid;
-    const base = `${c.canonicalAppOrigin}/~${j.username}`;
+    const base = j.baseUrl;
     const url = `${base}/${ditemid}.html`;
     // EntryPage.pm derives OpenGraph from event_text, not the displayed body.
     // text_trim trims again after its 300 UTF-8 character limit; the worker's
@@ -208,7 +208,7 @@ function entryHead(input: RenderInput,
 }
 export function hostData(input: RenderInput, page: S2Object, monday: boolean): S2Object {
     const c = input.config;
-    const base = `${c.canonicalAppOrigin}/~${input.journal.username}`;
+    const base = input.journal.baseUrl;
     const image = (path: string, alt: string) => object("Image", {
         url: `${c.imgPrefix}/${path}`, width: 16, height: 16, alttext: alt, extra: {}});
     const disabled = (path: string, text: string, title: string) => ({

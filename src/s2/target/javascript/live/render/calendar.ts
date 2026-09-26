@@ -28,20 +28,11 @@ import type { RenderInput } from "./types";
 import { date, object, S2Object } from "./objects";
 
 export function calendar(input: RenderInput, base: string, monday: boolean): S2Object {
-    const counts = new Map<string, number>();
-    for (const entry of input.journal.entries) {
-        const key = `${entry.year}-${entry.month}-${entry.day}`;
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    const now = new Date(input.nowSeconds * 1000);
-    const years = [...new Set(input.journal.entries.map(e => e.year))]
-        .filter(y => y <= now.getUTCFullYear()).sort((a, b) => a - b);
-    const year = years.at(-1) ?? now.getUTCFullYear();
-    const months = [...new Set(input.journal.entries.filter(e => e.year === year).map(e => e.month))]
-        .filter(m => year < now.getUTCFullYear() || m <= now.getUTCMonth() + 1).sort((a, b) => a - b);
-    // Retained get_latest_month assigns undef (numeric0), not the current
-    // month, when the newest eligible year contains only future months.
-    const month = years.length ? months.at(-1) ?? 0 : now.getUTCMonth() + 1;
+    // Calendar contributors are independent of the selected body window.
+    // Policy has qualified the bounded public aggregates and witnesses.
+    const summary = input.journal.calendar;
+    const {year, month} = summary;
+    const counts = new Map(summary.days.map(item => [item.day, item.count]));
     const pad = (n: number) => String(n).padStart(2, "0");
     const weeks: S2Object[] = [];
     let week: S2Object | undefined;
@@ -53,7 +44,7 @@ export function calendar(input: RenderInput, base: string, monday: boolean): S2O
                 post_empty: 0, days: []});
             weeks.push(week);
         }
-        const count = counts.get(`${year}-${month}-${day}`) ?? 0;
+        const count = counts.get(day) ?? 0;
         const item = object("YearDay", {day, date: d, num_entries: count,
             url: count ? `${base}/${year}/${pad(month)}/${pad(day)}/` : ""});
         week.days.push(item);
@@ -62,11 +53,9 @@ export function calendar(input: RenderInput, base: string, monday: boolean): S2O
     if (week) week.post_empty = 7 - week.pre_empty - week.days.length;
     const result = object("YearMonth", {year, month, weeks,
         url: `${base}/${year}/${pad(month)}/`,
-        has_entries: input.journal.entries.some(e => e.year === year && e.month === month) ? 1 : 0});
-    const before = input.journal.entries.filter(e => e.year <= year && e.month < month)
-        .sort((a, b) => b.year * 12 + b.month - a.year * 12 - a.month)[0];
-    const after = input.journal.entries.filter(e => e.year >= year && e.month > month)
-        .sort((a, b) => a.year * 12 + a.month - b.year * 12 - b.month)[0];
+        has_entries: summary.days.some(item => item.count > 0) ? 1 : 0});
+    const before = summary.previous;
+    const after = summary.next;
     for (const [key, entry] of [["prev", before], ["next", after]] as const) {
         if (entry) {
             result[`_${key}_url`] = `${base}/${entry.year}/${pad(entry.month)}/`;
