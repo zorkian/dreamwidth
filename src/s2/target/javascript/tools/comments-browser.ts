@@ -96,8 +96,10 @@ export async function commentsBrowser(html:string,port:number):Promise<void> {
                     await page.locator('#cmt1025 a[onclick*="Expander.make"]').first().click();
                     await page.waitForFunction(()=>document.querySelector('#cmt1025')?.textContent?.includes('Public body 4'));
                     assert.ok(ajax.includes(pageUrl+'?thread=1025&destination_thread=0'));
+                    assert.equal(await page.locator('#cmt257_hide a').textContent(),'Hide 2 comments');
                     await page.locator('#cmt257_hide a').click();
                     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#cmt513')!).display==='none');
+                    assert.equal(await page.locator('#cmt257_unhide a').textContent(),'Show 2 comments');
                     await page.locator('#cmt257_unhide a').click();
                     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#cmt513')!).display!=='none');
                     // Reload the real page to exercise the distinct expand-all path.
