@@ -79,8 +79,10 @@ pictures reuse the qualified picture domain.
 
 Known all/reg/friends reply policies and screening enums govern posting.
 `opt_showtalklinks=N`, entry `opt_nocomments` and maintainer disablement change
-CommentInfo enabled/effective count/link facts; they do not suppress the direct
-Entry comment tree which retained EntryPage still prints. `show_readlink` is
+CommentInfo enabled/effective count/link facts. Native EntryPage.pm191-196
+loads comments only when that enabled fact is true. Disabled entries therefore
+read no comment headers/text/authors and expose no comment tree or author/ID
+cmtinfo; the public Entry body remains available. `show_readlink` is
 the native scalar count. `maxcomments` compares the effective count against the
 source capability, including defined zero. This is display metadata, not
 request captcha or posting enforcement.

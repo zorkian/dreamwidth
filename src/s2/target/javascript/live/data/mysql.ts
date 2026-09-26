@@ -378,9 +378,14 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, compiled, raw};
         });
         if (!selected) return null;
-        // EntryPage loads existing comments even when posting/read-link settings
-        // are disabled. Target public visibility was established above.
-        const comments=frozenRequest.page.kind==='entry' && selected.entries[0] ?
+        // EntryPage.pm loads no comments when CommentInfo.enabled is false.
+        // Gate before headers, text and author reads; these owner/entry facts
+        // already participate in the bracket and final fingerprint reread.
+        const target=selected.entries[0];
+        const truth=(value:string|null|undefined)=>!!value&&value!=='0';
+        const enabled=before.facts.owner.opt_showtalklinks==='Y'&&target&&
+            !truth(target.props.opt_nocomments)&&!truth(target.props.opt_nocomments_maintainer);
+        const comments=frozenRequest.page.kind==='entry' && enabled ?
             await this.loadComments(ownerId,clusterId,selected.entries[0]!.jitemid,frozenRequest,
                 unsigned(before.facts.owner.caps,16)) : undefined;
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
