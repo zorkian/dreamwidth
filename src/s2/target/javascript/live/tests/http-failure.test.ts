@@ -18,7 +18,7 @@ import {get, type IncomingHttpHeaders} from "node:http";
 import type {RawRecentRepository, RepositoryError} from "../contracts";
 import {createAnonymousRecentService} from "../policy/service";
 import {createLiveApp} from "../server/app";
-import {config, limits, snapshot} from "./fixtures";
+import {config, capabilities, limits, snapshot} from "./fixtures";
 
 const sentinel = "SECRET_CONNECTION_SENTINEL_PASSWORD_SQL";
 class InjectedRepositoryError extends Error implements RepositoryError {
@@ -39,11 +39,12 @@ test("injected repository HTTP matrix returns fixed failures without buffered HT
     ] as const;
     for (const row of matrix) {
         let loads = 0, rechecks = 0, secrets = 0;
-        const data = snapshot();
+        let data = snapshot();
         const repository: RawRecentRepository = {
-            async loadRawSnapshot(username) {
+            async loadRawSnapshot(request) {
                 loads++;
-                assert.equal(username, "s2js_slice3");
+                assert.equal(request.username, "s2js_slice3");
+                data = {...data, request};
                 if (row.name === "missing") return null;
                 if (row.name === "load-error") throw new InjectedRepositoryError("unavailable");
                 if (row.name === "unsupported-repository") throw new InjectedRepositoryError("unsupported");
@@ -59,7 +60,7 @@ test("injected repository HTTP matrix returns fixed failures without buffered HT
             },
             async close() {},
         };
-        const service = await createAnonymousRecentService({repository, config, limits,
+        const service = await createAnonymousRecentService({repository, config, capabilities, limits,
             artifact: {path: process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice3-stock.json"},
             secretSource: {async loadLatestSecret(nowSeconds) {
                 secrets++;

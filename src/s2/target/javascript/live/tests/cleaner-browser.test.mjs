@@ -128,8 +128,8 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
     const artifact = validateArtifact(JSON.parse(readFileSync(
         process.env.S2_LIVE_TEST_ARTIFACT || '/tmp/slice3-stock.json', 'utf8')));
     const data = fixture.snapshot();
-    const journal = approveSnapshot({...data, entries: [data.entries[0]]});
-    const stockInput = {page: {kind: 'recent'}, journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
+    const journal = approveSnapshot(fixture.selectFixture({...data, entries: [data.entries[0]]}), config, fixture.capabilities);
+    const stockInput = {page: {kind: 'recent', pageSkip: 0, itemshow: 20, maxScrollback: 100, hasPrevious: false}, journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
         formChallenge: 'public-test-challenge', uniq: 'AAAAAAAAAAAAAAA', resourceTimes: loadResourceTimes()};
     // Offline assembly exercises unchanged prop_init/modules_init/Page.print.
     // It is deliberately separate from the real isolated-worker qualification.
