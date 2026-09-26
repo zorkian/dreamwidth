@@ -29,6 +29,17 @@ import type { RenderContentPreparation, RenderInput, ApprovedEntry, ApprovedUser
 import { object, date, nullObject, S2Object } from "./objects";
 import { escapeHtml } from "./builtins";
 
+function customtext(input:RenderInput,ctx:Context,content:RenderContentPreparation):Record<string,string> {
+    const stored=input.journal.customtextStored;
+    const plain=(value:string):string=>value.replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('\n','<br />');
+    const truthy=(value:string|null|undefined):boolean=>!!value&&value!=='0';
+    const title=stored?.title;
+    const url=truthy(stored?.url)?stored!.url!:String(ctx.prop._text_module_customtext_url??'');
+    const body=truthy(stored?.content)?stored!.content!:String(ctx.prop._text_module_customtext_content??'');
+    return {customtext_title:plain(title!==undefined&&title!==null&&title!==''&&title!=='Custom Text'?title:String(ctx.prop._text_module_customtext??'')),
+        customtext_url:plain(url),customtext_content:body?(content.customtext?content.customtext(body):(()=>{throw new Error('Missing customtext cleaner');})()):body};
+}
+
 export function prepareTag(tag: ApprovedTag, base: string): S2Object {
     // Tags.pm tag_url/TextUtil eurl operate on native UTF8 database bytes.
     const bytes=Buffer.from(tag.name,"utf8");let encoded="";
@@ -126,9 +137,8 @@ export function prepare(input: RenderInput, ctx: Context,
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
         view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),
-            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), customtext_title: ctx.prop._text_module_customtext,
-        customtext_content: ctx.prop._text_module_customtext_content,
-        customtext_url: ctx.prop._text_module_customtext_url,
+            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), ...customtext(input,ctx,content),
+
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
         global_title: escapeHtml(j.title), global_subtitle: escapeHtml(j.subtitle),
         show_control_strip: Number(j.showControlStrip), head_content: "", is_canary: 0,
@@ -200,9 +210,8 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
         view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),
-            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), customtext_title: ctx.prop._text_module_customtext,
-        customtext_content: ctx.prop._text_module_customtext_content,
-        customtext_url: ctx.prop._text_module_customtext_url,
+            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), ...customtext(input,ctx,content),
+
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
         global_title: escapeHtml(j.title), global_subtitle: escapeHtml(j.subtitle),
         show_control_strip: Number(j.showControlStrip), head_content: "", is_canary: 0,

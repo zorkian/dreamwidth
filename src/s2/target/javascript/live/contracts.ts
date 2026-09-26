@@ -57,8 +57,11 @@ export interface RawStyleLayer {
     readonly s2lid: number;
     readonly ownerid: number;
     readonly ownerUsername: string; // joined global owner; missing row unsupported; fingerprint both
-    readonly compiledTime: number; // s2compiled.comptime; s2layers has no modtime
+    readonly compiledTime: number; // system s2compiled or owner s2compiled2.comptime; s2layers has no modtime
     readonly sourceHash: string;
+    readonly parentId?: number;
+    readonly nativeType?: string;
+    readonly propertyCompiled?: string;
 }
 
 export interface RawStyle {

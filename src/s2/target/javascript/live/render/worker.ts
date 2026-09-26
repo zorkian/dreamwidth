@@ -88,6 +88,16 @@ process.stdin.on("end", () => {
             }};
         };
         const content: RenderContentPreparation = {
+            customtext(source) {
+                const result=cleaner.customtext({source,context:{
+                    policy:'dreamwidth-entry-html-raw0-v1',insertionContext:'html-div-flow',documentUrl,
+                    entryUrl:documentUrl,journalUsername:request.journal.username,journalId:request.journal.userid,
+                    entryId:1,cuts:'source-compatible-entry',...request.config.entryContent,
+                    reader:{removeColors:false,removeSizes:false,removeFonts:false,maxImageWidth:null,maxImageHeight:null,
+                        placeholderUndefinedImageSize:false,extractImages:false}}});
+                if(result.kind!=='ok')throw new Unsupported();
+                return result.html;
+            },
             subject(entry, entryUrl, source = entry.subject) {
                 const entryInput = contentInput(entry, entryUrl);
                 if (source !== entry.subject && !Object.values(entry.currents ?? {}).includes(source)) {

@@ -209,12 +209,49 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
     }
 }
 
+// html_casual1 autolinks and breaks are a distinct original-source operation.
+function casualText(root:Element,source:string):void {
+    if(/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
+    if(/(^|[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(source.replace(/\\./g,'')))throw new UnsupportedContent();
+    if(root.querySelector('lj-cut,lj-raw,lj,user,poll,site-embed'))throw new UnsupportedContent();
+    for(const element of root.querySelectorAll('*'))for(const attribute of element.attributes) {
+        if(/[\r\n]/.test(attribute.value))throw new UnsupportedContent();
+    }
+    const document=root.ownerDocument;
+    const walker=document.createTreeWalker(root,4);
+    const nodes:Text[]=[];
+    while(walker.nextNode())nodes.push(walker.currentNode as Text);
+    for(const node of nodes) {
+        let value=node.data;
+        // Match actual reached mention contexts, not email or every at-sign.
+        if(/(^|[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value.replace(/\\./g,''))) {
+            throw new UnsupportedContent();
+        }
+        value=value.replace(/\\@/g,'@');
+        const parent=node.parentElement!;
+        const raw=parent.closest('pre,textarea');
+        const table=parent.closest('table');
+        const cell=parent.closest('td,th');
+        if(raw || table && (!cell || !table.contains(cell))) {node.data=value;continue;}
+        const fragment=document.createDocumentFragment();
+        const pattern=parent.closest('a')?/\r?\n/g:/https?:\/\/[^\s'"<>]+[a-zA-Z0-9_/&=\-]|\r?\n/g;
+        let offset=0;
+        for(const match of value.matchAll(pattern)) {
+            fragment.append(document.createTextNode(value.slice(offset,match.index)));
+            if(match[0].includes('\n'))fragment.append(document.createElement('br'));
+            else {const anchor=document.createElement('a');anchor.setAttribute('href',match[0]);anchor.textContent=match[0];fragment.append(anchor);}
+            offset=match.index!+match[0].length;
+        }
+        fragment.append(document.createTextNode(value.slice(offset)));
+        node.replaceWith(fragment);
+    }
+}
+
 export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
     validateCleanerLimits(limits);
     const bounds = Object.freeze({...limits});
     let closed = false;
-    return {
-        clean(input: EntryContentInput, resolutions?: ImageResolutionSet): EntryContentResult {
+    const clean = (input: EntryContentInput, resolutions?: ImageResolutionSet, casual = false): EntryContentResult => {
             if (closed) return {kind: "failure", reason: "unavailable"};
             let dom: JSDOM | undefined;
             try {
@@ -237,6 +274,19 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 removeSourceComments(root);
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
+                if(casual) {
+                    // Full-document parsing discards a source-leading ASCII
+                    // whitespace token. This context formats its LF visibly;
+                    // it does not inherit the entry-body whitespace adaptation.
+                    const prefix=/^[\t\n\v\f\r ]*/.exec(input.body)![0];
+                    const first=root.firstChild;
+                    if(prefix) {
+                        const location=first?dom!.nodeLocation(first):null;
+                        if(first&&(!location||location.startOffset<prefix.length))throw new UnsupportedContent();
+                        root.insertBefore(dom.window.document.createTextNode(prefix),first);
+                    }
+                    casualText(root,input.body);
+                }
                 // Source body wrappers are removed by clean_event, including all
                 // their attributes. The private BODY remains only as context.
                 for (const attribute of [...root.attributes]) root.removeAttribute(attribute.name);
@@ -260,7 +310,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 });
                 // Final operation on markup. No later string replacement or raw
                 // substitution may invalidate this body-context sanitation.
-                const html = purify.sanitize(root, {
+                let html = purify.sanitize(root, {
                     // The non-IN_PLACE node path deep-clones this private BODY.
                     // Do not reparse transformed markup as a new document.
                     ALLOWED_TAGS: [...entryTags, "#text", "body"], ALLOWED_ATTR: [...entryAttributes],
@@ -283,6 +333,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     }
                     throw new UnsupportedContent();
                 }
+                if(casual) html=html.replaceAll("\n","<br />");
                 if (Buffer.byteLength(html) > bounds.maxOutputBytes) throw new UnsupportedContent();
                 return {kind: "ok", fragment: {context: "html-div-flow", html} as BodyFragment,
                     provenance: {policy: input.context.policy, inputSha256: hash,
@@ -290,6 +341,14 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
             } catch (error) {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
             } finally { dom?.window.close(); }
+        };
+    return {
+        clean,
+        customtext(input) {
+            const result=clean({body:input.source,format:'html_raw0',context:input.context},undefined,true);
+            if(result.kind==='ok')return {kind:'ok',html:result.fragment.html};
+            if(result.kind==='failure')return result;
+            return {kind:'failure',reason:'unsupported'};
         },
         subject(input) {
             if (closed) return {kind: "failure", reason: "unavailable"};
