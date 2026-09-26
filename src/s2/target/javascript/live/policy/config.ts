@@ -101,7 +101,7 @@ export function validateConfig(config: PublicAppConfig): void {
     }
     if ((config.userDomain !== "" && !hostKey(config.userDomain)) ||
         !Number.isSafeInteger(config.usernameMaxLength) || config.usernameMaxLength < 1 ||
-        config.usernameMaxLength > 255 || !Number.isSafeInteger(config.maxScrollback) ||
+        !Number.isSafeInteger(config.maxScrollback) ||
         config.maxScrollback < 1) throw new Unsupported();
     const journal = exactRecord(config.journalUrls,
         ["protocol", "domain", "isDevServer", "subdomainRules", "hookConfigured"]);
