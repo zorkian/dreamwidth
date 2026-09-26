@@ -180,7 +180,7 @@ function entryHead(input: RenderInput,
     // text_trim trims again after its 300 UTF-8 character limit; the worker's
     // inert helper string is escaped exactly once at this attribute boundary.
     const description = entryOgDescription(metadata.eventText);
-    let html = `<meta property="og:title" content="${escapeHtml(metadata.subjectText || "(no subject)")}"/>\n` +
+    let html = `<meta property="og:title" content="${escapeHtml((metadata.subjectText && metadata.subjectText !== "0" ? metadata.subjectText : "(no subject)"))}"/>\n` +
         '<meta property="og:type" content="article"/>\n' +
         `<meta property="og:url" content="${escapeHtml(url)}"/>\n` +
         `<meta property="og:site_name" content="${escapeHtml(c.siteName)}"/>\n` +

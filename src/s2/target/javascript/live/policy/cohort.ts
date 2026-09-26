@@ -195,7 +195,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         (BigInt(u.caps) & BigInt(capabilities.moveInProgressMask)) !== 0n || !integer(u.defaultpicid) ||
         !["Y", "N"].includes(u.optShowTalkLinks) ||
         u.optWhocanReply !== "all" ||
-        u.optForceMoodtheme !== "N" || ![0, 1].includes(u.moodthemeid) ||
+        !["N", "Y"].includes(u.optForceMoodtheme) || !integer(u.moodthemeid) ||
         !Number.isSafeInteger(u.userid) || u.userid <= 0) throw new Unsupported();
     const empty = ["adult_content_reason", "sticky_entry", "icbm",
         "google_analytics", "ga4_analytics", "renamedto", "customtext_content",
@@ -266,7 +266,8 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         const props = entry.props;
         const allowed = new Set(["editor", "opt_preformatted", "opt_backdated", "opt_nocomments",
             "opt_nocomments_maintainer", "revnum", "revtime", "interface", "useragent",
-            "opt_noemail", "opt_screening", "statusvis", "picture_mapid", "picture_keyword"]);
+            "opt_noemail", "opt_screening", "statusvis", "picture_mapid", "picture_keyword",
+            "current_mood", "current_music", "current_location", "current_coords", "current_moodid"]);
         if (Object.entries(props).some(([key, value]) => value && !allowed.has(key)) ||
             props.editor !== "html_raw0" || ![undefined, null, "", "0", "1"].includes(props.opt_preformatted) ||
             (props.statusvis && props.statusvis !== "V")) throw new Unsupported();
@@ -275,6 +276,16 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             if (![undefined, null, "", "0", "1"].includes(props[flag])) throw new Unsupported();
         }
         if (perlTrue(props.opt_nocomments_maintainer)) throw new Unsupported();
+        // Numeric mood still reaches theme/icon lookup even with custom text;
+        // coords can suppress/autovivify Location. These are separate features.
+        if (perlTrue(props.current_moodid) || perlTrue(props.current_coords)) throw new Unsupported();
+        const currents: Record<string,string> = {};
+        for (const [property, name] of [["current_mood", "mood"], ["current_music", "music"],
+            ["current_location", "location"]] as const) {
+            const value = props[property];
+            if (perlTrue(value)) currents[name] = plainSubject(value!);
+        }
+
         for (const time of [entry.eventtime, entry.logtime]) {
             if (!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(time) ||
                 !Number.isFinite(Date.parse(time.replace(" ", "T") + "Z")) ||
@@ -288,7 +299,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             entry.day !== Number(entry.eventtime.slice(8, 10))) throw new Unsupported();
         entries.push({
             id: entry.jitemid * 256 + entry.anum, tags: tags.entries.get(entry.jitemid) ?? [],
-            subject: plainSubject(entry.subjectText), rawBody: rawBody(entry.eventText),
+            subject: plainSubject(entry.subjectText), currents, rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
             userpic: pictures.forEntry(props),

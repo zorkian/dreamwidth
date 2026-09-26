@@ -124,13 +124,28 @@ export interface InertEntryMetadata {
     readonly eventText: string;
 }
 export interface EntryMetadataInput {
-    readonly subject: string; // raw subject under the existing plain-subject gate
+    readonly subject: string; // raw subject, independent of displayed subject preparation
     readonly entry: EntryContentInput; // raw body; requires source-compatible-entry cuts
 }
 export type EntryMetadataResult =
     | { readonly kind: "ok"; readonly metadata: InertEntryMetadata }
     | { readonly kind: "failure"; readonly reason: "unsupported" | "unavailable" };
+declare const subjectFragmentBrand: unique symbol;
+export interface SubjectPreparation {
+    readonly [subjectFragmentBrand]: true;
+    readonly html: string;
+    readonly recentHtml: string;
+    readonly all: string; // inert, derived separately from ORIGINAL source
+}
+export interface SubjectInput {
+    readonly source: string;
+    readonly context: EntryContentContext;
+}
+export type SubjectResult =
+    | {readonly kind: "ok"; readonly subject: SubjectPreparation}
+    | {readonly kind: "failure"; readonly reason: "unsupported" | "unavailable"};
 export interface EntryCleaner {
+    subject(input: SubjectInput): SubjectResult;
     // Runs ONLY in a credential-free bounded worker. No caller DOM or hooks.
     // When needed, a second call uses the exact same input plus host resolutions.
     // DOM/CSS transforms precede final DOMPurify; no output string patching.
