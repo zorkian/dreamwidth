@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+
 #
 # site-config.pl
 #
@@ -133,14 +134,15 @@ sub export_config {
 
     # Presence detection must include installed site hooks, not just config's
     # initial HOOKS hash. Module imports stay under the no-connect tripwire.
-    my $entry_hook   = LJ::Hooks::are_hooks('check_cap_s2viewentry');
-    my $journal_hook = LJ::Hooks::are_hooks('journal_base');
-    my $userpic_hook = LJ::Hooks::are_hooks('construct_userpic_url');
-    my $tag_hook = LJ::Hooks::are_hooks('augment_s2_tag_list');
+    my $entry_hook    = LJ::Hooks::are_hooks('check_cap_s2viewentry');
+    my $journal_hook  = LJ::Hooks::are_hooks('journal_base');
+    my $userpic_hook  = LJ::Hooks::are_hooks('construct_userpic_url');
+    my $tag_hook      = LJ::Hooks::are_hooks('augment_s2_tag_list');
     my $tags_disabled = $LJ::DISABLED{tags};
     $tags_disabled = $tags_disabled->() if ref $tags_disabled eq 'CODE';
     fail('Hook discovery attempted a database connection') if $blocked_connections;
     my ( @sources, %pairs, %rules, @bits );
+
     for my $id ( sort keys %LJ::DBINFO ) {
         next if $id =~ /^_/;
         my $s = $LJ::DBINFO{$id};
@@ -202,6 +204,23 @@ sub export_config {
     fail('Invalid placeholder configuration') unless ref $image eq 'HASH';
     my @language_files = grep { defined $_ } map { LJ::resolve_file($_) }
         ( "bin/upgrading/$LJ::DEFAULT_LANG.dat", 'bin/upgrading/en.dat' );
+    my %comment_caps;
+    for my $pair (
+        [ threadExpander  => 'thread_expander' ],
+        [ threadExpandAll => 'thread_expand_all' ],
+        [ maxComments     => 'maxcomments' ]
+        )
+    {
+        my ( $name, $native ) = @$pair;
+        $comment_caps{$name} = {
+            defaultValue => defined $LJ::CAP_DEF{$native} ? number( $LJ::CAP_DEF{$native} ) : undef,
+            byBit        => [
+                map { { bit => number($_), value => number( $LJ::CAP{$_}{$native} ) } }
+                grep { defined $LJ::CAP{$_}{$native} } sort { $a <=> $b } keys %LJ::CAP
+            ],
+            hookConfigured => truth( LJ::Hooks::are_hooks("check_cap_$native") )
+        };
+    }
     my $config = {
         schema       => 1,
         listener     => { host => $host, port => 0 + $port },
@@ -222,20 +241,25 @@ sub export_config {
                 subdomainRules => \%rules,
                 hookConfigured => truth($journal_hook)
             },
-            usernameMaxLength   => number($LJ::USERNAME_MAXLENGTH),
-            maxScrollback       => number($LJ::MAX_SCROLLBACK_LASTN),
-            imgPrefix           => string( $LJ::IMGPREFIX // '' ),
-            palImgRoot          => string( $LJ::PALIMGROOT // '' ),
-            userpicRoot         => string( $LJ::USERPIC_ROOT // '' ),
+            usernameMaxLength => number($LJ::USERNAME_MAXLENGTH),
+            maxScrollback     => number($LJ::MAX_SCROLLBACK_LASTN),
+            commentSettings   => {
+                pageSize    => number( $LJ::TALK_PAGE_SIZE    || 25 ),
+                threadPoint => number( $LJ::TALK_THREAD_POINT || 50 ),
+                maxSubjects => number( $LJ::TALK_MAX_SUBJECTS || 200 )
+            },
+            imgPrefix   => string( $LJ::IMGPREFIX    // '' ),
+            palImgRoot  => string( $LJ::PALIMGROOT   // '' ),
+            userpicRoot => string( $LJ::USERPIC_ROOT // '' ),
             userpicUrlHookConfigured => truth($userpic_hook),
-            tagsEnabled => truth(!$tags_disabled),
-            tagListHookConfigured => truth($tag_hook),
-            siteName            => string( $LJ::SITENAME // '' ),
-            siteNameShort       => string( $LJ::SITENAMESHORT // '' ),
-            siteNameAbbrev      => string( $LJ::SITENAMEABBREV // '' ),
-            appleTouchIcon      => string( $LJ::APPLE_TOUCH_ICON // '' ),
-            facebookPreviewIcon => string( $LJ::FACEBOOK_PREVIEW_ICON // '' ),
-            entryContent        => {
+            tagsEnabled              => truth( !$tags_disabled ),
+            tagListHookConfigured    => truth($tag_hook),
+            siteName                 => string( $LJ::SITENAME // '' ),
+            siteNameShort            => string( $LJ::SITENAMESHORT // '' ),
+            siteNameAbbrev           => string( $LJ::SITENAMEABBREV // '' ),
+            appleTouchIcon           => string( $LJ::APPLE_TOUCH_ICON // '' ),
+            facebookPreviewIcon      => string( $LJ::FACEBOOK_PREVIEW_ICON // '' ),
+            entryContent             => {
                 urls => {
                     siteDomain => string( $LJ::DOMAIN // '' ),
                     knownHttpsSites =>
@@ -265,7 +289,8 @@ sub export_config {
         },
         capabilities => {
             moveInProgressMask => $move_mask,
-            s2ViewEntry        => {
+            %comment_caps,
+            s2ViewEntry => {
                 defaultValue => defined $LJ::CAP_DEF{s2viewentry}
                 ? number( $LJ::CAP_DEF{s2viewentry} )
                 : undef,

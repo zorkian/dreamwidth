@@ -182,7 +182,7 @@ export interface RawPageRequest {
     readonly calendarNow: RawCalendarMonth; // same captured UTC clock as rendering
     readonly page:
         | {readonly kind: "recent"; readonly skip: number; readonly itemshow: number}
-        | {readonly kind: "entry"; readonly ditemid: number};
+        | {readonly kind: "entry"; readonly ditemid: number; readonly comments?:CommentQuery};
 }
 
 export type RawPageSelection =
@@ -210,7 +210,39 @@ export interface RawMoods {
     readonly pictures: readonly {readonly moodid:number; readonly url:string|null; readonly width:number; readonly height:number}[];
 }
 
+export interface CommentQuery {
+    readonly page?: number;
+    readonly thread?: number;
+    readonly destinationThread?: number;
+    readonly expandAll?: boolean;
+}
+export interface RawCommentHeader {
+    readonly jtalkid:number;
+    readonly parenttalkid:number;
+    readonly posterid:number;
+    readonly state:string;
+    readonly datepost:string;
+}
+export interface RawCommentAuthor {
+    readonly userid:number; readonly user:string; readonly name:string;
+    readonly clusterid:number; readonly status:string; readonly statusvis:string;
+    readonly journaltype:string; readonly caps:string; readonly timezone:string|null;
+    readonly defaultpicid:number; readonly dversion:number; readonly pictures:RawUserpics;
+}
+// Only public allowlisted props enter this record. Private/unknown bytes are
+// fingerprinted by the parent and never copied to snapshots or render input.
+export interface RawCommentText {
+    readonly jtalkid:number; readonly subject:string; readonly body:string|null;
+    readonly props:Readonly<Record<string,string|null>>;
+}
+export interface RawComments {
+    readonly headers:readonly RawCommentHeader[];
+    readonly authors:readonly RawCommentAuthor[];
+    readonly texts:readonly RawCommentText[];
+}
+
 export interface RawJournalSnapshot {
+    readonly comments?:RawComments;
     readonly request: RawPageRequest;
     readonly selection: RawPageSelection;
     readonly owner: RawUser;
@@ -291,6 +323,7 @@ export interface AnonymousRecentRequest {
 
 // Exact /users/<canonical-username>/<decimal>.html, GET/HEAD, no query or alias.
 export interface AnonymousEntryRequest {
+    readonly comments?:CommentQuery;
     readonly uniqCookie: string | null; // parsed anonymous form-cookie value only
     readonly method: "GET" | "HEAD";
     readonly username: string;
@@ -339,6 +372,7 @@ export interface JournalUrlConfiguration {
 }
 
 export interface PublicAppConfig {
+    readonly commentSettings?:{readonly pageSize:number;readonly threadPoint:number;readonly maxSubjects:number};
     // Public source facts and startup-resolved placeholder text, never HTML.
     // This private viewer defers proxying, even if the retained app enables it.
     // Original URLs retain sanitation/unsafe-URL and declared known-HTTPS rules.

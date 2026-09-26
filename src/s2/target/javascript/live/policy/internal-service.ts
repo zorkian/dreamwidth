@@ -12,6 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {validateCommentQuery} from "../domain/comments";
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AnonymousRecentRequest, AnonymousEntryRequest, AnonymousRecentService,
@@ -80,7 +81,8 @@ export async function buildService(deps: AnonymousRecentServiceDeps,
             const rawRequest: RawPageRequest = Object.freeze({username: request.username,
                 calendarNow: Object.freeze({year: now.getUTCFullYear(), month: now.getUTCMonth() + 1}),
                 page: Object.freeze(kind === "recent" ? {kind, skip, itemshow: 20} :
-                    {kind, ditemid: (request as AnonymousEntryRequest).ditemid})});
+                    {kind, ditemid: (request as AnonymousEntryRequest).ditemid,
+                        ...((request as AnonymousEntryRequest).comments?{comments:Object.freeze({...validateCommentQuery((request as AnonymousEntryRequest).comments)})}:{})})});
             const snapshot = await deps.repository.loadRawSnapshot(rawRequest);
             if (snapshot === null) return {ok: false, reason: "not-found"};
             const received = snapshot.request;
@@ -91,13 +93,14 @@ export async function buildService(deps: AnonymousRecentServiceDeps,
                 (received.page.kind === "recent" && (rawRequest.page.kind !== "recent" ||
                     received.page.skip !== rawRequest.page.skip || received.page.itemshow !== rawRequest.page.itemshow)) ||
                 (received.page.kind === "entry" && (rawRequest.page.kind !== "entry" ||
-                    received.page.ditemid !== rawRequest.page.ditemid))) throw new Unsupported();
+                    received.page.ditemid !== rawRequest.page.ditemid ||
+                    JSON.stringify(received.page.comments??{})!==JSON.stringify(rawRequest.page.comments??{})))) throw new Unsupported();
             const journal = rawRequest.page.kind === "entry" ?
                 approveEntrySnapshot(snapshot, rawRequest.page.ditemid, config, capabilities) :
                 approveSnapshot(snapshot, config, capabilities);
             if (journal === null) return {ok: false, reason: "not-found"};
             const selected = snapshot.selection;
-            const page: RenderPage = selected.kind === "entry" ? {kind: "entry", ditemid: selected.ditemid} :
+            const page: RenderPage = selected.kind === "entry" ? {kind: "entry", ditemid: selected.ditemid, ...(rawRequest.page.kind==='entry'&&rawRequest.page.comments?{comments:rawRequest.page.comments}:{})} :
                 {kind: "recent", pageSkip: selected.pageSkip, itemshow: selected.itemshow,
                     maxScrollback: selected.maxScrollback, hasPrevious: selected.window.length > selected.itemshow};
             const token = await formToken(deps.secretSource, inputs.random, nowSeconds, request.uniqCookie);
