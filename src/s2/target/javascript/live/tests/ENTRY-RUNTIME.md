@@ -65,23 +65,24 @@ those probes or relax their grants.
 
 ## Real database status and setting checks
 
-After normal marked-journal setup, offline public config and read-only grants,
+After normal marked-journal setup and private site-config export,
 run from `src/s2/target/javascript`:
 
 ```sh
-S2_LIVE_TEST_ARTIFACT=/tmp/entry-stock.json /opt/dw-node24/bin/node dist/live/tests/privacy-db.js --entry
+S2_SITE_CONFIG=/path/to/private/site-config.json S2_LIVE_TEST_ARTIFACT=/tmp/entry-stock.json /opt/dw-node24/bin/node dist/live/tests/privacy-db.js --entry
 ```
 
 This discovers the actual public entry ID from the primary snapshot and checks
 both GET and HEAD through the live service and HTTP socket. The existing offline
 Perl helper changes only the marked owner's status, settings and style selection
-between requests. Each refusal must restore the exact baseline fingerprint and
-successful response. It does not create ban records or alter entries/comments.
+between requests. Each mutation must restore the exact baseline fingerprint and
+successful response. Legacy or missing style selection follows the exported
+DEFAULT_STYLE: qualified core2/core2base is accepted, while core1 is refused. It does not create ban records or alter entries/comments.
 Run sequentially without other marked-journal mutations. Interrupted runs retain
 the same scoped recovery state and use the existing recovery command:
 
 ```sh
-/opt/dw-node24/bin/node dist/live/tests/privacy-db.js --recover
+S2_SITE_CONFIG=/path/to/private/site-config.json /opt/dw-node24/bin/node dist/live/tests/privacy-db.js --recover
 ```
 
 No Perl helper runs on the serving path. Full retained-page differential,
