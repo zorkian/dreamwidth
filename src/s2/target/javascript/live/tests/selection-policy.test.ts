@@ -194,3 +194,20 @@ test("distinct seconds within a minute retain their SQL order", () => {
     assert.throws(() => approve({...selected, selection: {...selection,
         selectedJitemids: [3, 2, 1]}}), Unsupported);
 });
+
+test("calendar neighbors cross year boundaries with strict chronological direction", () => {
+    const data = snapshot();
+    for (const calendar of [
+        {...data.calendar, current: {year: 2026, month: 1}, previous: {year: 2025, month: 12}},
+        {...data.calendar, current: {year: 2025, month: 12}, next: {year: 2026, month: 1}},
+    ]) {
+        assert.deepEqual(approve({...data, calendar}).calendar.previous, calendar.previous);
+        assert.deepEqual(approve({...data, calendar}).calendar.next, calendar.next);
+        for (const previous of [calendar.current, {year: 2027, month: 1}]) {
+            assert.throws(() => approve({...data, calendar: {...calendar, previous}}), Unsupported);
+        }
+        for (const next of [calendar.current, {year: 2024, month: 12}]) {
+            assert.throws(() => approve({...data, calendar: {...calendar, next}}), Unsupported);
+        }
+    }
+});
