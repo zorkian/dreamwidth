@@ -1,6 +1,14 @@
 // mysql.ts
 //
-// Bounded primary MySQL snapshot for the local live S2 journal.
+// Configured-primary selected page snapshots for the standalone S2 viewer.
+//
+// Source ports: LJ/S2.pm get_style and YearMonth, and DW/Logic/LogItems.pm
+// recent_items. The LJ code was forked from the LiveJournal project owned and
+// operated by Live Journal, Inc., then modified by Dreamwidth Studios, LLC.
+// Its inherited license is available at:
+// http://code.livejournal.org/trac/livejournal/browser/trunk/LICENSE-LiveJournal.txt
+// Those ports and their modifications are provided under the GNU General
+// Public License. See LICENSE in this distribution.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -13,25 +21,23 @@
 //
 
 import { createHash } from "node:crypto";
-import { Kysely, MysqlDialect, sql } from "kysely";
-import mysql from "mysql2";
+import { sql } from "kysely";
+import { PrimaryDatabases, type ReadConnection, type SqlRow } from "./primary";
+import type { LiveStoreConfig } from "../startup-types";
+import {resolvePlaceholder} from "../domain/placeholder";
 import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
     RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
+    RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
+    PlaceholderResolutionSpec,
 } from "../contracts";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
 import { decodeLegacyText } from "./legacy-text";
 
-type Connection = Kysely<Record<string, never>>;
-type Row = Record<string, unknown>;
-
-export interface MysqlStoreConfig {
-    readonly host: "127.0.0.1";
-    readonly port: number;
-    readonly user: string;
-    readonly password: string;
-}
+type Connection = ReadConnection;
+type Row = SqlRow;
+export type MysqlStoreConfig = LiveStoreConfig;
 
 const PUBLIC_SETTINGS = [
     "stylesys", "s2_style", "journaltitle", "journalsubtitle",
@@ -50,10 +56,10 @@ const PUBLIC_SETTINGS = [
 
 const GLOBAL_TABLES = [
     "user", "useridmap", "userprop", "userproplist", "s2styles", "s2layers",
-    "s2compiled", "s2source_inno", "logproplist", "secrets", "sysban",
+    "s2compiled", "s2source_inno", "s2info", "logproplist", "sysban",
 ] as const;
 const CLUSTER_TABLES = [
-    "userbio", "userproplite2", "userpropblob", "s2stylelayers2",
+    "userproplite2", "userpropblob", "s2stylelayers2",
     "log2", "logtext2", "logprop2",
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
     "links", "userpic2", "talk2",
@@ -126,12 +132,14 @@ function fingerprint(
     rawText: ReadonlyMap<number, readonly [string, string, string, string]>,
     mapping: readonly [number, string],
     rawFields: readonly RawField[],
+    request: RawPageRequest, selection: RawPageSelection, calendar: RawCalendarSummary,
+    sourceFacts: unknown,
 ): string {
     const userValue = (user: RawUser) => [
         user.userid, user.user, user.clusterid, user.status, user.statusvis,
         user.journaltype, user.name, user.optShowTalkLinks, user.optWhocanReply,
         user.optForceMoodtheme, user.moodthemeid, user.defaultpicid, user.dversion,
-        user.caps, user.hasBio, user.bio, sortedRecord(user.publicSettings),
+        user.caps, sortedRecord(user.publicSettings),
     ];
     const entryValue = (entry: RawEntry) => [
         entry.journalid, entry.jitemid, entry.anum, entry.posterid,
@@ -141,100 +149,220 @@ function fingerprint(
         entry.subjectText, entry.eventText, rawText.get(entry.jitemid),
     ];
     const payload = [
-        1, mapping, userValue(owner), posters.map(userValue), style,
+        2, request, selection, calendar, sourceFacts, mapping, userValue(owner), posters.map(userValue), style,
         entries.length, entries.map(entryValue), features,
         [...rawFields].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
     ];
     return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
-export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
-    private constructor(private readonly db: Connection) {}
+
+interface GlobalFacts {
+    owner: Row;
+    mapping: readonly Row[];
+    properties: readonly Row[];
+    propertyNames: readonly Row[];
+    logNames: readonly Row[];
+    spamreportBans: number;
+}
+interface ClusterSettings { properties: readonly Row[]; layers: readonly Row[]; }
+function digest(value: unknown): string {
+    return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+function header(row: Row, journalid: number): RawEntryHeader {
+    if (number(row.journalid, 1) !== journalid) unsupported();
+    return {journalid, jitemid: number(row.jitemid, 1), anum: number(row.anum, 0, 255),
+        posterid: number(row.posterid, 1), eventtime: civilTime(row.eventtime), logtime: civilTime(row.logtime),
+        rlogtime: number(row.rlogtime), revttime: number(row.revttime),
+        year: number(row.year, 1, 9999), month: number(row.month, 1, 12), day: number(row.day, 1, 31),
+        security: requiredString(row.security), allowmask: unsigned(row.allowmask, 64),
+        replycount: number(row.replycount), compressed: requiredString(row.compressed)};
+}
+
+export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, PlaceholderResolver {
+    private constructor(private readonly databases: PrimaryDatabases,
+        private readonly config: LiveStoreConfig) {}
 
     static async open(config: MysqlStoreConfig): Promise<MysqlLiveStore> {
-        if (config.host !== "127.0.0.1" || config.port !== 3306 ||
-            config.user !== "s2js_slice3_ro" ||
-            !/^[A-Za-z0-9]{40}$/.test(config.password)) {
-            unsupported();
-        }
-        const pool = mysql.createPool({
-            host: config.host, port: config.port, user: config.user,
-            password: config.password, database: "dw_global", charset: "utf8mb4",
-            dateStrings: true, supportBigNumbers: true, bigNumberStrings: true,
-            connectionLimit: 2, waitForConnections: true, queueLimit: 4,
-            connectTimeout: 3000, enableKeepAlive: false,
-        });
-        const db = new Kysely<Record<string, never>>({ dialect: new MysqlDialect({ pool }) });
-        const store = new MysqlLiveStore(db);
-        try {
-            await store.verifyTopology();
-            return store;
-        } catch (error) {
-            try { await db.destroy(); } catch { /* startup still fails closed */ }
-            if (error instanceof SnapshotError) throw error;
-            throw new SnapshotError("unavailable");
-        }
+        if (!Number.isSafeInteger(config.maxScrollback) || config.maxScrollback < 2 ||
+            !Number.isSafeInteger(config.capabilities.moveInProgressMask) ||
+            config.capabilities.moveInProgressMask < 0) unsupported();
+        const frozen = structuredClone(config);
+        return new MysqlLiveStore(PrimaryDatabases.create(frozen.database), frozen);
     }
-
-    private async verifyTopology(): Promise<void> {
-        await this.db.connection().execute(async connection => {
-            const system = (await sql<Row>`
-                SELECT VERSION() AS version, DATABASE() AS dbname,
-                    CURRENT_USER() AS principal,
-                    @@global.read_only AS read_only,
-                    @@global.super_read_only AS super_read_only
-            `.execute(connection)).rows[0];
-            if (!system || !/^8\./.test(requiredString(system.version)) ||
-                system.dbname !== "dw_global" ||
-                system.principal !== "s2js_slice3_ro@127.0.0.1" ||
-                number(system.read_only) !== 0 ||
-                number(system.super_read_only) !== 0) unsupported();
-            const tables = (await sql<Row>`
-                SELECT TABLE_SCHEMA AS schema_name, TABLE_NAME AS table_name,
-                    ENGINE AS engine
-                FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA IN ('dw_global', 'dw_cluster01')
-                    AND TABLE_TYPE = 'BASE TABLE'
-            `.execute(connection)).rows;
-            const engines = new Map(tables.map(row => [
-                `${requiredString(row.schema_name)}.${requiredString(row.table_name)}`,
-                requiredString(row.engine),
-            ]));
-            for (const name of GLOBAL_TABLES) {
-                if (engines.get(`dw_global.${name}`) !== "InnoDB") unsupported();
-            }
-            for (const name of CLUSTER_TABLES) {
-                if (engines.get(`dw_cluster01.${name}`) !== "InnoDB") unsupported();
-            }
+    async close(): Promise<void> { await this.databases.close(); }
+    async resolvePlaceholder(spec: PlaceholderResolutionSpec): Promise<{readonly alt: string; readonly title: string}> {
+        // Only the startup public-language resolver uses an empty engine list.
+        // MyISAM labels are a restart-lived value, never authorization dependencies.
+        return this.databases.snapshot(undefined, [], connection => resolvePlaceholder(connection, spec));
+    }
+    async loadLatestSecret(nowSeconds: number, maxAgeSeconds: number): Promise<LocalSecret | null> {
+        number(nowSeconds); number(maxAgeSeconds, 0, 86400);
+        const hour = nowSeconds - nowSeconds % 3600;
+        return this.databases.snapshot(undefined, ["secrets"], async connection => {
+            const rows = (await sql<Row>`SELECT stime, HEX(secret) AS secret_hex
+                FROM secrets WHERE stime <= ${hour} ORDER BY stime DESC LIMIT 1`.execute(connection)).rows;
+            const row = rows[0];
+            if (!row) return null;
+            const stime = number(row.stime);
+            if (stime % 3600 || nowSeconds - stime > maxAgeSeconds) return null;
+            const hex = requiredString(row.secret_hex);
+            if (!/^(?:[0-9A-F]{2}){32}$/i.test(hex)) unsupported();
+            const secret = Buffer.from(hex, "hex");
+            if (!/^[A-Za-z0-9]{32}$/.test(secret.toString("ascii"))) unsupported();
+            return {stime, secret};
         });
     }
 
-    private async readSnapshot<T>(read: (connection: Connection) => Promise<T>): Promise<T> {
-        try {
-            return await this.db.connection().execute(async connection => {
-                await sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`.execute(connection);
-                await sql`SET SESSION MAX_EXECUTION_TIME = 2000`.execute(connection);
-                await sql`START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`.execute(connection);
-                try {
-                    return await read(connection);
-                } finally {
-                    await sql`ROLLBACK`.execute(connection);
-                }
-            });
-        } catch (error) {
-            if (error instanceof SnapshotError) throw error;
-            throw new SnapshotError("unavailable");
+    private async globalFacts(connection: Connection, username: string): Promise<GlobalFacts | null> {
+        const owners = (await sql<Row>`SELECT userid,user,clusterid,status,statusvis,journaltype,
+            HEX(name) AS name_stored, HEX(CONVERT(name USING latin1)) AS name_original,
+            HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
+            opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,defaultpicid,dversion,
+            CAST(caps AS CHAR) AS caps
+            FROM user WHERE BINARY user = BINARY ${username} LIMIT 2`.execute(connection)).rows;
+        if (!owners.length) return null;
+        if (owners.length !== 1) unsupported();
+        const owner = owners[0]!, id = number(owner.userid, 1);
+        // Both directions expose incomplete rename/move mappings, rather than
+        // treating a one-sided useridmap row as the current journal identity.
+        const mapping = (await sql<Row>`SELECT userid,user FROM useridmap
+            WHERE userid = ${id} OR BINARY user = BINARY ${username}
+            ORDER BY userid,user LIMIT 3`.execute(connection)).rows;
+        if (mapping.length !== 1 || number(mapping[0]!.userid, 1) !== id || mapping[0]!.user !== username) unsupported();
+        const propertyNames = (await sql<Row>`SELECT upropid,name FROM userproplist
+            WHERE name IN (${sql.join(PUBLIC_SETTINGS)}) ORDER BY upropid,name`.execute(connection)).rows;
+        const logNames = (await sql<Row>`SELECT propid,name FROM logproplist ORDER BY propid LIMIT 4097`
+            .execute(connection)).rows;
+        if (logNames.length > 4096) unsupported();
+        const properties = (await sql<Row>`SELECT p.upropid,
+            HEX(p.value) AS value_stored, HEX(CONVERT(p.value USING latin1)) AS value_original,
+            HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
+            FROM userprop p WHERE p.userid = ${id} AND p.upropid IN
+            (SELECT upropid FROM userproplist WHERE name IN (${sql.join(PUBLIC_SETTINGS)}))
+            ORDER BY p.upropid`.execute(connection)).rows;
+        const bans = (await sql<Row>`SELECT COUNT(*) AS matching FROM sysban
+            WHERE BINARY what = BINARY 'spamreport' AND BINARY value = BINARY ${username}`.execute(connection)).rows;
+        if (bans.length !== 1) unsupported();
+        return {owner, mapping, properties, propertyNames, logNames, spamreportBans: number(bans[0]!.matching)};
+    }
+    private names(rows: readonly Row[], idKey: string): Map<number, string> {
+        const result = new Map<number, string>(), names = new Set<string>();
+        for (const row of rows) {
+            const id = number(row[idKey], 1), name = requiredString(row.name);
+            if (!name || name.length > 256 || result.has(id) || names.has(name)) unsupported();
+            result.set(id, name); names.add(name);
         }
+        return result;
+    }
+    private async clusterSettings(connection: Connection, id: number, facts: GlobalFacts): Promise<ClusterSettings> {
+        const ids = facts.propertyNames.map(row => number(row.upropid, 1));
+        const properties: Row[] = [];
+        if (ids.length) {
+            const lite = (await sql<Row>`SELECT upropid,
+                HEX(value) AS value_stored, HEX(CONVERT(value USING latin1)) AS value_original,
+                HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
+                FROM userproplite2 WHERE userid = ${id} AND upropid IN (${sql.join(ids)})
+                ORDER BY upropid`.execute(connection)).rows;
+            const blob = (await sql<Row>`SELECT upropid, HEX(value) AS value_stored
+                FROM userpropblob WHERE userid = ${id} AND upropid IN (${sql.join(ids)})
+                ORDER BY upropid`.execute(connection)).rows;
+            properties.push(...lite, ...blob);
+        }
+        const settings = this.settings(facts, {properties, layers: []}, []);
+        const styleId = settings.s2_style ? number(settings.s2_style, 1) : 0;
+        const layers = styleId ? (await sql<Row>`SELECT type,s2lid FROM s2stylelayers2
+            WHERE userid = ${id} AND styleid = ${styleId} ORDER BY type,s2lid LIMIT 9`.execute(connection)).rows : [];
+        if (layers.length > 8) unsupported();
+        return {properties, layers};
+    }
+    private settings(facts: GlobalFacts, cluster: ClusterSettings, raw: RawField[]): PublicSettings {
+        const names = this.names(facts.propertyNames, "upropid");
+        const result = nullRecord(PUBLIC_SETTINGS), seen = new Set<string>();
+        for (const row of [...facts.properties, ...cluster.properties]) {
+            const name = names.get(number(row.upropid, 1));
+            if (!name || !PUBLIC_SETTINGS.includes(name as PublicSettingName) || seen.has(name)) unsupported();
+            seen.add(name);
+            result[name as PublicSettingName] = decodedColumn(row, "value",
+                "user:" + facts.owner.userid + ":prop:" + name, raw,
+                row.value_original === undefined ? 65536 : 8192, true, row.value_original === undefined);
+        }
+        return Object.freeze(result);
+    }
+    private user(row: Row, settings: PublicSettings, raw: RawField[]): UserRecord {
+        const id = number(row.userid, 1);
+        return new UserRecord({userid: id, user: requiredString(row.user), clusterid: number(row.clusterid, 1),
+            status: requiredString(row.status), statusvis: requiredString(row.statusvis), journaltype: requiredString(row.journaltype),
+            name: decodedColumn(row, "name", "user:" + id + ":name", raw, 1024, false)!,
+            optShowTalkLinks: requiredString(row.opt_showtalklinks), optWhocanReply: requiredString(row.opt_whocanreply),
+            optForceMoodtheme: requiredString(row.opt_forcemoodtheme), moodthemeid: number(row.moodthemeid),
+            defaultpicid: row.defaultpicid === null ? 0 : number(row.defaultpicid), dversion: number(row.dversion),
+            caps: unsigned(row.caps, 16), publicSettings: settings});
     }
 
-    async loadRawSnapshot(username: string): Promise<RawJournalSnapshot | null> {
-        if (!/^[a-z][a-z0-9_]{0,24}$/.test(username)) unsupported();
-        return this.readSnapshot(connection => this.loadInSnapshot(connection, username));
+    async loadRawSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
+        if (!/^[a-z0-9_]{1,25}$/.test(request.username)) unsupported();
+        number(request.calendarNow.year, 1, 9999); number(request.calendarNow.month, 1, 12);
+        const frozenRequest = structuredClone(request);
+        const initial = await this.databases.snapshot(undefined, GLOBAL_TABLES,
+            connection => this.globalFacts(connection, request.username));
+        if (!initial) return null;
+        const ownerId = number(initial.owner.userid, 1), clusterId = number(initial.owner.clusterid, 1);
+        const caps = BigInt(unsigned(initial.owner.caps, 16));
+        if (caps & BigInt(this.config.capabilities.moveInProgressMask)) unsupported();
+        // Planning reads only public settings/style IDs. A second cluster
+        // snapshot below must match them; no private body is loaded in planning.
+        const plan = await this.databases.snapshot(clusterId, CLUSTER_TABLES, async connection => {
+            if (frozenRequest.page.kind === "entry" &&
+                !await this.loadWindow(connection, ownerId, frozenRequest)) return null;
+            return this.clusterSettings(connection, ownerId, initial);
+        });
+        if (!plan) return null;
+        const before = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
+            const facts = await this.globalFacts(connection, request.username);
+            if (!facts || digest(facts) !== digest(initial)) unsupported();
+            const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
+            const style = await this.loadStyle(connection, owner, plan, raw);
+            return {facts, style, raw};
+        });
+        const selected = await this.databases.snapshot(clusterId, CLUSTER_TABLES, async connection => {
+            const current = await this.clusterSettings(connection, ownerId, before.facts);
+            if (digest(current) !== digest(plan)) unsupported();
+            const window = await this.loadWindow(connection, ownerId, frozenRequest);
+            if (!window) return null;
+            const raw: RawField[] = [];
+            const loaded = await this.loadEntries(connection, ownerId, window.rows,
+                window.rows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            const statusId = before.facts.logNames.find(row => row.name === "statusvis")?.propid;
+            const calendar = await this.loadCalendar(connection, ownerId, frozenRequest,
+                statusId === undefined ? 0 : number(statusId, 1), raw,
+                window.selection.kind === "recent" ? window.selection.window.map(row => row.jitemid) :
+                    [window.selection.target.jitemid]);
+            const features = await this.loadFeatures(connection, ownerId, before.facts.spamreportBans);
+            return {...loaded, selection: window.selection, calendar, features, raw};
+        });
+        if (!selected) return null;
+        const after = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
+            const facts = await this.globalFacts(connection, request.username);
+            if (!facts || digest(facts) !== digest(before.facts)) unsupported();
+            const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
+            const style = await this.loadStyle(connection, owner, plan, raw);
+            if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
+            const posters = await this.loadPosters(connection, owner, selected.entries, raw);
+            return {owner, style, posters, raw};
+        });
+        const rawFields = [...after.raw, ...selected.raw];
+        if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
+        const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
+            plan.layers, this.config.styles, this.config.capabilities];
+        return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
+            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features,
+            fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
+                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts)};
     }
-
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
-            const fresh = await this.loadRawSnapshot(snapshot.owner.user);
+            const fresh = await this.loadRawSnapshot(snapshot.request);
             return fresh !== null && fresh.fingerprint === snapshot.fingerprint;
         } catch (error) {
             if (error instanceof SnapshotError && error.kind === "unsupported") return false;
@@ -242,240 +370,198 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         }
     }
 
-    async loadLatestSecret(nowSeconds: number, maxAgeSeconds: number): Promise<LocalSecret | null> {
-        if (!Number.isSafeInteger(nowSeconds) || !Number.isSafeInteger(maxAgeSeconds) ||
-            maxAgeSeconds < 0 || maxAgeSeconds > 86400) unsupported();
-        const hour = nowSeconds - nowSeconds % 3600;
-        try {
-            const rows = (await sql<Row>`
-                SELECT stime, HEX(secret) AS secret_hex
-                FROM dw_global.secrets WHERE stime <= ${hour}
-                ORDER BY stime DESC LIMIT 1
-            `.execute(this.db)).rows;
-            const row = rows[0];
-            if (!row) return null;
-            const stime = number(row.stime);
-            if (stime % 3600 !== 0 || nowSeconds - stime > maxAgeSeconds) return null;
-            const hex = requiredString(row.secret_hex);
-            if (!/^(?:[0-9A-F]{2}){32}$/i.test(hex)) unsupported();
-            const secret = Buffer.from(hex, "hex");
-            if (!/^[A-Za-z0-9]{32}$/.test(secret.toString("ascii"))) unsupported();
-            return { stime, secret };
-        } catch (error) {
-            if (error instanceof SnapshotError) throw error;
-            throw new SnapshotError("unavailable");
+
+    private async loadStyle(connection: Connection, owner: RawUser, selected: ClusterSettings,
+        raw: RawField[]): Promise<RawStyle | null> {
+        const value = owner.publicSettings.s2_style;
+        const styleId = value ? number(value, 1) : 0;
+        const rows = styleId ? (await sql<Row>`SELECT styleid,userid,modtime,
+            HEX(name) AS name_stored, HEX(CONVERT(name USING latin1)) AS name_original,
+            HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip
+            FROM s2styles WHERE styleid = ${styleId} LIMIT 2`.execute(connection)).rows : [];
+        if (rows.length > 1) unsupported();
+        let layerIds = rows.length ? selected.layers.map(row => ({type: requiredString(row.type),
+            s2lid: number(row.s2lid, 1)})) : [];
+        const persisted = layerIds.length > 0;
+        if (!persisted) {
+            layerIds = [];
+            for (const [type, name] of Object.entries(this.config.styles.defaultStyle).sort()) {
+                if (!name) continue;
+                const matches = (await sql<Row>`SELECT l.s2lid,l.b2lid FROM s2layers l
+                    JOIN user u ON u.userid = l.userid
+                    JOIN useridmap system_map ON system_map.userid = u.userid
+                        AND BINARY system_map.user = BINARY 'system'
+                    JOIN s2info i ON i.s2lid = l.s2lid AND BINARY i.infokey = BINARY 'redist_uniq'
+                    WHERE BINARY u.user = BINARY 'system' AND BINARY i.value = BINARY ${name}
+                    AND (l.b2lid = 0 OR EXISTS (SELECT 1 FROM s2layers parent JOIN s2info parent_info ON parent_info.s2lid = parent.s2lid
+                        WHERE parent.s2lid = l.b2lid AND parent.userid = l.userid
+                        AND parent_info.infokey IN ('redist_uniq','type','name','langcode',
+                            'majorversion','_previews','des','note','author','author_name','author_email','is_internal')))
+                    ORDER BY l.s2lid LIMIT 2`.execute(connection)).rows;
+                if (matches.length > 1) unsupported();
+                if (matches.length) layerIds.push({type, s2lid: number(matches[0]!.s2lid, 1)});
+            }
+        } else {
+            layerIds = layerIds.map(layer => ({...layer,
+                s2lid: ["core","i18nc","i18n","layout","theme"].includes(layer.type) &&
+                    Object.hasOwn(this.config.styles.layerRemap, String(layer.s2lid))
+                    ? number(this.config.styles.layerRemap[String(layer.s2lid)], 1) : layer.s2lid}));
         }
+        if (!layerIds.length) return null;
+        if (layerIds.length > 8 || new Set(layerIds.map(layer => layer.type)).size !== layerIds.length) unsupported();
+        const ids = [...new Set(layerIds.map(layer => layer.s2lid))];
+        const definitions = (await sql<Row>`SELECT source.s2lid,source.userid AS ownerid,
+            layer_owner.user AS owner_username, compiled.comptime AS compiled_time,
+            SHA2(text.s2code,256) AS source_hash
+            FROM s2layers source
+            LEFT JOIN user layer_owner ON layer_owner.userid = source.userid
+            LEFT JOIN s2compiled compiled ON compiled.s2lid = source.s2lid
+            LEFT JOIN s2source_inno text ON text.s2lid = source.s2lid
+            WHERE source.s2lid IN (${sql.join(ids)}) ORDER BY source.s2lid`.execute(connection)).rows;
+        if (definitions.length !== ids.length) unsupported();
+        const byId = new Map(definitions.map(row => [number(row.s2lid, 1), row]));
+        if (byId.size !== ids.length) unsupported();
+        const stored = rows[0];
+        return {origin: persisted ? "persisted" : "default", styleid: persisted ? styleId : 0,
+            ownerid: persisted ? number(stored!.userid, 1) : null,
+            name: persisted ? decodedColumn(stored!, "name", "style:" + styleId + ":name", raw, 1024, false)! : null,
+            modtime: persisted ? number(stored!.modtime) : 0,
+            layers: layerIds.sort((a,b) => a.type.localeCompare(b.type)).map(layer => {
+                const definition = byId.get(layer.s2lid)!;
+                return {type: layer.type, s2lid: layer.s2lid, ownerid: number(definition.ownerid, 1),
+                    ownerUsername: requiredString(definition.owner_username),
+                    compiledTime: number(definition.compiled_time),
+                    sourceHash: requiredString(definition.source_hash).toLowerCase()};
+            })};
     }
-
-    async close(): Promise<void> { await this.db.destroy(); }
-
-    private async loadInSnapshot(
-        connection: Connection, username: string,
-    ): Promise<RawJournalSnapshot | null> {
-        const owners = (await sql<Row>`
-            SELECT userid FROM dw_global.user WHERE user = ${username} LIMIT 2
-        `.execute(connection)).rows;
-        if (owners.length === 0) return null;
-        if (owners.length !== 1) unsupported();
-        const ownerId = number(owners[0]?.userid, 1);
-        const mappings = (await sql<Row>`
-            SELECT userid, user FROM dw_global.useridmap WHERE userid = ${ownerId}
-        `.execute(connection)).rows;
-        if (mappings.length !== 1 || mappings[0]?.user !== username ||
-            number(mappings[0]?.userid, 1) !== ownerId) unsupported();
-
-        // No security or status predicate: policy must see every candidate.
-        const logRows = (await sql<Row>`
-            SELECT journalid, jitemid, anum, posterid, eventtime, logtime,
-                rlogtime, revttime, year, month, day, security,
-                CAST(allowmask AS CHAR) AS allowmask, replycount, compressed
-            FROM dw_cluster01.log2 WHERE journalid = ${ownerId}
-            ORDER BY revttime ASC, jitemid DESC LIMIT 201
-        `.execute(connection)).rows;
-        if (logRows.length > 200) unsupported();
-        const itemIds = logRows.map(row => number(row.jitemid, 1));
-        if (new Set(itemIds).size !== itemIds.length) unsupported();
-        const posterIds = [...new Set([ownerId, ...logRows.map(row => number(row.posterid, 1))])];
-        const rawFields: RawField[] = [];
-        const users = await this.loadUsers(connection, posterIds, rawFields);
-        const owner = users.get(ownerId);
-        if (!owner || owner.clusterid !== 1) unsupported();
-        const posters = posterIds.sort((a, b) => a - b).map(id => {
-            const user = users.get(id);
-            if (!user || user.clusterid !== 1) unsupported();
-            return user;
-        });
-        const style = await this.loadStyle(connection, owner, rawFields);
-        const { entries, rawText } = await this.loadEntries(
-            connection, ownerId, logRows, itemIds, rawFields,
-        );
-        const features = await this.loadFeatures(connection, ownerId, username);
-        const rawFieldBytes = rawFields.reduce((sum, field) =>
-            sum + (field[1].length + field[2].length) / 2, 0);
-        if (rawFieldBytes > 2097152) unsupported();
-        const mapping: [number, string] = [ownerId, username];
-        return {
-            owner, posters, style, entries, features,
-            fingerprint: fingerprint(
-                owner, posters, style, entries, features, rawText, mapping, rawFields,
-            ),
-        };
-    }
-
-    private async loadUsers(
-        connection: Connection, ids: readonly number[], rawFields: RawField[],
-    ): Promise<Map<number, UserRecord>> {
-        const users = (await sql<Row>`
-            SELECT userid, user, clusterid, status, statusvis, journaltype,
-                HEX(name) AS name_stored,
-                HEX(CONVERT(name USING latin1)) AS name_original,
-                HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
-                opt_showtalklinks, opt_whocanreply, opt_forcemoodtheme,
-                moodthemeid, defaultpicid, dversion, CAST(caps AS CHAR) AS caps,
-                has_bio
-            FROM dw_global.user WHERE userid IN (${sql.join(ids)})
-        `.execute(connection)).rows;
-        if (users.length !== ids.length) unsupported();
-        const bios = (await sql<Row>`
-            SELECT userid,
-                HEX(bio) AS bio_stored,
-                HEX(CONVERT(bio USING latin1)) AS bio_original,
-                HEX(CONVERT(CONVERT(bio USING latin1) USING utf8mb4)) AS bio_roundtrip
-            FROM dw_cluster01.userbio
-            WHERE userid IN (${sql.join(ids)})
-        `.execute(connection)).rows;
-        const bioById = new Map<number, string | null>();
-        for (const row of bios) {
-            const id = number(row.userid, 1);
-            if (bioById.has(id) || !ids.includes(id)) unsupported();
-            bioById.set(id, decodedColumn(
-                row, "bio", "user:" + id + ":bio", rawFields, 65536, true,
-            ));
-        }
-        const globalProps = (await sql<Row>`
-            SELECT p.userid, names.name,
-                HEX(p.value) AS value_stored,
-                HEX(CONVERT(p.value USING latin1)) AS value_original,
-                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
-            FROM dw_global.userprop AS p
-            JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
-            WHERE p.userid IN (${sql.join(ids)})
-                AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
-        `.execute(connection)).rows;
-        const clusterProps = (await sql<Row>`
-            SELECT p.userid, names.name,
-                HEX(p.value) AS value_stored,
-                HEX(CONVERT(p.value USING latin1)) AS value_original,
-                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
-            FROM dw_cluster01.userproplite2 AS p
-            JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
-            WHERE p.userid IN (${sql.join(ids)})
-                AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
-        `.execute(connection)).rows;
-        const blobProps = (await sql<Row>`
-            SELECT p.userid, names.name, HEX(p.value) AS value_stored
-            FROM dw_cluster01.userpropblob AS p
-            JOIN dw_global.userproplist AS names ON names.upropid = p.upropid
-            WHERE p.userid IN (${sql.join(ids)})
-                AND names.name IN (${sql.join(PUBLIC_SETTINGS)})
-        `.execute(connection)).rows;
-        const propsById = new Map<number, Record<PublicSettingName, string | null>>();
-        for (const id of ids) propsById.set(id, nullRecord(PUBLIC_SETTINGS));
-        const allowed = new Set<string>(PUBLIC_SETTINGS);
-        const seen = new Set<string>();
-        for (const row of [...globalProps, ...clusterProps, ...blobProps]) {
-            const id = number(row.userid, 1);
-            const name = requiredString(row.name);
-            if (!propsById.has(id) || !allowed.has(name)) unsupported();
-            const key = `${id}/${name}`;
-            if (seen.has(key)) unsupported();
-            seen.add(key);
-            propsById.get(id)![name as PublicSettingName] = decodedColumn(
-                row, "value", "user:" + id + ":prop:" + name, rawFields,
-                row.value_original === undefined ? 65536 : 8192, true,
-                row.value_original === undefined,
-            );
-        }
-        const result = new Map<number, UserRecord>();
-        for (const row of users) {
-            const id = number(row.userid, 1);
-            if (result.has(id) || !propsById.has(id)) unsupported();
-            const props = propsById.get(id)!;
-            Object.freeze(props);
-            result.set(id, new UserRecord({
-                userid: id,
-                user: requiredString(row.user),
-                clusterid: number(row.clusterid),
-                status: requiredString(row.status),
-                statusvis: requiredString(row.statusvis),
-                journaltype: requiredString(row.journaltype),
-                name: decodedColumn(
-                    row, "name", "user:" + id + ":name", rawFields, 1024, false,
-                )!,
-                optShowTalkLinks: requiredString(row.opt_showtalklinks),
-                optWhocanReply: requiredString(row.opt_whocanreply),
-                optForceMoodtheme: requiredString(row.opt_forcemoodtheme),
-                moodthemeid: number(row.moodthemeid),
-                defaultpicid: row.defaultpicid === null ? 0 : number(row.defaultpicid),
-                dversion: number(row.dversion),
-                caps: unsigned(row.caps, 16),
-                hasBio: requiredString(row.has_bio),
-                bio: bioById.get(id) ?? null,
-                publicSettings: props as PublicSettings,
-            }));
+    private async loadPosters(connection: Connection, owner: RawUser, entries: readonly RawEntry[],
+        raw: RawField[]): Promise<RawUser[]> {
+        const ids = [...new Set(entries.map(entry => entry.posterid))].sort((a,b) => a-b);
+        if (!ids.includes(owner.userid)) ids.push(owner.userid);
+        ids.sort((a,b) => a-b);
+        const result: RawUser[] = [];
+        for (const id of ids) {
+            if (id === owner.userid) { result.push(owner); continue; }
+            const identity = (await sql<Row>`SELECT user FROM user WHERE userid = ${id} LIMIT 2`.execute(connection)).rows;
+            if (identity.length !== 1) unsupported();
+            const facts = await this.globalFacts(connection, requiredString(identity[0]!.user));
+            if (!facts || number(facts.owner.userid, 1) !== id) unsupported();
+            // Foreign posters are exposed as facts and explicitly refused by
+            // the personal-journal policy. No other journal body is queried.
+            result.push(this.user(facts.owner, this.settings(facts, {properties: [], layers: []}, raw), raw));
         }
         return result;
     }
 
-    private async loadStyle(
-        connection: Connection, owner: RawUser, rawFields: RawField[],
-    ): Promise<RawStyle | null> {
-        const styleValue = owner.publicSettings.s2_style;
-        if (styleValue === null) return null;
-        const styleId = number(styleValue, 1);
-        const rows = (await sql<Row>`
-            SELECT styleid, userid,
-                HEX(name) AS name_stored,
-                HEX(CONVERT(name USING latin1)) AS name_original,
-                HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
-                modtime
-            FROM dw_global.s2styles WHERE styleid = ${styleId}
-        `.execute(connection)).rows;
+    private async loadWindow(connection: Connection, ownerId: number, request: RawPageRequest):
+        Promise<{selection: RawPageSelection; rows: readonly Row[]} | null> {
+        const columns = sql`journalid,jitemid,anum,posterid,eventtime,logtime,rlogtime,revttime,
+            year,month,day,security,CAST(allowmask AS CHAR) AS allowmask,replycount,compressed`;
+        if (request.page.kind === "entry") {
+            const id = number(request.page.ditemid, 1, 4294967295);
+            const rows = (await sql<Row>`SELECT ${columns} FROM log2
+                WHERE journalid = ${ownerId} AND jitemid = ${Math.floor(id / 256)} LIMIT 2`.execute(connection)).rows;
+            if (!rows.length) return null;
+            if (rows.length !== 1) unsupported();
+            const row = rows[0]!;
+            if (number(row.anum, 0, 255) !== id % 256 || row.security === "private" || row.security === "usemask") return null;
+            if (row.security !== "public") unsupported();
+            const target = header(row, ownerId);
+            return {selection: {kind: "entry", ditemid: id, target}, rows};
+        }
+        const itemshow = number(request.page.itemshow, 1, 200), skip = number(request.page.skip);
+        const maximum = this.config.maxScrollback;
+        if (itemshow >= maximum) unsupported();
+        const pageSkip = Math.min(skip, maximum - itemshow);
+        const loadSkip = Math.min(pageSkip, maximum - itemshow - 1);
+        const rows = (await sql<Row>`SELECT ${columns} FROM log2 USE INDEX (revttime)
+            WHERE journalid = ${ownerId} AND revttime <= 2147483647 AND security = 'public'
+            ORDER BY revttime ASC,jitemid ASC LIMIT ${loadSkip},${itemshow + 1}`.execute(connection)).rows;
+        const window = rows.map(row => header(row, ownerId));
+        if (new Set(window.map(row => row.jitemid)).size !== window.length) unsupported();
+        // Native "per-minute" buffer compares S2 alldatepart including seconds.
+        // Reorder only equal full event times AFTER LIMIT, then pop lookahead.
+        const reordered: Row[] = [];
+        for (let index = 0; index < rows.length;) {
+            let end = index + 1;
+            while (end < rows.length && rows[end]!.eventtime === rows[index]!.eventtime) end++;
+            reordered.push(...rows.slice(index,end).sort((a,b) => number(b.jitemid)-number(a.jitemid)));
+            index = end;
+        }
+        const selected = reordered.slice(0,itemshow);
+        return {selection: {kind: "recent", pageSkip, loadSkip, itemshow, maxScrollback: maximum,
+            window, selectedJitemids: selected.map(row => number(row.jitemid, 1))}, rows: selected};
+    }
+
+    private async loadCalendar(connection: Connection, ownerId: number, request: RawPageRequest, statusId: number, raw: RawField[], witnessIds: readonly number[]): Promise<RawCalendarSummary> {
+        const yearRows = (await sql<Row>`SELECT MAX(year) AS latest FROM log2
+            WHERE journalid = ${ownerId} AND security = 'public' AND year <= ${request.calendarNow.year}`
+            .execute(connection)).rows;
+        const latest = yearRows[0]?.latest;
+        const year = latest === null || latest === undefined ? request.calendarNow.year : number(latest,1,9999);
+        let month = request.calendarNow.month;
+        if (latest !== null && latest !== undefined) {
+            const monthRows = (await sql<Row>`SELECT MAX(month) AS latest FROM log2
+                WHERE journalid = ${ownerId} AND security = 'public' AND year = ${year}
+                AND (${year} < ${request.calendarNow.year} OR month <= ${request.calendarNow.month})`
+                .execute(connection)).rows;
+            month = monthRows[0]?.latest === null ? 0 : number(monthRows[0]?.latest,1,12);
+        }
+        const days = month ? (await sql<Row>`SELECT day,COUNT(*) AS count FROM log2
+            WHERE journalid = ${ownerId} AND security = 'public' AND year = ${year} AND month = ${month}
+            GROUP BY day ORDER BY day LIMIT 32`.execute(connection)).rows : [];
+        if (days.length > 31) unsupported();
+        // YearMonth's retained neighbor predicates constrain BOTH year and month.
+        const previousRows = (await sql<Row>`SELECT year,month FROM log2
+            WHERE journalid = ${ownerId} AND security = 'public' AND year <= ${year} AND month < ${month}
+            GROUP BY year,month ORDER BY year DESC,month DESC LIMIT 1`.execute(connection)).rows;
+        const nextRows = (await sql<Row>`SELECT year,month FROM log2
+            WHERE journalid = ${ownerId} AND security = 'public' AND year >= ${year} AND month > ${month}
+            GROUP BY year,month ORDER BY year ASC,month ASC LIMIT 1`.execute(connection)).rows;
+        const previous = previousRows[0] ? {year: number(previousRows[0].year,1,9999), month: number(previousRows[0].month,1,12)} : null;
+        const next = nextRows[0] ? {year: number(nextRows[0].year,1,9999), month: number(nextRows[0].month,1,12)} : null;
+        // Witnesses cover all selected/window IDs (including lookahead), shown
+        // month, source neighbor months and a future-only latest-year witness.
+        // Only aggregated statuses/posters are read here, never body text.
+        const witness = sql`((log.jitemid IN (${sql.join(witnessIds.length ? witnessIds : [0])})) OR (year = ${year} AND month = ${month}) OR
+            (year = ${year} AND ${month} = 0) OR
+            ${previous ? sql`(year = ${previous.year} AND month = ${previous.month})` : sql`FALSE`} OR
+            ${next ? sql`(year = ${next.year} AND month = ${next.month})` : sql`FALSE`})`;
+        const statuses = (await sql<Row>`SELECT HEX(p.value) AS status_stored,
+            HEX(CONVERT(p.value USING latin1)) AS status_original,
+            HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS status_roundtrip,COUNT(*) AS count,
+            SUM(log.posterid <> ${ownerId}) AS foreign_count
+            FROM log2 log LEFT JOIN logprop2 p ON p.journalid = log.journalid AND p.jitemid = log.jitemid
+                AND p.propid = ${statusId}
+            WHERE log.journalid = ${ownerId} AND log.security = 'public' AND ${witness}
+            GROUP BY HEX(p.value),HEX(CONVERT(p.value USING latin1)),
+                HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4))
+            ORDER BY HEX(p.value) LIMIT 17`.execute(connection)).rows;
+        if (statuses.length > 16) unsupported();
+        return {current: {year,month}, days: days.map(row => ({day: number(row.day,1,31),count: number(row.count,1)})),
+            previous,next, entryStatusCounts: statuses.map((row,index) => ({statusvis: decodedColumn(row, "status",
+                "calendar:status:" + index, raw, 8192, true), count: number(row.count,1)})), otherPosterCount: statuses.reduce((sum,row) => sum+number(row.foreign_count),0)};
+    }
+    private async loadFeatures(connection: Connection, ownerId: number, spamreportBans: number): Promise<RawFeatureCounts> {
+        const rows = (await sql<Row>`SELECT
+            (SELECT COUNT(*) FROM usertags WHERE journalid = ${ownerId}) AS usertags,
+            (SELECT COUNT(*) FROM userkeywords WHERE userid = ${ownerId}) AS userkeywords,
+            (SELECT COUNT(*) FROM logtags WHERE journalid = ${ownerId}) AS logtags,
+            (SELECT COUNT(*) FROM logtagsrecent WHERE journalid = ${ownerId}) AS logtagsrecent,
+            (SELECT COUNT(*) FROM logkwsum WHERE journalid = ${ownerId}) AS logkwsum,
+            (SELECT COUNT(*) FROM links WHERE journalid = ${ownerId}) AS links,
+            (SELECT COUNT(*) FROM userpic2 WHERE userid = ${ownerId}) AS userpics,
+            (SELECT COUNT(*) FROM talk2 WHERE journalid = ${ownerId}) AS comments`.execute(connection)).rows;
         if (rows.length !== 1) unsupported();
         const row = rows[0]!;
-        const layerRows = (await sql<Row>`
-            SELECT selected.type, selected.s2lid, source.userid AS ownerid,
-                layer_owner.user AS owner_username,
-                compiled.comptime AS compiled_time,
-                SHA2(text.s2code, 256) AS source_hash
-            FROM dw_cluster01.s2stylelayers2 AS selected
-            LEFT JOIN dw_global.s2layers AS source ON source.s2lid = selected.s2lid
-            LEFT JOIN dw_global.user AS layer_owner ON layer_owner.userid = source.userid
-            LEFT JOIN dw_global.s2compiled AS compiled ON compiled.s2lid = selected.s2lid
-            LEFT JOIN dw_global.s2source_inno AS text ON text.s2lid = selected.s2lid
-            WHERE selected.userid = ${owner.userid} AND selected.styleid = ${styleId}
-            ORDER BY selected.type, selected.s2lid
-        `.execute(connection)).rows;
-        if (layerRows.length > 8) unsupported();
-        return {
-            styleid: number(row.styleid, 1), ownerid: number(row.userid, 1),
-            name: decodedColumn(
-                row, "name", "style:" + styleId + ":name", rawFields, 1024, false,
-            )!, modtime: number(row.modtime),
-            layers: layerRows.map(layer => ({
-                type: requiredString(layer.type),
-                s2lid: number(layer.s2lid, 1),
-                ownerid: number(layer.ownerid),
-                ownerUsername: requiredString(layer.owner_username),
-                compiledTime: number(layer.compiled_time),
-                sourceHash: requiredString(layer.source_hash).toLowerCase(),
-            })),
-        };
+        return {spamreportBans,usertags: number(row.usertags),userkeywords: number(row.userkeywords),
+            logtags: number(row.logtags),logtagsrecent: number(row.logtagsrecent),logkwsum: number(row.logkwsum),
+            links: number(row.links),userpics: number(row.userpics),comments: number(row.comments)};
     }
 
     private async loadEntries(
         connection: Connection, ownerId: number, logRows: readonly Row[],
-        itemIds: readonly number[], rawFields: RawField[],
+        itemIds: readonly number[], rawFields: RawField[], logNames: ReadonlyMap<number, string>,
     ): Promise<{
         entries: EntryRecord[];
         rawText: Map<number, readonly [string, string, string, string]>;
@@ -486,7 +572,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         const lengths = (await sql<Row>`
             SELECT jitemid, OCTET_LENGTH(subject) AS subject_length,
                 OCTET_LENGTH(event) AS event_length
-            FROM dw_cluster01.logtext2 WHERE journalid = ${ownerId}
+            FROM logtext2 WHERE journalid = ${ownerId}
                 AND jitemid IN (${sql.join(itemIds)})
         `.execute(connection)).rows;
         if (lengths.length !== itemIds.length) unsupported();
@@ -510,7 +596,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
                 HEX(event) AS event_stored,
                 HEX(CONVERT(event USING latin1)) AS event_original,
                 HEX(CONVERT(CONVERT(event USING latin1) USING utf8mb4)) AS event_roundtrip
-            FROM dw_cluster01.logtext2 WHERE journalid = ${ownerId}
+            FROM logtext2 WHERE journalid = ${ownerId}
                 AND jitemid IN (${sql.join(itemIds)})
         `.execute(connection)).rows;
         if (texts.length !== itemIds.length) unsupported();
@@ -541,12 +627,11 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
             ]);
         }
         const propRows = (await sql<Row>`
-            SELECT p.jitemid, names.name,
+            SELECT p.jitemid, p.propid,
                 HEX(p.value) AS value_stored,
                 HEX(CONVERT(p.value USING latin1)) AS value_original,
                 HEX(CONVERT(CONVERT(p.value USING latin1) USING utf8mb4)) AS value_roundtrip
-            FROM dw_cluster01.logprop2 AS p
-            LEFT JOIN dw_global.logproplist AS names ON names.propid = p.propid
+            FROM logprop2 AS p
             WHERE p.journalid = ${ownerId}
                 AND p.jitemid IN (${sql.join(itemIds)})
             LIMIT 2001
@@ -556,7 +641,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         for (const id of itemIds) propsById.set(id, Object.create(null));
         for (const row of propRows) {
             const id = number(row.jitemid, 1);
-            const name = requiredString(row.name);
+            const name = logNames.get(number(row.propid, 1));
+            if (name === undefined) unsupported();
             const props = propsById.get(id);
             if (!props || Object.hasOwn(props, name)) unsupported();
             props[name] = decodedColumn(
@@ -586,38 +672,5 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource {
         return { entries, rawText };
     }
 
-    private async loadFeatures(
-        connection: Connection, ownerId: number, username: string,
-    ): Promise<RawFeatureCounts> {
-        // Count every exact matching row, including inactive and expired bans.
-        // The table uses a case-insensitive collation, so both predicates must
-        // compare bytes. No administrative row or note leaves this transaction.
-        const banRows = (await sql<Row>`
-            SELECT COUNT(*) AS matching_rows FROM dw_global.sysban
-            WHERE BINARY what = BINARY ${"spamreport"}
-                AND BINARY value = BINARY ${username}
-        `.execute(connection)).rows;
-        if (banRows.length !== 1) unsupported();
-        const spamreportBans = number(banRows[0]?.matching_rows);
-        const rows = (await sql<Row>`
-            SELECT
-                (SELECT COUNT(*) FROM dw_cluster01.usertags WHERE journalid = ${ownerId}) AS usertags,
-                (SELECT COUNT(*) FROM dw_cluster01.userkeywords WHERE userid = ${ownerId}) AS userkeywords,
-                (SELECT COUNT(*) FROM dw_cluster01.logtags WHERE journalid = ${ownerId}) AS logtags,
-                (SELECT COUNT(*) FROM dw_cluster01.logtagsrecent WHERE journalid = ${ownerId}) AS logtagsrecent,
-                (SELECT COUNT(*) FROM dw_cluster01.logkwsum WHERE journalid = ${ownerId}) AS logkwsum,
-                (SELECT COUNT(*) FROM dw_cluster01.links WHERE journalid = ${ownerId}) AS links,
-                (SELECT COUNT(*) FROM dw_cluster01.userpic2 WHERE userid = ${ownerId}) AS userpics,
-                (SELECT COUNT(*) FROM dw_cluster01.talk2 WHERE journalid = ${ownerId}) AS comments
-        `.execute(connection)).rows;
-        if (rows.length !== 1) unsupported();
-        const row = rows[0]!;
-        return {
-            spamreportBans,
-            usertags: number(row.usertags), userkeywords: number(row.userkeywords),
-            logtags: number(row.logtags), logtagsrecent: number(row.logtagsrecent),
-            logkwsum: number(row.logkwsum), links: number(row.links),
-            userpics: number(row.userpics), comments: number(row.comments),
-        };
-    }
+
 }
