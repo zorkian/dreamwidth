@@ -27,7 +27,7 @@ export function validateArtifact(value: unknown): Artifact {
     // Deterministic live-compile.pl output from the reviewed compiler and pinned
     // sources. Checking the claimed source hash alone would admit arbitrary JS.
     const codeHashes = [
-        "ba295628ca84e641671de9a4b8454fb1d4b706c807d9771aa17086729d330746",
+        "465cb6b53ccd1bb553561712dffd8bbf2a5d74df0913893346d0eb660f5dfc29",
         "b05f895f5ff5b03c24de9f28dd78e1c7bf4c9342011602d3c51ee3fcbafe9f65",
     ];
     const artifact = value as Artifact;
