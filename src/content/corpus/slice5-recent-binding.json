@@ -1,0 +1,23 @@
+{
+  "schema": 2,
+  "purpose": "slice5-recent-cleaner-regression",
+  "expectedCounts": {
+    "synthetic": 26,
+    "native": 384,
+    "entryCommon": 52,
+    "entryAdaptations": 6,
+    "entryRefusals": 4,
+    "browserGroups": 72,
+    "browserCases": 219
+  },
+  "expectationsSha256": {
+    "syntheticLedger": "c61572c26b8e9ed857147662a75c85bcf4cd32cc2bc35a940f0a1f35de73a8cd",
+    "nativeLedger": "2501605ff119d54c9c8bc139756ea5bb7f6dad49b2dc88d31de74895f4402dea",
+    "entryLedger": "3c54eefe353074820dd39ac77ac90ff829a2f621d8e32499458034b5a3fa79d3",
+    "browserCases": "adc5d0892750bdfc5aa6a09057d581209f42fcb12401c9ea14ec3c8722d960bc",
+    "syntheticManifest": "e326c3ecf63aac076713ee0284653bf372ff005d4e9b4a47498d67b15bcd8e7e",
+    "nativeManifest": "e203cd7ad4f588972d226f8b21b445fa1870feff090cbcbec4eb1c5016c71698",
+    "syntheticPerl": "b597272a3a397278a32617d355aa2e0595a59f09b4a9dd0905e74034cd16e390",
+    "nativePerl": "8495ca5770288a17ecdf345db96d25475feb96ef3554af52193aee2dbc69469a"
+  }
+}

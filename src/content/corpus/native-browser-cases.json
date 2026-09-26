@@ -1,0 +1,627 @@
+{
+  "schema": 2,
+  "coveredCases": 219,
+  "groups": [
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0017:html_raw0",
+        "t/cleaner-xss.t#call-0076:html_raw0",
+        "t/cleaner-xss.t#call-0135:html_raw0",
+        "t/cleaner-xss.t#call-0194:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0802:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0004:html_raw0",
+        "t/cleaner-xss.t#call-0063:html_raw0",
+        "t/cleaner-xss.t#call-0122:html_raw0",
+        "t/cleaner-xss.t#call-0181:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0056:html_raw0",
+        "t/cleaner-xss.t#call-0115:html_raw0",
+        "t/cleaner-xss.t#call-0174:html_raw0",
+        "t/cleaner-xss.t#call-0233:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0005:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0012:html_raw0",
+        "t/cleaner-xss.t#call-0071:html_raw0",
+        "t/cleaner-xss.t#call-0130:html_raw0",
+        "t/cleaner-xss.t#call-0189:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0035:html_raw0",
+        "t/cleaner-xss.t#call-0094:html_raw0",
+        "t/cleaner-xss.t#call-0153:html_raw0",
+        "t/cleaner-xss.t#call-0212:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0038:html_raw0",
+        "t/cleaner-xss.t#call-0097:html_raw0",
+        "t/cleaner-xss.t#call-0156:html_raw0",
+        "t/cleaner-xss.t#call-0215:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0020:html_raw0",
+        "t/cleaner-event.t#call-0021:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0036:html_raw0",
+        "t/cleaner-xss.t#call-0095:html_raw0",
+        "t/cleaner-xss.t#call-0154:html_raw0",
+        "t/cleaner-xss.t#call-0213:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0803:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0029:html_raw0",
+        "t/cleaner-xss.t#call-0088:html_raw0",
+        "t/cleaner-xss.t#call-0147:html_raw0",
+        "t/cleaner-xss.t#call-0206:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0801:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0022:html_raw0",
+        "t/cleaner-xss.t#call-0081:html_raw0",
+        "t/cleaner-xss.t#call-0140:html_raw0",
+        "t/cleaner-xss.t#call-0199:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0028:html_raw0",
+        "t/cleaner-xss.t#call-0087:html_raw0",
+        "t/cleaner-xss.t#call-0146:html_raw0",
+        "t/cleaner-xss.t#call-0205:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0053:html_raw0",
+        "t/cleaner-xss.t#call-0112:html_raw0",
+        "t/cleaner-xss.t#call-0171:html_raw0",
+        "t/cleaner-xss.t#call-0230:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0001:html_raw0",
+        "t/cleaner-xss.t#call-0060:html_raw0",
+        "t/cleaner-xss.t#call-0119:html_raw0",
+        "t/cleaner-xss.t#call-0178:html_raw0",
+        "t/cleaner-xss.t#call-0774:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0026:html_raw0",
+        "t/cleaner-xss.t#call-0085:html_raw0",
+        "t/cleaner-xss.t#call-0144:html_raw0",
+        "t/cleaner-xss.t#call-0203:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0045:html_raw0",
+        "t/cleaner-xss.t#call-0104:html_raw0",
+        "t/cleaner-xss.t#call-0163:html_raw0",
+        "t/cleaner-xss.t#call-0222:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0032:html_raw0",
+        "t/cleaner-xss.t#call-0091:html_raw0",
+        "t/cleaner-xss.t#call-0150:html_raw0",
+        "t/cleaner-xss.t#call-0209:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0006:html_raw0",
+        "t/cleaner-xss.t#call-0065:html_raw0",
+        "t/cleaner-xss.t#call-0124:html_raw0",
+        "t/cleaner-xss.t#call-0183:html_raw0",
+        "t/cleaner-xss.t#call-0773:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0777:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0002:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0027:html_raw0",
+        "t/cleaner-xss.t#call-0086:html_raw0",
+        "t/cleaner-xss.t#call-0145:html_raw0",
+        "t/cleaner-xss.t#call-0204:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0031:html_raw0",
+        "t/cleaner-xss.t#call-0090:html_raw0",
+        "t/cleaner-xss.t#call-0149:html_raw0",
+        "t/cleaner-xss.t#call-0208:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0014:html_raw0",
+        "t/cleaner-xss.t#call-0073:html_raw0",
+        "t/cleaner-xss.t#call-0132:html_raw0",
+        "t/cleaner-xss.t#call-0191:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-tables.t#call-0001:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0810:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0769:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0025:html_raw0",
+        "t/cleaner-xss.t#call-0084:html_raw0",
+        "t/cleaner-xss.t#call-0143:html_raw0",
+        "t/cleaner-xss.t#call-0202:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0024:html_raw0",
+        "t/cleaner-xss.t#call-0083:html_raw0",
+        "t/cleaner-xss.t#call-0142:html_raw0",
+        "t/cleaner-xss.t#call-0201:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0044:html_raw0",
+        "t/cleaner-xss.t#call-0103:html_raw0",
+        "t/cleaner-xss.t#call-0162:html_raw0",
+        "t/cleaner-xss.t#call-0221:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0048:html_raw0",
+        "t/cleaner-xss.t#call-0107:html_raw0",
+        "t/cleaner-xss.t#call-0166:html_raw0",
+        "t/cleaner-xss.t#call-0225:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0057:html_raw0",
+        "t/cleaner-xss.t#call-0116:html_raw0",
+        "t/cleaner-xss.t#call-0175:html_raw0",
+        "t/cleaner-xss.t#call-0234:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0041:html_raw0",
+        "t/cleaner-xss.t#call-0100:html_raw0",
+        "t/cleaner-xss.t#call-0159:html_raw0",
+        "t/cleaner-xss.t#call-0218:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0010:html_raw0",
+        "t/cleaner-xss.t#call-0069:html_raw0",
+        "t/cleaner-xss.t#call-0128:html_raw0",
+        "t/cleaner-xss.t#call-0187:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0003:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0046:html_raw0",
+        "t/cleaner-xss.t#call-0105:html_raw0",
+        "t/cleaner-xss.t#call-0164:html_raw0",
+        "t/cleaner-xss.t#call-0223:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0049:html_raw0",
+        "t/cleaner-xss.t#call-0108:html_raw0",
+        "t/cleaner-xss.t#call-0167:html_raw0",
+        "t/cleaner-xss.t#call-0226:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0004:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0002:html_raw0",
+        "t/cleaner-xss.t#call-0061:html_raw0",
+        "t/cleaner-xss.t#call-0120:html_raw0",
+        "t/cleaner-xss.t#call-0179:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0775:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0034:html_raw0",
+        "t/cleaner-xss.t#call-0093:html_raw0",
+        "t/cleaner-xss.t#call-0152:html_raw0",
+        "t/cleaner-xss.t#call-0211:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0808:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0040:html_raw0",
+        "t/cleaner-xss.t#call-0099:html_raw0",
+        "t/cleaner-xss.t#call-0158:html_raw0",
+        "t/cleaner-xss.t#call-0217:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0037:html_raw0",
+        "t/cleaner-xss.t#call-0096:html_raw0",
+        "t/cleaner-xss.t#call-0155:html_raw0",
+        "t/cleaner-xss.t#call-0214:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0023:html_raw0",
+        "t/cleaner-xss.t#call-0082:html_raw0",
+        "t/cleaner-xss.t#call-0141:html_raw0",
+        "t/cleaner-xss.t#call-0200:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0013:html_raw0",
+        "t/cleaner-xss.t#call-0072:html_raw0",
+        "t/cleaner-xss.t#call-0131:html_raw0",
+        "t/cleaner-xss.t#call-0190:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0811:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0007:html_raw0",
+        "t/cleaner-xss.t#call-0066:html_raw0",
+        "t/cleaner-xss.t#call-0125:html_raw0",
+        "t/cleaner-xss.t#call-0184:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0008:html_raw0",
+        "t/cleaner-xss.t#call-0067:html_raw0",
+        "t/cleaner-xss.t#call-0126:html_raw0",
+        "t/cleaner-xss.t#call-0185:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0771:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0021:html_raw0",
+        "t/cleaner-xss.t#call-0080:html_raw0",
+        "t/cleaner-xss.t#call-0139:html_raw0",
+        "t/cleaner-xss.t#call-0198:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0030:html_raw0",
+        "t/cleaner-xss.t#call-0089:html_raw0",
+        "t/cleaner-xss.t#call-0148:html_raw0",
+        "t/cleaner-xss.t#call-0207:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0019:html_raw0",
+        "t/cleaner-xss.t#call-0078:html_raw0",
+        "t/cleaner-xss.t#call-0137:html_raw0",
+        "t/cleaner-xss.t#call-0196:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0047:html_raw0",
+        "t/cleaner-xss.t#call-0106:html_raw0",
+        "t/cleaner-xss.t#call-0165:html_raw0",
+        "t/cleaner-xss.t#call-0224:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0043:html_raw0",
+        "t/cleaner-xss.t#call-0102:html_raw0",
+        "t/cleaner-xss.t#call-0161:html_raw0",
+        "t/cleaner-xss.t#call-0220:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0059:html_raw0",
+        "t/cleaner-xss.t#call-0118:html_raw0",
+        "t/cleaner-xss.t#call-0177:html_raw0",
+        "t/cleaner-xss.t#call-0236:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0015:html_raw0",
+        "t/cleaner-xss.t#call-0074:html_raw0",
+        "t/cleaner-xss.t#call-0133:html_raw0",
+        "t/cleaner-xss.t#call-0192:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-tables.t#call-0002:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0776:html_raw0"
+      ],
+      "expectedResources": [
+        {
+          "url": "https://app.slice4.invalid/s2js_slice3/x",
+          "count": 1,
+          "kind": "inert-pixel"
+        }
+      ]
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0800:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0768:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0017:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0033:html_raw0",
+        "t/cleaner-xss.t#call-0092:html_raw0",
+        "t/cleaner-xss.t#call-0151:html_raw0",
+        "t/cleaner-xss.t#call-0210:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0011:html_raw0",
+        "t/cleaner-xss.t#call-0070:html_raw0",
+        "t/cleaner-xss.t#call-0129:html_raw0",
+        "t/cleaner-xss.t#call-0188:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0778:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0052:html_raw0",
+        "t/cleaner-xss.t#call-0111:html_raw0",
+        "t/cleaner-xss.t#call-0170:html_raw0",
+        "t/cleaner-xss.t#call-0229:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0050:html_raw0",
+        "t/cleaner-xss.t#call-0109:html_raw0",
+        "t/cleaner-xss.t#call-0168:html_raw0",
+        "t/cleaner-xss.t#call-0227:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-tables.t#call-0009:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-event.t#call-0036:html_raw0"
+      ],
+      "expectedResources": []
+    },
+    {
+      "caseIds": [
+        "t/cleaner-xss.t#call-0018:html_raw0",
+        "t/cleaner-xss.t#call-0077:html_raw0",
+        "t/cleaner-xss.t#call-0136:html_raw0",
+        "t/cleaner-xss.t#call-0195:html_raw0"
+      ],
+      "expectedResources": []
+    }
+  ]
+}

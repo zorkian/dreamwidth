@@ -1,0 +1,30 @@
+// adapter.tsconfig.json
+//
+// Compile live worker integration probes against the separate content build.
+//
+// Authors:
+//      Dreamwidth contributors
+//
+// Copyright (c) 2026 by Dreamwidth Studios, LLC.
+//
+// This program is free software; you may redistribute it and/or modify it under
+// the same terms as Perl itself. For a copy of the license, please reference
+// 'perldoc perlartistic' or 'perldoc perlgpl'.
+//
+
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../../../../..",
+    "paths": {
+      "@dreamwidth/content": ["src/content/dist/index.d.ts"],
+      "@dreamwidth/content/contracts": ["src/content/dist/contracts.d.ts"]
+    }
+  },
+  "include": [],
+  "files": [
+    "../render/worker.ts", "./render.test.ts", "./sandbox-probe.ts",
+    "./config.test.ts", "./manifest.test.ts", "./policy.test.ts", "./http-failure.test.ts",
+    "./entry-policy.test.ts", "./entry-render.test.ts", "./entry-http.test.ts", "./privacy-db.ts"
+  ]
+}

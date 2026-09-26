@@ -9,7 +9,7 @@ package S2::Node;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->tabwriteln("--[[-- ${this}::asJS not implemented --]]");
+    die ref($this) . " has no JavaScript code generator";
 }
 
 # This should really be in S2::NodeExpr, but the compiler has
@@ -40,7 +40,9 @@ sub asJS_bool {
     }
 
     if ($s2type->isSimple()) {
+        $o->write("s2.runtime.objectToBool(");
         $this->asJS($bp, $o);
+        $o->write(")");
         return;
     }
 
@@ -201,78 +203,68 @@ package S2::NodeForeachStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-
-    my $varname;
+    $o->tabwrite("for (");
     if ($this->{'vardecl'}) {
-        $varname = sub {
-            $o->write($bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
-        };
-    }
-    else {
-        $varname = sub {
-            $this->{'varref'}->asJS($bp, $o);
-        };
-    }
-    
-    my $realexpr = $this->{'listexpr'}->isa('S2::NodeExpr') ?
-                   $this->{'listexpr'}->{expr} :
-                   $this->{'listexpr'};
-
-    # Optimise the foreach (x .. y) idiom to a JS numeric for
-    # FIXME: ...but this doesn't quite work right yet... the loop
-    # variable isn't declared.
-    if ($realexpr->isa('S2::NodeRange')) {
-        my $range = $realexpr;
-        $o->tabwrite("for (");
-        $varname->();
-        $o->write(" = ");
-        $range->{'lhs'}->asJS($bp, $o);    
-        $o->write("; ");
-        $varname->();
-        $o->write(" <= ");
-        $range->{'rhs'}->asJS($bp, $o);
-        $o->write("; ");
-        $varname->();
-        $o->write("++) ");
+        $o->write("let " . $bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
     } else {
-        $o->tabwrite("for (");
-
-        # FIXME: Implement foreach loops properly for arrays and strings
-        if ($this->{'isHash'}) {
-            $varname->();
-            $o->write(" in ");
-            $this->{'listexpr'}->asJS($bp, $o);
-        } elsif ($this->{'isString'}) {
-            $varname->();
-            $o->write("");
-            die "Foreach on strings isn't implemented for JS Backend";
-        } else {
-            # HACK: Use part of Perl's stringification of this object
-            # to create a unique identifier to use for the loop variables.
-            my $decorate = $this."";
-            if ($decorate =~ /HASH\(0x(\w+)\)/) {
-                $decorate = $1;
-            }
-            else {
-                die "Unable to generate loop variable thingy ???";
-            }
-            
-            $o->write("___a_${decorate} = ");
-            $this->{'listexpr'}->asJS($bp, $o);
-            
-            $o->write(", ___i_${decorate} = 0, ___a_${decorate}"."[0]; ");
-            $o->write("___i_${decorate} < ___a_${decorate}.length, ");
-            $varname->();
-            $o->write(" = ___a_${decorate}"."[___i_${decorate}]; ___i_${decorate}++");
-        }
-
-#        $this->{'listexpr'}->asJS($bp, $o);
-
-        $o->write(") ");
+        $this->{'varref'}->asJS($bp, $o);
     }
+    $o->write(" of ");
+    if ($this->{'isHash'}) {
+        $o->write("s2.runtime.hashKeys(");
+    } elsif ($this->{'isString'}) {
+        $o->write("s2.runtime.characters(");
+    } else {
+        $o->write("s2.runtime.asArray(");
+    }
+    $this->{'listexpr'}->asJS($bp, $o);
+    $o->write(")");
+    $o->write(") ");
 
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
+}
+
+package S2::NodeBranchStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    my $keyword = $this->{type} == $S2::TokenKeyword::BREAK ? "break" : "continue";
+    $o->tabwriteln("$keyword;");
+}
+
+package S2::NodeInstanceOf;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->write($this->{exact} ? "s2.runtime.objectInstanceOf(" : "ctx.objectIsa(");
+    $this->{expr}->asJS($bp, $o);
+    $o->write(", " . $bp->quoteString($this->{qClass}) . ")");
+}
+
+package S2::NodeTypeCastOp;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    if ($this->{downcast}) {
+        $o->write("ctx.downcastObject(");
+    }
+    $this->{expr}->asJS($bp, $o);
+    if ($this->{downcast}) {
+        $o->write(", " . $bp->quoteString($this->{toClass}) .
+                  ", $bp->{layerid}, " . ($this->{opline} + 0) . ")");
+    }
+}
+
+package S2::NodePushStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->tabwrite("");
+    $this->{lhs}->asJS($bp, $o);
+    $o->write($this->{expr}{_is_array} ? ".push(..." : ".push(");
+    $this->{expr}->asJS($bp, $o);
+    $o->writeln(");");
 }
 
 package S2::NodeForStmt;
@@ -400,6 +392,9 @@ package S2::NodeIncExpr;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    die "Increment target is not a variable reference"
+        unless $this->{'expr'}{'var'};
+    local $this->{'expr'}{'var'}{'varReturnType'} = undef;
     
     my $plus = $this->{'op'}->getPunct() eq $S2::TokenPunct::INCR->getPunct();
     
@@ -461,7 +456,7 @@ sub asJS {
     my ($this, $bp, $o) = @_;
 
     
-    $o->write("Math.floor(") if $this->{'op'} == $S2::TokenPunct::DIV;
+    $o->write("Math.trunc(") if $this->{'op'} == $S2::TokenPunct::DIV;
     $this->{'lhs'}->asJS($bp, $o);
 
     if ($this->{'op'} == $S2::TokenPunct::MULT) {
@@ -558,7 +553,7 @@ package S2::NodeRange;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->write("s2.runtime.makerange(");
+    $o->write("s2.runtime.makeRange(");
     $this->{'lhs'}->asJS($bp, $o);
     $o->write(", ");
     $this->{'rhs'}->asJS($bp, $o);
@@ -718,6 +713,13 @@ sub asJS {
         return;
     }
 
+    if ($type == $POPFUNC) {
+        $o->write("(");
+        $this->{'subExpr'}->asJS($bp, $o);
+        $o->write(").pop()");
+        return;
+    }
+
     if ($type == $SIZEFUNC) {
         if ($this->{'subType'}->isArrayOf()) {
             $o->write("(");
@@ -728,10 +730,9 @@ sub asJS {
             $this->{'subExpr'}->asJS($bp, $o);
             $o->write(")");
         } elsif ($this->{'subType'}->equals($S2::Type::STRING)) {
-            # JavaScript strings are unicode-aware, so this is easy
-            $o->write("(");
+            $o->write("s2.runtime.stringLength(");
             $this->{'subExpr'}->asJS($bp, $o);
-            $o->write(").length");
+            $o->write(")");
         }
         return;
     }
@@ -744,7 +745,7 @@ sub asJS {
     }
 
     if ($type == $ISNULLFUNC) {
-        $o->write("(not s2.runtime.isDefined(");
+        $o->write("(! s2.runtime.isDefined(");
         $this->{'subExpr'}->asJS($bp, $o);
         $o->write("))");
         return;
@@ -860,8 +861,9 @@ sub asJS {
         # Must initialize the variables otherwise they will have
         # type "null" and we'll have exceptions galore.
         my $t = $this->{'nvd'}->getType();
-        if (! $t->isSimple()) {
-            # FIXME: Arrays must use [] instead of {}
+        if ($t->isArrayOf()) {
+            $o->write(" = []");
+        } elsif ($t->isHashOf()) {
             $o->write(" = {}");
         } elsif ($t->equals($S2::Type::STRING)) {
             $o->write(" = \"\"");

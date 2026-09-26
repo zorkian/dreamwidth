@@ -1,0 +1,255 @@
+#!/usr/bin/perl
+#
+# live-oracle.pl
+#
+# Capture the real local Perl HTTP page and public configuration for comparison.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+use strict;
+use warnings;
+our $COMPARISON_CLOCK_ACTIVE;
+BEGIN {
+    # Compile the real app against a switch; only the comparison GET uses it.
+    *CORE::GLOBAL::time = sub () { $main::COMPARISON_CLOCK_ACTIVE ? 1790294400 : CORE::time() };
+    require "$ENV{LJHOME}/cgi-bin/ljlib.pl";
+}
+use Digest::SHA qw(sha256_hex);
+use Encode ();
+use File::Temp qw(tempfile);
+use HTML::Parser;
+use HTTP::Request::Common;
+use JSON::PP;
+use LJ::Entry;
+use LJ::Web;
+use Plack::Test;
+
+my ($origin, $outdir, @options) = @ARGV;
+my ($comparison, $cookie_value, $skip, $cohort_variant, $entry_ditemid);
+while (@options) {
+    my $option = shift @options;
+    if ($option eq '--comparison' && !$comparison && @options) {
+        $comparison = 1;
+        $cookie_value = shift @options;
+    }
+    elsif ($option eq '--skip' && !defined $skip && @options) {
+        $skip = shift @options;
+        die "Invalid bounded skip\n"
+            unless $skip =~ /^(?:0|[1-9][0-9]{0,2})$/ && $skip <= 200;
+    }
+    elsif ($option eq '--cohort-variant' && !$cohort_variant) {
+        $cohort_variant = 1;
+    }
+    elsif ($option eq '--entry' && !defined $entry_ditemid && @options) {
+        $entry_ditemid = shift @options;
+        die "Invalid canonical entry ID\n"
+            unless $entry_ditemid =~ /^[1-9][0-9]{0,9}$/
+            && $entry_ditemid <= 4294967295;
+    }
+    else {
+        die "Invalid oracle option\n";
+    }
+}
+die "Usage: perl tools/live-oracle.pl http://localhost:<app-port> <existing-output-dir> [--comparison <ljuniq-value>] [--skip 0..200] [--cohort-variant] [--entry <canonical-ditemid>]\n"
+    unless defined $origin && defined $outdir
+    && $origin =~ m!^http://localhost:\d{1,5}$! && -d $outdir;
+die "Entry oracle cannot use recent-only options\n"
+    if defined $entry_ditemid && (defined $skip || $cohort_variant);
+my ($comparison_uniq) = $comparison
+    ? ($cookie_value =~ /^([A-Za-z0-9]{15}):1790294400:[A-Za-z0-9]+$/)
+    : ();
+die "Invalid comparison ljuniq value\n" if $comparison && !$comparison_uniq;
+die "Comparison requires fixed Perl hash order at process start\n"
+    if $comparison && (($ENV{PERL_HASH_SEED} // '') ne '0'
+    || ($ENV{PERL_PERTURB_KEYS} // '') ne '0');
+die "Local devcontainer required\n" unless $LJ::IS_DEV_SERVER && $LJ::IS_DEV_CONTAINER;
+die "Anonymous CAPTCHA is enabled\n" if $LJ::CAPTCHA_HCAPTCHA_SITEKEY;
+die "Unexpected local recent scrollback limit\n" unless $LJ::MAX_SCROLLBACK_LASTN == 100;
+die "Local image proxy unexpectedly configured\n"
+    if $LJ::PROXY_URL || $LJ::PROXY_SALT_FILE;
+my $placeholder_html = LJ::img('placeholder');
+die "Unexpected placeholder helper shape\n"
+    unless defined $placeholder_html && $placeholder_html =~ m!^<img\b[^<>]*/>$!s;
+my ($placeholder, $placeholder_count) = (undef, 0);
+my $parser = HTML::Parser->new(
+    api_version => 3,
+    start_h => [ sub {
+        my ($tag, $attrs) = @_;
+        die "Unexpected placeholder element\n" unless $tag eq 'img' && !$placeholder_count++;
+        my %copy = %$attrs;
+        die "Unexpected placeholder close marker\n" unless (delete $copy{'/'}) eq '/';
+        die "Unexpected placeholder attributes\n"
+            unless join(',', sort keys %copy) eq 'alt,border,height,src,title,width';
+        die "Unexpected placeholder border\n" unless $copy{border} eq '0';
+        die "Invalid placeholder dimensions\n"
+            unless $copy{width} =~ /^[1-9][0-9]*$/
+            && $copy{height} =~ /^[1-9][0-9]*$/;
+        $placeholder = {
+            src => $copy{src}, width => 0 + $copy{width}, height => 0 + $copy{height},
+            alt => $copy{alt}, title => $copy{title},
+        };
+    }, 'tagname, attr' ],
+    text_h => [ sub { die "Unexpected placeholder text\n" if $_[0] =~ /\S/ }, 'text' ],
+);
+$parser->parse($placeholder_html);
+$parser->eof;
+die "Missing placeholder image\n" unless $placeholder_count == 1 && $placeholder->{src};
+my $u = LJ::load_user('s2js_slice3') or die "Missing marked journal\n";
+die "Unmarked journal\n" unless ($u->bio(1) // '') eq 's2-js-slice3 live dev v1';
+if (defined $entry_ditemid) {
+    # The retained /users/ controller supplies ljentry and skips a downstream
+    # anum guard. Verify the intended stored identity before using its output
+    # as an oracle; the serving policy deliberately returns 404 for bad anums.
+    my $entry = LJ::Entry->new($u, ditemid => $entry_ditemid);
+    die "Entry oracle ID does not identify a public stored entry\n"
+        unless $entry && $entry->valid && $entry->correct_anum
+        && $entry->journalid == $u->id && $entry->security eq 'public'
+        && $entry->ditemid == $entry_ditemid;
+}
+my $app = do "$ENV{LJHOME}/app.psgi";
+die "Cannot load real Plack app: $@\n" unless ref $app eq 'CODE';
+my $page_url = "$origin/users/s2js_slice3/"
+    . (defined $entry_ditemid ? "$entry_ditemid.html"
+        : defined $skip ? "?skip=$skip" : '');
+
+my $response;
+if ($comparison) {
+    # This uses the ordinary local helper and its real signing key before any
+    # request-scoped random override. No key is exported or used by the renderer.
+    my ($hour, $secret) = LJ::get_secret(1790294400);
+    die "Cannot prepare local comparison signing key\n"
+        unless $hour == 1790294400 && defined $secret && length $secret;
+    {
+        no warnings 'redefine';
+        local $COMPARISON_CLOCK_ACTIVE = 1;
+        local $LJ::_T_UNIQCOOKIE_CURRENT_UNIQ = $comparison_uniq;
+        local *LJ::rand_chars = sub {
+            my ($length, $charset) = @_;
+            die "Unsupported comparison random charset\n"
+                if defined $charset && $charset ne 'default';
+            return 'a' x $length;
+        };
+        test_psgi $app, sub {
+            my $callback = shift;
+            $response = $callback->(GET $page_url,
+                Cookie => "ljuniq=$cookie_value");
+        };
+        my ($challenge) = ($response ? $response->content : '')
+            =~ /name="lj_form_auth" value="([^"]+)"/;
+        die "Missing real comparison form challenge\n" unless $challenge;
+        die "Comparison challenge has unexpected nonce or identity\n"
+            unless $challenge =~ /^c0:1790294400:\d+:86400:aaaaaaaaaa-0-\Q$comparison_uniq\E:[0-9a-f]{32}$/;
+        die "Real local challenge verification failed\n"
+            unless DW::Auth::Challenge->check($challenge, { dont_check_count => 1 });
+    }
+}
+else {
+    test_psgi $app, sub {
+        my $callback = shift;
+        $response = $callback->(GET $page_url);
+    };
+}
+die "Real Perl journal HTTP route failed\n" unless $response && $response->code == 200;
+my $body = $response->content;
+$body = Encode::encode('UTF-8', $body) if Encode::is_utf8($body);
+die "Unexpected marked journal HTTP response\n"
+    unless $body =~ /S2 slice 3 fixture/;
+if (!$cohort_variant && !defined $skip) {
+    if (defined $entry_ditemid) {
+        die "Retained entry canonical identity differs\n"
+            unless $body =~ m!<link rel="canonical" href="\Q$origin\E/~s2js_slice3/\Q$entry_ditemid\E\.html"!;
+    }
+    else {
+        die "Baseline seed entries absent from retained HTTP response\n"
+            unless $body =~ /Live sample 1 caf\xC3\xA9/
+            && $body =~ /Live sample 2 \xF0\x9F\x98\x80/;
+    }
+}
+my $public = {
+    canonicalAppOrigin => $origin,
+    listenOrigin => 'http://localhost:8081',
+    siteRoot => $LJ::SITEROOT // '',
+    statPrefix => $LJ::STATPREFIX // '',
+    imgPrefix => $LJ::IMGPREFIX // '',
+    palImgRoot => $LJ::PALIMGROOT // '',
+    userpicRoot => $LJ::USERPIC_ROOT // '',
+    userpicUrlHookConfigured => LJ::Hooks::are_hooks('construct_userpic_url') ? JSON::PP::true : JSON::PP::false,
+    tagsEnabled => LJ::is_enabled('tags') ? JSON::PP::true : JSON::PP::false,
+    tagListHookConfigured => LJ::Hooks::are_hooks('augment_s2_tag_list') ? JSON::PP::true : JSON::PP::false,
+    siteName => $LJ::SITENAME // '',
+    siteNameShort => $LJ::SITENAMESHORT // '',
+    siteNameAbbrev => $LJ::SITENAMEABBREV // '',
+    appleTouchIcon => $LJ::APPLE_TOUCH_ICON // '',
+    facebookPreviewIcon => $LJ::FACEBOOK_PREVIEW_ICON // '',
+    anonymousCaptchaDisabled => JSON::PP::true,
+    entryContent => {
+        imagePlaceholder => $placeholder,
+        urls => {
+            siteDomain => $LJ::DOMAIN // '',
+            knownHttpsSites => [ sort grep { $LJ::KNOWN_HTTPS_SITES{$_} }
+                keys %LJ::KNOWN_HTTPS_SITES ],
+            formDomainBanned => [ sort grep { $LJ::FORM_DOMAIN_BANNED{$_} }
+                keys %LJ::FORM_DOMAIN_BANNED ],
+            imageProxy => 'not-configured',
+        },
+    },
+};
+my @headers;
+$response->headers->scan(sub {
+    my ($name, $value) = @_;
+    push @headers, [ $name, "$value" ];
+});
+@headers = sort { lc($a->[0]) cmp lc($b->[0]) || $a->[1] cmp $b->[1] } @headers;
+my $metadata = {
+    status => $response->code,
+    response_headers => \@headers,
+    bytes => length($body), sha256 => sha256_hex($body),
+    comparison => $comparison ? JSON::PP::true : JSON::PP::false,
+    skip_present => defined $skip ? JSON::PP::true : JSON::PP::false,
+    skip => defined $skip ? 0 + $skip : 0,
+    cohort_variant => $cohort_variant ? JSON::PP::true : JSON::PP::false,
+};
+$metadata->{entry_ditemid} = 0 + $entry_ditemid if defined $entry_ditemid;
+if ($comparison) {
+    $metadata->{comparison_time} = 1790294400;
+    $metadata->{comparison_uniq} = $comparison_uniq;
+    $metadata->{comparison_cookie} = $cookie_value;
+    $metadata->{comparison_random10} = 'aaaaaaaaaa';
+    $metadata->{perl_hash_seed} = $ENV{PERL_HASH_SEED};
+    $metadata->{perl_perturb_keys} = $ENV{PERL_PERTURB_KEYS};
+}
+my @outputs = (
+    [ 'page-oracle.html', $body ],
+    [ 'public-config.json', JSON::PP->new->canonical->pretty->encode($public) ],
+    [ 'response-metadata.json', JSON::PP->new->canonical->pretty->encode($metadata) ],
+);
+# Serialize all values first. Remove old metadata before replacing any output:
+# if publication fails, a stale manifest cannot silently validate a new page.
+my @staged;
+my $published = eval {
+    for my $item (@outputs) {
+        my ($fh, $path) = tempfile('.live-oracle-XXXXXX', DIR => $outdir, UNLINK => 0);
+        binmode $fh, ':raw';
+        push @staged, [ $path, "$outdir/$item->[0]" ];
+        print {$fh} $item->[1] or die "Cannot write staged oracle: $!\n";
+        close $fh or die "Cannot close staged oracle: $!\n";
+    }
+    my $manifest = "$outdir/response-metadata.json";
+    unlink $manifest or die "Cannot remove old oracle metadata: $!\n" if -e $manifest;
+    for my $item (@staged) {
+        rename $item->[0], $item->[1] or die "Cannot publish oracle output: $!\n";
+    }
+    1;
+};
+my $publication_error = $@;
+unlink $_->[0] for @staged;
+die $publication_error unless $published;
+print "Real Perl HTTP 200: $metadata->{bytes} bytes; public config and oracle in $outdir\n";

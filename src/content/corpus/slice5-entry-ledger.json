@@ -1,0 +1,1420 @@
+{
+  "schema": 2,
+  "purpose": "slice5-entry-full-body-and-inert-metadata",
+  "context": {
+    "policy": "dreamwidth-entry-html-raw0-v1",
+    "insertionContext": "html-div-flow",
+    "documentUrl": "http://localhost:8080/~s2js_slice3/384.html",
+    "entryUrl": "http://localhost:8080/~s2js_slice3/384.html",
+    "journalUsername": "s2js_slice3",
+    "journalId": 6,
+    "entryId": 384,
+    "reader": {
+      "removeColors": false,
+      "removeSizes": false,
+      "removeFonts": false,
+      "maxImageWidth": null,
+      "maxImageHeight": null,
+      "placeholderUndefinedImageSize": false,
+      "extractImages": false
+    },
+    "imagePlaceholder": {
+      "src": "/img/imageplaceholder2.png",
+      "width": 35,
+      "height": 35,
+      "alt": "Image",
+      "title": "Image"
+    },
+    "urls": {
+      "siteDomain": "",
+      "knownHttpsSites": [],
+      "formDomainBanned": [],
+      "imageProxy": "not-configured"
+    },
+    "cuts": "source-compatible-entry"
+  },
+  "common": [
+    {
+      "id": "plain",
+      "raw": "one café 😀 & tea",
+      "rawSha256": "4284edd348b81f5021a17c5856777b22a99389fd3a658abd94d9739a175133ce",
+      "perl": {
+        "eventText": "one café 😀 & tea",
+        "og": "one café 😀 &amp; tea",
+        "subjectText": "café 😀 & tea",
+        "full": "one café 😀 & tea"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "one café 😀 & tea"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one café 😀 &amp; tea",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "Escape a literal ampersand in HTML text."
+      }
+    },
+    {
+      "id": "leading-lf",
+      "raw": "\n<p>one</p>",
+      "rawSha256": "47a4b11d961be840c7abae7ac81e49fa47a72385266938090c7b250c8cf8d1a6",
+      "perl": {
+        "eventText": "<br /><p>one</p>",
+        "og": "&lt;br /&gt;&lt;p&gt;one&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "\n<p>one</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<br /><p>one</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p>one</p>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 div-flow parsing drops the leading LF before a paragraph."
+      }
+    },
+    {
+      "id": "leading-lf-space",
+      "raw": "\n  <p>one</p>",
+      "rawSha256": "58f51e2dd9a580348ca32bc9c2ff863a25c58a21874796cb9becc7a41116cdc0",
+      "perl": {
+        "eventText": "<br />  <p>one</p>",
+        "og": "&lt;br /&gt; &lt;p&gt;one&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "\n  <p>one</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<br />  <p>one</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p>one</p>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 div-flow parsing drops leading LF and spaces before a paragraph."
+      }
+    },
+    {
+      "id": "whitespace-only",
+      "raw": " \n \r\n ",
+      "rawSha256": "4d6deb84900eaddeff8725776fa07986ac38c30acdfc6907864080fe6f6cc0f7",
+      "perl": {
+        "eventText": " <br /> <br /> ",
+        "og": "&lt;br /&gt; &lt;br /&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": " \n \r\n "
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": " <br /> <br /> "
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 div-flow parsing drops the whitespace-only body."
+      }
+    },
+    {
+      "id": "leading-text",
+      "raw": " \n one",
+      "rawSha256": "71d6c64fb7f68eed0ddee166772202e721e49e9b5bfcc478589c9b6739ee9265",
+      "perl": {
+        "eventText": " <br /> one",
+        "og": "&lt;br /&gt; one",
+        "subjectText": "café 😀 & tea",
+        "full": " \n one"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": " <br /> one"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 div-flow parsing drops whitespace before text."
+      }
+    },
+    {
+      "id": "empty",
+      "raw": "",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "perl": {
+        "eventText": "",
+        "og": "",
+        "subjectText": "café 😀 & tea",
+        "full": ""
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": ""
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "head-gap",
+      "raw": "<head><title>x</title></head>\n<p>one</p>",
+      "rawSha256": "ad3e52618ac8a15a2c8cd2bb0c1181c863bb839ae73f00d00cd87e8951600620",
+      "perl": {
+        "eventText": "<br /><p>one</p>",
+        "og": "&lt;br /&gt;&lt;p&gt;one&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "\n<p>one</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<br /><p>one</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p>one</p>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 head-to-body parsing drops the leading LF."
+      }
+    },
+    {
+      "id": "implicit-head-space",
+      "raw": "<title>x</title>\n<title>y</title>\n<p>one</p>",
+      "rawSha256": "03c86f65125334156151e4928b772816dc145b69af1f313d8b6d260b539c9293",
+      "perl": {
+        "eventText": "<br /><br /><p>one</p>",
+        "og": "&lt;br /&gt;&lt;br /&gt;&lt;p&gt;one&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "\n\n<p>one</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<br /><br /><p>one</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p>one</p>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 head-to-body parsing drops two leading LFs."
+      }
+    },
+    {
+      "id": "pasted-document",
+      "raw": "<html><head><title>x</title></head>\n<body>one</body>\n</html>",
+      "rawSha256": "d0a7f3c4aeb9c464ca7e0931f9a87e1eae610646dd79e7e3c8285cd9971554d1",
+      "perl": {
+        "eventText": "<html><br />one<br /></html>",
+        "og": "&lt;html&gt;&lt;br /&gt;one&lt;br /&gt;&lt;/html&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<html>\none\n</html>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<html><br />one<br /></html>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one\n",
+        "reason": null,
+        "category": "context-adaptation",
+        "evidence": "The entry fragment omits pasted html and body document wrappers."
+      }
+    },
+    {
+      "id": "pasted-body",
+      "raw": "<body onload=\"BAD\">one &amp; two</body>\n",
+      "rawSha256": "d9d9e346316e63287760507e0f28fbe89e1ccbad74390b500978a2771632c10f",
+      "perl": {
+        "eventText": "one &amp; two<br />",
+        "og": "one &amp;amp; two&lt;br /&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "one &amp; two\n"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "one &amp; two<br />"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one &amp; two\n",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pasted-attrs",
+      "raw": "<html lang=\"en\" onclick=\"BAD\"><body>one &amp; two</body></html>",
+      "rawSha256": "f6cb9772eb5a125c1c932516cc8cf403d79ae5e38964e93eb3334c57d9effb52",
+      "perl": {
+        "eventText": "<html lang=\"en\">one &amp; two</html>",
+        "og": "&lt;html lang=&quot;en&quot;&gt;one &amp;amp; two&lt;/html&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<html lang=\"en\">one &amp; two</html>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<html lang=\"en\">one &amp; two</html>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one &amp; two",
+        "reason": null,
+        "category": "context-adaptation",
+        "evidence": "The entry fragment omits pasted document wrappers and their attributes."
+      }
+    },
+    {
+      "id": "decoder-entity",
+      "raw": "x &lt;/textarea&gt; y",
+      "rawSha256": "e8e6de71fdfd7a6c03c49c35f77f106e9acbd67a8b0446829bc4a4d3596ad221",
+      "perl": {
+        "eventText": "x &lt;/textarea&gt; y",
+        "og": "x &amp;lt;/textarea&amp;gt; y",
+        "subjectText": "café 😀 & tea",
+        "full": "x &lt;/textarea&gt; y"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "x &lt;/textarea&gt; y"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "x &lt;/textarea&gt; y",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "decoder-rcdata",
+      "raw": "<textarea>x&lt;/textarea&gt;y</textarea>",
+      "rawSha256": "bf789acfa8a6de9f5e10b4c4785f1e459b84b545d5ffa01c34fb96ac03c5ceec",
+      "perl": {
+        "eventText": "<textarea>x&lt;/textarea&gt;y</textarea>",
+        "og": "&lt;textarea&gt;x&amp;lt;/textarea&amp;gt;y&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>x&lt;/textarea&gt;y</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<textarea>x&lt;/textarea&gt;y</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<textarea>x&lt;/textarea&gt;y</textarea>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "quoted-angle",
+      "raw": "<p title=\"x > y &amp; z\">text</p>",
+      "rawSha256": "556eabd874bbad50a5e8d90514a9fdb52e67b4c8acf48a6ec3b78fd889c68fd7",
+      "perl": {
+        "eventText": "<p title=\"x &gt; y &amp; z\">text</p>",
+        "og": "&lt;p title=&quot;x &amp;gt; y &amp;amp; z&quot;&gt;text&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<p title=\"x &gt; y &amp; z\">text</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<p title=\"x &gt; y &amp; z\">text</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p title=\"x > y &amp; z\">text</p>",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML5 attribute serialization retains the literal angle bracket."
+      }
+    },
+    {
+      "id": "rich",
+      "raw": "<p class=\"x\" style=\"color:red\">one &amp; two</p><p>three<br>four</p>",
+      "rawSha256": "d545a8aa044206b72950f9df26bd1578d9567e5c6dec473ade57bd7870c0d2b4",
+      "perl": {
+        "eventText": "<p class=\"x\" style=\"color:red\">one &amp; two</p><p>three<br>four</p>",
+        "og": "&lt;p class=&quot;x&quot; style=&quot;color:red&quot;&gt;one &amp;amp; two&lt;/p&gt;&lt;p&gt;three&lt;br&gt;four&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<p class=\"x\" style=\"color:red\">one &amp; two</p><p>three<br>four</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<p class=\"x\" style=\"color:red\">one &amp; two</p><p>three<br>four</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p class=\"x\" style=\"color:red\">one &amp; two</p><p>three<br>four</p>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "lines",
+      "raw": "one\ntwo\n\nthree\r\nfour",
+      "rawSha256": "a5b5cd59ca11f5a001e39b2c1ffb500112dfb0d38819af32dab410850f2316c5",
+      "perl": {
+        "eventText": "one<br />two<br /><br />three<br />four",
+        "og": "one&lt;br /&gt;two&lt;br /&gt;&lt;br /&gt;three&lt;br /&gt;four",
+        "subjectText": "café 😀 & tea",
+        "full": "one\ntwo\n\nthree\r\nfour"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "one<br />two<br /><br />three<br />four"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "one\ntwo\n\nthree\nfour",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 parsing canonicalizes CRLF to LF."
+      }
+    },
+    {
+      "id": "block-lines",
+      "raw": "<p>one\ntwo</p>\n<p>three</p>\n",
+      "rawSha256": "0ec1c735333031994dceba8520b4072c003b8913da0a1d53baca1e10c2e23bf3",
+      "perl": {
+        "eventText": "<p>one<br />two</p><br /><p>three</p><br />",
+        "og": "&lt;p&gt;one&lt;br /&gt;two&lt;/p&gt;&lt;br /&gt;&lt;p&gt;three&lt;/p&gt;&lt;br /&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<p>one\ntwo</p>\n<p>three</p>\n"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<p>one<br />two</p><br /><p>three</p><br />"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p>one\ntwo</p>\n<p>three</p>\n",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre",
+      "raw": "<pre>one\ntwo &amp; tea</pre><textarea>x\ny</textarea>",
+      "rawSha256": "7c6c06904e181cf956da8f0da1a6184cc740fe5203045416e37ea81dfdbd6955",
+      "perl": {
+        "eventText": "<pre>one\ntwo &amp; tea</pre><textarea>x\ny</textarea>",
+        "og": "&lt;pre&gt;one two &amp;amp; tea&lt;/pre&gt;&lt;textarea&gt;x y&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>one\ntwo &amp; tea</pre><textarea>x\ny</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>one\ntwo &amp; tea</pre><textarea>x\ny</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>one\ntwo &amp; tea</pre><textarea>x\ny</textarea>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-initial-lf",
+      "raw": "<pre>\none</pre>",
+      "rawSha256": "6ba90c2ddad8ade1e3d92aac021da480b1a227244c834eb7193ec475abdd8d54",
+      "perl": {
+        "eventText": "<pre>\none</pre>",
+        "og": "&lt;pre&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\none</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>\none</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>\none</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "textarea-initial-lf",
+      "raw": "<textarea>\none</textarea>",
+      "rawSha256": "303d38342129fc5bf0de02248599cb707deff82fd8ccd72bf775017816ed177b",
+      "perl": {
+        "eventText": "<textarea>\none</textarea>",
+        "og": "&lt;textarea&gt; one&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>\none</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<textarea>\none</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<textarea>\none</textarea>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-double-lf",
+      "raw": "<pre>\n\none</pre>",
+      "rawSha256": "04365999d841c659ada3599bffa5acbf2045bb9eea5cd99c5823d1f6d899fcaa",
+      "perl": {
+        "eventText": "<pre>\n\none</pre>",
+        "og": "&lt;pre&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\n\none</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>\n\none</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>\n\none</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "textarea-double-lf",
+      "raw": "<textarea>\n\none</textarea>",
+      "rawSha256": "6135e2be672df5c14c2e5399b8264f54e2b2c84c36fe65b575d398c9737fe53a",
+      "perl": {
+        "eventText": "<textarea>\n\none</textarea>",
+        "og": "&lt;textarea&gt; one&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>\n\none</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<textarea>\n\none</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<textarea>\n\none</textarea>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-crlf",
+      "raw": "<pre>\r\none</pre>",
+      "rawSha256": "6559c212032b1a5eb47f60941e167fed201a6b6ff4774cbbf1a72161f813f3f1",
+      "perl": {
+        "eventText": "<pre>\r\none</pre>",
+        "og": "&lt;pre&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\r\none</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>\r\none</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>\none</pre>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 pre parsing canonicalizes CRLF to LF while retaining the initial line."
+      }
+    },
+    {
+      "id": "textarea-crlf",
+      "raw": "<textarea>\r\none</textarea>",
+      "rawSha256": "7ee822955e2f1c497dc26c766d1d973985c59cc776aee616c4051bd1e93a020b",
+      "perl": {
+        "eventText": "<textarea>\r\none</textarea>",
+        "og": "&lt;textarea&gt; one&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>\r\none</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<textarea>\r\none</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<textarea>\none</textarea>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 textarea parsing canonicalizes CRLF to LF while retaining the initial line."
+      }
+    },
+    {
+      "id": "pre-newline-only",
+      "raw": "<pre>\n</pre>",
+      "rawSha256": "511dcf0b05801e3f0573cf172c8e63b96f40069cdf93fade4a09bd6809c92975",
+      "perl": {
+        "eventText": "<pre>\n</pre>",
+        "og": "&lt;pre&gt; &lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\n</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>\n</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>\n</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "textarea-newline-only",
+      "raw": "<textarea>\r\n</textarea>",
+      "rawSha256": "9080a75cc7b8765517bfa92838746a64aa70f4a0e352c9647f995ed5eb00a9f3",
+      "perl": {
+        "eventText": "<textarea>\r\n</textarea>",
+        "og": "&lt;textarea&gt; &lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>\r\n</textarea>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<textarea>\r\n</textarea>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<textarea>\n</textarea>",
+        "reason": null,
+        "category": "whitespace-transform",
+        "evidence": "HTML5 textarea parsing canonicalizes CRLF to LF."
+      }
+    },
+    {
+      "id": "pre-later-lf",
+      "raw": "<pre>one\ntwo</pre>",
+      "rawSha256": "923017115f07c50602a7d4c17e28b45d350a65a780ff7c1afcb6d2eaa8c670e5",
+      "perl": {
+        "eventText": "<pre>one\ntwo</pre>",
+        "og": "&lt;pre&gt;one two&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>one\ntwo</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>one\ntwo</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>one\ntwo</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-comment-before-lf",
+      "raw": "<pre><!-- comment -->\none</pre>",
+      "rawSha256": "574f3706ff6ffbb4c4ea0ea9e5475617be18d01a9e9d6a18dfafb4cd0c359e78",
+      "perl": {
+        "eventText": "<pre>\none</pre>",
+        "og": "&lt;pre&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\none</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>\none</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>\none</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-tag-before-lf",
+      "raw": "<pre><b>x</b>\none</pre>",
+      "rawSha256": "e61a452da07955c980df74a2330f5ccbf76c09b5076e737c95d4146a7917d777",
+      "perl": {
+        "eventText": "<pre><b>x</b>\none</pre>",
+        "og": "&lt;pre&gt;&lt;b&gt;x&lt;/b&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre><b>x</b>\none</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre><b>x</b>\none</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre><b>x</b>\none</pre>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "pre-entities",
+      "raw": "<pre>&amp; &#10; one</pre>",
+      "rawSha256": "3d99c8c60c526e31e91d68ed69fcb2ec7d9d0ac0d3e728ff15325689ef954fc1",
+      "perl": {
+        "eventText": "<pre>&amp; &#10; one</pre>",
+        "og": "&lt;pre&gt;&amp;amp; &amp;#10; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>&amp; &#10; one</pre>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<pre>&amp; &#10; one</pre>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<pre>&amp; \n one</pre>",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML5 decodes the numeric linefeed entity in pre text."
+      }
+    },
+    {
+      "id": "code",
+      "raw": "<code>https://example.test/path\nnext @person</code>",
+      "rawSha256": "5bde6c613a2f9a0fdeadbde228876debb6b78e6f6ab58e2df1fe19e3e8dd96a7",
+      "perl": {
+        "eventText": "<code><a href=\"https://example.test/path\">https://example.test/path</a><br />next @person</code>",
+        "og": "&lt;code&gt;&lt;a href=&quot;https://example.test/path&quot;&gt;https://example.test/path&lt;/a&gt;&lt;br /&gt;next @person&lt;/code&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<code>https://example.test/path\nnext @person</code>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<code><a href=\"https://example.test/path\">https://example.test/path</a><br />next @person</code>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<code>https://example.test/path\nnext @person</code>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "url",
+      "raw": "See https://example.org/a?x=1&y=2 now",
+      "rawSha256": "aed1d8a8d97e8009dab0d6bdb4f52f7e8b1526108514d3e0db08fe6c879944a1",
+      "perl": {
+        "eventText": "See <a href=\"https://example.org/a?x=1&y=2\">https://example.org/a?x=1&y=2</a> now",
+        "og": "See &lt;a href=&quot;https://example.org/a?x=1&amp;y=2&quot;&gt;https://example.org/a?x=1&amp;y=2&lt;/a&gt; now",
+        "subjectText": "café 😀 & tea",
+        "full": "See https://example.org/a?x=1&y=2 now"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "See <a href=\"https://example.org/a?x=1&y=2\">https://example.org/a?x=1&y=2</a> now"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "See https://example.org/a?x=1&amp;y=2 now",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML text serializes a literal ampersand as an entity."
+      }
+    },
+    {
+      "id": "url-entity",
+      "raw": "https://example.test/path&quot; next",
+      "rawSha256": "d846263bf58f9b714946caf18121e4f281e52feb5f03235db054380dfc4edcfe",
+      "perl": {
+        "eventText": "<a href=\"https://example.test/path\">https://example.test/path</a>&quot; next",
+        "og": "&lt;a href=&quot;https://example.test/path&quot;&gt;https://example.test/path&lt;/a&gt;&amp;quot; next",
+        "subjectText": "café 😀 & tea",
+        "full": "https://example.test/path&quot; next"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<a href=\"https://example.test/path\">https://example.test/path</a>&quot; next"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "https://example.test/path\" next",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML5 text decodes the quoted entity."
+      }
+    },
+    {
+      "id": "email",
+      "raw": "Mail a@example.org now",
+      "rawSha256": "728cca6a88f7435e7ae97f6380d1075f01911fa79d87867677a5fcae2fb3c50f",
+      "perl": {
+        "eventText": "Mail a@example.org now",
+        "og": "Mail a@example.org now",
+        "subjectText": "café 😀 & tea",
+        "full": "Mail a@example.org now"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "Mail a@example.org now"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "Mail a@example.org now",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "anchor",
+      "raw": "<a href=\"/relative\">https://example.org/a\nnext</a> https://outside.example/z",
+      "rawSha256": "b363be02b42d196d790ed67de558f4d24c5b5a86577ae10443b7af05f58d4387",
+      "perl": {
+        "eventText": "<a href=\"/relative\">https://example.org/a<br />next</a> <a href=\"https://outside.example/z\">https://outside.example/z</a>",
+        "og": "&lt;a href=&quot;/relative&quot;&gt;https://example.org/a&lt;br /&gt;next&lt;/a&gt; &lt;a href=&quot;https://outside.example/z&quot;&gt;https://outside.example/z&lt;/a&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<a href=\"/relative\">https://example.org/a\nnext</a> https://outside.example/z"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<a href=\"/relative\">https://example.org/a<br />next</a> <a href=\"https://outside.example/z\">https://outside.example/z</a>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<a href=\"http://localhost:8080/relative\">https://example.org/a\nnext</a> https://outside.example/z",
+        "reason": null,
+        "category": "origin-adaptation",
+        "evidence": "Relative href resolves against the canonical retained entry permalink."
+      }
+    },
+    {
+      "id": "image",
+      "raw": "<img src=\"/x\" alt=\"A &amp; B\" title=\"q\">",
+      "rawSha256": "11e5a963a4b2d7019b2c771e28d8b8e3e315455efb2ff43ba165b24147e03dd2",
+      "perl": {
+        "eventText": "<img src=\"/x\" alt=\"A &amp; B\" title=\"q\">",
+        "og": "&lt;img src=&quot;/x&quot; alt=&quot;A &amp;amp; B&quot; title=&quot;q&quot;&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<img src=\"/x\" alt=\"A &amp; B\" title=\"q\">"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<img src=\"/x\" alt=\"A &amp; B\" title=\"q\">"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<img src=\"http://localhost:8080/x\" alt=\"A &amp; B\" title=\"q\">",
+        "reason": null,
+        "category": "origin-adaptation",
+        "evidence": "Relative image src resolves against the canonical retained entry permalink."
+      }
+    },
+    {
+      "id": "css-relative",
+      "raw": "<p style=\"background:url(/x);--brand:red;color:var(--brand)\">x</p>",
+      "rawSha256": "f8b9eb70a553b36332451ad6a6b3b81aa567e3e28dc4799f6a8ade02ae112037",
+      "perl": {
+        "eventText": "<p style=\"background:url(/x);--brand:red;color:var(--brand)\">x</p>",
+        "og": "&lt;p style=&quot;background:url(/x);--brand:red;color:var(--brand)&quot;&gt;x&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<p style=\"background:url(/x);--brand:red;color:var(--brand)\">x</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<p style=\"background:url(/x);--brand:red;color:var(--brand)\">x</p>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<p style=\"background:url(http://localhost:8080/x);--brand:red;color:var(--brand)\">x</p>",
+        "reason": null,
+        "category": "origin-adaptation",
+        "evidence": "Relative CSS URL resolves against the canonical retained entry permalink; CSS never uses image proxy."
+      }
+    },
+    {
+      "id": "table",
+      "raw": "<table>\n<tr><td>one\ntwo</td></tr>\n</table>",
+      "rawSha256": "67faf35caf0bd68c98ba6fc3f0ab57d2f3b56905b73c83cc6009a86c37fee79d",
+      "perl": {
+        "eventText": "<table>\n<tr><td>one<br />two</td></tr>\n</table>",
+        "og": "&lt;table&gt; &lt;tr&gt;&lt;td&gt;one&lt;br /&gt;two&lt;/td&gt;&lt;/tr&gt; &lt;/table&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<table>\n<tr><td>one\ntwo</td></tr>\n</table>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<table>\n<tr><td>one<br />two</td></tr>\n</table>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<table>\n<tbody><tr><td>one\ntwo</td></tr>\n</tbody></table>",
+        "reason": null,
+        "category": "parser-repair",
+        "evidence": "HTML5 table parsing emits a tbody and closes the repaired row context."
+      }
+    },
+    {
+      "id": "cut",
+      "raw": "before<lj-cut text=\"More\"><b>inside</b></lj-cut>after",
+      "rawSha256": "ad87ca9f8a227240ea15b84c92dfc681c362605c1a9d550866f04d1fcf569bd4",
+      "perl": {
+        "eventText": "before<b>inside</b>after",
+        "og": "before&lt;b&gt;inside&lt;/b&gt;after",
+        "subjectText": "café 😀 & tea",
+        "full": "before<a name=\"cutid1\"></a><b>inside</b>after"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "before<b>inside</b>after"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "before<a name=\"cutid1\"></a><b>inside</b>after",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "alias",
+      "raw": "before<cut text=\"More\"><b>inside</b></cut>after",
+      "rawSha256": "77d8479c098de4b430272245e5b25454973f0d7d6dff1ca14bf0a2f3769f0f41",
+      "perl": {
+        "eventText": "before<b>inside</b>after",
+        "og": "before&lt;b&gt;inside&lt;/b&gt;after",
+        "subjectText": "café 😀 & tea",
+        "full": "before<a name=\"cutid1\"></a><b>inside</b>after"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "before<b>inside</b>after"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "before<a name=\"cutid1\"></a><b>inside</b>after",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "div-cut",
+      "raw": "before<div class=\"ljcut\" text=\"More\"><b>inside</b></div>after",
+      "rawSha256": "343073c50d55b8b396137d1fc79ecfad954c051a08e05901ba0ad37533da0278",
+      "perl": {
+        "eventText": "before<b>inside</b>after",
+        "og": "before&lt;b&gt;inside&lt;/b&gt;after",
+        "subjectText": "café 😀 & tea",
+        "full": "before<a name=\"cutid1\"></a><div class=\"ljcut\" text=\"More\"><b>inside</b></div>after"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "before<b>inside</b>after"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "before<a name=\"cutid1\"></a><div class=\"ljcut\" text=\"More\"><b>inside</b></div>after",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "names-before",
+      "raw": "<a name=\"cutid1\">source</a><lj-cut>inside</lj-cut>",
+      "rawSha256": "2e6eb5d7b2f820e1ae075109ca6cfbc72063fdfc4aca8acbde9a9705afce45a1",
+      "perl": {
+        "eventText": "<a name=\"cutid1\">source</a>inside",
+        "og": "&lt;a name=&quot;cutid1&quot;&gt;source&lt;/a&gt;inside",
+        "subjectText": "café 😀 & tea",
+        "full": "<a name=\"cutid1\">source</a><a name=\"cutid1\"></a>inside"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<a name=\"cutid1\">source</a>inside"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<a name=\"cutid1\">source</a><a name=\"cutid1\"></a>inside",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "names-inside",
+      "raw": "<lj-cut><a name=\"cutid1\">source</a>inside</lj-cut>",
+      "rawSha256": "da8f39dedf2f2ba2ef967d279454bc0c1d3eef2b79db666e6c9af6b36780af1d",
+      "perl": {
+        "eventText": "<a name=\"cutid1\">source</a>inside",
+        "og": "&lt;a name=&quot;cutid1&quot;&gt;source&lt;/a&gt;inside",
+        "subjectText": "café 😀 & tea",
+        "full": "<a name=\"cutid1\"></a><a name=\"cutid1\">source</a>inside"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<a name=\"cutid1\">source</a>inside"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<a name=\"cutid1\"></a><a name=\"cutid1\">source</a>inside",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "source-id",
+      "raw": "<a id=\"cutid1\">source</a><lj-cut>inside</lj-cut>",
+      "rawSha256": "bad3e54cfdf47202fd98a13cce7a2759bf7864196a88c110d591cb5ffebe3e93",
+      "perl": {
+        "eventText": "<a>source</a>inside",
+        "og": "&lt;a&gt;source&lt;/a&gt;inside",
+        "subjectText": "café 😀 & tea",
+        "full": "<a>source</a><a name=\"cutid1\"></a>inside"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<a>source</a>inside"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<a>source</a><a name=\"cutid1\"></a>inside",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "two-cuts",
+      "raw": "<lj-cut>A</lj-cut><div class=\"ljcut\">B</div>",
+      "rawSha256": "5b4631b4e00c334117ec613ddd3f878b314f856335498e2b3ae6f9776124a4e3",
+      "perl": {
+        "eventText": "AB",
+        "og": "AB",
+        "subjectText": "café 😀 & tea",
+        "full": "<a name=\"cutid1\"></a>A<a name=\"cutid2\"></a><div class=\"ljcut\" text=\"Read more...\">B</div>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "AB"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<a name=\"cutid1\"></a>A<a name=\"cutid2\"></a><div class=\"ljcut\" text=\"Read more...\">B</div>",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "inert-quote",
+      "raw": "<p title=\"&quot;><script>bad</script>\">safe</p>",
+      "rawSha256": "2ff1539b97d48379264dfa3c074f182ed8a55656a56a0e7bd66478858c843b86",
+      "perl": {
+        "eventText": "<p title=\"&quot;&gt;&lt;script&gt;bad&lt;/script&gt;\">safe</p>",
+        "og": "&lt;p title=&quot;&amp;quot;&amp;gt;&amp;lt;script&amp;gt;bad&amp;lt;/script&amp;gt;&quot;&gt;safe&lt;/p&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<p title=\"&quot;&gt;&lt;script&gt;bad&lt;/script&gt;\">safe</p>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<p title=\"&quot;&gt;&lt;script&gt;bad&lt;/script&gt;\">safe</p>"
+      },
+      "fullBody": {
+        "kind": "failure",
+        "html": null,
+        "reason": "unsupported",
+        "category": "unsupported",
+        "evidence": "Ambiguous attribute/entity source is refused before full-body release."
+      }
+    },
+    {
+      "id": "eaten",
+      "raw": "<script>@person BAD</script><style>p{color:red}</style>safe",
+      "rawSha256": "6fa3073b7fafb43db99e6a28b7b7b1dfaace9a74020f8462777654e8f472c680",
+      "perl": {
+        "eventText": "safe",
+        "og": "safe",
+        "subjectText": "café 😀 & tea",
+        "full": "safe"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "safe"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "safe",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "unicode",
+      "raw": "café tea 😀 &amp; &#160;",
+      "rawSha256": "bda8da97921d85f350bbcb49a5ebc49b564e76e53b67df32a5d4a2702badb485",
+      "perl": {
+        "eventText": "café tea 😀 &amp; &#160;",
+        "og": "café tea 😀 &amp;amp; &amp;#160;",
+        "subjectText": "café 😀 & tea",
+        "full": "café tea 😀 &amp; &#160;"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "café tea 😀 &amp; &#160;"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "café&nbsp;tea 😀 &amp; &nbsp;",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML5 serializes NBSP entities without changing decoded text."
+      }
+    },
+    {
+      "id": "limit",
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀YZ",
+      "rawSha256": "8e1a8cda0ea997f5600bd5fa1f8341c6fe85a6ed733e02d293450e182c0578e4",
+      "perl": {
+        "eventText": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀YZ",
+        "og": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀Y",
+        "subjectText": "café 😀 & tea",
+        "full": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀YZ"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀YZ"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀YZ",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "entity-limit",
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;Z",
+      "rawSha256": "37eee3f65e9d9d0d5fa754cec0b25b8ec5c721cad854f55e3fd27dbd7d629eab",
+      "perl": {
+        "eventText": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;Z",
+        "og": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;am",
+        "subjectText": "café 😀 & tea",
+        "full": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;Z"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;Z"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&amp;Z",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    },
+    {
+      "id": "form",
+      "raw": "<form action=\"https://example.test/post\"><input type=\"password\" value=\"q\"><input disabled></form>",
+      "rawSha256": "1151a67eb393d9f7a30e50351c07a99f89fef06b6f2960399a26c27eebb73f99",
+      "perl": {
+        "eventText": "<form action=\"https://example.test/post\"><input value=\"q\"><input disabled=\"disabled\"></form>",
+        "og": "&lt;form action=&quot;https://example.test/post&quot;&gt;&lt;input value=&quot;q&quot;&gt;&lt;input disabled=&quot;disabled&quot;&gt;&lt;/form&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<form action=\"https://example.test/post\"><input value=\"q\"><input disabled=\"disabled\"></form>"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "<form action=\"https://example.test/post\"><input value=\"q\"><input disabled=\"disabled\"></form>"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "<form action=\"https://example.test/post\"><input value=\"q\"><input disabled=\"\"></form>",
+        "reason": null,
+        "category": "serialization",
+        "evidence": "HTML5 serializes the disabled boolean attribute as an empty value."
+      }
+    },
+    {
+      "id": "outside-control",
+      "raw": "<select><option>hello</option><option>bye</option></select>",
+      "rawSha256": "b12fe5469cdcb724eda422c75319ad0dc2e850e2571c7e0954be10eeac955938",
+      "perl": {
+        "eventText": "&lt;select ... &gt;&lt;option ... &gt;hello&lt;/option&gt;&lt;option ... &gt;bye&lt;/option&gt;&lt;/select&gt;",
+        "og": "&amp;lt;select ... &amp;gt;&amp;lt;option ... &amp;gt;hello&amp;lt;/option&amp;gt;&amp;lt;option ... &amp;gt;bye&amp;lt;/option&amp;gt;&amp;lt;/select&amp;gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "&lt;select ... &gt;&lt;option ... &gt;hello&lt;/option&gt;&lt;option ... &gt;bye&lt;/option&gt;&lt;/select&gt;"
+      },
+      "metadata": {
+        "kind": "inert-entry-metadata",
+        "subjectText": "café 😀 & tea",
+        "eventText": "&lt;select ... &gt;&lt;option ... &gt;hello&lt;/option&gt;&lt;option ... &gt;bye&lt;/option&gt;&lt;/select&gt;"
+      },
+      "fullBody": {
+        "kind": "ok",
+        "html": "&lt;select ... &gt;&lt;option ... &gt;hello&lt;/option&gt;&lt;option ... &gt;bye&lt;/option&gt;&lt;/select&gt;",
+        "reason": null,
+        "category": "exact",
+        "evidence": "Full entry body equals retained Perl bytes."
+      }
+    }
+  ],
+  "adaptations": [
+    {
+      "id": "p-short",
+      "raw": "<p>one<p>two",
+      "perlHelper": "<p>one<p>two</p></p>",
+      "tsHelper": "<p>one</p><p>two</p>",
+      "perlOg": "&lt;p&gt;one&lt;p&gt;two&lt;/p&gt;&lt;/p&gt;",
+      "tsOg": "&lt;p&gt;one&lt;/p&gt;&lt;p&gt;two&lt;/p&gt;",
+      "displayed": "<p>one</p><p>two</p>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    },
+    {
+      "id": "list-short",
+      "raw": "<ul><li>one<li>two</ul>",
+      "perlHelper": "<ul><li>one<li>two</li></li></ul>",
+      "tsHelper": "<ul><li>one</li><li>two</li></ul>",
+      "perlOg": "&lt;ul&gt;&lt;li&gt;one&lt;li&gt;two&lt;/li&gt;&lt;/li&gt;&lt;/ul&gt;",
+      "tsOg": "&lt;ul&gt;&lt;li&gt;one&lt;/li&gt;&lt;li&gt;two&lt;/li&gt;&lt;/ul&gt;",
+      "displayed": "<ul><li>one</li><li>two</li></ul>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    },
+    {
+      "id": "table-short",
+      "raw": "<table><tr><td>one<td>two</table>",
+      "perlHelper": "<table><tr><td>one<td>two</table>",
+      "tsHelper": "<table><tr><td>one</td><td>two</td></tr></table>",
+      "perlOg": "&lt;table&gt;&lt;tr&gt;&lt;td&gt;one&lt;td&gt;two&lt;/table&gt;",
+      "tsOg": "&lt;table&gt;&lt;tr&gt;&lt;td&gt;one&lt;/td&gt;&lt;td&gt;two&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;",
+      "displayed": "<table><tbody><tr><td>one</td><td>two</td></tr></tbody></table>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    },
+    {
+      "id": "p-near300",
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<p>one<p>two",
+      "perlHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<p>one<p>two</p></p>",
+      "tsHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<p>one</p><p>two</p>",
+      "perlOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;p&gt;one&lt;p&gt;two&lt;/p&gt;&lt;/p&gt;",
+      "tsOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;p&gt;one&lt;/p&gt;&lt;p&gt;two&lt;/p&gt;",
+      "displayed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<p>one</p><p>two</p>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    },
+    {
+      "id": "list-near300",
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<ul><li>one<li>two</ul>",
+      "perlHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<ul><li>one<li>two</li></li></ul>",
+      "tsHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<ul><li>one</li><li>two</li></ul>",
+      "perlOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;ul&gt;&lt;li&gt;one&lt;li&gt;two&lt;/",
+      "tsOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;ul&gt;&lt;li&gt;one&lt;/li&gt;&lt;li&gt;",
+      "displayed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<ul><li>one</li><li>two</li></ul>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    },
+    {
+      "id": "table-near300",
+      "raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<table><tr><td>one<td>two</table>",
+      "perlHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<table><tr><td>one<td>two</table>",
+      "tsHelper": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<table><tr><td>one</td><td>two</td></tr></table>",
+      "perlOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;table&gt;&lt;tr&gt;&lt;td&gt;one&lt;t",
+      "tsOg": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&lt;table&gt;&lt;tr&gt;&lt;td&gt;one&lt;/",
+      "displayed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<table><tbody><tr><td>one</td><td>two</td></tr></tbody></table>",
+      "category": "metadata-visible-parser-adaptation",
+      "evidence": "Omitted end tags serialize as explicit closes in the inert helper; literal tags change the 300-scalar OpenGraph budget."
+    }
+  ],
+  "refusals": [
+    {
+      "id": "pre-entity-linefeed",
+      "raw": "<pre>\n&amp; &#10; one</pre>",
+      "perl": {
+        "eventText": "<pre>\n&amp; &#10; one</pre>",
+        "og": "&lt;pre&gt; &amp;amp; &amp;#10; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\n&amp; &#10; one</pre>"
+      },
+      "candidate": {
+        "kind": "failure",
+        "reason": "unsupported"
+      },
+      "sourceProof": {
+        "location": {
+          "startLine": 2,
+          "startCol": 5,
+          "startOffset": 10,
+          "endLine": 2,
+          "endCol": 16,
+          "endOffset": 21
+        },
+        "parsedText": "& \n one",
+        "failingSlice": "; &#10; one"
+      },
+      "classification": "ambiguous-helper-source-proof",
+      "category": "unsupported-source-location",
+      "evidence": "Maintained parser source location cannot prove this initial pre/textarea character sequence without guessing."
+    },
+    {
+      "id": "pre-bare-cr",
+      "raw": "<pre>\rone</pre>",
+      "perl": {
+        "eventText": "<pre>\rone</pre>",
+        "og": "&lt;pre&gt; one&lt;/pre&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<pre>\rone</pre>"
+      },
+      "candidate": {
+        "kind": "failure",
+        "reason": "unsupported"
+      },
+      "sourceProof": {
+        "location": {
+          "startLine": 2,
+          "startCol": 1,
+          "startOffset": 6,
+          "endLine": 2,
+          "endCol": 4,
+          "endOffset": 9
+        },
+        "parsedText": "one",
+        "failingSlice": "one"
+      },
+      "classification": "ambiguous-helper-source-proof",
+      "category": "unsupported-source-location",
+      "evidence": "Maintained parser source location cannot prove this initial pre/textarea character sequence without guessing."
+    },
+    {
+      "id": "textarea-entity-linefeed",
+      "raw": "<textarea>&#10;one</textarea>",
+      "perl": {
+        "eventText": "<textarea>&#10;one</textarea>",
+        "og": "&lt;textarea&gt;&amp;#10;one&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>&#10;one</textarea>"
+      },
+      "candidate": {
+        "kind": "failure",
+        "reason": "unsupported"
+      },
+      "sourceProof": {
+        "location": {
+          "startLine": 1,
+          "startCol": 16,
+          "startOffset": 15,
+          "endLine": 1,
+          "endCol": 19,
+          "endOffset": 18
+        },
+        "parsedText": "one",
+        "failingSlice": "one"
+      },
+      "classification": "ambiguous-helper-source-proof",
+      "category": "unsupported-source-location",
+      "evidence": "Maintained parser source location cannot prove this initial pre/textarea character sequence without guessing."
+    },
+    {
+      "id": "textarea-lf-rcdata",
+      "raw": "<textarea>\n<b>t</b></textarea>",
+      "perl": {
+        "eventText": "<textarea>\n&lt;b&gt;t&lt;/b&gt;</textarea>",
+        "og": "&lt;textarea&gt; &amp;lt;b&amp;gt;t&amp;lt;/b&amp;gt;&lt;/textarea&gt;",
+        "subjectText": "café 😀 & tea",
+        "full": "<textarea>\n&lt;b&gt;t&lt;/b&gt;</textarea>"
+      },
+      "candidate": {
+        "kind": "failure",
+        "reason": "unsupported"
+      },
+      "sourceProof": {
+        "location": {
+          "startLine": 2,
+          "startCol": 2,
+          "startOffset": 12,
+          "endLine": 2,
+          "endCol": 9,
+          "endOffset": 19
+        },
+        "parsedText": "<b>t</b>",
+        "failingSlice": "b>t</b>"
+      },
+      "classification": "ambiguous-helper-source-proof",
+      "category": "unsupported-source-location",
+      "evidence": "Maintained parser source location cannot prove this initial pre/textarea character sequence without guessing."
+    }
+  ]
+}
