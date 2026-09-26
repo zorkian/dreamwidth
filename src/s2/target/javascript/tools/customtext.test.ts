@@ -67,6 +67,11 @@ test('canonical native wrapper data and original-source customtext',()=>{
         ...config.entryContent,reader:{removeColors:false,removeSizes:false,removeFonts:false,
             maxImageWidth:null,maxImageHeight:null,placeholderUndefinedImageSize:false,extractImages:false}}});
     try {
+        for(const row of rows.filter((row:any)=>row.kind==='byte_mentions')) {
+            const result=clean(row.source);
+            if(row.mentions.length)assert.deepEqual(result,{kind:'failure',reason:'unsupported'},row.source);
+            else {assert.equal(result.kind,'ok');if(result.kind==='ok')assert.equal(Buffer.from(result.html).toString('hex'),row.output_hex);}
+        }
         for(const source of ['\ntext','plain\nline','<pre>a\nb</pre>','mail@example.invalid','\\@name']) {
             const row=rows.find((row:any)=>row.kind==='pipeline'&&row.source===source);
             const result=clean(source);assert.equal(result.kind,'ok');
