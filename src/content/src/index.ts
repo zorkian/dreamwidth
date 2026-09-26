@@ -232,8 +232,8 @@ function casualText(root:Element,source:string):void {
     while(walker.nextNode())nodes.push(walker.currentNode as Text);
     for(const node of nodes) {
         let value=node.data;
-        value=casualMentions(value);
         const parent=node.parentElement!;
+        if(!parent.closest('code,pre,textarea'))value=casualMentions(value);
         const raw=parent.closest('pre,textarea');
         const table=parent.closest('table');
         const cell=parent.closest('td,th');
