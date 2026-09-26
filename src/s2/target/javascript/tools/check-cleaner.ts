@@ -19,6 +19,7 @@ import {mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import path from "node:path";
 import type {PublicAppConfig} from "../live/contracts";
 import {MysqlLiveStore, type MysqlStoreConfig} from "../live/data/mysql";
+import {regressionConfig, recentRequest} from "./regression-config";
 import {createAnonymousRecentService} from "../live/policy/service";
 import {createLiveApp} from "../live/server/app";
 
@@ -60,11 +61,8 @@ function setup(): void {
     process.stdout.write(result.stdout);
 }
 
-function config(): {public: PublicAppConfig; credential: MysqlStoreConfig} {
-    return {
-        public: JSON.parse(readFileSync(path.join(artifacts, "public-config.json"), "utf8")),
-        credential: JSON.parse(readFileSync(path.join(artifacts, "mysql-readonly.json"), "utf8")),
-    };
+async function config(): Promise<{public: PublicAppConfig; credential: MysqlStoreConfig; artifactPath: string}> {
+    return regressionConfig(project);
 }
 
 function sha(bytes: Buffer): string {
@@ -96,16 +94,16 @@ async function main(): Promise<void> {
         "Usage: node dist/tools/check-cleaner.js");
     helperRun(["--restore"]); // Recover only this helper's exact marked entry.
     setup(); // Rebuild and verify A.runtime after each fresh live stock compile.
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const store = await MysqlLiveStore.open(credential);
-    const before = await store.loadRawSnapshot("s2js_slice3");
+    const before = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
     assert.ok(before && before.entries.length === 2);
     const seedIds = before.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
     let app: ReturnType<typeof createLiveApp> | undefined;
     try {
         const service = await createAnonymousRecentService({
-            repository: store, secretSource: store,
-            artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+            repository: store, secretSource: store, capabilities: credential.capabilities,
+            artifact: {path: artifactPath}, config: publicConfig,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
         });
         app = createLiveApp(publicConfig, service);
@@ -126,7 +124,7 @@ async function main(): Promise<void> {
             const entryRoute = route + ditemid + ".html";
             for (const variant of variants) {
                 if (variant !== "rich") helperRun(["--set", variant]);
-                const snapshot = await store.loadRawSnapshot("s2js_slice3");
+                const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
                 assert.ok(snapshot && snapshot.entries.length === 3);
                 const entry = snapshot.entries.find(item => item.jitemid === state.jitemid);
                 assert.ok(entry && entry.props.editor === "html_raw0");
@@ -138,7 +136,7 @@ async function main(): Promise<void> {
                 assert.ok(!html.includes("source-id-discarded"));
                 assert.ok(!html.includes("span-cuttag_other_123_1"));
                 assert.ok(!html.includes('href="javascript:'));
-                assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                     snapshot.fingerprint, "TS rich GET wrote journal data");
                 const entryResponse = await fetch(entryRoute, {
                     redirect: "manual", signal: AbortSignal.timeout(20000),
@@ -161,7 +159,7 @@ async function main(): Promise<void> {
                 const ogDescription = ogMatch[1]!;
                 assert.ok(!ogDescription.includes("cutid1"),
                     "Generated full-cut anchor leaked into inert metadata");
-                assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                     snapshot.fingerprint, "TS rich EntryPage GET wrote journal data");
                 if (variant === "rich") {
                     assert.ok(ogDescription.includes("Rich café 😀"));
@@ -187,7 +185,7 @@ async function main(): Promise<void> {
                     assert.ok(!rpcBody.includes(Buffer.from(marker)) &&
                         !rpcBody.includes(Buffer.from("HIDDEN-")) &&
                         !rpcBody.includes(Buffer.from("<html")));
-                    assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                    assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                         snapshot.fingerprint, "cut RPC refusal wrote journal data");
                     writeFileSync(path.join(artifacts, "slice4-rich-page.html"), body);
                     writeFileSync(path.join(artifacts, "slice5-rich-entry.html"), entryBody);
@@ -230,7 +228,7 @@ async function main(): Promise<void> {
         } finally {
             helperRun(["--restore"]);
         }
-        const after = await store.loadRawSnapshot("s2js_slice3");
+        const after = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(after && after.entries.length === 2);
         assert.deepEqual(after.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
