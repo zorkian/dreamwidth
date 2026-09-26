@@ -92,7 +92,7 @@ export function prepare(input: RenderInput, ctx: Context,
         return object("Entry", {...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
             time: date(e.eventtime), system_time: date(e.logtime), new_day: Number(newday),
             end_day: Number(newday), comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url,
-            itemid: e.id, tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: nullObject("Image"), depth: 0, timeformat24: 0, admin_post: 0,
+            itemid: e.id, tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: prepareMoodIcon(e), depth: 0, timeformat24: 0, admin_post: 0,
             dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"]});
     });
@@ -146,7 +146,12 @@ function currentFields(content: RenderContentPreparation, entry: ApprovedEntry, 
     for (const [name,raw] of Object.entries(entry.currents ?? {})) {
         result[name] = content.subject(entry,url,raw).html;
     }
+    if (entry.moodName !== undefined && (!result.mood || result.mood === "0")) result.mood = entry.moodName;
     return result;
+}
+function prepareMoodIcon(entry: ApprovedEntry): S2Object {
+    const icon = entry.moodIcon;
+    return icon ? object("Image",{url:icon.url,width:icon.width,height:icon.height,alttext:"",extra:{}}) : nullObject("Image");
 }
 
 function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPreparation,
@@ -170,7 +175,7 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         ...subjectFields(content,e,url), text: content.body(e, url), journal: user, poster: user,
         time: date(e.eventtime), system_time: date(e.logtime), new_day: 0, end_day: 0,
         comments, userpic: prepareUserpic(input,e.userpic,ctx), permalink_url: url, itemid: e.id,
-        tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: nullObject("Image"), depth: 0, timeformat24: 0, admin_post: 0,
+        tags: prepareEntryTags(e.tags,base), metadata: currentFields(content,e,url), mood_icon: prepareMoodIcon(e), depth: 0, timeformat24: 0, admin_post: 0,
         dom_id: `entry-${j.username}-${e.id}`, adult_content_level: "",
         link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend",
             "watch_comments", "unwatch_comments"],

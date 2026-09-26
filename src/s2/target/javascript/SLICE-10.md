@@ -151,3 +151,6 @@ externally. Only finite observed local stock assets are captured; temporary
 fixture style44 maps to the separately qualified retained stock stylesheet.
 Screenshot/report hashes bind that page. This is not full native feature-page
 byte equality, binary resource-route parity or a new broad browser matrix.
+
+[SLICE-11.md](SLICE-11.md) extends the historical numeric-mood/coordinate refusal
+boundary with source-qualified names, icons and coordinate currents.
