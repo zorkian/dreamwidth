@@ -72,11 +72,16 @@ returns the baseline fingerprint and200. Schema cleanup runs in `finally`.
 
 For the one representative Chromium proof, preserve an independently captured
 qualified stock EntryPage (the retained `entry-compare` regression supplies the
-usual path). Run with the existing three-engine setup from the content guide:
+current entry IDs). The historical implicit ID384 default is owner-specific;
+set `S2_USERPIC_STOCK_PAGE` from your current comparison. Run with the existing
+three-engine setup from the content guide:
 
 ```sh
+/opt/dw-node24/bin/node dist/tools/check-live.js entry-compare
+S7_STOCK_ID=$(/opt/dw-node24/bin/node -p \
+    'require("./artifacts/live/entry-comparison.json").results[0].ditemid')
 S2_SELECTED_FIXTURE=1 S2_LIVE_TEST_ARTIFACT="$S7_RUN/stock.json" \
-    S2_USERPIC_STOCK_PAGE="$PWD/artifacts/live/entry-oracle-384-one/page-oracle.html" \
+    S2_USERPIC_STOCK_PAGE="$PWD/artifacts/live/entry-oracle-${S7_STOCK_ID}-one/page-oracle.html" \
     S2_USERPIC_BROWSER_OUTPUT="$S7_RUN/browser" \
     /opt/dw-node24/bin/node --test dist/tools/userpics-http.test.js
 ```
