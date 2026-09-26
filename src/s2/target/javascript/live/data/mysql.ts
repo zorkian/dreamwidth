@@ -29,7 +29,7 @@ import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
     RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
-    PlaceholderResolutionSpec, RawUserpics,
+    PlaceholderResolutionSpec, RawUserpics, RawLink,
 } from "../contracts";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
@@ -143,7 +143,7 @@ function fingerprint(
     mapping: readonly [number, string],
     rawFields: readonly RawField[],
     request: RawPageRequest, selection: RawPageSelection, calendar: RawCalendarSummary,
-    sourceFacts: unknown, userpics: RawUserpics,
+    sourceFacts: unknown, userpics: RawUserpics, links: readonly RawLink[],
 ): string {
     const userValue = (user: RawUser) => [
         user.userid, user.user, user.clusterid, user.status, user.statusvis,
@@ -160,7 +160,7 @@ function fingerprint(
     ];
     const payload = [
         2, request, selection, calendar, sourceFacts, mapping, userValue(owner), posters.map(userValue), style,
-        entries.length, entries.map(entryValue), features, userpics,
+        entries.length, entries.map(entryValue), features, userpics, links,
         [...rawFields].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
     ];
     return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -350,7 +350,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                     [window.selection.target.jitemid]);
             const features = await this.loadFeatures(connection, ownerId, before.facts.spamreportBans);
             const userpics = await this.loadUserpics(connection, ownerId, number(before.facts.owner.dversion), raw);
-            return {...loaded, selection: window.selection, calendar, features, userpics, raw};
+            const links = await this.loadLinks(connection, ownerId, raw);
+            return {...loaded, selection: window.selection, calendar, features, userpics, links, raw};
         });
         if (!selected) return null;
         const after = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
@@ -367,9 +368,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities];
         return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
-            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics,
+            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links,
             fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
-                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics)};
+                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links)};
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
@@ -552,6 +553,25 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             previous,next, entryStatusCounts: statuses.map((row,index) => ({statusvis: decodedColumn(row, "status",
                 "calendar:status:" + index, raw, 8192, true), count: number(row.count,1)})), otherPosterCount: statuses.reduce((sum,row) => sum+number(row.foreign_count),0)};
     }
+    private async loadLinks(connection: Connection, ownerId: number, raw: RawField[]): Promise<readonly RawLink[]> {
+        // Native load_linkobj has no SQL ordering; stable numeric sorting later
+        // preserves received order for ties. The schema has no unique ordernum.
+        const rows = (await sql<Row>`SELECT ordernum,parentnum,
+            HEX(title) AS title_stored,HEX(CONVERT(title USING latin1)) AS title_original,
+            HEX(CONVERT(CONVERT(title USING latin1) USING utf8mb4)) AS title_roundtrip,
+            HEX(url) AS url_stored,HEX(CONVERT(url USING latin1)) AS url_original,
+            HEX(CONVERT(CONVERT(url USING latin1) USING utf8mb4)) AS url_roundtrip,
+            HEX(hover) AS hover_stored,HEX(CONVERT(hover USING latin1)) AS hover_original,
+            HEX(CONVERT(CONVERT(hover USING latin1) USING utf8mb4)) AS hover_roundtrip
+            FROM links WHERE journalid=${ownerId} LIMIT 10001`.execute(connection)).rows;
+        if (rows.length > 10000) unsupported();
+        return rows.map((row,index)=>({ordernum:number(row.ordernum,0,255),
+            parentnum:number(row.parentnum,0,255),
+            title:decodedColumn(row,"title",`link:${ownerId}:${index}:title`,raw,4096,false)!,
+            url:decodedColumn(row,"url",`link:${ownerId}:${index}:url`,raw,4096,true),
+            hover:decodedColumn(row,"hover",`link:${ownerId}:${index}:hover`,raw,4096,true)}));
+    }
+
     private async loadUserpics(connection: Connection, ownerId: number, dversion: number,
         raw: RawField[]): Promise<RawUserpics> {
         // Include directly requested X/S rows: native default skeleton/get can

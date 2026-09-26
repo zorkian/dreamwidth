@@ -52,7 +52,7 @@ export function prepare(input: RenderInput, ctx: Context,
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
         journal_type: "P", userpic_listing_url: `${base}/icons`, host_userid: j.userid,
         link_keyseq: ["manage_membership", "trust", "watch", "post_entry", "track", "message", "tell_friend"],
-        default_pic: prepareUserpic(input,j.defaultUserpic), website_url: "", website_name: ""});
+        default_pic: prepareUserpic(input,j.defaultUserpic), website_url: escapeHtml(j.websiteUrl), website_name: escapeHtml(j.websiteName)});
     if (input.page.kind === "entry") return prepareEntry(input, ctx, content, user, base);
     // The primary loader has already applied the public SQL window, source
     // buffer ordering and lookahead removal. Preserve approved entry identity
@@ -106,7 +106,8 @@ export function prepare(input: RenderInput, ctx: Context,
         layout_name: "Tabula Rasa", theme_name: "(Layout Default)", layout_url: "",
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
-        view_url: views, linklist: [], customtext_title: ctx.prop._text_module_customtext,
+        view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),
+            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), customtext_title: ctx.prop._text_module_customtext,
         customtext_content: ctx.prop._text_module_customtext_content,
         customtext_url: ctx.prop._text_module_customtext_url,
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
@@ -160,7 +161,8 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         layout_name: "Tabula Rasa", theme_name: "(Layout Default)", layout_url: "",
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
-        view_url: views, linklist: [], customtext_title: ctx.prop._text_module_customtext,
+        view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),
+            url:escapeHtml(link.url),title:escapeHtml(link.title),hover:escapeHtml(link.hover),children:[]})), customtext_title: ctx.prop._text_module_customtext,
         customtext_content: ctx.prop._text_module_customtext_content,
         customtext_url: ctx.prop._text_module_customtext_url,
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
