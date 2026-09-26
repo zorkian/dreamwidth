@@ -14,15 +14,19 @@
 
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {approveEntrySnapshot, validEntryId} from "../policy/entry";
-import {approveSnapshot} from "../policy/cohort";
+import {approveEntrySnapshot as approveRawEntrySnapshot, validEntryId} from "../policy/entry";
+import {approveSnapshot as approveRawSnapshot} from "../policy/cohort";
 import {createRedirectAdmission} from "../policy/redirects";
 import {createAnonymousRecentService} from "../policy/service";
 import {Renderer} from "../render/child";
 import type {RenderInput} from "../render/types";
 import type {RawJournalSnapshot, RawRecentRepository, RedirectAdmissionRequest, RepositoryError} from "../contracts";
 import {Unsupported} from "../policy/content";
-import {snapshot, config, limits} from "./fixtures";
+import {snapshot, selectFixture, config, capabilities, limits} from "./fixtures";
+
+const approveSnapshot = (data: RawJournalSnapshot) => approveRawSnapshot(data, config, capabilities);
+const approveEntrySnapshot = (data: RawJournalSnapshot, id: number) =>
+    approveRawEntrySnapshot(data, id, config, capabilities);
 
 const request: RedirectAdmissionRequest = {method: "GET", rawTarget: "/users/s2js_slice3/384.html",
     host: "localhost:8081", origin: null, hasForwardedHeaders: false,
@@ -40,7 +44,7 @@ test("entry admission owns exact canonical uint32 identity and finite controls",
     for (const rawTarget of ["/users/s2js_slice3/0.html", "/users/s2js_slice3/0384.html",
         "/users/s2js_slice3/+384.html", "/users/s2js_slice3/3e2.html", "/users/s2js_slice3/4294967296.html",
         "/users/s2js_slice3/384.HTML", "/users/s2js_slice3/384.html/", "/~s2js_slice3/384.html",
-        "/users/other/384.html", "/users/s2js_slice3/384.html?", "/users/s2js_slice3/384.html?mode=reply",
+        "/users/s2js_slice3/384.html?", "/users/s2js_slice3/384.html?mode=reply",
         "/users/s2js_slice3/384.html?style=mine", "/users/s2js_slice3/384.html?thread=1",
         "/users/s2js_slice3/384.html?viewall=1", "/users/s2js_slice3/384.html?page=1",
         "/users/s2js_slice3/384.html?nohtml=1", "/users/s2js_slice3/384.html?skip=0",
@@ -62,7 +66,7 @@ test("entry admission owns exact canonical uint32 identity and finite controls",
         assert.equal(decide({...request, rawTarget, method: "POST", origin: config.listenOrigin}).kind, "reject");
     }
     for (const rawTarget of ["/go?dir=prev&itemid=0384&journal=s2js_slice3",
-        "/go?itemid=384&dir=prev&journal=s2js_slice3", "/go?dir=prev&itemid=384&journal=other",
+        "/go?itemid=384&dir=prev&journal=s2js_slice3", "/go?dir=prev&itemid=384&journal=UPPER",
         "/go?dir=prev&itemid=384&journal=s2js_slice3&dir=next",
         "/go?dir=next&itemid=4294967296&journal=s2js_slice3",
         "/openid/?returnto=http://localhost:8080/users/s2js_slice3/384.html?mode=reply",
@@ -71,53 +75,58 @@ test("entry admission owns exact canonical uint32 identity and finite controls",
     }
 });
 
-test("target privacy/identity404 precedes unsupported cohort; exact public retains whole cohort422", () => {
-    const data = snapshot();
+test("target privacy/identity404 precedes unsupported cohort; exact public keeps selected-data422", () => {
+    const data = snapshot({kind: "entry", ditemid: 384});
     const broken = {...data, owner: {...data.owner, statusvis: "S"}};
-    for (const ditemid of [1, 255, 385, 4294967295]) assert.equal(approveEntrySnapshot(broken, ditemid), null);
+    const selection = data.selection;
+    if (selection.kind !== "entry") throw new Error("fixture selection");
+    assert.equal(approveEntrySnapshot({...broken, selection: {...selection, target: {
+        ...selection.target, anum: 129}}}, 384), null);
     for (const security of ["private", "usemask"]) {
-        assert.equal(approveEntrySnapshot({...broken, entries: [
-            {...data.entries[0]!, security, eventText: "PRIVATE_SENTINEL"}, data.entries[1]!,
-        ]}, 384), null);
+        assert.equal(approveEntrySnapshot({...broken, entries: [], selection: {...selection,
+            target: {...selection.target, security}}}, 384), null);
     }
     assert.throws(() => approveEntrySnapshot(broken, 384));
-    assert.throws(() => approveEntrySnapshot({...data, entries: [
-        {...data.entries[0]!, security: "unknown"}, data.entries[1]!,
-    ]}, 384));
-    assert.throws(() => approveEntrySnapshot({...data, entries: [data.entries[0]!,
-        {...data.entries[1]!, props: {...data.entries[1]!.props, statusvis: "S"}},
-    ]}, 384));
+    assert.throws(() => approveEntrySnapshot({...data, selection: {...selection,
+        target: {...selection.target, security: "unknown"}}}, 384));
+    assert.throws(() => approveEntrySnapshot({...data, entries: [{...data.entries[0]!,
+        props: {...data.entries[0]!.props, statusvis: "S"}}]}, 384));
     for (const spamreportBans of [1, 3, -1, NaN]) {
-        const withBan = {...data, features: {...data.features, spamreportBans}};
-        assert.throws(() => approveEntrySnapshot(withBan, 384));
-        assert.deepEqual(approveSnapshot(withBan), approveSnapshot(data));
+        assert.throws(() => approveEntrySnapshot({...data, features: {...data.features, spamreportBans}}, 384));
+        const recent = snapshot();
+        assert.deepEqual(approveSnapshot({...recent, features: {...recent.features, spamreportBans}}),
+            approveSnapshot(recent));
     }
     for (const changed of [{...data, features: {...data.features, comments: 1}},
-        {...data, entries: [{...data.entries[0]!, replycount: 1}, data.entries[1]!]}]) {
+        {...data, entries: [{...data.entries[0]!, replycount: 1}]}]) {
         assert.throws(() => approveEntrySnapshot(changed, 384));
     }
-    assert.ok(approveEntrySnapshot(data, 384)?.entries.some(entry => entry.id === 384));
+    assert.equal(approveEntrySnapshot(data, 384)?.entries[0]!.id, 384);
 });
 
 // This test injects the repository generation and renderer completion only.
 // The service, token path, full-snapshot handoff and final recheck ordering are
 // real. It is not an actual DB mutation, HTTP or staged worker rendering proof.
-test("entry outside the recent window is rechecked through the complete snapshot before release", async t => {
+test("entry outside the recent window rechecks its complete selected dependency snapshot before release", async t => {
     const seed = snapshot();
     const rows = Array.from({length: 80}, (_, i) => ({...seed.entries[0]!, jitemid: i + 1,
         revttime: seed.entries[0]!.revttime + i, eventText: `<p>public ${i + 1}</p>`}));
-    let latest: RawJournalSnapshot = {...seed, entries: rows};
     const target = 80 * 256 + rows[79]!.anum;
-    assert.ok(!approveSnapshot(latest).entries.slice(0, 20).some(row => row.id === target));
+    let latest: RawJournalSnapshot = selectFixture({...seed, entries: rows}, {kind: "entry", ditemid: target});
+    let revoked = false;
+    assert.ok(!approveSnapshot(selectFixture({...seed, entries: rows})).entries.some(row => row.id === target));
     let rechecks = 0, renders = 0, loaded: RawJournalSnapshot | null = null;
     const repository: RawRecentRepository = {
-        async loadRawSnapshot() { loaded = latest; return latest; },
+        async loadRawSnapshot(request) {
+            if (revoked) return null;
+            latest = {...latest, request}; loaded = latest; return latest;
+        },
         async revalidateFingerprint(original) {
             rechecks++;
             assert.equal(original, loaded);
-            assert.equal(original.entries.length, 80);
-            assert.equal(original.entries[79]!.jitemid, 80);
-            return original === latest;
+            assert.equal(original.entries.length, 1);
+            assert.equal(original.entries[0]!.jitemid, 80);
+            return !revoked && original === latest;
         },
         async close() {},
     };
@@ -126,11 +135,12 @@ test("entry outside the recent window is rechecked through the complete snapshot
         renders++; seen.push(input);
         assert.deepEqual(input.page, {kind: "entry", ditemid: target});
         assert.equal(input.skip, 0); assert.equal(input.skipPresent, false);
+        revoked = true;
         latest = {...latest, fingerprint: "new-primary-generation", entries: latest.entries.map(row =>
             row.jitemid === 80 ? {...row, security: "private", eventText: "PRIVATE_AFTER_REVOCATION"} : row)};
         return "<html>BUFFERED_PUBLIC_HTML</html>";
     });
-    const service = await createAnonymousRecentService({repository, config, limits,
+    const service = await createAnonymousRecentService({repository, config, capabilities, limits,
         artifact: {path: process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice4-h1-worker/slice3-stock.json"},
         secretSource: {async loadLatestSecret(now) {return {stime: now - now % 3600,
             secret: Buffer.from("0123456789abcdefghijklmnopqrstuv")};}}});
@@ -167,7 +177,7 @@ test("entry service keeps fixed typed failures and target privacy ordering befor
     ] as const;
     for (const row of matrix) {
         let renders = 0, secrets = 0, rechecks = 0;
-        const data = snapshot();
+        let data = snapshot({kind: "entry", ditemid: 384});
         const render = t.mock.method(Renderer.prototype, "render", async () => {
             renders++;
             if (row.name === "render-unsupported") throw new Unsupported();
@@ -175,22 +185,22 @@ test("entry service keeps fixed typed failures and target privacy ordering befor
             return "<html>BUFFERED_PUBLIC_HTML</html>";
         });
         const repository: RawRecentRepository = {
-            async loadRawSnapshot() {
-                if (row.name === "missing-owner") return null;
+            async loadRawSnapshot(request) {
+                data = {...data, request};
+                if (row.name === "missing-owner" || row.name === "missing-entry" || row.name === "wrong-anum") return null;
                 if (row.name === "load-unsupported") throw new InjectedRepositoryError("unsupported");
                 if (row.name === "load-unavailable") throw new InjectedRepositoryError("unavailable");
-                if (row.name === "missing-entry") return {...data, entries: []};
                 if (row.name === "spamreport-ban") return {...data, features: {...data.features, spamreportBans: 1}};
                 if (row.name === "public-suspended") return {...data, owner: {...data.owner, statusvis: "S"}};
+                const selection = data.selection;
+                if (selection.kind !== "entry") throw new Error("fixture selection");
                 if (row.name === "private-before-cohort" || row.name === "usemask-before-cohort") {
-                    return {...data, owner: {...data.owner, statusvis: "S"}, entries: [
-                        {...data.entries[0]!, security: row.name === "private-before-cohort" ? "private" : "usemask",
-                            eventText: sentinel}, data.entries[1]!,
-                    ]};
+                    return {...data, owner: {...data.owner, statusvis: "S"}, entries: [], selection: {...selection,
+                        target: {...selection.target,
+                            security: row.name === "private-before-cohort" ? "private" : "usemask"}}};
                 }
-                if (row.name === "unknown-security") return {...data, entries: [
-                    {...data.entries[0]!, security: "unknown"}, data.entries[1]!,
-                ]};
+                if (row.name === "unknown-security") return {...data, entries: [], selection: {...selection,
+                    target: {...selection.target, security: "unknown"}}};
                 return data;
             },
             async revalidateFingerprint(loaded) {
@@ -202,7 +212,7 @@ test("entry service keeps fixed typed failures and target privacy ordering befor
             },
             async close() {},
         };
-        const service = await createAnonymousRecentService({repository, config, limits,
+        const service = await createAnonymousRecentService({repository, config, capabilities, limits,
             artifact: {path: process.env.S2_LIVE_TEST_ARTIFACT || "/tmp/slice4-h1-worker/slice3-stock.json"},
             secretSource: {async loadLatestSecret(now) {secrets++; return {stime: now - now % 3600,
                 secret: Buffer.from("0123456789abcdefghijklmnopqrstuv")};}}});

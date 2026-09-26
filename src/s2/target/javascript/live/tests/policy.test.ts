@@ -16,11 +16,13 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {bodyHtml, plainSubject} from "../policy/content";
-import {approveSnapshot} from "../policy/cohort";
+import {approveSnapshot as approveRawSnapshot} from "../policy/cohort";
 import {createRedirectAdmission} from "../policy/redirects";
 import {formToken, parseUniqCookie} from "../policy/token";
 import type {RedirectAdmissionRequest, RawJournalSnapshot} from "../contracts";
-import {config, snapshot, now} from "./fixtures";
+import {config, snapshot, selectFixture, capabilities, now} from "./fixtures";
+
+const approveSnapshot = (data: RawJournalSnapshot) => approveRawSnapshot(data, config, capabilities);
 
 test("identity grammar retains Unicode, simple balanced markup and four entities", () => {
     for (const value of ["plain café 😀", "<p>Hello <strong>there</strong><br />yes &amp; no</p>",
@@ -41,17 +43,17 @@ test("content refuses active, repaired, attributed and unknown-encoding domains"
 test("private candidates never reach renderer; suspended public refuses whole page", () => {
     const data = snapshot();
     const privateEntry = {...data.entries[0]!, security: "private", eventText: "PRIVATE_SENTINEL"};
-    const approved = approveSnapshot({...data, entries: [privateEntry, data.entries[1]!]});
+    const approved = approveSnapshot(selectFixture({...data, entries: [privateEntry, data.entries[1]!]}));
     assert.equal(approved.entries.length, 1);
     assert.ok(!JSON.stringify(approved).includes("PRIVATE_SENTINEL"));
     assert.throws(() => approveSnapshot({...data, entries: [
         {...data.entries[0]!, props: {...data.entries[0]!.props, statusvis: "S"}},
     ]}));
 });
-test("unmarked, nonvisible, external authors, unsupported style and feature states fail closed", () => {
+test("nonvisible, external authors, unsupported style and feature states fail closed", () => {
     const data = snapshot();
-    for (const change of [{bio: "wrong"}, {statusvis: "S"}, {status: "D"}, {journaltype: "C"},
-        {clusterid: 2}, {caps: "9007199254740993"}, {defaultpicid: 1}, {optWhocanReply: "friends"}]) {
+    for (const change of [{statusvis: "S"}, {status: "D"}, {journaltype: "C"},
+        {clusterid: 0}, {caps: "9007199254740993"}, {defaultpicid: 1}, {optWhocanReply: "friends"}]) {
         assert.throws(() => approveSnapshot({...data, owner: {...data.owner, ...change}}));
     }
     for (const key of Object.keys(data.features).filter(key => key !== "spamreportBans")) assert.throws(() => approveSnapshot({
@@ -69,16 +71,13 @@ test("unmarked, nonvisible, external authors, unsupported style and feature stat
     assert.throws(() => approveSnapshot({...data, entries: [{...data.entries[0]!, posterid: 7}]}));
     assert.throws(() => approveSnapshot({...data, entries: Array(201).fill(data.entries[0])}));
 });
-test("recent admission accepts only the stock-derived entry-page preference", () => {
+test("entry-page preference never restricts Recent admission", () => {
     const data = snapshot();
     const withPreference = (value: string | null): RawJournalSnapshot => ({...data,
         owner: {...data.owner, publicSettings: {...data.owner.publicSettings,
             use_journalstyle_entry_page: value}}});
-    for (const value of [null, "", "Y"]) {
+    for (const value of [null, "", "Y", "N", "1", "true", "y", " Y", "Y "]) {
         assert.deepEqual(approveSnapshot(withPreference(value)), approveSnapshot(data));
-    }
-    for (const value of ["N", "1", "true", "y", " Y", "Y "]) {
-        assert.throws(() => approveSnapshot(withPreference(value)));
     }
 });
 test("admission owns recent parsing and finite app redirects", () => {
@@ -114,9 +113,9 @@ test("tainted host/cookie/origin, ambiguity and arbitrary destinations are rejec
         {cookieHeader: "ljsession=secret"}, {cookieHeader: "ljuniq=AAAAAAAAAAAAAAA:1; ljsession=secret"},
         {cookieHeader: "ljuniq=AAAAAAAAAAAAAAA:1; ljuniq=BBBBBBBBBBBBBBB:1"}, {method: "OPTIONS"},
         {origin: "http://evil.invalid"}]) assert.equal(decide({...base, ...change}).kind, "reject");
-    for (const rawTarget of ["//evil.invalid/", "/%75sers/s2js_slice3/", "/users/other/",
+    for (const rawTarget of ["//evil.invalid/", "/%75sers/s2js_slice3/", "/users/UPPER/",
         "/users/s2js_slice3/?skip=01", "/users/s2js_slice3/?skip=1&skip=2",
-        "/users/s2js_slice3/?skip=201", "/users/s2js_slice3/?skip=+1",
+        "/users/s2js_slice3/?skip=9007199254740992", "/users/s2js_slice3/?skip=+1",
         "/users/s2js_slice3/?style=light", "/stc/../etc/config.pl", "/stc/%2e%2e/config.pl",
         "/stc/??../config.css?v=1", "/stc/??safe.js?v=1", "/img/a.png?url=http://evil.invalid",
         "/palimg/a.png", "/userpic/1/2", "/2026/02/30/",
