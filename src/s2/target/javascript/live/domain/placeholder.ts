@@ -39,10 +39,10 @@ export function placeholderFileValue(source: string, key: string): string | null
         const line = lines[index]!;
         if (/^[#;]/.test(line)) continue;
         let action = false;
-        const single = /^(\S+?)=([^\n]*)/.exec(line);
-        const multi = /^(\S+?)<<\s*$/.exec(line);
+        const single = /^([^\x09-\x0d\x20]+?)=([^\n]*)/.exec(line);
+        const multi = /^([^\x09-\x0d\x20]+?)<<[\x09-\x0d\x20]*$/.exec(line);
         if (single) { code = single[1]!; text = single[2]!; action = true; }
-        else if (/^!\s*\S+/.test(line)) {
+        else if (/^![\x09-\x0d\x20]*[^\x09-\x0d\x20]+/.test(line)) {
             // Native deletion syntax retains the previous code/text in parse().
             action = true;
         } else if (multi) {
@@ -54,7 +54,7 @@ export function placeholderFileValue(source: string, key: string): string | null
             }
             if (text.endsWith("\n")) text = text.slice(0, -1);
             action = true;
-        } else if (/\S/.test(line)) unsupported();
+        } else if (/[^\x09-\x0d\x20]/.test(line)) unsupported();
         if (code.includes("|")) { code = code.replace(/\|([^\n]+)/, ""); action = true; }
         if (action) values.set(code.toLowerCase(), text);
     }
