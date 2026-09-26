@@ -42,6 +42,11 @@ export interface SourceCapabilities {
     readonly threadExpander?:SourceCapability;
     readonly threadExpandAll?:SourceCapability;
     readonly maxComments?:SourceCapability;
+    readonly authorStaffHeadicon?:SourceCapability;
+    readonly authorReadonly?:SourceCapability;
+    readonly authorAvoidReadonly?:SourceCapability;
+    readonly authorReadonlyClusters?:readonly {readonly clusterId:number;readonly forced:boolean;
+        readonly advisory:"off"|"on"|"when-needed"}[];
     readonly moveInProgressMask: number; // configured class bits, BigInt operations
     readonly s2ViewEntry: {
         readonly defaultValue: number | null;

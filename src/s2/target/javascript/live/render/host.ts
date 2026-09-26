@@ -60,12 +60,12 @@ function label(id: string, css: string, text: string): string {
 function hidden(name: string, value: string): string {
     return `<input type='hidden' name="${name}" value="${escapeHtml(value)}" />`;
 }
-export function badge(input: RenderInput): string {
+export function badge(input: RenderInput,appearance?:{badgeKind:"personal"|"staff";badgeDeleted:boolean}): string {
     const u = input.journal.username;
     const base = input.journal.baseUrl;
-    return `<span lj:user='${u}' style='white-space: nowrap;' class='ljuser'>` +
-        `<a href='${base}/profile'><img src='${input.config.imgPrefix}/silk/identity/user.png' ` +
-        "alt='[personal profile] ' width='17' height='17' " +
+    return `<span lj:user='${u}' style='white-space: nowrap;${appearance?.badgeDeleted?' text-decoration: line-through;':''}' class='ljuser'>` +
+        `<a href='${base}/profile'><img src='${input.config.imgPrefix}/silk/identity/${appearance?.badgeKind==='staff'?'user_staff':'user'}.png' ` +
+        `alt='[${appearance?.badgeKind==='staff'?'staff':'personal'} profile] ' width='17' height='17' ` +
         "style='vertical-align: text-bottom; border: 0; padding-right: 1px;' /></a>" +
         `<a href='${base}/'><b>${u}</b></a></span>`;
 }
@@ -234,7 +234,7 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
         if(author) {
             if(author.journalType!=='P')throw new Error('Unsupported comment profile type');
             userBadges[String(author.userid)]=badge({...input,journal:{...input.journal,username:author.username,
-                userid:author.userid,baseUrl:journalBase(author.username,input.config)}});
+                userid:author.userid,baseUrl:journalBase(author.username,input.config)}},author);
         }
         addBadges(comment.replies);
     }};

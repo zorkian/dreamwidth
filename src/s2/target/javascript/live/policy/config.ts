@@ -74,11 +74,13 @@ export function validateConfig(config: PublicAppConfig): void {
     exactRecord(config, ["entryContent", "canonicalAppOrigin", "listenOrigin", "siteRoot", "statPrefix",
         "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback", "imgPrefix",
         "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
-        "facebookPreviewIcon", ...(config.commentSettings === undefined ? [] : ["commentSettings"])]);
+        "facebookPreviewIcon", ...(config.commentSettings === undefined ? [] : ["commentSettings"]),
+        ...(config.headIconHookConfigured===undefined?[]:["headIconHookConfigured"])]);
     if(config.commentSettings!==undefined) {
         const c=exactRecord(config.commentSettings,["pageSize","threadPoint","maxSubjects"]);
         if(Object.values(c).some(n=>typeof n!=="number"||!Number.isSafeInteger(n)||n<1||n>10000))throw new Unsupported();
     }
+    if(config.headIconHookConfigured!==undefined&&typeof config.headIconHookConfigured!=="boolean")throw new Unsupported();
     if ([config.userpicUrlHookConfigured,config.tagsEnabled,config.tagListHookConfigured].some(value=>typeof value !== "boolean")) throw new Unsupported();
     for (const value of [config.listenOrigin, config.canonicalAppOrigin]) {
         let url;
