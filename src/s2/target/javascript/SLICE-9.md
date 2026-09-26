@@ -39,7 +39,9 @@ in the parent. Foreign journal IDs never qualify through a matching kwid/jitemid
 
 Each definition/summary/selected-association query uses LIMIT10001 and refuses
 more than10000 rows, alongside existing text/child bounds. These are explicit
-safety limits, not native account quotas. Missing selected taxonomy/keywords and
+safety limits, not native account quotas. Malformed or unusable owner taxonomy can
+refuse the whole page even when unrelated to selected entries; this is a stricter
+malformed-data boundary. Missing selected taxonomy/keywords and
 false names producing undefined native Tag/URL results refuse422; no invented
 name or silent selected-tag dropping. kwid0 also refuses. Dangling summary rows
 are ignored for projection as native does, but remain fingerprinted.
