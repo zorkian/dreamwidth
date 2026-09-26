@@ -13,6 +13,7 @@
 //
 
 import type { EntryContentContext, ImagePlaceholder } from "@dreamwidth/content/contracts";
+import type { SourceCapabilities } from "./startup-types";
 
 export type PublicSettingName =
     | "stylesys" | "s2_style" | "journaltitle" | "journalsubtitle"
@@ -48,8 +49,6 @@ export interface RawUser {
     readonly defaultpicid: number;
     readonly dversion: number;
     readonly caps: string; // decimal unsigned bitmask; never JS bitwise truncation
-    readonly hasBio: string;
-    readonly bio: string | null; // exact dev enrollment marker; never rendered
     readonly publicSettings: PublicSettings;
 }
 
@@ -63,9 +62,10 @@ export interface RawStyleLayer {
 }
 
 export interface RawStyle {
-    readonly styleid: number;
-    readonly ownerid: number;
-    readonly name: string;
+    readonly origin: "persisted" | "default";
+    readonly styleid: number; // 0 for a resolved DEFAULT_STYLE without a stored style
+    readonly ownerid: number | null;
+    readonly name: string | null; // informational, never an enrollment gate
     readonly modtime: number;
     readonly layers: readonly RawStyleLayer[];
 }
@@ -97,7 +97,7 @@ export interface RawEntry {
 
 export interface RawFeatureCounts {
     // All primary sysban rows with byte-exact what="spamreport" and value equal
-    // to the marked username, without status/date filtering. Count only: no ban
+    // to the canonical journal username, without status/date filtering. Count only: no ban
     // rows/notes enter the snapshot or child. Include in the full fingerprint.
     // EntryPage requires zero; RecentPage admission does not gate on this count.
     readonly spamreportBans: number;
@@ -111,32 +111,110 @@ export interface RawFeatureCounts {
     readonly comments: number; // talk rows, not cache-authoritative replycount
 }
 
+export interface RawCalendarMonth {
+    readonly year: number;
+    readonly month: number; // 0 preserves the latest-year/future-only-month case
+}
+
+export interface RawCalendarSummary {
+    readonly current: RawCalendarMonth;
+    readonly days: readonly {readonly day: number; readonly count: number}[]; // <=31
+    readonly previous: RawCalendarMonth | null;
+    readonly next: RawCalendarMonth | null;
+    // Only contributors to these visible calendar facts/selection witnesses,
+    // never a new unsupported-state scan over unrelated journal history.
+    // Raw statuses remain policy-visible; no contributor body text is loaded.
+    readonly entryStatusCounts: readonly {
+        readonly statusvis: string | null;
+        readonly count: number;
+    }[];
+    readonly otherPosterCount: number;
+}
+
+export type RawEntryHeader = Pick<RawEntry,
+    "journalid" | "jitemid" | "anum" | "posterid" | "eventtime" | "logtime" |
+    "rlogtime" | "revttime" | "year" | "month" | "day" | "security" |
+    "allowmask" | "replycount" | "compressed">;
+
+export interface RawPageRequest {
+    readonly username: string;
+    readonly calendarNow: RawCalendarMonth; // same captured UTC clock as rendering
+    readonly page:
+        | {readonly kind: "recent"; readonly skip: number; readonly itemshow: number}
+        | {readonly kind: "entry"; readonly ditemid: number};
+}
+
+export type RawPageSelection =
+    | {
+        readonly kind: "recent";
+        readonly pageSkip: number;
+        readonly loadSkip: number;
+        readonly itemshow: number;
+        readonly maxScrollback: number;
+        // Source anonymous public predicate BEFORE LIMIT(loadSkip,itemshow+1).
+        readonly window: readonly RawEntryHeader[];
+        // Source same-minute reorder AFTER SQL LIMIT, then drop lookahead.
+        // Policy independently proves exact membership/order against window.
+        readonly selectedJitemids: readonly number[];
+    }
+    | {
+        readonly kind: "entry";
+        readonly ditemid: number;
+        readonly target: RawEntryHeader;
+    };
+
 export interface RawJournalSnapshot {
+    readonly request: RawPageRequest;
+    readonly selection: RawPageSelection;
     readonly owner: RawUser;
     readonly posters: readonly RawUser[];
     readonly style: RawStyle | null;
+    // Complete displayed public entries only. No text for private/wrong-anum
+    // targets, lookahead-only rows, or unrelated older entries.
     readonly entries: readonly RawEntry[];
+    readonly calendar: RawCalendarSummary;
     readonly features: RawFeatureCounts;
     readonly fingerprint: string;
 }
 
 export interface RawRecentRepository {
-    // null only for missing exact username. <=200 COMPLETE candidates, no policy
-    // filtering, one primary cross-schema read-only consistent snapshot. Reject
-    // >200, missing rows/fields (including NULL log2 eventtime/logtime/replycount),
-    // invalid bytes, duplicate ids, unsupported engines or nonlocal topology.
-    // Fingerprint includes owner, identity mapping, settings, bio, style, complete
-    // layers and timestamps, posters, candidate count/rows, original text bytes,
-    // decoded text, props/status/security, and each separate feature count.
-    // RepositoryError distinguishes unsupported input/state from unavailable I/O.
-    loadRawSnapshot(username: string): Promise<RawJournalSnapshot | null>;
-    // Fresh independent primary snapshot AFTER render; false includes removal,
-    // any relevant change or now unsupported state. Query failures reject.
-    // Authorization decision point: policy buffers full HTML, invokes this last,
-    // then returns/enqueues without any intervening asynchronous work. Later DB
-    // commits and network receipt are outside this decision's atomicity claim.
+    // Primary SELECTs only; zero cache operations. null for missing exact owner
+    // or missing/wrong-anum/private/usemask Entry target. Unknown states refuse.
+    // No total-history limit: bounded request window, selected body/props and
+    // calendar aggregates. Missing required selected rows/invalid bytes refuse.
+    // Configured global primary brackets a cluster read-only consistent snapshot.
+    // All relevant identities/mappings/move facts/settings/style/selected window,
+    // source bytes, props/status/posters/features/calendar contribute
+    // to validation. No distributed transaction or arbitrary ABA guarantee.
+    loadRawSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null>;
+    // Independently reread complete request dependencies AFTER buffering HTML.
+    // Changed/removed relevant data returns false. I/O rejects. This is the
+    // LAST await before send, after complete HTML has been buffered.
+    // Commits after each final read/network delivery are outside the guarantee.
     revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean>;
     close(): Promise<void>;
+}
+
+export interface PlaceholderResolutionSpec {
+    readonly descriptor: {
+        readonly src: string;
+        readonly width: number;
+        readonly height: number;
+        readonly altKey: string;
+    };
+    readonly defaultLang: string;
+    readonly isDevServer: boolean;
+    readonly languageFiles: readonly string[]; // source-resolved ordered .dat files
+}
+
+export interface PlaceholderResolver {
+    // Parent startup: one key, normal DB/file precedence, no helper allocation,
+    // visible UPDATE, source persistence or cache calls. Public attribute text
+    // follows the qualified native helper projection; never prepared HTML.
+    resolvePlaceholder(spec: PlaceholderResolutionSpec): Promise<{
+        readonly alt: string;
+        readonly title: string;
+    }>;
 }
 
 export interface LocalSecret {
@@ -153,22 +231,22 @@ export interface LocalSecretSource {
 }
 
 export interface AnonymousRecentRequest {
+    readonly uniqCookie: string | null; // parsed anonymous form-cookie value only
     readonly method: "GET" | "HEAD";
-    readonly username: string; // s2js_slice3, bio marker "s2-js-slice3 live dev v1"
-    readonly skip: number; // strict decimal input; 0..200 admission bound
+    readonly username: string; // source-canonical username, no fixture enrollment
+    readonly skip: number; // canonical nonnegative safe integer; source clamping later
     readonly skipPresent: boolean; // absent query=false; canonical explicit skip (including 0)=true
-    readonly uniqCookie: string | null; // only parsed ljuniq value; no other cookies
 }
 
-// Exact /users/s2js_slice3/<canonical decimal>.html, GET/HEAD, no query or alias.
+// Exact /users/<canonical-username>/<decimal>.html, GET/HEAD, no query or alias.
 export interface AnonymousEntryRequest {
+    readonly uniqCookie: string | null; // parsed anonymous form-cookie value only
     readonly method: "GET" | "HEAD";
     readonly username: string;
     // log2 jitemid is MEDIUMINT UNSIGNED and anum TINYINT: 1..4294967295.
     // Select using floor(ditemid / 256) and ditemid % 256, never JS bitwise math.
     // Positive IDs below 256 select no row and return the fixed not-found result.
     readonly ditemid: number;
-    readonly uniqCookie: string | null; // only parsed ljuniq; no other cookies
 }
 
 export type LiveFailure = "not-found" | "unsupported" | "changed" | "unavailable";
@@ -181,8 +259,8 @@ export interface AnonymousRecentService {
     // the body and preserves status/headers, including the private cache policy.
     serve(request: AnonymousRecentRequest): Promise<LiveResult>;
     // Same HEAD/recheck semantics. For a successfully loaded snapshot, missing,
-    // wrong-anum and private/usemask targets return not-found before cohort
-    // preparation; an exact public target still requires the entire cohort.
+    // wrong-anum and private/usemask targets return not-found before preparation;
+    // an exact public target requires supported selected data and page features.
     serveEntry(request: AnonymousEntryRequest): Promise<LiveResult>;
     // Stop new renders and close active renderer children. Repository lifetime
     // remains server-owned; this does not close the repository or secret source.
@@ -198,24 +276,34 @@ export interface RepositoryError extends Error {
     readonly kind: "unsupported" | "unavailable";
 }
 
-// Public values only, validated at startup. Origins are explicit loopback URLs
-// with distinct ports and no path/query/credentials; both use the same hostname
-// so ljuniq reaches retained app controls. siteRoot/prefixes retain local config
-// values (empty, root-relative, or canonical-origin URL), never derived from
-// untrusted Host. Page markup retains natural prefixes; allowed HTTP redirects
-// target canonicalAppOrigin, never proxying or processing retained-app controls.
+// Public values only. Explicit origins/prefixes and source journal URL rules;
+// never derive navigation from an untrusted Host. Private keys/paths/credentials
+// and request identity never enter this object. No same-host/loopback assumption.
+export interface JournalUrlConfiguration {
+    readonly protocol: "http" | "https";
+    readonly domain: string;
+    readonly isDevServer: boolean;
+    readonly subdomainRules: Readonly<Record<string, readonly [boolean, string]>>;
+    readonly hookConfigured: boolean;
+}
+
 export interface PublicAppConfig {
-    // Public source-derived facts from offline local configuration, never HTML
-    // or proxy credentials. Ordinary live serving asserts proxy not-configured;
-    // synthetic configured-proxy qualification uses a separate host-only key.
+    // Public source facts and startup-resolved placeholder text, never HTML.
+    // This private viewer defers proxying, even if the retained app enables it.
+    // Original URLs retain sanitation/unsafe-URL and declared known-HTTPS rules.
     readonly entryContent: {
         readonly imagePlaceholder: ImagePlaceholder;
-        readonly urls: EntryContentContext["urls"];
+        readonly urls: EntryContentContext["urls"] & {readonly imageProxy: "not-configured"};
     };
     readonly canonicalAppOrigin: string;
     readonly listenOrigin: string;
     readonly siteRoot: string;
     readonly statPrefix: string;
+    readonly jsPrefix: string;
+    readonly userDomain: string;
+    readonly journalUrls: JournalUrlConfiguration;
+    readonly usernameMaxLength: number;
+    readonly maxScrollback: number;
     readonly imgPrefix: string;
     readonly palImgRoot: string;
     readonly userpicRoot: string;
@@ -224,9 +312,6 @@ export interface PublicAppConfig {
     readonly siteNameAbbrev: string;
     readonly appleTouchIcon: string;
     readonly facebookPreviewIcon: string;
-    // Must be verified from the owning local app configuration before serving,
-    // including absence of CAPTCHA_HCAPTCHA_SITEKEY; never an unchecked default.
-    readonly anonymousCaptchaDisabled: true;
 }
 
 export interface RedirectAdmissionRequest {
@@ -282,6 +367,7 @@ export interface AnonymousRecentServiceDeps {
     readonly artifact: CompiledStockArtifact;
     readonly config: PublicAppConfig;
     readonly limits: RenderLimits;
+    readonly capabilities: SourceCapabilities;
     // Disallow injected/frozen entropy in the ordinary factory, even via spread.
     readonly clock?: never;
     readonly random?: never;
@@ -316,5 +402,5 @@ export type CreateComparisonRecentService =
         Promise<AnonymousRecentService>;
 
 // Renderer types live in render/, not this data/domain contract. Inputs must be
-// new approved objects: no RawUser/RawEntry spread, raw props, bio, fingerprint,
+// new approved objects: no RawUser/RawEntry spread, raw props, fingerprint,
 // query capability, environment or secrets. Signed token is a public form value.

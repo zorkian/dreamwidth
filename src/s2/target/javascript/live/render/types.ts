@@ -33,15 +33,29 @@ export interface ApprovedJournal {
     readonly name: string;
     readonly title: string;
     readonly subtitle: string;
+    readonly baseUrl: string; // source-derived canonical journal base
     readonly styleid: number;
     readonly styleTime: number;
     readonly showControlStrip: boolean;
     readonly controlStripColor: "dark" | "light";
     readonly blockRobots: boolean;
     readonly entries: readonly ApprovedEntry[];
+    readonly calendar: ApprovedCalendar;
 }
+export interface ApprovedCalendar {
+    readonly year: number;
+    readonly month: number;
+    readonly days: readonly {readonly day: number; readonly count: number}[];
+    readonly previous: {readonly year: number; readonly month: number} | null;
+    readonly next: {readonly year: number; readonly month: number} | null;
+}
+
 export type RenderPage =
-    | { readonly kind: "recent" }
+    | { readonly kind: "recent";
+        readonly pageSkip: number;
+        readonly itemshow: number;
+        readonly maxScrollback: number;
+        readonly hasPrevious: boolean }
     | { readonly kind: "entry"; readonly ditemid: number };
 
 // These callbacks/results exist only inside the credential-free render child.
