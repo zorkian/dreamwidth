@@ -90,9 +90,23 @@ test('actual owner compiled customtext, source-only freshness and selected ident
         await admin.query(`UPDATE ${table(c,'userpropblob')} SET value=CONVERT(? USING latin1) WHERE userid=900001 AND upropid=?`,[Buffer.from(rich),propId]);
         assert.equal(await store.revalidateFingerprint(richSnapshot),true);
         if(process.env.S2_CUSTOMTEXT_BROWSER_OUTPUT)await customtextBrowser(response.body,8081);
-        for(const value of ['@name','!markdown\n**bold**']) {
+        for(const value of ['@name','!markdown\n**bold**','x\\\\@name','café@example.invalid']) {
             await admin.query(`UPDATE ${table(c,'userpropblob')} SET value=CONVERT(? USING latin1) WHERE userid=900001 AND upropid=?`,[Buffer.from(value),propId]);
             assert.equal((await app.inject({url:'/users/ordinary6/76801.html',headers:{host:'localhost:8081'}})).statusCode,422,value);
+            if(process.env.S2_CUSTOMTEXT_BROWSER_OUTPUT && ['x\\\\@name','café@example.invalid'].includes(value)) {
+                const {chromium}=require(resolve('../../../content/node_modules/playwright'));
+                const browser=await chromium.launch({headless:true});
+                try {
+                    const context=await browser.newContext({serviceWorkers:'block'});
+                    const page=await context.newPage();
+                    await page.route('**/*',(route:any)=>route.request().url()==='http://localhost:8081/users/ordinary6/76801.html'?route.continue():route.abort());
+                    const response=await page.goto('http://localhost:8081/users/ordinary6/76801.html');
+                    assert.equal(response?.status(),422);
+                    assert.equal(await page.locator('a').count(),0);
+                    assert.ok(!(await page.locator('body').innerText()).includes(value));
+                    t.diagnostic('Chromium actual changed mention refusal: '+JSON.stringify(value));
+                } finally {await browser.close();}
+            }
         }
         await admin.query(`UPDATE ${table(c,'userpropblob')} SET value='<script>alert(1)</script>' WHERE userid=900001 AND upropid=?`,[propId]);
         const removed=await app.inject({url:'/users/ordinary6/76801.html',headers:{host:'localhost:8081'}});
