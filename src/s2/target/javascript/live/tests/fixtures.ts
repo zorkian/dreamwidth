@@ -50,7 +50,7 @@ export function snapshot(page: RawPageRequest["page"] = {kind: "recent", skip: 0
         journaltype: "P", name: "S2 slice 3 fixture", optShowTalkLinks: "Y", optWhocanReply: "all",
         optForceMoodtheme: "N", moodthemeid: 1, defaultpicid: 0, dversion: 10, caps: "2",
         publicSettings: settings as PublicSettings};
-    const data = {tags: {definitions: [],summaries: [],associations: []},links: [],userpics: {pictures: [],mappings: []},owner, posters: [owner], fingerprint: "opaque-test-primary-generation-1",
+    const data = {moods:{moods:[],theme:null,pictures:[]},tags: {definitions: [],summaries: [],associations: []},links: [],userpics: {pictures: [],mappings: []},owner, posters: [owner], fingerprint: "opaque-test-primary-generation-1",
         style: {origin: "persisted" as const, styleid: 6, ownerid: 6, name: "Fixture style", modtime: now,
             layers: SOURCE_HASHES.map((hash, i) => ({type: i ? "layout" : "core", s2lid: i + 1,
                 ownerid: 91, ownerUsername: "system", compiledTime: now, sourceHash: hash}))},
@@ -74,12 +74,12 @@ export function entryHeader(entry: RawEntry): RawEntryHeader {
     return header;
 }
 export function selectFixture(
-    data: Pick<RawJournalSnapshot, "owner" | "posters" | "style" | "entries" | "features" | "fingerprint"> & {tags?: RawJournalSnapshot["tags"];userpics?: RawJournalSnapshot["userpics"];links?: RawJournalSnapshot["links"]},
+    data: Pick<RawJournalSnapshot, "owner" | "posters" | "style" | "entries" | "features" | "fingerprint"> & {moods?: RawJournalSnapshot["moods"];tags?: RawJournalSnapshot["tags"];userpics?: RawJournalSnapshot["userpics"];links?: RawJournalSnapshot["links"]},
     page: RawPageRequest["page"] = {kind: "recent", skip: 0, itemshow: 20},
     maxScrollback = 100,
 ): RawJournalSnapshot {
     const request: RawPageRequest = {username: data.owner.user, calendarNow: {year: 2026, month: 9}, page};
-    const common = {...data, tags:data.tags ?? {definitions: [],summaries: [],associations: []}, links:data.links ?? [], userpics: data.userpics ?? {pictures: [],mappings: []}, request, calendar: {
+    const common = {...data, moods:data.moods ?? {moods:[],theme:null,pictures:[]}, tags:data.tags ?? {definitions: [],summaries: [],associations: []}, links:data.links ?? [], userpics: data.userpics ?? {pictures: [],mappings: []}, request, calendar: {
         current: {year: 2026, month: 9}, days: [{day: 24, count: 2}], previous: null, next: null,
         entryStatusCounts: [{statusvis: null, count: 2}], otherPosterCount: 0,
     }};

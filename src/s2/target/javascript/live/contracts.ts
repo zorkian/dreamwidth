@@ -199,6 +199,12 @@ export type RawPageSelection =
         readonly target: RawEntryHeader;
     };
 
+export interface RawMoods {
+    readonly moods: readonly {readonly id:number; readonly name:string|null; readonly parent:number}[];
+    readonly theme: {readonly id:number; readonly name:string|null} | null;
+    readonly pictures: readonly {readonly moodid:number; readonly url:string|null; readonly width:number; readonly height:number}[];
+}
+
 export interface RawJournalSnapshot {
     readonly request: RawPageRequest;
     readonly selection: RawPageSelection;
@@ -213,6 +219,7 @@ export interface RawJournalSnapshot {
     readonly userpics: RawUserpics;
     readonly links: readonly RawLink[];
     readonly tags: RawTags;
+    readonly moods: RawMoods;
     readonly fingerprint: string;
 }
 
