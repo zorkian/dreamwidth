@@ -17,8 +17,8 @@ export class Unsupported extends Error {
 }
 
 export function plainSubject(value: string): string {
-    if (!value || Buffer.byteLength(value) > 1024 ||
-        /[<>"'\x00-\x1f\x7f]|&(?:#\w+|[A-Za-z][A-Za-z0-9]+);/.test(value) ||
+    if (typeof value !== "string" || Buffer.byteLength(value) > 1024 ||
+        /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value) ||
         /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value)) {
         throw new Unsupported();
     }

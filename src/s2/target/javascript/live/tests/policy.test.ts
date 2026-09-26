@@ -36,8 +36,11 @@ test("content refuses active, repaired, attributed and unknown-encoding domains"
         "<strong>".repeat(17) + "x" + "</strong>".repeat(17), "x".repeat(65537)]) {
         assert.throws(() => bodyHtml(value), value.slice(0, 50));
     }
-    for (const value of ["", '"quoted"', "<b>x</b>", "&amp;", "x\n", "\ud800", "😀".repeat(257)]) {
+    for (const value of ["\u0000", "\ud800", "😀".repeat(257)]) {
         assert.throws(() => plainSubject(value));
+    }
+    for (const value of ["", '"quoted"', "<b>x</b>", "&amp;", "x\n"]) {
+        assert.equal(plainSubject(value),value,"raw bounded subject is not parent safe HTML");
     }
 });
 test("private candidates never reach renderer; suspended public refuses whole page", () => {

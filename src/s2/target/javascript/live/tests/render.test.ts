@@ -45,6 +45,8 @@ const request = {method: "GET" as const, username: "s2js_slice3", skip: 0, skipP
 // Existing direct Recent model tests inspect pagination only. Actual rendering
 // tests below still exercise the real worker's shared cleaner, never this helper.
 const rawRecentContent: RenderContentPreparation = {
+    subject: entry => ({html:entry.subject,recentHtml:entry.subject,all:entry.subject}) as
+        import("@dreamwidth/content/contracts").SubjectPreparation,
     body: entry => entry.rawBody,
     metadata() {throw new Error("Recent preparation must not request metadata");},
 };

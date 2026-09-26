@@ -126,11 +126,6 @@ export function validateInput(value: EntryContentInput, limits: CleanerLimits): 
 export function validateMetadataInput(value: EntryMetadataInput, limits: CleanerLimits): void {
     const input = record(value, ["subject", "entry"]);
     text(input.subject, 1024);
-    // Same existing plain-subject cohort; empty remains unsupported rather than
-    // silently expanding to the broader source's no-subject fallback.
-    if (!input.subject || /[<>"'\x00-\x1f\x7f]|&(?:#\w+|[A-Za-z][A-Za-z0-9]+);/.test(input.subject)) {
-        throw new UnsupportedContent();
-    }
     validateInput(input.entry as EntryContentInput, limits);
     if ((input.entry as EntryContentInput).context.cuts !== "source-compatible-entry") {
         throw new UnsupportedContent();

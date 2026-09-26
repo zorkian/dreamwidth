@@ -134,6 +134,7 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
     // Offline assembly exercises unchanged prop_init/modules_init/Page.print.
     // It is deliberately separate from the real isolated-worker qualification.
     const assemble = fragment => renderStock(artifact, stockInput, 2097152, {
+        subject: entry => ({html:entry.subject,recentHtml:entry.subject,all:entry.subject}),
         body: () => fragment,
         metadata: () => { throw new Error('Recent formatting probe must not prepare entry metadata'); },
     });

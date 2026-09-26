@@ -216,7 +216,7 @@ test("metadata refuses contextual unsupported helpers, never plain email or iner
             '<p title="@person">safe</p>', '<!-- @person --><script>@person</script>safe']) {
             assert.equal(cleaner.metadata({subject: "subject", entry: input(body)}).kind, "ok", body);
         }
-        assert.deepEqual(cleaner.metadata({subject: "", entry: input("x")}), {kind: "failure", reason: "unsupported"});
+        assert.equal(cleaner.metadata({subject: "", entry: input("x")}).kind, "ok");
         assert.deepEqual(cleaner.metadata({subject: "subject", entry: input("x", true)}), {kind: "failure", reason: "unsupported"});
         cleaner.close();
         assert.deepEqual(cleaner.metadata({subject: "subject", entry: input("x")}), {kind: "failure", reason: "unavailable"});
