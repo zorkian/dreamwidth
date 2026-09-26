@@ -192,9 +192,18 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
             key==='hide_comments'?'_text_comment_hide':'_text_comment_unhide'],icon:{'.type':'Image','.isnull':true},extra:{}}):
             {'.type':'Link','.isnull':true,_url:''};
     }
+    function pluralPhrase(ctx:Context,count:unknown,property:unknown):string {
+        const form=Number(ctx.getFunction("lang_map_plural(int)")(ctx,count));
+        const raw=ctx.prop[`_${property}`];
+        if(typeof raw!=="string")throw new Error(`Missing plural property ${property}`);
+        const choices=raw.split(/\s*\/\/\s*/);
+        const phrase=choices[form]??choices[choices.length-1];
+        return escape(phrase!.replace("#",String(count??0)));
+    }
     function commentReadLink(ctx:Context,raw:unknown,rawOptions:unknown,kind:'expand'|'hide'|'unhide'):string {
         const comment=record(raw,'comment control'),options=rawOptions?record(rawOptions,'comment control options'):{};
-        const caption=escape(options.text||ctx.prop['_text_comment_'+kind]);
+        const caption=escape(options.text||(kind==='expand'?ctx.prop._text_comment_expand:
+            pluralPhrase(ctx,comment.showable_children,'text_comment_'+kind)));
         const attrs=(options.title?` title='${escape(options.title)}'`:'')+(options.class?` class='${escape(options.class)}'`:'');
         let text=caption;
         if(options.img_url) {
@@ -404,13 +413,6 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         _string__contains: (_ctx, text, part) => String(text).includes(String(part)),
         _weekdays: ctx => ctx.prop._reg_firstdayofweek === "monday"
             ? [2, 3, 4, 5, 6, 7, 1] : [1, 2, 3, 4, 5, 6, 7],
-        _get_plural_phrase: (ctx, count, property) => {
-            const form = Number(ctx.getFunction("lang_map_plural(int)")(ctx, count));
-            const raw = ctx.prop[`_${property}`];
-            if (typeof raw !== "string") throw new Error(`Missing plural property ${property}`);
-            const choices = raw.split(/\s*\/\/\s*/);
-            const phrase = choices[form] ?? choices[choices.length - 1];
-            return escape(phrase!.replace("#", String(count ?? 0)));
-        },
+        _get_plural_phrase: pluralPhrase,
     };
 }

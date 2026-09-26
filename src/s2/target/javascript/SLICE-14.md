@@ -57,7 +57,9 @@ Only owner/node-specific headers are loaded, at most 10,000 plus a refusal
 sentinel. Root depth is zero; maximum structural edge-depth is 1,000, checked
 iteratively before recursive model projection. Depth 1,001 and cycles refuse
 without truncation. These are resource boundaries, not native account limits.
-Stock visual nesting still flattens after its native threshold.
+Stock visual nesting still flattens after its native threshold. Comment elapsed
+seconds use the approved entry logtime, independently of its eventtime.
+Hide/show captions use the retained plural helper and showable-child count.
 
 Public A/F comments are selected using native root pagination, first-child and
 subject-only rules. S/D headers retain only necessary structure. Suspended
@@ -91,8 +93,11 @@ request captcha or posting enforcement.
 
 Comments use their own credential-free original-source cleaner operation.
 Registered and anonymous CSS/extraction rules differ. Anonymous anchors become
-label-plus-URL text, images become the source placeholder, and source CSS is
-removed. Registered ordinary rich formatting survives within existing safety
+label-plus-original-screened-URL text: the href is trimmed without document URL
+resolution, and missing or screened hrefs still produce `()`. Plain text is
+escaped by DOM serialization. Images become the source placeholder, and source
+CSS is removed. Registered relative navigation resolves against the approved
+canonical Entry document as an explicit origin adaptation. Registered ordinary rich formatting survives within existing safety
 containment. The source editor/preformatted/import/date cutoff controls casual
 newlines and autolinks. Comments do not gain magic Markdown. Reached mentions,
 unsupported editors and custom LJ operations refuse; no generic callback port
