@@ -89,7 +89,7 @@ test("public-before-LIMIT windows at79/80/81/200 and >200 history never double-s
     assert.ok(!approve(selectFixture(data)).entries.some(row => row.id === oldId));
 });
 
-test("same-minute reorder occurs after the21-row SQL window and then lookahead removal", () => {
+test("equal-full-time reorder occurs after the21-row SQL window and then lookahead removal", () => {
     const data = snapshot();
     const rows = Array.from({length: 30}, (_, index) => ({...data.entries[0]!, jitemid: index + 1}));
     const selected = selectFixture({...data, entries: rows});
@@ -178,4 +178,19 @@ test("canonical source journal URLs use configured rules without request Host sy
     assert.equal(canonicalUsername("a".repeat(26),30),null);
     for (const value of ["", "a/b", "a?b", "é", "a".repeat(26)]) assert.equal(canonicalUsername(value,25),null);
     assert.throws(()=>journalBase("ordinary",{...app,journalUrls:{...app.journalUrls,hookConfigured:true}}),Unsupported);
+});
+
+// LogItems S2 DATE_FORMAT includes seconds. Its old per-minute comment must
+// not merge adjacent distinct civil seconds before the itemid reorder.
+test("distinct seconds within a minute retain their SQL order", () => {
+    const data = snapshot();
+    const rows = [2, 1, 0].map((seconds, index) => ({...data.entries[0]!, jitemid: index + 1,
+        eventtime: `2026-09-24 11:00:0${seconds}`, logtime: `2026-09-24 11:00:0${seconds}`,
+        revttime: data.entries[0]!.revttime - seconds}));
+    const selected = selectFixture({...data, entries: rows});
+    assert.deepEqual(approve(selected).entries.map(row => Math.floor(row.id / 256)), [1, 2, 3]);
+    if (selected.selection.kind !== "recent") throw new Error("fixture selection");
+    const selection = selected.selection;
+    assert.throws(() => approve({...selected, selection: {...selection,
+        selectedJitemids: [3, 2, 1]}}), Unsupported);
 });
