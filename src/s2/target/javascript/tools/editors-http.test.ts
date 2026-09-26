@@ -99,3 +99,48 @@ test('actual original-source formats exclude private bytes and revoke editor/imp
         await editorsBrowser(address.port,page.body);
     }finally{capture.mock.restore();await app.close();}
 }));
+
+test('current child strips support-auth source but final reread retains original bytes',{
+    skip:process.env.S2_SELECTED_FIXTURE!=='1',timeout:60000},async t=>withSelectedFixture(async f=>{
+    const {store,admin,table,c}=f;
+    const source='https://example.invalid/see_request?id=1&auth=CHILD_SYNTH_TOKEN&more=1';
+    const body='<a href="'+source+'">'+source+'</a><pre>\nAfter token</pre>';
+    await admin.query(`UPDATE ${table(c,'logtext2')} SET subject=CONVERT(? USING latin1),event=CONVERT(? USING latin1)
+        WHERE journalid=900001 AND jitemid=300`,[Buffer.from(source),Buffer.from(body)]);
+    const baseline=await store.loadRawSnapshot(f.request('ordinary6'));assert.ok(baseline);
+    assert.ok(baseline.entries.find(e=>e.jitemid===300)!.eventText.includes('CHILD_SYNTH_TOKEN'));
+    const service=await createAnonymousRecentService({repository:store,secretSource:store,config,capabilities,limits,
+        artifact:{path:process.env.S2_LIVE_TEST_ARTIFACT!}});
+    const app=createLiveApp(config,service);const original=Renderer.prototype.render;
+    try {
+        await app.listen({host:'127.0.0.1',port:0});const address=app.server.address();
+        assert.ok(address&&typeof address!=='string');
+        for(const path of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+            const page=await get(address.port,path);assert.equal(page.status,200,page.body);
+            assert.equal(page.headers['cache-control'],'private, no-store');
+            assert.ok(!page.body.includes('CHILD_SYNTH_TOKEN'));assert.ok(!page.body.includes('&auth='));
+            assert.ok(page.body.includes('see_request?id=1&amp;more=1'));
+            assert.ok(page.body.includes('After token'));
+            if(path.endsWith('.html')) {
+                assert.ok(page.body.includes('property="og:description"'));
+                assert.ok(page.body.includes('property="og:title"'));
+            }
+        }
+        assert.equal((await store.loadRawSnapshot(f.request('ordinary6')))!.fingerprint,baseline.fingerprint);
+        const hook=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,input:RenderInput){
+            const output=await original.call(this,input);
+            await admin.query(`UPDATE ${table(c,'logtext2')} SET event=CONVERT(? USING latin1)
+                WHERE journalid=900001 AND jitemid=300`,[Buffer.from(body.replace('CHILD_SYNTH_TOKEN','CHANGED_SYNTH_TOKEN'))]);
+            return output;
+        });
+        try {
+            const revoked=await get(address.port,'/users/ordinary6/76801.html');assert.equal(revoked.status,409);
+            assert.equal(revoked.headers['set-cookie'],undefined);assert.ok(!revoked.body.includes('After token'));
+        } finally {
+            hook.mock.restore();await admin.query(`UPDATE ${table(c,'logtext2')} SET event=CONVERT(? USING latin1)
+                WHERE journalid=900001 AND jitemid=300`,[Buffer.from(body)]);
+        }
+        assert.equal((await store.loadRawSnapshot(f.request('ordinary6')))!.fingerprint,baseline.fingerprint);
+        assert.equal((await get(address.port,'/users/ordinary6/76801.html')).status,200);
+    } finally {await app.close();}
+}));
