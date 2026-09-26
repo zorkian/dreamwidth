@@ -32,25 +32,18 @@ import { escapeHtml } from "./builtins";
 export function prepare(input: RenderInput, ctx: Context,
     content: RenderContentPreparation): S2Object {
     const { journal: j, config: c } = input;
-    const base = `${c.canonicalAppOrigin}/~${j.username}`;
+    const base = j.baseUrl;
     const user = object("User", {user: j.username, username: j.username, name: escapeHtml(j.name),
         journal_type: "P", userpic_listing_url: `${base}/icons`, host_userid: j.userid,
         link_keyseq: ["manage_membership", "trust", "watch", "post_entry", "track", "message", "tell_friend"],
         default_pic: nullObject("Image"), website_url: "", website_name: ""});
     if (input.page.kind === "entry") return prepareEntry(input, ctx, content, user, base);
-    const itemshow = Math.min(50, Number(ctx.prop._num_items_recent) || 20);
-    // RecentPage clamps with itemshow; recent_items clamps again with the extra
-    // lookahead row. Preserve this off-by-one behavior at the local max100.
-    // The offline config assertion pins MAX_SCROLLBACK_LASTN=100. Request skip
-    // remains in input for exact returnto/script echoes, including explicit0.
-    const maxSkip = 100 - itemshow;
-    const skip = Math.min(input.skip, maxSkip);
-    const loadSkip = Math.min(skip, 100 - (itemshow + 1));
-    const selected = j.entries.slice(loadSkip, loadSkip + itemshow + 1);
-    selected.sort((a, b) => b.eventtime.slice(0, 16).localeCompare(a.eventtime.slice(0, 16)) ||
-        Math.floor(b.id / 256) - Math.floor(a.id / 256));
-    const hasPrevious = selected.length > itemshow;
-    if (hasPrevious) selected.pop();
+    // The primary loader has already applied the public SQL window, source
+    // buffer ordering and lookahead removal. Preserve approved entry identity
+    // for the child cleaner callbacks; applying skip again would lose rows.
+    const {itemshow, pageSkip: skip, maxScrollback, hasPrevious} = input.page;
+    const maxSkip = maxScrollback - itemshow;
+    const selected = j.entries;
     let lastday = "";
     const entries = selected.map(e => {
         const url = `${base}/${e.id}.html`;
