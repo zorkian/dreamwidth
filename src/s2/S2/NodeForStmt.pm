@@ -64,7 +64,16 @@ sub check {
 
     if ($this->{'vardecl'}) {
         $this->{'vardecl'}->{'nvd'}->populateScope($this->{'stmts'});
-        $this->{'vardecl'}->{'nvd'}->getType();
+        my $type = $this->{'vardecl'}->{'nvd'}->getType();
+        # The initializer belongs to the enclosing scope, not the new loop
+        # variable's body scope. Checking it also records native VarRef scope
+        # metadata used by backends that decorate lexical variable names.
+        if (my $expr = $this->{'vardecl'}->{'expr'}) {
+            my $exprtype = $expr->getType($ck, $type);
+            S2::error($this, "Can't initialize for variable of type " .
+                      $type->toString . " with expression of type " . $exprtype->toString)
+                unless $ck->typeIsa($exprtype, $type);
+        }
     }
     else {
         $this->{'initexpr'}->getType($ck);
