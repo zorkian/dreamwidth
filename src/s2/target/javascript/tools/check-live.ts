@@ -20,6 +20,8 @@ import path from "node:path";
 import type { PublicAppConfig, RawRecentRepository } from "../live/contracts";
 import { MysqlLiveStore, type MysqlStoreConfig } from "../live/data/mysql";
 import { createComparisonRecentService } from "../live/policy/comparison";
+import {readStartupConfig} from "../live/server/startup-config";
+import {regressionConfig, regressionConfigPath, recentRequest} from "./regression-config";
 import { createAnonymousRecentService } from "../live/policy/service";
 import { createLiveApp } from "../live/server/app";
 
@@ -53,7 +55,7 @@ function setup(): void {
     perl("live-seed.pl");
     perl("live-config.pl");
     perl("live-grants.pl");
-    const artifact = path.join(artifacts, "stock.json");
+    const artifact = readStartupConfig(regressionConfigPath(project)).artifactPath;
     perl("live-compile.pl", [artifact]);
     const staged = spawnSync("/opt/dw-node24/bin/node", [
         path.join(root, "src/content/tools/stage-runtime.mjs"), artifact,
@@ -68,11 +70,8 @@ function setup(): void {
     }
 }
 
-function config(): {public: PublicAppConfig; credential: MysqlStoreConfig} {
-    return {
-        public: JSON.parse(readFileSync(path.join(artifacts, "public-config.json"), "utf8")),
-        credential: JSON.parse(readFileSync(path.join(artifacts, "mysql-readonly.json"), "utf8")),
-    };
+async function config(): Promise<{public: PublicAppConfig; credential: MysqlStoreConfig; artifactPath: string}> {
+    return regressionConfig(project);
 }
 
 async function request(uniq: string | null = null, url = route): Promise<{
@@ -101,7 +100,7 @@ async function ready(child: ChildProcess): Promise<void> {
         };
         child.stdout?.on("data", chunk => {
             stdout += String(chunk).slice(0, 1024);
-            if (stdout.includes("Live S2 loopback listener ready")) finish();
+            if (stdout.includes("Private S2 listener ready")) finish();
         });
         child.stderr?.on("data", chunk => { stderr += String(chunk).slice(0, 1024); });
         child.once("error", finish);
@@ -122,7 +121,7 @@ async function stop(child: ChildProcess): Promise<void> {
 }
 
 async function liveServer(run: () => Promise<void>): Promise<void> {
-    const child = spawn(process.execPath, [path.join(project, "dist/live/server/main.js")], {
+    const child = spawn(process.execPath, [path.join(project, "dist/live/server/main.js"), "--config", regressionConfigPath(project)], {
         cwd: project, env: process.env, stdio: ["ignore", "pipe", "pipe"],
     });
     try {
@@ -149,11 +148,11 @@ function assertExactHtml(oracle: Buffer, rendered: Buffer): void {
 
 async function first(): Promise<void> {
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
     let beforeHash: string;
     try {
-        const before = await store.loadRawSnapshot("s2js_slice3");
+        const before = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(before);
         for (const key of ["customtext_title", "customtext_url", "customtext_content"] as const) {
             assert.equal(before.owner.publicSettings[key], null,
@@ -172,7 +171,7 @@ async function first(): Promise<void> {
         assert.ok(response.body.includes(Buffer.from("Live sample 2 😀")));
         const check = await MysqlLiveStore.open(credential);
         try {
-            assert.equal((await check.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+            assert.equal((await check.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                 beforeHash, "TS GET wrote journal state");
         } finally {
             await check.close();
@@ -220,11 +219,11 @@ async function update(): Promise<void> {
 async function recovery(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
     let seedIds: number[];
     try {
-        const before = await store.loadRawSnapshot("s2js_slice3");
+        const before = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(before && before.entries.length === 2);
         seedIds = before.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
     } finally {
@@ -285,7 +284,7 @@ async function recovery(): Promise<void> {
     assert.equal(existsSync(suspendedMarker), false);
     const restored = await MysqlLiveStore.open(credential);
     try {
-        const snapshot = await restored.loadRawSnapshot("s2js_slice3");
+        const snapshot = await restored.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot);
         assert.deepEqual(snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
@@ -299,11 +298,11 @@ async function recovery(): Promise<void> {
 async function pagination(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const baselineStore = await MysqlLiveStore.open(credential);
     let seedIds: number[];
     try {
-        const snapshot = await baselineStore.loadRawSnapshot("s2js_slice3");
+        const snapshot = await baselineStore.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot && snapshot.entries.length === 2);
         seedIds = snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
     } finally {
@@ -315,12 +314,26 @@ async function pagination(): Promise<void> {
         const marker = state.marker + " " + state.run;
         const populated = await MysqlLiveStore.open(credential);
         try {
-            const snapshot = await populated.loadRawSnapshot("s2js_slice3");
+            const snapshot = await populated.loadRawSnapshot(recentRequest("s2js_slice3"));
             assert.ok(snapshot);
-            assert.equal(snapshot.entries.length, 26);
-            assert.equal(snapshot.entries.filter(entry => entry.security === "public").length, 24);
-            assert.equal(snapshot.entries.filter(entry => entry.security === "private").length, 1);
-            assert.equal(snapshot.entries.filter(entry => entry.security === "usemask").length, 1);
+            assert.equal(Object.keys(state.ids).length, 24, "Owned probe setup lost a row");
+            assert.equal(snapshot.entries.length, 20, "Only selected public bodies may be returned");
+            assert.ok(snapshot.entries.every(entry => entry.security === "public"));
+            assert.equal(snapshot.selection.kind, "recent");
+            if (snapshot.selection.kind !== "recent") throw Error("Wrong selected page");
+            assert.equal(snapshot.selection.window.length, 21);
+            assert.ok(snapshot.selection.window.every(entry => entry.security === "public"));
+            assert.equal(snapshot.calendar.days.reduce((sum, day) => sum + day.count, 0), 24,
+                "Independent public calendar must include22 probes plus2 seeds");
+            for (const index of ["23", "24"]) {
+                const probe = state.ids[index];
+                assert.ok(probe);
+                assert.ok(!snapshot.selection.window.some(row => row.jitemid === probe.jitemid));
+                const direct = recentRequest("s2js_slice3");
+                const hidden = await populated.loadRawSnapshot({...direct,
+                    page: {kind: "entry", ditemid: probe.jitemid*256+probe.anum}});
+                assert.equal(hidden, null, "Private/usemask body must not enter raw snapshot");
+            }
         } finally {
             await populated.close();
         }
@@ -355,8 +368,8 @@ async function pagination(): Promise<void> {
         let app: ReturnType<typeof createLiveApp> | undefined;
         try {
             const service = await createComparisonRecentService({
-                repository: store, secretSource: store,
-                artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+                repository: store, secretSource: store, capabilities: credential.capabilities,
+                artifact: {path: artifactPath}, config: publicConfig,
                 limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
             }, {
                 purpose: "offline-perl-comparison",
@@ -393,7 +406,7 @@ async function pagination(): Promise<void> {
     }
     const restored = await MysqlLiveStore.open(credential);
     try {
-        const snapshot = await restored.loadRawSnapshot("s2js_slice3");
+        const snapshot = await restored.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot);
         assert.deepEqual(snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
@@ -405,7 +418,7 @@ async function pagination(): Promise<void> {
 
 async function compare(): Promise<void> {
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const one = path.join(artifacts, "oracle-one");
     const two = path.join(artifacts, "oracle-two");
     mkdirSync(one, {recursive: true});
@@ -434,11 +447,11 @@ async function compare(): Promise<void> {
     const store = await MysqlLiveStore.open(credential);
     let app: ReturnType<typeof createLiveApp> | undefined;
     try {
-        const before = await store.loadRawSnapshot("s2js_slice3");
+        const before = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(before);
         const service = await createComparisonRecentService({
-            repository: store, secretSource: store,
-            artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+            repository: store, secretSource: store, capabilities: credential.capabilities,
+            artifact: {path: artifactPath}, config: publicConfig,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
         }, {
             purpose: "offline-perl-comparison",
@@ -466,7 +479,7 @@ async function compare(): Promise<void> {
         assert.equal(head.headers.get("content-length"), String(rendered.body.length));
         assert.equal(head.headers.get("set-cookie"), null);
         assert.equal((await head.arrayBuffer()).byteLength, 0);
-        assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+        assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
             before.fingerprint, "Compared GET/HEAD wrote journal state");
         const deliberatelyChanged = Buffer.from(rendered.body);
         assert.ok(deliberatelyChanged.length > 10);
@@ -483,19 +496,19 @@ async function compare(): Promise<void> {
 
 async function compareEntry(): Promise<void> {
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const store = await MysqlLiveStore.open(credential);
     let app: ReturnType<typeof createLiveApp> | undefined;
     try {
-        const before = await store.loadRawSnapshot("s2js_slice3");
+        const before = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(before && before.entries.length === 2,
             "entry comparison requires the two marked seed entries");
         const ids = before.entries.map(entry => entry.jitemid * 256 + entry.anum);
         assert.equal(new Set(ids).size, 2);
         for (const id of ids) assert.ok(Number.isSafeInteger(id) && id > 0);
         const service = await createComparisonRecentService({
-            repository: store, secretSource: store,
-            artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+            repository: store, secretSource: store, capabilities: credential.capabilities,
+            artifact: {path: artifactPath}, config: publicConfig,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
         }, {
             purpose: "offline-perl-comparison",
@@ -511,7 +524,7 @@ async function compareEntry(): Promise<void> {
         const firstRoute = route + ids[0] + ".html";
         const firstTs = await request(cookie, firstRoute);
         assert.equal(firstTs.status, 200, firstTs.body.toString("utf8").slice(0, 120));
-        assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+        assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
             before.fingerprint, "first TS EntryPage GET wrote journal state");
         const results: Array<{ditemid: number; bytes: number; sha256: string;
             perlDefaultWrite: boolean}> = [];
@@ -538,7 +551,7 @@ async function compareEntry(): Promise<void> {
             assert.equal(metadata.comparison_time, clock);
             assert.equal(metadata.bytes, oracle.length);
             assert.equal(metadata.sha256, sha(oracle));
-            const afterOracle = await store.loadRawSnapshot("s2js_slice3");
+            const afterOracle = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
             assert.ok(afterOracle);
             const url = route + id + ".html";
             const rendered = await request(cookie, url);
@@ -559,7 +572,7 @@ async function compareEntry(): Promise<void> {
             assert.equal(head.headers.get("content-length"), String(rendered.body.length));
             assert.equal(head.headers.get("set-cookie"), null);
             assert.equal((await head.arrayBuffer()).byteLength, 0);
-            assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+            assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                 afterOracle.fingerprint, "Compared EntryPage GET/HEAD wrote journal state");
             results.push({ditemid: id, bytes: oracle.length, sha256: sha(oracle),
                 perlDefaultWrite: afterOracle.fingerprint !== priorFingerprint});
@@ -576,11 +589,11 @@ async function compareEntry(): Promise<void> {
 
 async function resources(): Promise<void> {
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const store = await MysqlLiveStore.open(credential);
     let entryId: number;
     try {
-        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot && snapshot.entries.length === 2);
         entryId = snapshot.entries[0]!.jitemid * 256 + snapshot.entries[0]!.anum;
         assert.ok(Number.isSafeInteger(entryId) && entryId > 0);
@@ -690,11 +703,11 @@ async function appAvailable(): Promise<boolean> {
 async function noPerl(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
     let entryUrl: string;
     try {
-        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot && snapshot.entries.length === 2);
         const selected = snapshot.entries[0]!;
         entryUrl = route + (selected.jitemid * 256 + selected.anum) + ".html";
@@ -756,19 +769,19 @@ async function crossJournal(): Promise<void> {
     perl("live-other-probe.pl", ["--restore"]);
     setup();
     perl("live-seed.pl", ["--other"]);
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const store = await MysqlLiveStore.open(credential);
     try {
-        const original = await store.loadRawSnapshot("s2js_slice3");
+        const original = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(original && original.entries.length === 2);
         const seedIds = original.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
         try {
             perl("live-other-probe.pl", ["--create-primary"]);
-            const baseline = await store.loadRawSnapshot("s2js_slice3");
+            const baseline = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
             assert.ok(baseline && baseline.entries.length === 3);
             const service = await createComparisonRecentService({
-                repository: store, secretSource: store,
-                artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+                repository: store, secretSource: store, capabilities: credential.capabilities,
+                artifact: {path: artifactPath}, config: publicConfig,
                 limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
             }, {
                 purpose: "offline-perl-comparison",
@@ -795,7 +808,7 @@ async function crossJournal(): Promise<void> {
                 assert.notEqual(state.other_ownerid, original.owner.userid);
                 assert.equal(state.ids.s2js_slice3.jitemid,
                     state.ids.s2js_slice3_other.jitemid);
-                const refreshed = await store.loadRawSnapshot("s2js_slice3");
+                const refreshed = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
                 assert.ok(refreshed);
                 assert.equal(refreshed.fingerprint, baseline.fingerprint);
                 assert.equal(refreshed.entries.length, 3);
@@ -812,21 +825,29 @@ async function crossJournal(): Promise<void> {
                     state.marker + " " + state.run + " s2js_slice3_other")));
                 const alternate = await request(cookie,
                     "http://localhost:8081/users/s2js_slice3_other/");
-                assert.equal(alternate.status, 400);
-                assert.equal(alternate.body.toString("utf8"), "Unsupported request\n");
+                // The legacy isolation account is now admitted by username;
+                // its stored zero layer IDs cannot qualify the pinned stack.
+                await assert.rejects(() => store.loadRawSnapshot(recentRequest("s2js_slice3_other")),
+                    {name: "RepositoryError", kind: "unsupported"});
+                assert.equal(alternate.status, 422);
+                assert.equal(alternate.body.toString("utf8"), "Unsupported journal state\n");
+                assert.equal(alternate.headers.get("set-cookie"), null);
+                assert.equal(alternate.headers.get("location"), null);
                 const alternateEntry = await request(cookie,
                     "http://localhost:8081/users/s2js_slice3_other/" +
                     (state.ids.s2js_slice3_other.jitemid * 256 +
                         state.ids.s2js_slice3_other.anum) + ".html");
-                assert.equal(alternateEntry.status, 400);
-                assert.equal(alternateEntry.body.toString("utf8"), "Unsupported request\n");
+                assert.equal(alternateEntry.status, 422);
+                assert.equal(alternateEntry.body.toString("utf8"), "Unsupported journal state\n");
+                assert.equal(alternateEntry.headers.get("set-cookie"), null);
+                assert.equal(alternateEntry.headers.get("location"), null);
             } finally {
                 await app.close();
             }
         } finally {
             perl("live-other-probe.pl", ["--restore"]);
         }
-        const restored = await store.loadRawSnapshot("s2js_slice3");
+        const restored = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(restored);
         assert.deepEqual(restored.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
@@ -840,12 +861,12 @@ async function crossJournal(): Promise<void> {
 async function empty(): Promise<void> {
     perl("live-empty.pl", ["--restore"]);
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const baseline = await MysqlLiveStore.open(credential);
     let seedIds: number[];
     let seedDitemids: number[];
     try {
-        const snapshot = await baseline.loadRawSnapshot("s2js_slice3");
+        const snapshot = await baseline.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot && snapshot.entries.length === 2);
         seedIds = snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
         seedDitemids = snapshot.entries.map(entry => entry.jitemid * 256 + entry.anum);
@@ -856,9 +877,13 @@ async function empty(): Promise<void> {
         perl("live-empty.pl", ["--hide"]);
         const reader = await MysqlLiveStore.open(credential);
         try {
-            const hidden = await reader.loadRawSnapshot("s2js_slice3");
-            assert.ok(hidden && hidden.entries.length === 2);
-            assert.ok(hidden.entries.every(entry => entry.security === "private"));
+            const hidden = await reader.loadRawSnapshot(recentRequest("s2js_slice3"));
+            assert.ok(hidden && hidden.entries.length === 0,
+                "Private seed bodies must not enter the empty public snapshot");
+            assert.equal(hidden.selection.kind, "recent");
+            if (hidden.selection.kind !== "recent") throw Error("Wrong empty selected page");
+            assert.equal(hidden.selection.window.length, 0);
+            assert.equal(hidden.calendar.days.length, 0);
         } finally {
             await reader.close();
         }
@@ -889,8 +914,8 @@ async function empty(): Promise<void> {
         let app: ReturnType<typeof createLiveApp> | undefined;
         try {
             const service = await createComparisonRecentService({
-                repository: store, secretSource: store,
-                artifact: {path: path.join(artifacts, "stock.json")}, config: publicConfig,
+                repository: store, secretSource: store, capabilities: credential.capabilities,
+                artifact: {path: artifactPath}, config: publicConfig,
                 limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
             }, {
                 purpose: "offline-perl-comparison",
@@ -912,7 +937,7 @@ async function empty(): Promise<void> {
     }
     const restored = await MysqlLiveStore.open(credential);
     try {
-        const snapshot = await restored.loadRawSnapshot("s2js_slice3");
+        const snapshot = await restored.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot);
         assert.deepEqual(snapshot.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
@@ -926,9 +951,9 @@ async function empty(): Promise<void> {
 async function entryStates(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
-    const seed = await store.loadRawSnapshot("s2js_slice3");
+    const seed = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
     assert.ok(seed && seed.entries.length === 2);
     const seedIds = seed.entries.map(entry => entry.jitemid).sort((a, b) => a - b);
     try {
@@ -949,10 +974,10 @@ async function entryStates(): Promise<void> {
                 const publicEntry = await request(null, entryUrl);
                 assert.equal(publicEntry.status, 200);
                 assert.ok(publicEntry.body.includes(Buffer.from(marker)));
-                const beforeSuspend = await store.loadRawSnapshot("s2js_slice3");
+                const beforeSuspend = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
                 assert.ok(beforeSuspend);
                 perl("live-probes.pl", ["--suspend-single"]);
-                const suspended = await store.loadRawSnapshot("s2js_slice3");
+                const suspended = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
                 assert.ok(suspended);
                 assert.notEqual(suspended.fingerprint, beforeSuspend.fingerprint,
                     "Suspended entry must revoke the primary fingerprint");
@@ -984,7 +1009,7 @@ async function entryStates(): Promise<void> {
                     assert.ok(!blockedEntry.body.includes(Buffer.from(marker)));
                 }
                 perl("live-probes.pl", ["--unsuspend-single"]);
-                assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                     beforeSuspend.fingerprint, "Original entry status property was not restored");
                 const unsuspended = await request();
                 assert.equal(unsuspended.status, 200);
@@ -992,10 +1017,12 @@ async function entryStates(): Promise<void> {
                 assert.equal((await request(null, entryUrl)).status, 200);
                 for (const security of ["private", "usemask"] as const) {
                     perl("live-probes.pl", ["--" + security + "-single"]);
-                    const snapshot = await store.loadRawSnapshot("s2js_slice3");
-                    assert.ok(snapshot && snapshot.entries.some(entry =>
-                        entry.jitemid === state.ids["1"].jitemid &&
-                        entry.security === security));
+                    const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
+                    assert.ok(snapshot && !snapshot.entries.some(entry =>
+                        entry.jitemid === state.ids["1"].jitemid));
+                    const selectedRequest = recentRequest("s2js_slice3");
+                    assert.equal(await store.loadRawSnapshot({...selectedRequest,
+                        page: {kind: "entry", ditemid: probe.jitemid * 256 + probe.anum}}), null);
                     const hidden = await request();
                     assert.equal(hidden.status, 200);
                     assert.ok(!hidden.body.includes(Buffer.from(marker)));
@@ -1029,7 +1056,7 @@ async function entryStates(): Promise<void> {
                 perl("live-probes.pl", ["--restore"]);
             }
         });
-        const restored = await store.loadRawSnapshot("s2js_slice3");
+        const restored = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(restored);
         assert.deepEqual(restored.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
             seedIds);
@@ -1043,9 +1070,9 @@ async function entryStates(): Promise<void> {
 async function contentCleaning(): Promise<void> {
     perl("live-probes.pl", ["--restore"]);
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
-    const baseline = await store.loadRawSnapshot("s2js_slice3");
+    const baseline = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
     assert.ok(baseline && baseline.entries.length === 2);
     const expected = {
         "bad-malformed": "<p>unterminated</p>",
@@ -1059,7 +1086,7 @@ async function contentCleaning(): Promise<void> {
                     perl("live-probes.pl", ["--create-" + kind]);
                     const state = JSON.parse(readFileSync(
                         path.join(artifacts, "probe-state.json"), "utf8"));
-                    const snapshot = await store.loadRawSnapshot("s2js_slice3");
+                    const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
                     assert.ok(snapshot && snapshot.entries.length === 3);
                     assert.ok(snapshot.entries.some(entry =>
                         entry.jitemid === state.ids["1"].jitemid &&
@@ -1085,7 +1112,7 @@ async function contentCleaning(): Promise<void> {
                         String(response.body.length));
                     assert.equal(response.headers.get("location"), null);
                     assert.ok(response.headers.get("set-cookie")?.includes("ljuniq="));
-                    assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+                    assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                         snapshot.fingerprint, kind + ": TS GET wrote journal state");
                 } finally {
                     perl("live-probes.pl", ["--restore"]);
@@ -1095,7 +1122,7 @@ async function contentCleaning(): Promise<void> {
                 assert.ok(restoredPage.body.includes(Buffer.from("Live sample 1 café")));
             }
         });
-        const after = await store.loadRawSnapshot("s2js_slice3");
+        const after = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(after && after.entries.length === 2);
         assert.equal(after.fingerprint, baseline.fingerprint);
         assert.deepEqual(after.entries.map(entry => entry.jitemid).sort((a, b) => a - b),
@@ -1109,19 +1136,21 @@ async function contentCleaning(): Promise<void> {
 
 async function missing(): Promise<void> {
     setup();
-    const {credential} = config();
+    const {credential} = await config();
     const store = await MysqlLiveStore.open(credential);
     try {
-        assert.equal(await store.loadRawSnapshot("s2js_slice3_missing"), null);
-        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        assert.equal(await store.loadRawSnapshot(recentRequest("s2js_slice3_missing")), null);
+        const snapshot = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
         assert.ok(snapshot && snapshot.entries.length === 2);
         const selected = snapshot.entries[0]!;
         const wrongAnum = selected.jitemid * 256 + ((selected.anum + 1) % 256);
         await liveServer(async () => {
             const response = await request(null,
                 "http://localhost:8081/users/s2js_slice3_missing/");
-            assert.equal(response.status, 400);
-            assert.equal(response.body.toString("utf8"), "Unsupported request\n");
+            // Canonical unknown journals now reach the ordinary repository;
+            // the former fixture-only admission400 is intentionally gone.
+            assert.equal(response.status, 404);
+            assert.equal(response.body.toString("utf8"), "Journal not found\n");
             assert.equal(response.headers.get("cache-control"), "private, no-store");
             assert.equal(response.headers.get("set-cookie"), null);
             for (const id of [1, 255, wrongAnum, 4294967295]) {
@@ -1134,7 +1163,7 @@ async function missing(): Promise<void> {
                 assert.equal(absent.headers.get("set-cookie"), null);
                 assert.equal(absent.headers.get("location"), null);
             }
-            assert.equal((await store.loadRawSnapshot("s2js_slice3"))?.fingerprint,
+            assert.equal((await store.loadRawSnapshot(recentRequest("s2js_slice3")))?.fingerprint,
                 snapshot.fingerprint, "Missing entry selection wrote journal data");
         });
     } finally {
@@ -1146,9 +1175,9 @@ async function missing(): Promise<void> {
 async function recheck(): Promise<void> {
     perl("live-mutate.pl", ["--restore"]);
     setup();
-    const {public: publicConfig, credential} = config();
+    const {public: publicConfig, credential, artifactPath} = await config();
     const store = await MysqlLiveStore.open(credential);
-    const baseline = await store.loadRawSnapshot("s2js_slice3");
+    const baseline = await store.loadRawSnapshot(recentRequest("s2js_slice3"));
     assert.ok(baseline);
     let changed = false;
     const repository: RawRecentRepository = {
@@ -1165,8 +1194,8 @@ async function recheck(): Promise<void> {
     let app: ReturnType<typeof createLiveApp> | undefined;
     try {
         const service = await createAnonymousRecentService({
-            repository, secretSource: store,
-            artifact: {path: path.join(artifacts, "stock.json")},
+            repository, secretSource: store, capabilities: credential.capabilities,
+            artifact: {path: artifactPath},
             config: publicConfig,
             limits: {timeoutMs: 10000, maxOutputBytes: 2097152, maxHeapMiB: 128},
         });
