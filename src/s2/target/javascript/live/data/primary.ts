@@ -144,6 +144,10 @@ export class PrimaryDatabases {
             const source = candidates.splice(index, 1)[0]!;
             try {
                 return await this.connection(source).connection().execute(async connection => {
+                    // Session default also covers implicit commits (DDL) and
+                    // accidental COMMIT/ROLLBACK inside a data callback. Keep it
+                    // read-only across pooled reuse, not only this transaction.
+                    await sql`SET SESSION TRANSACTION READ ONLY`.execute(connection);
                     await sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`.execute(connection);
                     await sql`SET SESSION MAX_EXECUTION_TIME = 2000`.execute(connection);
                     await sql`START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`.execute(connection);

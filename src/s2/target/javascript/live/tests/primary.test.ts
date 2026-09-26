@@ -107,6 +107,24 @@ test("own isolated MySQL schemas: privileged credential still reads only, active
             await sql`UPDATE probe SET value = 99 WHERE id = 1`.execute(connection);
         }), (error: unknown) => error instanceof SnapshotError && error.kind === "unavailable");
         assert.equal(await read(7), 2);
+        await assert.rejects(databases.snapshot(7, ["probe"], async connection => {
+            await sql`CREATE TABLE escaped_ddl (id INT) ENGINE=InnoDB`.execute(connection);
+        }), (error: unknown) => error instanceof SnapshotError && error.kind === "unavailable");
+        for (const end of ["COMMIT", "ROLLBACK"] as const) {
+            await assert.rejects(databases.snapshot(7, ["probe"], async connection => {
+                await sql.raw(end).execute(connection);
+                await sql`UPDATE probe SET value = 99 WHERE id = 1`.execute(connection);
+            }), (error: unknown) => error instanceof SnapshotError && error.kind === "unavailable");
+        }
+        const [createdByEscape] = await admin.query<mysql.RowDataPacket[]>(
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'escaped_ddl'",
+            [schemas[1]],
+        );
+        assert.deepEqual(createdByEscape, []);
+        assert.equal(await read(7), 2);
+        const session = await databases.snapshot(7, ["probe"], async connection =>
+            (await sql<SqlRow>`SELECT @@session.transaction_read_only AS read_only`.execute(connection)).rows[0]);
+        assert.equal(Number(session?.read_only), 1);
         await databases.snapshot(7, ["probe"], async connection => {
             assert.equal((await sql<SqlRow>`SELECT value FROM probe WHERE id = 1`.execute(connection)).rows[0]!.value, 2);
             await admin.query(`UPDATE \`${schemas[1]}\`.probe SET value = 4 WHERE id = 1`);
