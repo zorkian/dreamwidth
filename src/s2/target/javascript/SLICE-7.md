@@ -100,3 +100,5 @@ unchanged privacy gates and independent owner SQL. No-picture frozen Recent and
 Entry byte regressions remain separate proofs. Fresh Recent410/Entry62 attestations
 must pass unchanged; historical accepted ledgers are never regenerated. Prior
 cleaner/parser browser evidence carries because the cleaner is unchanged.
+
+Ordinary flat links and website support is documented in [SLICE-8.md](SLICE-8.md).

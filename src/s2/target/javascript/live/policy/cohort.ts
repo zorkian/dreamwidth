@@ -24,6 +24,8 @@ import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
+import {approveLinks, navigationUrl, websiteName} from "../domain/links";
+
 import {UserpicSelection} from "../domain/userpics";
 
 import { SOURCE_HASHES } from "../render/source-hashes";
@@ -194,7 +196,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         u.optWhocanReply !== "all" ||
         u.optForceMoodtheme !== "N" || ![0, 1].includes(u.moodthemeid) ||
         !Number.isSafeInteger(u.userid) || u.userid <= 0) throw new Unsupported();
-    const empty = ["url", "urlname", "adult_content_reason", "sticky_entry", "icbm",
+    const empty = ["adult_content_reason", "sticky_entry", "icbm",
         "google_analytics", "ga4_analytics", "renamedto", "customtext_content",
         "customtext_url"] as const;
     if (empty.some(key => p[key] !== null && p[key] !== "") ||
@@ -206,8 +208,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         ![null, "", "off", "off:dark", "dark"].includes(p.view_control_strip)) throw new Unsupported();
     // Preserve the supported picture/comment rendering feature boundary. The
     // private viewer intentionally does not implement request captcha defenses.
-    if (![null, "", "N"].includes(p.opt_usesharedpic) ||
-        ![null, "", "N"].includes(p.opt_no_quickreply)) throw new Unsupported();
+    if (![null, "", "N"].includes(p.opt_usesharedpic)) throw new Unsupported();
     // LJ/S2.pm calls use_journalstyle_entry_page even for recent requests and
     // persists Y from the stock core2 default. Its switch affects entry/reply
     // only; admit that normal derived value without writing absent defaults.
@@ -216,8 +217,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
     for (const key of ["opt_allowsearchby", "opt_blockglobalsearch", "opt_ctxpopup",
         "opt_whoscreened", "opt_usermsg", "opt_tagpermissions",
         "opt_embedplaceholders", "opt_imagelinks", "opt_imageundef", "opt_maxpicheight",
-        "opt_maxpicwidth", "timezone", "exclude_from_own_stats",
-        "use_journalstyle_icons_page"] as const) {
+        "opt_maxpicwidth", "exclude_from_own_stats"] as const) {
         if (p[key] !== null && p[key] !== "") throw new Unsupported();
     }
     const style = snapshot.style;
@@ -235,10 +235,11 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
     }
-    if (["usertags", "logtags", "logtagsrecent", "logkwsum", "links", "comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
+    if (["usertags", "logtags", "logtagsrecent", "logkwsum", "comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
         snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
             poster.userid !== u.userid || poster.user !== u.user || poster.clusterid !== u.clusterid ||
             poster.statusvis !== "V" || poster.status !== "A")) throw new Unsupported();
+    if (snapshot.features.links !== snapshot.links.length) throw new Unsupported();
     const headers = selectedHeaders(snapshot, config);
     const calendar = approveCalendar(snapshot);
     const pictures = new UserpicSelection(snapshot.userpics,u.userid,u.defaultpicid,u.dversion);
@@ -310,5 +311,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             (display !== "none" && (Number(display) & 1) !== 0),
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
+        websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
+        links: approveLinks(snapshot.links),
     };
 }

@@ -95,6 +95,14 @@ export interface RawEntry {
     readonly eventText: string;
 }
 
+export interface RawLink {
+    readonly ordernum: number;
+    readonly parentnum: number;
+    readonly title: string;
+    readonly url: string | null;
+    readonly hover: string | null;
+}
+
 export interface RawUserpic {
     readonly userid: number;
     readonly picid: number;
@@ -196,6 +204,7 @@ export interface RawJournalSnapshot {
     readonly calendar: RawCalendarSummary;
     readonly features: RawFeatureCounts;
     readonly userpics: RawUserpics;
+    readonly links: readonly RawLink[];
     readonly fingerprint: string;
 }
 
