@@ -24,10 +24,10 @@ import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
-export const SOURCE_HASHES = [
-    "8621d96ebc6f9ee9eaf19f4cc0ac9e029b0e816d982653d19d52b04918cd9db6",
-    "c1f6fb95fbecc202a024efa7558c6cedcdb5229f150e765fd441ba632ff0b411",
-] as const;
+import {UserpicSelection} from "../domain/userpics";
+
+import { SOURCE_HASHES } from "../render/source-hashes";
+export { SOURCE_HASHES } from "../render/source-hashes";
 
 const perlTrue = (value: string | null | undefined): boolean =>
     value !== undefined && value !== null && value !== "" && value !== "0";
@@ -189,7 +189,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         u.status !== "A" || u.statusvis !== "V" || u.journaltype !== "P" ||
         !integer(u.clusterid, 1) || !integer(u.dversion) || !/^(0|[1-9][0-9]*)$/.test(u.caps) ||
         BigInt(u.caps) > 65535n || !integer(capabilities.moveInProgressMask, 0, 65535) ||
-        (BigInt(u.caps) & BigInt(capabilities.moveInProgressMask)) !== 0n || u.defaultpicid !== 0 ||
+        (BigInt(u.caps) & BigInt(capabilities.moveInProgressMask)) !== 0n || !integer(u.defaultpicid) ||
         !["Y", "N"].includes(u.optShowTalkLinks) ||
         u.optWhocanReply !== "all" ||
         u.optForceMoodtheme !== "N" || ![0, 1].includes(u.moodthemeid) ||
@@ -235,13 +235,14 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
     }
-    if (["usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum", "links",
-        "userpics", "comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
+    if (["usertags", "logtags", "logtagsrecent", "logkwsum", "links", "comments"].some(key => snapshot.features[key as keyof typeof snapshot.features] !== 0) ||
         snapshot.posters.length !== 1 || snapshot.posters.some(poster =>
             poster.userid !== u.userid || poster.user !== u.user || poster.clusterid !== u.clusterid ||
             poster.statusvis !== "V" || poster.status !== "A")) throw new Unsupported();
     const headers = selectedHeaders(snapshot, config);
     const calendar = approveCalendar(snapshot);
+    const pictures = new UserpicSelection(snapshot.userpics,u.userid,u.defaultpicid,u.dversion);
+    const defaultUserpic = pictures.defaultPicture();
     const entries: ApprovedEntry[] = [];
     const ids = new Set<number>();
     let bytes = 0;
@@ -260,7 +261,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         const props = entry.props;
         const allowed = new Set(["editor", "opt_preformatted", "opt_backdated", "opt_nocomments",
             "opt_nocomments_maintainer", "revnum", "revtime", "interface", "useragent",
-            "opt_noemail", "opt_screening", "statusvis"]);
+            "opt_noemail", "opt_screening", "statusvis", "picture_mapid", "picture_keyword"]);
         if (Object.entries(props).some(([key, value]) => value && !allowed.has(key)) ||
             props.editor !== "html_raw0" || ![undefined, null, "", "0", "1"].includes(props.opt_preformatted) ||
             (props.statusvis && props.statusvis !== "V")) throw new Unsupported();
@@ -285,9 +286,12 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             subject: plainSubject(entry.subjectText), rawBody: rawBody(entry.eventText),
             eventtime: entry.eventtime, logtime: entry.logtime, reverseTime: entry.revttime,
             year: entry.year, month: entry.month, day: entry.day,
+            userpic: pictures.forEntry(props),
             commentsEnabled: u.optShowTalkLinks === "Y" && !perlTrue(props.opt_nocomments),
         });
     }
+    if (snapshot.selection.kind === "entry" && config.userpicUrlHookConfigured &&
+        entries.some(entry=>entry.userpic!==null)) throw new Unsupported();
     const display = p.control_strip_display;
     if (display !== null && display !== "" && display !== "none" && !/^[0-7]$/.test(display)) {
         throw new Unsupported();
@@ -305,6 +309,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         showControlStrip: display === null || display === "" ||
             (display !== "none" && (Number(display) & 1) !== 0),
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
-        blockRobots: p.opt_blockrobots === "Y", entries,
+        blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
     };
 }

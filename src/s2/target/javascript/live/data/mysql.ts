@@ -29,7 +29,7 @@ import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
     RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
-    PlaceholderResolutionSpec,
+    PlaceholderResolutionSpec, RawUserpics,
 } from "../contracts";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
@@ -62,7 +62,7 @@ const CLUSTER_TABLES = [
     "userproplite2", "userpropblob", "s2stylelayers2",
     "log2", "logtext2", "logprop2",
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
-    "links", "userpic2", "talk2",
+    "links", "userpic2", "userpicmap2", "userpicmap3", "talk2",
 ] as const;
 
 function unsupported(): never { throw new SnapshotError("unsupported"); }
@@ -143,7 +143,7 @@ function fingerprint(
     mapping: readonly [number, string],
     rawFields: readonly RawField[],
     request: RawPageRequest, selection: RawPageSelection, calendar: RawCalendarSummary,
-    sourceFacts: unknown,
+    sourceFacts: unknown, userpics: RawUserpics,
 ): string {
     const userValue = (user: RawUser) => [
         user.userid, user.user, user.clusterid, user.status, user.statusvis,
@@ -160,7 +160,7 @@ function fingerprint(
     ];
     const payload = [
         2, request, selection, calendar, sourceFacts, mapping, userValue(owner), posters.map(userValue), style,
-        entries.length, entries.map(entryValue), features,
+        entries.length, entries.map(entryValue), features, userpics,
         [...rawFields].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
     ];
     return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -349,7 +349,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 window.selection.kind === "recent" ? window.selection.window.map(row => row.jitemid) :
                     [window.selection.target.jitemid]);
             const features = await this.loadFeatures(connection, ownerId, before.facts.spamreportBans);
-            return {...loaded, selection: window.selection, calendar, features, raw};
+            const userpics = await this.loadUserpics(connection, ownerId, number(before.facts.owner.dversion), raw);
+            return {...loaded, selection: window.selection, calendar, features, userpics, raw};
         });
         if (!selected) return null;
         const after = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
@@ -366,9 +367,9 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const sourceFacts = [before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities];
         return {request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
-            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features,
+            style: after.style, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics,
             fingerprint: fingerprint(after.owner, after.posters, after.style, selected.entries, selected.features,
-                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts)};
+                selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics)};
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
@@ -551,6 +552,39 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             previous,next, entryStatusCounts: statuses.map((row,index) => ({statusvis: decodedColumn(row, "status",
                 "calendar:status:" + index, raw, 8192, true), count: number(row.count,1)})), otherPosterCount: statuses.reduce((sum,row) => sum+number(row.foreign_count),0)};
     }
+    private async loadUserpics(connection: Connection, ownerId: number, dversion: number,
+        raw: RawField[]): Promise<RawUserpics> {
+        // Include directly requested X/S rows: native default skeleton/get can
+        // read them even though keyword selection excludes them.
+        const rows = (await sql<Row>`SELECT userid,picid,width,height,state,
+            HEX(description) AS description_stored,
+            HEX(CONVERT(description USING latin1)) AS description_original,
+            HEX(CONVERT(CONVERT(description USING latin1) USING utf8mb4)) AS description_roundtrip
+            FROM userpic2 WHERE userid=${ownerId} ORDER BY picid LIMIT 10001`.execute(connection)).rows;
+        if (rows.length > 10000) unsupported();
+        const pictures = rows.map(row => ({userid:number(row.userid,1),picid:number(row.picid,1),
+            width:number(row.width),height:number(row.height),state:requiredString(row.state),
+            description:decodedColumn(row,"description",`picture:${ownerId}:${row.picid}`,raw,4096,false)!}));
+        const mappings = dversion >= 9 ?
+            (await sql<Row>`SELECT m.mapid,m.picid,m.redirect_mapid,
+                HEX(k.keyword) AS keyword_stored,
+                HEX(CONVERT(k.keyword USING latin1)) AS keyword_original,
+                HEX(CONVERT(CONVERT(k.keyword USING latin1) USING utf8mb4)) AS keyword_roundtrip
+                FROM userpicmap3 m LEFT JOIN userkeywords k ON m.userid=k.userid AND m.kwid=k.kwid
+                WHERE m.userid=${ownerId} ORDER BY m.mapid LIMIT 10001`.execute(connection)).rows :
+            (await sql<Row>`SELECT NULL AS mapid,m.picid,NULL AS redirect_mapid,
+                HEX(k.keyword) AS keyword_stored,
+                HEX(CONVERT(k.keyword USING latin1)) AS keyword_original,
+                HEX(CONVERT(CONVERT(k.keyword USING latin1) USING utf8mb4)) AS keyword_roundtrip
+                FROM userpicmap2 m JOIN userkeywords k ON m.userid=k.userid AND m.kwid=k.kwid
+                WHERE m.userid=${ownerId} ORDER BY m.kwid LIMIT 10001`.execute(connection)).rows;
+        if (mappings.length > 10000) unsupported();
+        return {pictures,mappings:mappings.map((row,index)=>({
+            mapid:row.mapid===null?null:number(row.mapid),picid:row.picid===null?null:number(row.picid),
+            redirectMapid:row.redirect_mapid===null?null:number(row.redirect_mapid),
+            keyword:decodedColumn(row,"keyword",`picture-map:${ownerId}:${index}`,raw,4096,true)}))};
+    }
+
     private async loadFeatures(connection: Connection, ownerId: number, spamreportBans: number): Promise<RawFeatureCounts> {
         const rows = (await sql<Row>`SELECT
             (SELECT COUNT(*) FROM usertags WHERE journalid = ${ownerId}) AS usertags,

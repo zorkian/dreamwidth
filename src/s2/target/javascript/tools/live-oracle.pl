@@ -181,6 +181,7 @@ my $public = {
     imgPrefix => $LJ::IMGPREFIX // '',
     palImgRoot => $LJ::PALIMGROOT // '',
     userpicRoot => $LJ::USERPIC_ROOT // '',
+    userpicUrlHookConfigured => LJ::Hooks::are_hooks('construct_userpic_url') ? JSON::PP::true : JSON::PP::false,
     siteName => $LJ::SITENAME // '',
     siteNameShort => $LJ::SITENAMESHORT // '',
     siteNameAbbrev => $LJ::SITENAMEABBREV // '',

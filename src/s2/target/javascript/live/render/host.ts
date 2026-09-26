@@ -186,6 +186,12 @@ function entryHead(input: RenderInput,
         `<meta property="og:description" content="${description}"/>\n`;
     const selected = j.entries.filter(entry => entry.id === ditemid);
     if (selected.length !== 1) throw new Error("Invalid entry metadata identity");
+    if (selected[0]!.userpic) {
+        const picture = selected[0]!.userpic;
+        html += `<meta property="og:image" content="${escapeHtml(c.userpicRoot + "/" + picture.picid + "/" + j.userid)}"/>\n` +
+            '<meta property="og:image:width" content="100"/>\n' +
+            '<meta property="og:image:height" content="100"/>\n';
+    }
     html += `<meta property="article:published_time" content="${selected[0]!.eventtime.replace(" ", "T")}"/>\n` +
         `<meta property="article:author" content="${escapeHtml(base + "/profile")}"/>\n`;
     html += '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' +
