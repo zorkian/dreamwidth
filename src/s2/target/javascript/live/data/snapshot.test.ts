@@ -14,10 +14,12 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
-import mysql from "mysql2/promise";
+import {sql} from "kysely";
+import {PrimaryDatabases} from "./primary";
+import {readStartupConfig} from "../server/startup-config";
+import type {RawPageRequest} from "../contracts";
 import type { MysqlStoreConfig } from "./mysql";
 import { decodeLegacyText } from "./legacy-text";
 import { MysqlLiveStore } from "./mysql";
@@ -63,33 +65,37 @@ function normalHelper(
 }
 
 async function verifyExactBanCount(config: MysqlStoreConfig, expected: number): Promise<void> {
-    const connection = await mysql.createConnection({...config, database: "dw_global",
-        charset: "utf8mb4"});
+    const primary = PrimaryDatabases.create(config.database);
     try {
-        const [comparison] = await connection.query<mysql.RowDataPacket[]>(`
-            SELECT 'spamreport' = 'SpamReport' COLLATE utf8mb4_unicode_ci AS folded,
-                BINARY 'spamreport' = BINARY 'SpamReport' AS exact
-        `);
-        assert.equal(Number(comparison[0]?.folded), 1);
-        assert.equal(Number(comparison[0]?.exact), 0);
-        const [rows] = await connection.execute<mysql.RowDataPacket[]>(`
-            SELECT COUNT(*) AS matching FROM dw_global.sysban
-            WHERE BINARY what = BINARY ? AND BINARY value = BINARY ?
-        `, ["spamreport", "s2js_slice3"]);
-        assert.equal(Number(rows[0]?.matching), expected);
-    } finally {
-        await connection.end();
-    }
+        await primary.snapshot(undefined, ["sysban"], async connection => {
+            const comparison = await sql<{folded: number; exact: number}>`
+                SELECT 'spamreport' = 'SpamReport' COLLATE utf8mb4_unicode_ci AS folded,
+                    BINARY 'spamreport' = BINARY 'SpamReport' AS exact
+            `.execute(connection);
+            assert.equal(Number(comparison.rows[0]?.folded), 1);
+            assert.equal(Number(comparison.rows[0]?.exact), 0);
+            const rows = await sql<{matching: number}>`
+                SELECT COUNT(*) AS matching FROM sysban
+                WHERE BINARY what = BINARY ${"spamreport"} AND BINARY value = BINARY ${"s2js_slice3"}
+            `.execute(connection);
+            assert.equal(Number(rows.rows[0]?.matching), expected);
+        });
+    } finally { await primary.close(); }
 }
 
 async function main(): Promise<void> {
     decoderEdges();
-    const pathToCredentials = path.join(process.cwd(), "artifacts/live/mysql-readonly.json");
-    assert.equal(statSync(pathToCredentials).mode & 0o077, 0);
-    const config = JSON.parse(readFileSync(pathToCredentials, "utf8")) as MysqlStoreConfig;
+    const startup = readStartupConfig(process.env.S2_SITE_CONFIG ??
+        path.join(process.cwd(), "artifacts/live/site-config.json"));
+    const config: MysqlStoreConfig = {database: startup.database, styles: startup.styles,
+        capabilities: startup.capabilities, maxScrollback: startup.app.maxScrollback};
+    const now = new Date();
+    const request = (username: string): RawPageRequest => ({username,
+        calendarNow: {year: now.getUTCFullYear(), month: now.getUTCMonth() + 1},
+        page: {kind: "recent", skip: 0, itemshow: 20}});
     const store = await MysqlLiveStore.open(config);
     try {
-        const snapshot = await store.loadRawSnapshot("s2js_slice3");
+        const snapshot = await store.loadRawSnapshot(request("s2js_slice3"));
         assert.ok(snapshot);
         assert.equal(snapshot.owner.user, "s2js_slice3");
         assert.equal(snapshot.owner.defaultpicid, 0);
@@ -110,11 +116,11 @@ async function main(): Promise<void> {
         assert.equal(await store.revalidateFingerprint(snapshot), true);
         const key = await store.loadLatestSecret(Math.floor(Date.now() / 1000), 86400);
         assert.ok(key && key.secret.length === 32);
-        assert.equal(await store.loadRawSnapshot("s2js_slice3_missing"), null);
+        assert.equal(await store.loadRawSnapshot(request("s2js_slice3_missing")), null);
         try {
             normalHelper("--mutate");
             assert.equal(await store.revalidateFingerprint(snapshot), false);
-            const changed = await store.loadRawSnapshot("s2js_slice3");
+            const changed = await store.loadRawSnapshot(request("s2js_slice3"));
             assert.equal(changed?.owner.name, "S2 slice 3 mutation probe");
             assert.notEqual(changed.fingerprint, snapshot.fingerprint);
         } finally {
@@ -124,7 +130,7 @@ async function main(): Promise<void> {
         try {
             normalHelper("--mutate-text");
             assert.equal(await store.revalidateFingerprint(snapshot), false);
-            const changed = await store.loadRawSnapshot("s2js_slice3");
+            const changed = await store.loadRawSnapshot(request("s2js_slice3"));
             assert.ok(changed);
             assert.equal(changed.owner.name, "S2 slice 3 café 😀");
             assert.equal(changed.owner.publicSettings.journaltitle, "Journal café 😀");
