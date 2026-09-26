@@ -274,3 +274,25 @@ test("tag enable fact preserves native scalar and no-argument callback configura
         const value=readStartupConfig(out);assert.equal(value.app.tagsEnabled,enabled);assert.equal(value.app.tagListHookConfigured,false);
     }
 }));
+
+
+test("author badge export preserves reached hooks and readonly source facts without execution",()=>temporary(dir=>{
+    const home=fixture(dir,`$CAP_DEF{staff_headicon}=0;$CAP_DEF{readonly}=0;$CAP_DEF{avoid_readonly}=1;
+$CAP{1}{staff_headicon}=1;$CAP{5}{readonly}=1;
+%READONLY_CLUSTER=(0=>1,7=>1,9=>0);%READONLY_CLUSTER_ADVISORY=(7=>'when_needed',9=>'configured',10=>'0');
+LJ::Hooks::register_hook('head_icon',sub{die 'must-not-execute'});
+LJ::Hooks::register_hook('check_cap_readonly',sub{die 'must-not-execute'});`);
+    const output=path.join(dir,'author.json');const result=exportSite(home,output);
+    assert.equal(result.status,0,result.stderr);assert.equal(result.stderr,'');
+    const value=readStartupConfig(output);assert.equal(value.app.headIconHookConfigured,true);
+    assert.deepEqual(value.capabilities.authorStaffHeadicon,{defaultValue:0,byBit:[{bit:1,value:1}],hookConfigured:false});
+    assert.deepEqual(value.capabilities.authorReadonly,{defaultValue:0,byBit:[{bit:5,value:1}],hookConfigured:true});
+    assert.deepEqual(value.capabilities.authorAvoidReadonly,{defaultValue:1,byBit:[],hookConfigured:false});
+    assert.deepEqual(value.capabilities.authorReadonlyClusters,[{clusterId:0,forced:true,advisory:'off'},
+        {clusterId:7,forced:true,advisory:'when-needed'},{clusterId:9,forced:false,advisory:'on'}]);
+    for(const mutate of [(v:any)=>v.app.headIconHookConfigured='false',
+        (v:any)=>v.capabilities.authorReadonlyClusters.push(v.capabilities.authorReadonlyClusters[0]),
+        (v:any)=>v.capabilities.authorReadonlyClusters[0].advisory='unknown']) {
+        const changed=JSON.parse(JSON.stringify(value));mutate(changed);assert.throws(()=>validateStartupConfig(changed));
+    }
+}));
