@@ -26,6 +26,16 @@ test("public cleaner config accepts derived placeholder and exact host:port keys
             formDomainBanned: ["blocked.example.test:8080"]}}});
 });
 
+test("public cleaner config preserves exact-case source map keys", () => {
+    const source: PublicAppConfig = {...config, entryContent: {...config.entryContent,
+        urls: {...config.entryContent.urls, knownHttpsSites: ["Example.org", "example.org"],
+            formDomainBanned: ["Blocked.example.test:8080", "blocked.example.test:8080"]}}};
+    validateConfig(source);
+    assert.deepEqual(source.entryContent.urls.knownHttpsSites, ["Example.org", "example.org"]);
+    assert.deepEqual(source.entryContent.urls.formDomainBanned,
+        ["Blocked.example.test:8080", "blocked.example.test:8080"]);
+});
+
 test("public cleaner config rejects unchecked shapes, capabilities and descriptors", () => {
     const entry = config.entryContent;
     const images: unknown[] = [null, {}, {...entry.imagePlaceholder, width: 0},
@@ -38,7 +48,6 @@ test("public cleaner config rejects unchecked shapes, capabilities and descripto
         {...entry.imagePlaceholder, onclick: "alert(1)"}];
     const urls: unknown[] = [null, {}, {...entry.urls, imageProxy: "host-resolved"},
         {...entry.urls, siteDomain: "https://example.test"},
-        {...entry.urls, knownHttpsSites: ["Example.org"]},
         {...entry.urls, knownHttpsSites: ["example.org", "example.org"]},
         {...entry.urls, formDomainBanned: ["z.test", "a.test"]},
         {...entry.urls, formDomainBanned: ["user@host.test"]},
