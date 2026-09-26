@@ -33,7 +33,7 @@ import type {
 } from "../contracts";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
-import { decodeLegacyText } from "./legacy-text";
+import { decodeLegacyText, decodeLegacyBytes } from "./legacy-text";
 
 type Connection = ReadConnection;
 type Row = SqlRow;
@@ -772,6 +772,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         `.execute(connection)).rows;
         if (propRows.length > 2000) unsupported();
         const propsById = new Map<number, Record<string, string | null>>();
+        const binaryById = new Map<number, {xpostOpaque?:RawEntry["xpostOpaque"];xpostDetail?:RawEntry["xpostDetail"]}>();
         for (const id of itemIds) propsById.set(id, Object.create(null));
         for (const row of propRows) {
             const id = number(row.jitemid, 1);
@@ -779,6 +780,27 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             if (name === undefined) unsupported();
             const props = propsById.get(id);
             if (!props || Object.hasOwn(props, name)) unsupported();
+            if (name === "xpost" || name === "xpostdetail") {
+                const field = name === "xpost" ? "xpostOpaque" : "xpostDetail";
+                const values = binaryById.get(id) ?? {};
+                if (Object.hasOwn(values,field)) unsupported();
+                if (row.value_stored === null && row.value_original === null && row.value_roundtrip === null) {
+                    rawFields.push(["entry:"+id+":prop:"+name,"<NULL>","<NULL>"]);
+                } else {
+                    // Binary is never UTF8/gzip decoded. Stored cp1252 conversion
+                    // can occupy three bytes for each recovered original byte.
+                    const bytes = decodeLegacyBytes(row.value_stored,row.value_original,
+                        row.value_roundtrip,24576,8192);
+                    rawFields.push(["entry:"+id+":prop:"+name,bytes.storedBytes.toString("hex"),
+                        bytes.originalBytes.toString("hex")]);
+                    if (field === "xpostOpaque") values.xpostOpaque = Object.freeze({encoding:"opaque-bytes",
+                        base64:bytes.originalBytes.toString("base64")});
+                    else values.xpostDetail = Object.freeze({encoding:"storable-network-2.11",
+                        base64:bytes.originalBytes.toString("base64")});
+                }
+                binaryById.set(id,values);
+                continue;
+            }
             props[name] = decodedColumn(
                 row, "value", "entry:" + id + ":prop:" + name,
                 rawFields, 8192, true,
@@ -800,7 +822,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 allowmask: unsigned(row.allowmask, 64),
                 replycount: number(row.replycount),
                 compressed: requiredString(row.compressed),
-                props, subjectText: text.subject, eventText: text.event,
+                props, ...binaryById.get(id), subjectText: text.subject, eventText: text.event,
             }));
         }
         return { entries, rawText };
