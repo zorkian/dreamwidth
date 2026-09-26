@@ -40,6 +40,7 @@ test("independent origins, CDN prefixes and exact source key case are accepted u
     validateConfig(value);
     assert.equal(JSON.stringify(value), before);
     validateConfig({...value, listenOrigin: "https://viewer.example.test"});
+    validateConfig({...value, usernameMaxLength: 1000});
     validateConfig({...value, canonicalAppOrigin: "http://localhost:8080", userDomain: "",
         journalUrls: {protocol: "http", domain: "", isDevServer: true,
             subdomainRules: {P: [false, ""]}, hookConfigured: false}});
@@ -58,7 +59,8 @@ test("credentials, active URL schemes, unexpected config and unported hooks refu
         {...value, anonymousCaptchaDisabled: true},
         {...value, journalUrls: {...value.journalUrls, hookConfigured: true}},
         {...value, journalUrls: {...value.journalUrls, domain: "", subdomainRules: {P: [true, ""]}}},
-        {...value, usernameMaxLength: 0}, {...value, maxScrollback: 0},
+        {...value, usernameMaxLength: 0}, {...value, usernameMaxLength: Number.MAX_SAFE_INTEGER + 1},
+        {...value, maxScrollback: 0},
         {...value, entryContent: {...value.entryContent, urls: {...value.entryContent.urls,
             imageProxy: "host-resolved"}}},
         {...value, entryContent: {...value.entryContent, urls: {...value.entryContent.urls,
