@@ -27,9 +27,9 @@ const context={policy:"dreamwidth-entry-html-raw0-v1" as const,insertionContext:
     journalUsername:"ordinary",journalId:11,entryId:384,cuts:"source-compatible-entry" as const,...config.entryContent,
     reader:{removeColors:false,removeSizes:false,removeFonts:false,maxImageWidth:null,maxImageHeight:null,
         placeholderUndefinedImageSize:false,extractImages:false}};
-test("29 native current wrappers, half-even ties and theme/image inheritance",()=>{
+test("31 native current wrappers, half-even ties and theme/image inheritance",()=>{
     const call=spawnSync("perl",[resolve(__dirname,"../../tools/moods-native.pl")],{encoding:"utf8",timeout:10000});
-    assert.equal(call.status,0,call.stderr);const rows=JSON.parse(call.stdout);assert.equal(rows.length,29);
+    assert.equal(call.status,0,call.stderr);const rows=JSON.parse(call.stdout);assert.equal(rows.length,31);
     const cleaner=createEntryCleaner(limits);
     try{for(const row of rows){
         if(row.kind==="location"){
@@ -56,6 +56,8 @@ test("29 native current wrappers, half-even ties and theme/image inheritance",()
     }}finally{cleaner.close();}
     assert.equal(coordinateFixed(0.03125),"0.0312");assert.equal(coordinateFixed(-0.03125),"-0.0312");
     assert.equal(coordinateFixed(0.09375),"0.0938");assert.equal(coordinateFixed(-0.09375),"-0.0938");
+    assert.equal(locationCurrent("1.0,2.0\n\n","Text"),"");
+    assert.equal(locationCurrent("1.0N,2.0E\r\n","Text"),"");
 });
 test("source https_url exact case/domain and malformed vocabulary boundaries",()=>{
     const raw:RawMoods={moods:[{id:1,name:"Happy",parent:0}],theme:{id:7,name:"Theme"},

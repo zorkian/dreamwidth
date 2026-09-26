@@ -41,8 +41,9 @@ export function locationCurrent(coords: string | null | undefined,
     location: string | null | undefined): string | undefined {
     const truth = (value: string | null | undefined): boolean => !!value && value !== "0";
     if (!truth(coords)) return truth(location) ? location! : undefined;
-    const hemisphere = /^(\d+\.\d+)[\t\n\r\f\v ]*([NS])[\t\n\r\f\v ]*,?[\t\n\r\f\v ]*(\d+\.\d+)[\t\n\r\f\v ]*([EW])$/i.exec(coords!);
-    const signed = /^(-?\d+\.\d+)[\t\n\r\f\v ]*,?[\t\n\r\f\v ]*(-?\d+\.\d+)$/.exec(coords!);
+    // Native Perl $ also matches immediately before exactly one final LF.
+    const hemisphere = /^(\d+\.\d+)[\t\n\r\f\v ]*([NS])[\t\n\r\f\v ]*,?[\t\n\r\f\v ]*(\d+\.\d+)[\t\n\r\f\v ]*([EW])\n?$/i.exec(coords!);
+    const signed = /^(-?\d+\.\d+)[\t\n\r\f\v ]*,?[\t\n\r\f\v ]*(-?\d+\.\d+)\n?$/.exec(coords!);
     if (!hemisphere && !signed) return ""; // caught native construction; existing empty key
     const lat = hemisphere ? Number(hemisphere[1]) * (hemisphere[2]!.toUpperCase() === "S" ? -1 : 1) : Number(signed![1]);
     const lon = hemisphere ? Number(hemisphere[3]) * (hemisphere[4]!.toUpperCase() === "W" ? -1 : 1) : Number(signed![2]);
