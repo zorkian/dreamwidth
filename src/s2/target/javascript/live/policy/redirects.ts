@@ -15,7 +15,7 @@
 import type { CreateRedirectAdmission, RedirectAdmissionDecision } from "../contracts";
 import { validateConfig } from "./config";
 import { parseUniqCookie } from "./token";
-import { USERNAME } from "./cohort";
+import { canonicalUsername } from "./cohort";
 import { validEntryId } from "./entry";
 
 const REJECT: RedirectAdmissionDecision = Object.freeze({ kind: "reject" });
@@ -26,19 +26,25 @@ function datePath(path: string): boolean {
     if (!match) return false;
     const y = Number(match[1]), m = Number(match[2] ?? 1), d = Number(match[3] ?? 1);
     const date = new Date(Date.UTC(y, m - 1, d));
-    return y >= 1970 && y <= 2038 && date.getUTCFullYear() === y &&
+    return y >= 1000 && y <= 9999 && date.getUTCFullYear() === y &&
         date.getUTCMonth() + 1 === m && date.getUTCDate() === d;
 }
-function asset(target: string): boolean {
-    // Actual slice3 oracle emits only /stc, /img, /js. No palimg/userpic.
-    // Combo URLs use ??file,file?v=mtime, not generic URL query parsing.
-    const combo = /^\/(stc|js)\/\?\?([^?]+)\?v=([1-9][0-9]{0,10})$/.exec(target);
+function asset(target: string, prefixes: readonly [string, "css" | "js" | null][]): boolean {
+    // Resource paths are relative to the configured source prefixes. Absolute
+    // resource URLs leave the private listener directly and need no redirect.
     const file = /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:css|js|png|gif|jpg|svg|woff2?)$/;
-    if (combo) return combo[2]!.length < 4096 && combo[2]!.split(",").every(name =>
-        file.test(name) && !name.includes("..") &&
-        name.endsWith(combo[1] === "stc" ? ".css" : ".js"));
-    const single = /^\/(stc|img|js)\/([^?]+)(?:\?v=([1-9][0-9]{0,10}))?$/.exec(target);
-    return Boolean(single && file.test(single[2]!) && !single[2]!.includes(".."));
+    for (const [prefix, extension] of prefixes) {
+        if (!prefix.startsWith("/") || prefix.startsWith("//")) continue;
+        const start = prefix.replace(/\/$/, "") + "/";
+        if (!target.startsWith(start)) continue;
+        const rest = target.slice(start.length);
+        const combo = /^\?\?([^?]+)\?v=([1-9][0-9]{0,10})$/.exec(rest);
+        if (combo && extension && combo[1]!.length < 4096 && combo[1]!.split(",").every(name =>
+            file.test(name) && !name.includes("..") && name.endsWith("." + extension))) return true;
+        const single = /^([^?]+)(?:\?v=([1-9][0-9]{0,10}))?$/.exec(rest);
+        if (single && file.test(single[1]!) && !single[1]!.includes("..")) return true;
+    }
+    return false;
 }
 
 // Inventory: the retained anonymous stock core2/Tabula Rasa recent page emits
@@ -47,13 +53,24 @@ function asset(target: string): boolean {
 export const createRedirectAdmission: CreateRedirectAdmission = config => {
     validateConfig(config);
     const expectedHost = new URL(config.listenOrigin).host;
-    const recent = "/users/" + USERNAME + "/";
-    const originalRecent = config.canonicalAppOrigin + recent;
-    const entryPath = (path: string): number | null => {
-        const match = new RegExp("^" + recent + "([1-9][0-9]{0,9})\\.html$").exec(path);
-        const id = match ? Number(match[1]) : 0;
-        return validEntryId(id) ? id : null;
+    const canonical = (name: string): boolean => canonicalUsername(name, config.usernameMaxLength) === name;
+    const page = (raw: string): {username: string; kind: "recent"; skip: number; skipPresent: boolean} |
+        {username: string; kind: "entry"; ditemid: number} | null => {
+        const recent = /^\/users\/([a-z0-9_]{1,25})\/(?:\?skip=(0|[1-9][0-9]{0,15}))?$/.exec(raw);
+        if (recent && canonical(recent[1]!)) {
+            const skip = Number(recent[2] ?? 0);
+            return Number.isSafeInteger(skip) ? {kind: "recent", username: recent[1]!, skip,
+                skipPresent: recent[2] !== undefined} : null;
+        }
+        const entry = /^\/users\/([a-z0-9_]{1,25})\/([1-9][0-9]{0,9})\.html$/.exec(raw);
+        return entry && canonical(entry[1]!) && validEntryId(Number(entry[2])) ?
+            {kind: "entry", username: entry[1]!, ditemid: Number(entry[2])} : null;
     };
+    const controlRoot = config.siteRoot.startsWith("/") && !config.siteRoot.startsWith("//") ?
+        config.siteRoot.replace(/\/$/, "") : "";
+    const prefixes: readonly [string, "css" | "js" | null][] = [
+        [config.statPrefix, "css"], [config.jsPrefix, "js"], [config.imgPrefix, null],
+    ];
     return request => {
         try {
             if (request.host !== expectedHost || request.hasAuthorization || request.hasForwardedHeaders ||
@@ -62,36 +79,31 @@ export const createRedirectAdmission: CreateRedirectAdmission = config => {
             const raw = request.rawTarget;
             if (typeof raw !== "string" || raw.length > 8192 || !raw.startsWith("/") ||
                 /[\\#\x00-\x20\x7f]/.test(raw) || raw.startsWith("//")) return REJECT;
-            const match = new RegExp("^" + recent + "(?:\\?skip=(0|[1-9][0-9]{0,2}))?$").exec(raw);
-            if (match && request.method !== "POST") {
-                const skip = Number(match[1] ?? 0);
-                if (skip > 200 || (request.origin !== null && request.origin !== config.listenOrigin)) return REJECT;
-                return {kind: "recent", request: {method: request.method as "GET" | "HEAD",
-                    username: USERNAME, skip, skipPresent: match[1] !== undefined, uniqCookie}};
-            }
-            const ditemid = entryPath(raw);
-            if (ditemid !== null && request.method !== "POST") {
+            const selected = page(raw);
+            if (selected && request.method !== "POST") {
                 if (request.origin !== null && request.origin !== config.listenOrigin) return REJECT;
-                return {kind: "entry", request: {method: request.method as "GET" | "HEAD",
-                    username: USERNAME, ditemid, uniqCookie}};
+                const method = request.method as "GET" | "HEAD";
+                return selected.kind === "recent" ? {kind: "recent", request: {method,
+                    username: selected.username, skip: selected.skip, skipPresent: selected.skipPresent, uniqCookie}} :
+                    {kind: "entry", request: {method, username: selected.username, ditemid: selected.ditemid, uniqCookie}};
             }
+            const control = raw.startsWith(controlRoot + "/") ? raw.slice(controlRoot.length) : null;
             if (request.method === "POST") {
-                if ((raw !== "/login" && raw !== "/multisearch") ||
+                if ((control !== "/login" && control !== "/multisearch") ||
                     request.origin !== config.listenOrigin) return REJECT;
             } else {
                 if (request.origin !== null && request.origin !== config.listenOrigin) return REJECT;
-                const item = /^\/tools\/(memadd|tellafriend)\?journal=s2js_slice3&itemid=([1-9][0-9]{0,12})$/.exec(raw);
-                const returnto = raw.startsWith("/openid/?returnto=") ? raw.slice("/openid/?returnto=".length) : "";
-                const safeReturn = returnto === originalRecent ||
-                    (returnto.startsWith(config.canonicalAppOrigin + "/") &&
-                     entryPath(returnto.slice(config.canonicalAppOrigin.length)) !== null) ||
-                    (returnto.startsWith(originalRecent + "?skip=") &&
-                     /^(0|[1-9][0-9]{0,2})$/.test(returnto.slice((originalRecent + "?skip=").length)) &&
-                     Number(returnto.slice((originalRecent + "?skip=").length)) <= 200);
-                const go = /^\/go\?dir=(prev|next)&itemid=([1-9][0-9]{0,9})&journal=s2js_slice3$/.exec(raw);
-                const safeGo = go !== null && validEntryId(Number(go[2]));
-                if (!GET_PATHS.has(raw) && raw !== "/tools/memories?user=" + USERNAME &&
-                    !item && !safeReturn && !safeGo && !datePath(raw) && !asset(raw)) return REJECT;
+                const item = control && /^\/tools\/(memadd|tellafriend)\?journal=([a-z0-9_]{1,25})&itemid=([1-9][0-9]{0,9})$/.exec(control);
+                const safeItem = item && canonical(item[2]!) && validEntryId(Number(item[3]));
+                const memories = control && /^\/tools\/memories\?user=([a-z0-9_]{1,25})$/.exec(control);
+                const safeMemories = memories && canonical(memories[1]!);
+                const returnto = control?.startsWith("/openid/?returnto=") ? control.slice("/openid/?returnto=".length) : "";
+                const safeReturn = returnto.startsWith(config.canonicalAppOrigin + "/") &&
+                    page(returnto.slice(config.canonicalAppOrigin.length)) !== null;
+                const go = control && /^\/go\?dir=(prev|next)&itemid=([1-9][0-9]{0,9})&journal=([a-z0-9_]{1,25})$/.exec(control);
+                const safeGo = go && validEntryId(Number(go[2])) && canonical(go[3]!);
+                if (!(control && GET_PATHS.has(control)) && !safeMemories && !safeItem && !safeReturn && !safeGo &&
+                    !datePath(raw) && !asset(raw, prefixes)) return REJECT;
             }
             return {kind: "redirect", status: 307, location: config.canonicalAppOrigin + raw};
         } catch {
