@@ -195,19 +195,30 @@ test("distinct seconds within a minute retain their SQL order", () => {
         selectedJitemids: [3, 2, 1]}}), Unsupported);
 });
 
-test("calendar neighbors cross year boundaries with strict chronological direction", () => {
+test("calendar neighbors preserve native independent year and month filters", () => {
     const data = snapshot();
-    for (const calendar of [
-        {...data.calendar, current: {year: 2026, month: 1}, previous: {year: 2025, month: 12}},
-        {...data.calendar, current: {year: 2025, month: 12}, next: {year: 2026, month: 1}},
-    ]) {
-        assert.deepEqual(approve({...data, calendar}).calendar.previous, calendar.previous);
-        assert.deepEqual(approve({...data, calendar}).calendar.next, calendar.next);
-        for (const previous of [calendar.current, {year: 2027, month: 1}]) {
-            assert.throws(() => approve({...data, calendar: {...calendar, previous}}), Unsupported);
-        }
-        for (const next of [calendar.current, {year: 2024, month: 12}]) {
-            assert.throws(() => approve({...data, calendar: {...calendar, next}}), Unsupported);
-        }
+    const withMonth = (year: number, month: number) => ({...data, calendar: {...data.calendar,
+        current: {year, month}, days: month === 0 ? [] : data.calendar.days}});
+    const january = withMonth(2026, 1);
+    assert.equal(approve(january).calendar.previous, null);
+    assert.throws(() => approve({...january, calendar: {...january.calendar,
+        previous: {year: 2025, month: 12}}}), Unsupported);
+    const december = withMonth(2025, 12);
+    assert.equal(approve(december).calendar.next, null);
+    assert.throws(() => approve({...december, calendar: {...december.calendar,
+        next: {year: 2026, month: 1}}}), Unsupported);
+    const september = withMonth(2026, 9);
+    assert.deepEqual(approve({...september, calendar: {...september.calendar,
+        previous: {year: 2025, month: 3}, next: {year: 2027, month: 10}}}).calendar.previous,
+        {year: 2025, month: 3});
+    for (const previous of [{year: 2025, month: 12}, {year: 2026, month: 9}, {year: 2027, month: 3}]) {
+        assert.throws(() => approve({...september, calendar: {...september.calendar, previous}}), Unsupported);
     }
+    for (const next of [{year: 2027, month: 2}, {year: 2026, month: 9}, {year: 2025, month: 10}]) {
+        assert.throws(() => approve({...september, calendar: {...september.calendar, next}}), Unsupported);
+    }
+    const zero = withMonth(2026, 0);
+    assert.equal(approve(zero).calendar.previous, null);
+    assert.throws(() => approve({...zero, calendar: {...zero.calendar,
+        previous: {year: 2025, month: 12}}}), Unsupported);
 });

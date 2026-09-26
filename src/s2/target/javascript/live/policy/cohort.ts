@@ -169,10 +169,12 @@ function approveCalendar(snapshot: RawJournalSnapshot): ApprovedJournal["calenda
         statuses.add(row.statusvis); contributors += row.count;
     }
     if (!integer(total) || !integer(contributors) || contributors < total) throw new Unsupported();
-    const ordinal = (value: {year: number; month: number}): number => value.year * 12 + value.month;
+    // LJ/S2/YearPage.pm157-190 filters year AND month independently before
+    // selecting a neighbor. Preserve that source quirk across year boundaries;
+    // ordinary chronological ordering would admit a different visible link.
     if (calendar.previous && (!validMonth(calendar.previous) ||
-        ordinal(calendar.previous) >= ordinal(calendar.current))) throw new Unsupported();
-    if (calendar.next && (!validMonth(calendar.next) || ordinal(calendar.next) <= ordinal(calendar.current))) {
+        calendar.previous.year > year || calendar.previous.month >= month)) throw new Unsupported();
+    if (calendar.next && (!validMonth(calendar.next) || calendar.next.year < year || calendar.next.month <= month)) {
         throw new Unsupported();
     }
     return {year, month, days: calendar.days.map(day => ({...day})),
