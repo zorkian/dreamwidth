@@ -141,4 +141,3 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
         await admin.end();
     }
 }
-
