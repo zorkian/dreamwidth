@@ -136,12 +136,50 @@ test('selected comment SQL excludes hidden bytes and private props, brackets aut
                 try {const retained=await get();assert.equal(retained.status,200);assert.ok((await retained.text()).includes('Public body 1'));}
                 finally {await f.admin.query(`UPDATE ${f.table(f.g,'user')} SET opt_whocanreply='all' WHERE userid=900001`);}
             }
+            const disabled=async()=>{
+                // Any loadComments invocation would enter header/text/author
+                // reads. Fail immediately rather than merely checking output.
+                const proto=MysqlLiveStore.prototype as unknown as {loadComments:(...args:unknown[])=>Promise<unknown>};
+                const blocked=t.mock.method(proto,'loadComments',async()=>{throw new Error('Disabled comment read');});
+                try {
+                    const raw=await store.loadRawSnapshot(req);assert.ok(raw);assert.equal(raw.comments,undefined);
+                    assert.equal(approveSnapshot(raw,cfg,startup.capabilities).comments,undefined);
+                    const response=await get();assert.equal(response.status,200);
+                    const html=await response.text();assert.ok(html.includes('Public body 300'));
+                    for(const marker of ['Public body 1','Public subject 1','Public body 4','Public subject 4','second6','dwexpcomment','comment-257'])
+                        assert.ok(!html.includes(marker),marker);
+                    const info=JSON.parse(/var LJ_cmtinfo = (\{[^\n]*\})/.exec(html)![1]!);
+                    assert.deepEqual(Object.keys(info),['journal','form_auth','remote','canSpam','canAdmin']);
+                    assert.equal(info.canAdmin,null);
+                    assert.equal(blocked.mock.callCount(),0);
+                }finally {blocked.mock.restore();}
+            };
+            const render=Renderer.prototype.render;
+            const transition=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>){
+                const html=await render.apply(this,args);
+                await f.admin.query(`UPDATE ${f.table(f.g,'user')} SET opt_showtalklinks='N' WHERE userid=900001`);
+                return html;
+            });
+            try {
+                const revoked=await get();assert.equal(revoked.status,409);
+                assert.equal(await revoked.text(),'Journal changed during render\n');
+                assert.equal(revoked.headers.get('cache-control'),'private, no-store');
+                assert.equal(revoked.headers.get('set-cookie'),null);assert.equal(revoked.headers.get('location'),null);
+                transition.mock.restore();
+                await disabled();
+            }finally {
+                transition.mock.restore();
+                await f.admin.query(`UPDATE ${f.table(f.g,'user')} SET opt_showtalklinks='Y' WHERE userid=900001`);
+            }
+            assert.equal((await store.loadRawSnapshot(req))!.fingerprint,data.fingerprint);
+            const restored=await get();assert.equal(restored.status,200);
+            assert.ok((await restored.text()).includes('Public body 1'));
             await f.admin.query(`UPDATE ${f.table(f.g,'user')} SET opt_showtalklinks='N' WHERE userid=900001`);
-            try {const retained=await get();assert.equal(retained.status,200);assert.ok((await retained.text()).includes('Public body 1'));}
+            try {await disabled();}
             finally {await f.admin.query(`UPDATE ${f.table(f.g,'user')} SET opt_showtalklinks='Y' WHERE userid=900001`);}
             for(const name of ['opt_nocomments','opt_nocomments_maintainer']) {
                 await f.admin.query(`INSERT INTO ${f.table(f.c,'logprop2')} (journalid,jitemid,propid,value) VALUES(900001,300,?,'1')`,[f.logProp(name)]);
-                try {const retained=await get();assert.equal(retained.status,200);assert.ok((await retained.text()).includes('Public body 1'));}
+                try {await disabled();}
                 finally {await f.admin.query(`DELETE FROM ${f.table(f.c,'logprop2')} WHERE journalid=900001 AND jitemid=300 AND propid=?`,[f.logProp(name)]);}
             }
         }finally {await app.close();}
