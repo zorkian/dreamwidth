@@ -88,11 +88,11 @@ sub scalar_map {
 sub export_config {
     my %opts;
     GetOptions( \%opts, 'output=s', 'artifact=s', 'app-origin=s', 'listen-origin=s',
-        'listen-host=s', 'listen-port=i' )
+        'listen-host=s', 'listen-port=i', 'local-socket=s' )
         or fail('Invalid exporter arguments');
     fail(     'Usage: site-config.pl --output PRIVATE_JSON --app-origin URL --listen-origin URL '
-            . '[--artifact PATH --listen-host HOST --listen-port PORT]' )
-        if @ARGV || !$opts{output};
+            . '[--artifact PATH --listen-host HOST --listen-port PORT --local-socket ABSOLUTE_PATH]'
+    ) if @ARGV || !$opts{output};
 
     # Use exactly Config.pm's ordinary resolved order. Detect do() errors instead
     # of allowing a broken private file to fall through silently to defaults.
@@ -124,6 +124,13 @@ sub export_config {
         || $port < 1
         || $port > 65535;
 
+    my $local_socket = $opts{'local-socket'};
+    fail('Invalid --local-socket; provide an absolute socket path')
+        if defined $local_socket
+        && ( !length($local_socket)
+        || !File::Spec->file_name_is_absolute($local_socket)
+        || $local_socket =~ /[\x00-\x1f\x7f]/ );
+
     # Presence detection must include installed site hooks, not just config's
     # initial HOOKS hash. Module imports stay under the no-connect tripwire.
     my $entry_hook   = LJ::Hooks::are_hooks('check_cap_s2viewentry');
@@ -134,12 +141,29 @@ sub export_config {
         next if $id =~ /^_/;
         my $s = $LJ::DBINFO{$id};
         fail('Invalid configured database source') unless ref $s eq 'HASH';
+        my $source_host = $s->{host} ? string( $s->{host}, 253 ) : undef;
+        my $socket      = $s->{sock} ? string( $s->{sock} )      : undef;
+
+        # Native libmysql uses a socket only for absent/empty host or exact
+        # lowercase localhost. Other hosts use TCP even when sock is present.
+        if ( !defined $source_host || $source_host eq 'localhost' ) {
+            $socket //= $local_socket;
+            fail('Local database endpoint needs explicit sock or --local-socket ABSOLUTE_PATH')
+                unless defined $socket;
+            fail('Invalid local database socket path')
+                unless File::Spec->file_name_is_absolute($socket)
+                && $socket !~ /[\x00-\x1f\x7f]/;
+            $source_host = undef;
+        }
+        else {
+            $socket = undef;
+        }
         push @sources,
             {
             id         => string( $id, 256 ),
-            host       => $s->{host} ? string( $s->{host}, 253 ) : undef,
+            host       => $source_host,
             port       => $s->{port} ? number( $s->{port} ) : undef,
-            socketPath => $s->{sock} ? string( $s->{sock} ) : undef,
+            socketPath => $socket,
             database   => string( $s->{dbname} || 'livejournal', 256 ),
             user       => string( $s->{user} // '', 256 ),
             password   => string( $s->{pass} // '' ),

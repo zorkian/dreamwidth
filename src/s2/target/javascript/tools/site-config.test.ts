@@ -124,6 +124,37 @@ test("exported origins round-trip through startup validation in canonical form",
     }
 }));
 
+test("native local endpoints require explicit sockets and TCP ignores sock", () => temporary(dir => {
+    const cases = [
+        {host: "", sock: "", override: null, expectedHost: null, expectedSocket: null, pass: false},
+        {host: "localhost", sock: "", override: "/not-read/override.sock", expectedHost: null,
+            expectedSocket: "/not-read/override.sock", pass: true},
+        {host: "", sock: "/not-read/explicit.sock", override: "/not-read/override.sock", expectedHost: null,
+            expectedSocket: "/not-read/explicit.sock", pass: true},
+        {host: "LOCALHOST", sock: "/not-read/ignored.sock", override: null, expectedHost: "LOCALHOST",
+            expectedSocket: null, pass: true},
+        {host: "127.0.0.1", sock: "/not-read/ignored.sock", override: null, expectedHost: "127.0.0.1",
+            expectedSocket: null, pass: true},
+        {host: "db.example.test", sock: "/not-read/ignored.sock", override: "relative.sock",
+            expectedHost: "db.example.test", expectedSocket: null, pass: false},
+    ];
+    for (const [index, value] of cases.entries()) {
+        const base = path.join(dir, String(index)); mkdirSync(base);
+        const home = fixture(base, `$DBINFO{master}{host}='${value.host}'; $DBINFO{master}{sock}='${value.sock}';`);
+        const output = path.join(base, "site.json");
+        const args = ["-I", path.join(repo, "cgi-bin"), exporter, "--output", output,
+            "--app-origin", "https://app.example.test", "--listen-origin", "http://viewer.example.test:9191"];
+        if (value.override !== null) args.push("--local-socket", value.override);
+        const result = spawnSync("perl", args,
+            {env: {...process.env, LJHOME: home}, encoding: "utf8", timeout: 15000, maxBuffer: 65536});
+        assert.equal(result.status, value.pass ? 0 : 1, result.stderr);
+        if (!value.pass) { assert.ok(!existsSync(output)); assert.match(result.stderr, /socket/); continue; }
+        const source = readStartupConfig(output).database.sources.find(s => s.id === "master")!;
+        assert.equal(source.host, value.expectedHost);
+        assert.equal(source.socketPath, value.expectedSocket);
+    }
+}));
+
 test("config and hook connection attempts/errors cannot publish or leak credentials", () => temporary(dir => {
     for (const [id, extra] of [
         ["connect", `eval { DBI->connect('DBI:mysql:never-connect','fixture','${secret}') };`],
