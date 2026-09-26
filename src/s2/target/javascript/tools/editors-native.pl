@@ -18,7 +18,9 @@ use lib "$ENV{LJHOME}/cgi-bin";
 require 'ljlib.pl';
 use LJ::Entry;
 use LJ::CleanHTML;
+use LJ::S2;
 use JSON::PP;
+use Encode qw(encode decode);
 {
 
     package EditorFixture;
@@ -34,6 +36,69 @@ use JSON::PP;
     package EditorOwner;
     sub user          { 'synthetic' }
     sub is_syndicated { 0 }
+}
+if ( @ARGV && $ARGV[0] eq '--request-auth' ) {
+    my @scalars = (
+        'see_request?id=1&auth=TOKEN&x=2',
+        'SEE_REQUEST?ID=1&AUTH=A_09',
+        'see_request?id=1&auth=A see_request?id=2&auth=B',
+        'see_request?id=1&amp;auth=A',
+        'other?id=1&auth=A',
+        'see_request&auth=A',
+        "see_request\n?id=1&auth=A",
+        'see_request?id=1&auth=A-B',
+        'see_request?id=1&auth=' . encode( 'UTF-8', chr(0xe9) ) . 'Z',
+        'see_request?id=1&auth=A' . encode( 'UTF-8', chr(0xe9) ) . 'Z',
+        'see_request' . encode( 'UTF-8', chr(0xa0) ) . '?id=1&auth=A',
+    );
+    my @rows = map {
+        {
+            kind   => 'scalar',
+            source => decode( 'UTF-8', $_ ),
+            output => decode( 'UTF-8', LJ::strip_request_auth($_) )
+        }
+    } @scalars;
+    my $url =
+      'https://example.invalid/see_request?id=1&auth=SYNTH_TOKEN&more=1';
+    my $source = qq{<a href="$url">$url</a>};
+    for my $mode (
+        qw(raw casual subject all plain_subject plain_all metadata comment customtext second)
+      )
+    {
+        my $value = $mode =~ /^plain/ ? $url : $source;
+        if ( $mode eq 'subject' || $mode eq 'plain_subject' ) {
+            LJ::CleanHTML::clean_subject( \$value );
+        }
+        elsif ( $mode eq 'all' || $mode eq 'plain_all' ) {
+            LJ::CleanHTML::clean_subject_all( \$value );
+        }
+        elsif ( $mode eq 'comment' ) {
+            LJ::CleanHTML::clean_comment( \$value, { editor => 'html_raw0' } );
+        }
+        elsif ( $mode eq 'customtext' || $mode eq 'second' ) {
+            LJ::S2::escape_prop_value( $value, 'html' );
+            LJ::S2::escape_prop_value( $value, 'html' ) if $mode eq 'second';
+        }
+        else {
+            LJ::CleanHTML::clean_event(
+                \$value,
+                {
+                    editor => $mode eq 'casual' ? 'html_casual1' : 'html_raw0',
+                    textonly => $mode eq 'metadata' ? 1 : 0,
+                }
+            );
+        }
+        push @rows,
+          {
+            kind   => 'context',
+            mode   => $mode,
+            source => $source,
+            url    => $url,
+            output => $value
+          };
+    }
+    print JSON::PP->new->canonical->utf8->encode( \@rows );
+    exit;
 }
 my @cases = (
     [ 'raw',     { editor => 'html_raw0' } ],
