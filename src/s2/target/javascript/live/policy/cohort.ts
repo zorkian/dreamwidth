@@ -115,14 +115,15 @@ function selectedHeaders(snapshot: RawJournalSnapshot, config: PublicAppConfig):
             }
             ids.add(row.jitemid);
         }
-        // DW::Logic::LogItems flushes each contiguous event-time minute AFTER
+        // DW::Logic::LogItems flushes each contiguous full event-time group AFTER
         // SQL LIMIT and sorts that group by itemid descending. Then RecentPage
-        // removes the extra row. Never slice the already selected bodies again.
+        // removes the extra row. S2 alldatepart includes seconds despite the
+        // retained per-minute comment. Never slice selected bodies again.
         const reordered: RawEntryHeader[] = [];
         for (let start = 0; start < selection.window.length;) {
             let end = start + 1;
-            const minute = selection.window[start]!.eventtime.slice(0, 16);
-            while (end < selection.window.length && selection.window[end]!.eventtime.slice(0, 16) === minute) end++;
+            const time = selection.window[start]!.eventtime;
+            while (end < selection.window.length && selection.window[end]!.eventtime === time) end++;
             reordered.push(...selection.window.slice(start, end).sort((a, b) => b.jitemid - a.jitemid));
             start = end;
         }
