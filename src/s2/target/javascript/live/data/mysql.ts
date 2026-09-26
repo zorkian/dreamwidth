@@ -78,7 +78,9 @@ function selectedStyleId(settings: PublicSettings): number {
     // User/Styles.pm590-600 chooses a persisted style only for stylesys2.
     // A stale s2_style or its incompatible layers must not override DEFAULT_STYLE.
     // Original property bytes still participate in the settings fingerprint.
-    if (Number(settings.stylesys) !== 2) return 0;
+    const system = settings.stylesys;
+    if (system !== null && system !== "" && !/^[0-9]+$/.test(system)) unsupported();
+    if (Number(system) !== 2) return 0;
     return settings.s2_style ? number(settings.s2_style) : 0;
 }
 
