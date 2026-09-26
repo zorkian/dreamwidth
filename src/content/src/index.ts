@@ -209,10 +209,19 @@ function transform(root: Element, input: EntryContentInput, limits: CleanerLimit
     }
 }
 
+// Native inputs are byte strings; keep ASCII word classes and escape-pair order.
+function casualMentions(value:string):string {
+    if(/^@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value))throw new UnsupportedContent();
+    return value.replace(/(\\.)|(?<=[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/gm,(match,escape)=>{
+        if(escape)return escape==='\\@'?'@':escape;
+        throw new UnsupportedContent();
+    });
+}
+
 // html_casual1 autolinks and breaks are a distinct original-source operation.
 function casualText(root:Element,source:string):void {
     if(/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
-    if(/(^|[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(source.replace(/\\./g,'')))throw new UnsupportedContent();
+    casualMentions(source);
     if(root.querySelector('lj-cut,lj-raw,lj,user,poll,site-embed'))throw new UnsupportedContent();
     for(const element of root.querySelectorAll('*'))for(const attribute of element.attributes) {
         if(/[\r\n]/.test(attribute.value))throw new UnsupportedContent();
@@ -223,11 +232,7 @@ function casualText(root:Element,source:string):void {
     while(walker.nextNode())nodes.push(walker.currentNode as Text);
     for(const node of nodes) {
         let value=node.data;
-        // Match actual reached mention contexts, not email or every at-sign.
-        if(/(^|[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value.replace(/\\./g,''))) {
-            throw new UnsupportedContent();
-        }
-        value=value.replace(/\\@/g,'@');
+        value=casualMentions(value);
         const parent=node.parentElement!;
         const raw=parent.closest('pre,textarea');
         const table=parent.closest('table');

@@ -19,6 +19,7 @@ use lib "$ENV{LJHOME}/cgi-bin", "$ENV{LJHOME}/src/s2";
 require 'ljlib.pl';
 use LJ::S2;
 use JSON::PP;
+use Encode qw(encode);
 use File::Temp qw(tempdir);
 my $dir = tempdir( CLEANUP => 1 );
 my $base =
@@ -47,6 +48,31 @@ qq{set module_customtext_show = false;\nset module_customtext_order = -2;\nset t
     close $compiler or die 'Native compile failed';
 }
 my @rows;
+for my $source (
+    'café@example.invalid', 'x\\\\@name',
+    'x\\@name',              'café @name',
+    'mail@example.invalid'
+    )
+{
+    my $value = encode( 'UTF-8', $source );
+    my @mentions;
+    {
+        no warnings 'redefine';
+        local *LJ::CleanHTML::user_link_html =
+            sub { push @mentions, $_[0]; return '[MENTION]'; };
+        local *LJ::get_db_reader = sub { die "DB READ FORBIDDEN\n" };
+        local *LJ::get_db_writer = sub { die "DB WRITE FORBIDDEN\n" };
+        LJ::S2::escape_prop_value( $value, 'html' );
+    }
+    push @rows,
+        {
+        kind       => 'byte_mentions',
+        source     => $source,
+        mentions   => \@mentions,
+        output_hex => unpack( 'H*', $value )
+        };
+}
+
 {
     no warnings 'redefine';
     *S2::Builtin::Color__Color = \&S2::Builtin::LJ::Color__Color;

@@ -86,7 +86,10 @@ Perl-false (undefined, empty or string 0), its already-cleaned property default
 undergoes a real second clean. Escaped-at text can therefore reach a mention only
 on that second pass and refuse. Encountered mentions, legacy Markdown markers,
 custom application tags/cuts/embeds and other unported capabilities refuse;
-email is not treated as a mention. Scripts are removed safely rather than causing
+ASCII-local email is not treated as a mention. Native inputs are byte strings;
+Unicode-local café@example.invalid reaches the unported mention helper and refuses.
+Escape pairs retain native left-to-right precedence: one backslash-at becomes
+literal at, while two backslashes before at can reach a mention and refuse. Scripts are removed safely rather than causing
 an invented formatting refusal. Newline-bearing attributes refuse as an
 unrepresentable native final-string-transformation shape.
 
@@ -103,7 +106,10 @@ Named serialization/security adaptations in this context include maintained
 void-tag spelling (`<br>` versus native `<br />`), safe entity serialization in
 autolink text/attributes, canonical document-origin resolution for relative URLs,
 and the existing CSS containment/unsafe URL/DOM-clobber defenses. These are not
-unconditional byte-equivalence or arbitrary caller-stylesheet claims. See
+unconditional byte-equivalence or arbitrary caller-stylesheet claims. A bare CR
+becomes a break through HTML5 parsing, unlike native bare-CR whitespace.
+Semicolon-less numeric URL references fail closed during rendering rather than
+receiving the earlier typed unsupported response. See
 [CLEANER-POLICY.md](live/tests/CLEANER-POLICY.md) for the underlying safety policy.
 
 Stock prints the finalized customtext HTML as one separate safe chunk. The engine
