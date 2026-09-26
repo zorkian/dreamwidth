@@ -117,3 +117,29 @@ canonical prior feature/privacy tests and repository checks remain final gates.
 Compiler/runtime/stager/dependency rules are unchanged. Broader Markdown,
 custom capabilities, remaining comment metadata and broader styles remain
 explicit subsequent work.
+
+## Support-request authentication preprocessing
+
+Before parsing, every entry body (raw/casual), comment body, customtext HTML,
+parsed subject display/all and independent metadata body applies the retained
+`LJ::strip_request_auth` scalar rule from `LJ/TextUtil.pm:42-48`. It removes only
+literal `&auth=` followed by ASCII word bytes after a matching `see_request`
+non-whitespace extent; matching is case insensitive and global. It does not
+remove encoded `&amp;auth`, other URLs or arbitrary secret-looking strings.
+
+The subject cleaner also applies this exact rule to its no-angle fast path,
+including entry subject/all/OG and textual currents. That is a narrow privacy
+adaptation: retained `clean_subject`/`clean_subject_all` return before cleaning
+plain subjects. Plain customtext title/URL, directly escaped comment subjects,
+account names and other non-cleaner fields are unchanged. There is no universal
+token-redaction claim.
+
+Original input bounds, original content/context hash and parent raw snapshots
+remain authoritative. Parsing, source audit and every source slice instead use
+the stripped copy, including offline image-candidate offsets. Image exchange
+identity still hashes the original input. No removed token is returned by those
+cleaner outputs or logged by preprocessing. Later raw-byte changes still revoke
+the page through the complete final reread, even if both versions clean to the
+same visible text. Compact native scalar/context assertions and an actual
+selected SQL/current-child Recent/Entry check prove this distinction; no
+request-authentication or production request-defense implementation is added.

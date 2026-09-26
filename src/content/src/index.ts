@@ -30,6 +30,7 @@ import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
 import {metadataText} from "./policy/metadata";
 import {initialNewlines} from "./policy/newlines";
+import {stripRequestAuth} from "./policy/request-auth";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
 import {entryTags, entryAttributes, eatenTags, removedTags, unsupportedRawtext, discardedHeadTags,
     ordinaryAttribute, externalControlAttributes} from "./policy/inventory";
@@ -322,6 +323,9 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
             try {
                 validateInput(input, bounds);
                 const hash = inputHash(input);
+                // Bounds and exchange identity cover ORIGINAL input. All parser
+                // locations and source slices below cover the stripped copy.
+                input = {...input, body: stripRequestAuth(input.body)};
                 const entryCasual = !casual && !comment && input.format !== "html_raw0";
                 // No runScripts, resources, fromURL or caller DOM. This worker is
                 // also denied network/files/children by the outer kernel/runtime
@@ -451,7 +455,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
             let dom: JSDOM | undefined;
             try {
                 validateMetadataInput(input, bounds);
-                const entry = input.entry;
+                const entry = {...input.entry, body: stripRequestAuth(input.entry.body)};
                 // Independent RAW-input parse; never derive helper strings from
                 // the displayed fragment. No scripts/resources or ambient console.
                 dom = new JSDOM(entry.body, {url: entry.context.documentUrl,

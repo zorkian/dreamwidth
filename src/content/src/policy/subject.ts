@@ -26,6 +26,7 @@ import {repairFormatting} from "./formatting";
 import {cleanSubjectStyle} from "./css";
 import {retainedAttributeValue, resolveDocumentUrl} from "./urls";
 import {entryAttributes} from "./inventory";
+import {stripRequestAuth} from "./request-auth";
 
 const allowed = new Set(["a", "b", "i", "u", "em", "strong", "cite"]);
 const eaten = new Set("head title style layer iframe applet object xml param base script".split(" "));
@@ -43,6 +44,10 @@ export function prepareSubject(input: SubjectInput, limits: CleanerLimits): Subj
         // cleaning as the subject policy. Native subjects have a no-angle fast
         // path preserving literal entity spellings and LF, including empty/0.
         validateInput({body: input.source, format: "html_raw0", context: input.context}, limits);
+        // Native parsed subjects reach strip_request_auth; extending that exact
+        // removal to the no-angle fast path is a narrow privacy adaptation.
+        // Validate original bounds first, then bind every location to this copy.
+        input = {...input, source: stripRequestAuth(input.source)};
         if (!/[<>]/.test(input.source)) return {kind: "ok", subject: {
             html: input.source, recentHtml: input.source, all: input.source,
         } as SubjectPreparation};
