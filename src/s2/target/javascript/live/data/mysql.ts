@@ -74,6 +74,14 @@ function number(value: unknown, min = 0, max = Number.MAX_SAFE_INTEGER): number 
     return parsed;
 }
 
+function selectedStyleId(settings: PublicSettings): number {
+    // User/Styles.pm590-600 chooses a persisted style only for stylesys2.
+    // A stale s2_style or its incompatible layers must not override DEFAULT_STYLE.
+    // Original property bytes still participate in the settings fingerprint.
+    if (Number(settings.stylesys) !== 2) return 0;
+    return settings.s2_style ? number(settings.s2_style) : 0;
+}
+
 function unsigned(value: unknown, bits: number): string {
     if ((typeof value !== "string" && typeof value !== "number" &&
         typeof value !== "bigint") || !/^\d+$/.test(String(value))) unsupported();
@@ -270,7 +278,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             properties.push(...lite, ...blob);
         }
         const settings = this.settings(facts, {properties, layers: []}, []);
-        const styleId = settings.s2_style ? number(settings.s2_style, 1) : 0;
+        const styleId = selectedStyleId(settings);
         const layers = styleId ? (await sql<Row>`SELECT type,s2lid FROM s2stylelayers2
             WHERE userid = ${id} AND styleid = ${styleId} ORDER BY type,s2lid LIMIT 9`.execute(connection)).rows : [];
         if (layers.length > 8) unsupported();
@@ -373,8 +381,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
 
     private async loadStyle(connection: Connection, owner: RawUser, selected: ClusterSettings,
         raw: RawField[]): Promise<RawStyle | null> {
-        const value = owner.publicSettings.s2_style;
-        const styleId = value ? number(value, 1) : 0;
+        const styleId = selectedStyleId(owner.publicSettings);
         const rows = styleId ? (await sql<Row>`SELECT styleid,userid,modtime,
             HEX(name) AS name_stored, HEX(CONVERT(name USING latin1)) AS name_original,
             HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip
