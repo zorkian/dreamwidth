@@ -256,10 +256,10 @@ function casualMentions(value:string):string {
 }
 
 // html_casual1 autolinks and breaks are a distinct original-source operation.
-function casualText(root:Element,source:string,comment=false,mentions=true,autoLinks=true):void {
-    if(!comment&&/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
-    if(mentions)casualMentions(source);
-    if(root.querySelector('lj-cut,lj-raw,lj,user,poll,site-embed'))throw new UnsupportedContent();
+function casualText(root:Element,source:string,comment=false,mentions=true,autoLinks=true,entry=false,recent=false,locate?:LocateNode):void {
+    if(!comment&&!entry&&/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
+    if(mentions&&!entry)casualMentions(source);
+    if(root.querySelector(entry?'lj-raw,lj,user,poll,site-embed':'lj-cut,lj-raw,lj,user,poll,site-embed'))throw new UnsupportedContent();
     for(const element of root.querySelectorAll('*'))for(const attribute of element.attributes) {
         if(/[\r\n]/.test(attribute.value))throw new UnsupportedContent();
     }
@@ -269,8 +269,31 @@ function casualText(root:Element,source:string,comment=false,mentions=true,autoL
     while(walker.nextNode())nodes.push(walker.currentNode as Text);
     for(const node of nodes) {
         let value=node.data;
+        if(entry&&!locate?.(node)) {
+            // Cut labels/controls are generated separately by the trusted cut
+            // transform. Native does not casually format their label text.
+            const prefix=/^[\t\n\v\f\r ]*/.exec(source)![0];
+            if(node!==root.firstChild||value!==prefix)continue;
+        }
+        if(entry) {
+            const location=locate?.(node);
+            const raw=location?source.slice(location.startOffset,location.endOffset):null;
+            // Bare CR is literal native data, not an automatically added break.
+            // Only restore a source extent with a maintained-parser equality proof.
+            if(raw&&/\r(?!\n)/.test(raw)) {
+                if(raw.replace(/\r\n?/g,"\n")!==value)throw new UnsupportedContent();
+                value=raw;
+            }
+        }
         const parent=node.parentElement!;
-        if(mentions&&!parent.closest('code,pre,textarea'))value=casualMentions(value);
+        if(entry&&recent&&parent.closest('lj-cut,div.ljcut'))continue;
+        if(mentions&&!parent.closest('code,pre,textarea')) {
+            if(entry) {
+                const location=locate?.(node);
+                if(location)casualMentions(source.slice(location.startOffset,location.endOffset));
+            }
+            value=casualMentions(value);
+        }
         const raw=parent.closest('pre,textarea');
         const table=parent.closest('table');
         const cell=parent.closest('td,th');
@@ -299,6 +322,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
             try {
                 validateInput(input, bounds);
                 const hash = inputHash(input);
+                const entryCasual = !casual && !comment && input.format !== "html_raw0";
                 // No runScripts, resources, fromURL or caller DOM. This worker is
                 // also denied network/files/children by the outer kernel/runtime
                 // boundary; DOMPurify is not treated as a resource-privacy tool.
@@ -316,7 +340,12 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
                 removeSourceComments(root);
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
-                if(casual||comment) {
+                // Resolve entry cuts first: omitted Recent bodies must not reach
+                // format/capability checks, and generated labels are not source text.
+                if(entryCasual)for(const element of root.querySelectorAll("[id]"))element.removeAttribute("id");
+                const earlyIds=entryCasual?replaceCuts(root,input.context,
+                    node=>dom!.nodeLocation(node)??null,bounds.maxCuts):undefined;
+                if(casual||comment||entryCasual) {
                     // Full-document parsing discards a source-leading ASCII
                     // whitespace token. This context formats its LF visibly;
                     // it does not inherit the entry-body whitespace adaptation.
@@ -327,14 +356,15 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                         if(first&&(!location||location.startOffset<prefix.length))throw new UnsupportedContent();
                         root.insertBefore(dom.window.document.createTextNode(prefix),first);
                     }
-                    if(casual)casualText(root,input.body,!!comment,comment?.formatting!=="html_casual0",!comment?.anonymous);
+                    if(casual||entryCasual)casualText(root,input.body,!!comment,
+                        entryCasual?input.format!=="html_casual0":comment?.formatting!=="html_casual0",!comment?.anonymous,entryCasual,input.context.cuts==="source-compatible-recent",node=>dom!.nodeLocation(node)??null);
                 }
                 // Source body wrappers are removed by clean_event, including all
                 // their attributes. The private BODY remains only as context.
                 for (const attribute of [...root.attributes]) root.removeAttribute(attribute.name);
-                for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
+                if(!entryCasual)for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
                 if(comment&&root.querySelector("lj-cut,lj-raw,lj,user,poll,site-embed"))throw new UnsupportedContent();
-                const ids = replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
+                const ids = earlyIds ?? replaceCuts(root, input.context, node => dom!.nodeLocation(node) ?? null, bounds.maxCuts);
                 if(comment)for(const element of root.querySelectorAll("[class]"))element.removeAttribute("class");
                 if(comment?.anonymous)for(const element of root.querySelectorAll("[style]"))element.removeAttribute("style");
                 // Anonymous extraction displays the screened original scalar,

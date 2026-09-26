@@ -63,7 +63,7 @@ export interface EntryContentContext {
 // explicit refusal or a documented security removal, never implicit admission.
 export interface EntryContentInput {
     readonly body: string; // RAW, untrusted UTF8 text; explicitly not safe HTML
-    readonly format: "html_raw0";
+    readonly format: "html_raw0" | "html_casual0" | "html_casual1";
     readonly context: EntryContentContext;
 }
 // A comment is original source with independently selected native trust/format.

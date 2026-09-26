@@ -81,7 +81,7 @@ export function validateCleanerLimits(value: CleanerLimits): void {
 export function validateInput(value: EntryContentInput, limits: CleanerLimits): void {
     const input = record(value, ["body", "format", "context"]);
     text(input.body, limits.maxInputBytes);
-    if (input.format !== "html_raw0") throw new UnsupportedContent();
+    if (!["html_raw0", "html_casual0", "html_casual1"].includes(String(input.format))) throw new UnsupportedContent();
     const context = record(input.context, ["policy", "insertionContext", "documentUrl", "entryUrl",
         "journalUsername", "journalId", "entryId", "reader", "imagePlaceholder", "cuts", "urls"]);
     if (context.policy !== "dreamwidth-entry-html-raw0-v1" ||
