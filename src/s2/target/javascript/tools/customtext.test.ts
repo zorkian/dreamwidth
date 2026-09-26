@@ -72,7 +72,7 @@ test('canonical native wrapper data and original-source customtext',()=>{
             if(row.mentions.length)assert.deepEqual(result,{kind:'failure',reason:'unsupported'},row.source);
             else {assert.equal(result.kind,'ok');if(result.kind==='ok')assert.equal(Buffer.from(result.html).toString('hex'),row.output_hex);}
         }
-        for(const source of ['\ntext','plain\nline','<pre>a\nb</pre>','mail@example.invalid','\\@name']) {
+        for(const source of ['\ntext','plain\nline','<pre>a\nb</pre>','mail@example.invalid','\\@name','<pre>\\@x</pre>','<code>\\@x</code>','<textarea>\\@x</textarea>']) {
             const row=rows.find((row:any)=>row.kind==='pipeline'&&row.source===source);
             const result=clean(source);assert.equal(result.kind,'ok');
             if(result.kind==='ok') {

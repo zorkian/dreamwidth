@@ -111,6 +111,7 @@ for my $definition ( [ 987650, 'core', 'core2.s2' ], [ 987651, 'layout', 'core2b
         "\ntext",              "https://example.invalid/a?x=1&y=2\nnext",
         "<pre>a\nb</pre>",     'mail@example.invalid',
         '\@name',              '@name',
+        '<pre>\@x</pre>', '<code>\@x</code>', '<textarea>\@x</textarea>',
         "!markdown\n**bold**", '<b>x</b>\n'
         )
     {
