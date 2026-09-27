@@ -108,6 +108,31 @@ test("effective source recursion override exports and validates without DB acces
     assert.equal(readStartupConfig(output).app.maxRecursion,50);
 }));
 
+test("trusted site-scheme setup exports actual default inheritance and rejects swallowed DB attempts", () => {
+    for (const dbAttempt of [false, true]) temporary(dir => {
+        const home = fixture(dir, `
+LJ::Hooks::register_hook('modify_scheme_list', sub {
+    my ($schemes, $merge) = @_;
+    @$schemes = ({scheme=>'fixture_child',parent=>'fixture_parent'}, {scheme=>'fixture_parent'});
+    $merge->(fixture_parent=>{parent=>'global'});
+    print '${secret}'; warn '${secret}';
+    ${dbAttempt ? "eval { DBI->connect('DBI:mysql:should-not-connect','private-user','private-password'); };" : ""}
+});
+`);
+        const output = path.join(dir, "schemes.json");
+        const result = exportSite(home, output);
+        assert.ok(!result.stdout.includes(secret) && !result.stderr.includes(secret));
+        if (dbAttempt) {
+            assert.equal(result.status, 1);
+            assert.equal(existsSync(output), false);
+        } else {
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(readStartupConfig(output).styles.siteSchemeInheritance,
+                ["fixture_child", "fixture_parent", "global"]);
+        }
+    });
+});
+
 test("exported origins round-trip through startup validation in canonical form", () => temporary(dir => {
     const cases = [
         {app: "https://app.example.test", listen: "http://Viewer.Example.test:9191",
