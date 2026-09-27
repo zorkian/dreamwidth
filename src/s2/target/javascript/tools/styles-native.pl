@@ -80,4 +80,29 @@ for my$value("15em", "1.5em", "junk15em", "0", "bad", "15bogus", "-5px", "0em") 
   }
  }
 }
+{
+ my @keys=map {my $module=$_;map {"module_${module}_$_"} qw(show order section)} qw(userprofile links pagesummary calendar);
+ push @keys,'module_tags_section';
+ my $source='layerinfo type = "user"; '.join(' ',map {'set '.$_.' = '.(/_show$/?'true':/_order$/?'8':'"two"').';'} @keys).' set module_links_order = 9;';
+ my $output='';
+ $compiler->compile_source({source=>\$source,type=>'user',layerid=>990004,output=>\$output,format=>'perl',builtinPackage=>'S2::Builtin::LJ'});
+ S2::load_layer(990004,$output,123);
+ for my $layout(qw(tabula easyread)) {
+  my @layers=$layout eq 'tabula'?(980001,980002,980003,990004):(990001,990002,990003,990004);
+  my $ctx=S2::make_context(@layers);
+  push @rows,{name=>'module-properties',layout=>$layout,compiled=>$output,values=>{map {$_=>$ctx->[S2::PROPS]->{$_}} @keys}};
+  for my $case(qw(collision none empty-negative none-negative seeded-negative credit-slot)) {
+   my $ctx=S2::make_context(@layers);my $p=$ctx->[S2::PROPS];
+   for my $key(keys %$p){$p->{$key}=0 if $key=~/^module_.*_show$/;}
+   $p->{module_sections}={one=>[],two=>[],none=>[]};
+   $p->{module_userprofile_show}=1;$p->{module_userprofile_section}=$case=~/^none/?'none':'one';
+   $p->{module_userprofile_order}=$case=~/negative/?-1:2;
+   if($case eq 'seeded-negative'){$p->{module_sections}{one}=[['seed'],['seed']];}
+   if($case eq 'collision'){$p->{module_links_show}=1;$p->{module_links_section}='one';$p->{module_links_order}=2;}
+   if($case eq 'credit-slot'){$p->{module_userprofile_show}=0;$p->{module_links_show}=1;$p->{module_links_section}=$p->{module_credit_section};$p->{module_links_order}=$p->{module_credit_order};$p->{module_credit_show}=1;}
+   my $error='';eval {S2::run_code($ctx,'modules_init()');1} or $error=$@;
+   push @rows,{name=>'module-placement',layout=>$layout,case=>$case,sections=>$p->{module_sections},error=>$error};
+  }
+ }
+}
 print JSON::PP->new->canonical->utf8->encode(\@rows);
