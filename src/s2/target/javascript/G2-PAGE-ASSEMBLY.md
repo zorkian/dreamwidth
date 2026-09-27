@@ -206,3 +206,16 @@ no-read behavior, not a JS cleaner implementation. Tree order/alias/cycle contro
 approved synthetic records. Original cleaning, installed calendar, source URL/image
 providers, public SQL/identity witnesses, factory binding, cmtinfo and ordinary
 HTTP/browser acceptance remain required. Held subject code is not imported.
+
+The general selected-text parent now validates a suspended metadata-only
+record against its shown header and page-loaded S poster instead of requesting
+a nonexistent talktext2 subject source. It projects only named converted
+Comment fields. For a map-based picture keyword, it traverses the witnessed
+owner map redirects without sending the map rows to the child. Comment
+`admin_post` is derived from the same current community/poster/`reluser A`
+witness used by Entry; the stored property alone grants nothing. The witness
+is revalidated before release. An isolated SQL fixture compares installed
+`LJ::Comment::admin_post` on personal, current maintainer and revoked cases,
+then passes the approved suspended record into a real Context Comment model.
+The test supplies declared fixed URL/date/edit providers and never claims
+installed comment cleaning or complete worker/HTTP serving.
