@@ -19,7 +19,10 @@ import path from "node:path";
 import {tmpdir} from "node:os";
 import {ArtifactCompiler,CompilerFailure,instantiateProgram,type ActiveStyleSnapshot,type ProgramArtifact} from "../live/render/layer-artifact";
 import {ArtifactCache} from "../live/render/artifact-cache";
+import {NativeOutput,NativeString,caseString} from "../runtime/native-string";
 import {Context} from "../runtime/s2runtime";
+import {scalarPV,scalarNumber,legacyText} from "../runtime/native-scalar";
+import {exactHostInteger} from "../runtime/native-number";
 
 const root=path.resolve(__dirname,"../../../..");
 const tools=path.join(root,"target/javascript/tools");
@@ -59,9 +62,9 @@ test("arbitrary custom stack: native function/alias/inheritance/composites/trust
     for(const row of oracle.recursion) {
         const bounded:Context=new Context(instantiateProgram(result.program),()=>{},undefined,undefined,undefined,row.maxRecursion);
         if(row.refused)assert.throws(()=>bounded.getFunction("depth(int)")(bounded,120),/Excessive S2 recursion/);
-        else assert.equal(bounded.getFunction("depth(int)")(bounded,120),row.value);
+        else assert.equal(exactHostInteger(scalarNumber(bounded.getFunction("depth(int)")(bounded,120)),0,500),row.value);
     }
-    assert.equal(ctx.getFunction("depth(int)")(ctx,120),120); // legacy config DW default500
+    assert.equal(exactHostInteger(scalarNumber(ctx.getFunction("depth(int)")(ctx,120)),0,500),120); // legacy config DW default500
     assert.equal(layers[0]!.declarations.get("_matrix")?.type,"int[][]");
     assert.equal(layers[0]!.declarations.get("_labels")?.type,"string{}");
     for(const row of oracle.enumerations) {
@@ -69,11 +72,11 @@ test("arbitrary custom stack: native function/alias/inheritance/composites/trust
         const current=new Context(layers,()=>{});
         assert.equal(Object.hasOwn(current.prop,"_tone"),row.present);
         assert.equal(current.prop._tone??null,row.value);
-        assert.equal(current.prop._other,"outside");assert.equal(current.prop._zero,"0");
+        assert.equal(legacyText(scalarPV(current.prop._other)),"outside");assert.equal(legacyText(scalarPV(current.prop._zero)),"0");
     }
     const first=new Context(instantiateProgram(result.program),()=>{});
     (first.prop._matrix as number[][])[0]![0]=999;
-    assert.equal((new Context(instantiateProgram(result.program),()=>{}).prop._matrix as number[][])[0]![0],2);
+    assert.equal(exactHostInteger(scalarNumber((new Context(instantiateProgram(result.program),()=>{}).prop._matrix as unknown[][])[0]![0]),0,10),2);
     assert.throws(()=>instantiateProgram({...result.program} as ProgramArtifact),CompilerFailure);
     for(const negative of ["delete-array","delete-scalar"]) {
         const failure=spawnSync("/usr/bin/perl",[path.join(tools,"active-native.pl"),negative],{env,encoding:"utf8"});
@@ -149,4 +152,52 @@ test("compiler isolation denies private reads, writes, sockets, children and inh
         const control=spawnSync("/usr/bin/perl",[probe],{env,stdio:["pipe","pipe","pipe",fd]});
         assert.notEqual(control.status,0);assert.match(control.stderr!.toString(),/private read/);
     }finally{closeSync(fd);}
+}));
+
+
+test("source and shared sink preserve independent native raw octets and wide operators",()=>fixture(async(_directory,launcher)=> {
+    const oracle=JSON.parse(execFileSync("/usr/bin/prlimit",["--as=134217728","--cpu=5","--",
+        "/usr/bin/perl",path.join(tools,"scalar-native.pl")],{env,encoding:"utf8",timeout:10000}));
+    assert.equal(oracle.outputUtf8,false);
+    const snapshot={...oracle.snapshot,layers:oracle.snapshot.layers.map((layer:any)=>{
+        const {sourceBase64,activeBase64,...identity}=layer;
+        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64"),activeCompiledBytes:Buffer.from(activeBase64,"base64")};
+    })};
+    const result=await compiler(launcher).compile(snapshot);
+    assert.equal(result.kind,"compiled");if(result.kind!=="compiled")throw Error("compile required");
+    for(const row of oracle.caseRows) {
+        const pv=NativeString.flagged(Buffer.from(row.input,"hex"));
+        for(const [op,key] of [["lower","lower"],["upper","upper"],["upperfirst","title"]] as const) {
+            assert.equal(caseString(pv,op,result.program.scalarProfile).bytes().toString("hex"),row[key]);
+        }
+    }
+    const output=new NativeOutput();
+    const context=new Context(instantiateProgram(result.program),()=>{throw Error("Legacy sink used");},
+        undefined,undefined,undefined,500,{raw:value=>output.append(value),safe:()=>{throw Error("Unexpected safe output");}});
+    const bytes=NativeString.bytes(Buffer.from('e78cabc3a9','hex'));
+    const pv=(value:string)=>NativeString.hostUtf8Bytes(value);
+    const calls:Record<string,()=>unknown>={
+        length:()=>context.builtin._string__length!(context,bytes),
+        index:()=>context.builtin._string__index!(context,bytes,pv('é')),
+        substr:()=>context.builtin._string__substr!(context,bytes,0,1),
+        substr_invalid:()=>context.builtin._string__substr!(context,NativeString.bytes(Buffer.from('ff41','hex')),0,1),
+        lower:()=>context.builtin._string__lower!(context,scalarPV('AZ猫é')),
+        upper:()=>context.builtin._string__upper!(context,scalarPV('az猫é')),
+        upperfirst:()=>context.builtin._string__upperfirst!(context,scalarPV('az猫é')),
+        ends_lf:()=>context.builtin._string__ends_with!(context,pv('x\n'),pv('x')),
+        replace:()=>context.builtin._string__replace!(context,pv('a.a'),pv('.'),pv('!')),
+        split:()=>context.builtin._string__split!(context,pv('a::'),pv(':')),
+        compare:()=>context.builtin._string__compare!(context,pv('a'),pv('b')),
+        repeat:()=>context.builtin._string__repeat!(context,pv('ab'),2),
+    };
+    assert.deepEqual(oracle.builtinRows.map((row:any)=>row.id),Object.keys(calls));
+    for(const row of oracle.builtinRows) {
+        const call=calls[row.id]; assert.ok(call);
+        const value=call();
+        if(row.hex!==undefined)assert.equal(scalarPV(value).bytes().toString('hex'),row.hex,row.id);
+        else if(row.parts)assert.deepEqual((value as unknown[]).map(part=>legacyText(scalarPV(part))),row.parts,row.id);
+        else assert.equal(exactHostInteger(scalarNumber(value),-100,100),row.value,row.id);
+    }
+    context.runFunction("main()");
+    assert.equal(output.bytes().toString("base64"),oracle.outputBase64);
 }));

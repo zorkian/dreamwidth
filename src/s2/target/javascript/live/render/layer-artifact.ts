@@ -12,9 +12,11 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 import {createHash, createHmac, timingSafeEqual} from "node:crypto";
-import {spawn} from "node:child_process";
+import {spawn,execFileSync} from "node:child_process";
 import {readFileSync, readdirSync, lstatSync, realpathSync} from "node:fs";
 import path from "node:path";
+import {NativeProfile} from "../../runtime/native-profile";
+import {NUMERIC_PROFILE} from "../../runtime/native-number";
 import {ABI_VERSION, Layer, s2} from "../../runtime/s2runtime";
 
 export type LayerType = "core" | "i18nc" | "layout" | "i18n" | "theme" | "user";
@@ -37,7 +39,7 @@ export interface CompiledLayer extends LayerIdentity {
 }
 export interface ProgramArtifact {
     readonly schema:1; readonly abi:number; readonly compilerDigest:string;
-    readonly dependenciesDigest:string; readonly layers:readonly CompiledLayer[];
+    readonly dependenciesDigest:string; readonly scalarProfile:NativeProfile; readonly layers:readonly CompiledLayer[];
 }
 export interface RecoveryDependency {
     readonly kind:"recovery"; readonly layerId:number;
@@ -84,6 +86,28 @@ function capture(snapshot:ActiveStyleSnapshot):Capture {
     if(layers[0]?.type!=="core")throw new CompilerFailure();
     return {styleId:snapshot.styleId,systemUserId:snapshot.systemUserId,layers};
 }
+function validateProfile(value:any):NativeProfile {
+    if(!value||value.version!=="5.34.0"||value.ivsize!=="8"||value.uvsize!=="8"||value.nvsize!=="8"||
+        value.nvtype!=="double"||value.nv_preserves_uv_bits!=="53"||typeof value.archname!=="string"||
+        typeof value.unicodeVersion!=="string")throw new CompilerFailure();
+    for(const name of ["lower","upper","title"]) {
+        const map=value[name];
+        if(!map||!Array.isArray(map.ranges)||!Array.isArray(map.values)||map.ranges.length!==map.values.length||
+            !map.ranges.length||map.ranges.length>100000)throw new CompilerFailure();
+        let previous=-1;
+        for(let index=0;index<map.ranges.length;index++) {
+            const range=map.ranges[index],mapped=map.values[index];
+            if(!Number.isSafeInteger(range)||range<0||range<=previous)throw new CompilerFailure();
+            previous=range;
+            const points=Array.isArray(mapped)?mapped:[mapped];
+            if(!points.length||!points.every((point:any)=>Number.isSafeInteger(point)&&point>=0))throw new CompilerFailure();
+            if(Array.isArray(mapped))Object.freeze(mapped);
+        }
+        Object.freeze(map.ranges);Object.freeze(map.values);Object.freeze(map);
+    }
+    return Object.freeze(value);
+}
+
 function freezeProgram(program:ProgramArtifact):ProgramArtifact {
     for(const layer of program.layers)Object.freeze(layer);
     Object.freeze(program.layers);Object.freeze(program);issued.add(program);return program;
@@ -95,11 +119,12 @@ export function instantiateProgram(program:ProgramArtifact):Layer[] {
     return program.layers.map(item=> {
         const layer=new Function("s2",`"use strict";\n${item.code}\nreturn ${item.variable};`)(s2);
         if(!(layer instanceof Layer))throw new CompilerFailure();
-        layer.source=`active-layer:${item.id}`;return layer;
+        layer.source=`active-layer:${item.id}`;layer.scalarProfile=program.scalarProfile;return layer;
     });
 }
 export class ArtifactCompiler {
     readonly digest:string;
+    readonly scalarProfile:NativeProfile;
     private readonly script:string;
     private readonly root:string;
     private readonly perl:string;
@@ -120,9 +145,29 @@ export class ArtifactCompiler {
         };
         walk(path.join(this.root,"S2"));
         files.push(path.join(this.root,"S2.pm"),this.script,
-            path.join(this.root,"target/javascript/runtime/s2runtime.ts"),this.perl,this.isolation);
+            path.join(this.root,"target/javascript/runtime/s2runtime.ts"),
+            path.join(this.root,"target/javascript/runtime/native-string.ts"),
+            path.join(this.root,"target/javascript/runtime/native-number.ts"),
+            path.join(this.root,"target/javascript/runtime/native-scalar.ts"),
+            path.join(this.root,"target/javascript/runtime/native-profile.ts"),this.perl,this.isolation);
+        // Trusted installed profile extraction is a setup operation, never a
+        // serving request or execution of persisted Perl. Use the same isolation.
+        let extracted:any;
+        try {
+            extracted=JSON.parse(execFileSync(this.isolation,[this.perl,this.script,this.root,path.join(this.root,"S2.pm")],{
+                input:JSON.stringify({profileOnly:true}),timeout:10000,maxBuffer:1048576,
+                env:{PATH:"/usr/bin:/bin",LANG:"C",LC_ALL:"C",TZ:"UTC",PERL_HASH_SEED:"0",PERL_PERTURB_KEYS:"0"},
+            }).toString("utf8"));
+        } catch {throw new CompilerFailure();}
+        this.scalarProfile=validateProfile(extracted.profile);
+        if(extracted.kind!=="profile"||!Array.isArray(extracted.sources))throw new CompilerFailure();
+        for(const source of extracted.sources) {
+            if(typeof source.file!=="string"||!path.isAbsolute(source.file)||
+                typeof source.digest!=="string"||sha256(readFileSync(source.file))!==source.digest)throw new CompilerFailure();
+            files.push(realpathSync(source.file));
+        }
         this.dependencies=files.map(file=>({file,digest:sha256(readFileSync(file))}));
-        this.digest=sha256(JSON.stringify({abi:ABI_VERSION,files:this.dependencies.map(({file,digest})=>[
+        this.digest=sha256(JSON.stringify({abi:ABI_VERSION,scalarABI:NUMERIC_PROFILE,profile:this.scalarProfile,files:this.dependencies.map(({file,digest})=>[
             file.startsWith(this.root+path.sep)?path.relative(this.root,file):path.basename(file),digest])}));
     }
     private assertDependencies():void {
@@ -154,7 +199,7 @@ export class ArtifactCompiler {
             return {...identity,variable:emitted.variable,code:emitted.code,codeSha256:sha256(emitted.code)};
         });
         return {kind:"compiled",program:freezeProgram({schema:1,abi:ABI_VERSION,compilerDigest:this.digest,
-            dependenciesDigest:key,layers})};
+            dependenciesDigest:key,scalarProfile:this.scalarProfile,layers})};
     }
     // Cache authentication is issued by the private local producer root. A caller
     // cannot import a plain artifact or bless it with its own code/source hashes.
@@ -171,6 +216,7 @@ export class ArtifactCompiler {
             if(!timingSafeEqual(expected,Buffer.from(envelope.mac,"hex")))throw new CompilerFailure();
             const program:ProgramArtifact=JSON.parse(envelope.payload);
             if(program.schema!==1||program.abi!==ABI_VERSION||program.compilerDigest!==this.digest||
+                JSON.stringify(program.scalarProfile)!==JSON.stringify(this.scalarProfile)||
                 program.dependenciesDigest!==this.key(snapshot)||!Array.isArray(program.layers)||
                 program.layers.length!==snapshot.layers.length)throw new CompilerFailure();
             for(const [index,layer] of program.layers.entries()) {

@@ -12,7 +12,24 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {NativeSink, scalarPV, scalarNumber, scalarConcat, scalarTruthy, scalarNotags, scalarCopy, incrementScalar, legacyText, NativeString, NativeNumber} from "./native-scalar";
+
+import {arithmetic, divide, modulo, intCast, numericCompare, arrayIndex} from "./native-number";
+
+import {NativeProfile} from "./native-profile";
+import * as nativeStrings from "./native-string";
+
 export const ABI_VERSION = 1;
+
+type EvaluationMode = "scalar" | "list" | "void";
+let evaluationMode: EvaluationMode = "scalar";
+function evaluateAs<T>(mode: EvaluationMode, operation: () => T): T {
+    const previous=evaluationMode;
+    evaluationMode=mode;
+    try {return operation();} finally {evaluationMode=previous;}
+}
+const contextBrands = new WeakSet<object>();
+const hashIdentities = new WeakMap<object, Map<string, NativeString>>();
 
 type S2Function = (context: Context, ...args: unknown[]) => unknown;
 type S2Object = Record<string, unknown>;
@@ -22,6 +39,7 @@ function object(value: unknown): value is S2Object {
 }
 
 function cloneData(value: unknown, seen = new Map<object, unknown>()): unknown {
+    if (NativeString.is(value) || NativeNumber.is(value)) return scalarCopy(value);
     if (typeof value !== "object" || value === null) return value;
     if (seen.has(value)) return seen.get(value);
     const copy: unknown[] | S2Object = Array.isArray(value) ? [] : Object.create(null);
@@ -30,10 +48,13 @@ function cloneData(value: unknown, seen = new Map<object, unknown>()): unknown {
     for (const key of Object.keys(value)) {
         (copy as S2Object)[key] = cloneData((value as S2Object)[key], seen);
     }
+    const identities = hashIdentities.get(value);
+    if (identities) hashIdentities.set(copy, new Map([...identities].map(([key, pv]) => [key, pv.clone()])));
     return copy;
 }
 
 export class Layer {
+    scalarProfile?: NativeProfile;
     source = "<unknown S2 layer>";
     readonly info: Record<string, string> = Object.create(null);
     readonly functions = new Map<string, S2Function>();
@@ -85,16 +106,128 @@ export class Layer {
     }
 }
 
+function nativeHashKey(value: unknown): string {
+    if (!NativeString.is(value) && !NativeNumber.is(value)) return String(value);
+    const key = nativeStrings.hashKeyBytes(scalarPV(value));
+    return (key.utf8 ? "\u0000utf8:" : "\u0000pv:") + key.bytes.toString("hex");
+}
+
 export const runtime = {
+    pvBytes(hex: string): NativeString {
+        if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error("Invalid native PV literal");
+        return NativeString.bytes(Buffer.from(hex, "hex"));
+    },
+    memberSlot(receiver: unknown, key: unknown, kind: "array" | "hash" | "field") {
+        if (receiver === null || typeof receiver !== "object" || runtime.isContext(receiver)) {
+            throw new Error("Invalid S2 lvalue receiver");
+        }
+        let property: string;
+        if (kind === "array") {
+            if (!Array.isArray(receiver)) throw new Error("S2 array lvalue requires an array");
+            let index = arrayIndex(scalarNumber(key));
+            if (index < 0n) index += BigInt(receiver.length);
+            property = index.toString();
+            return {
+                get: () => index < 0n || index >= BigInt(receiver.length) ? undefined : receiver[Number(index)],
+                set: (value: unknown) => {
+                    if (index < 0n) throw new Error("Modification of non-creatable array value");
+                    // JavaScript's array length is a transport constraint; do not
+                    // wrap a wide positive index into another native element.
+                    if (index >= 4294967295n) throw new Error("S2 array allocation exceeds transport bounds");
+                    receiver[Number(index)] = value;
+                    return value;
+                },
+            };
+        }
+        property = kind === "hash" ? nativeHashKey(key) : String(key);
+        const target = receiver as Record<string, unknown>;
+        return {get: () => target[property], delete: () => {
+            hashIdentities.get(target)?.delete(property);
+            return delete target[property];
+        }, set: (value: unknown) => {
+            if (kind === "hash" && (NativeString.is(key) || NativeNumber.is(key))) {
+                let identities = hashIdentities.get(target);
+                if (!identities) { identities = new Map(); hashIdentities.set(target, identities); }
+                identities.set(property, scalarPV(key));
+            }
+            Object.defineProperty(target, property, {value, writable: true, enumerable: true, configurable: true});
+            return value;
+        }};
+    },
+    deleteSlot(slot: {delete?(): boolean}): boolean {
+        if (!slot.delete) throw new Error("Native delete requires a hash element");
+        return slot.delete();
+    },
+    assignSlot(slot: {set(value: unknown): unknown}, value: unknown, notags: boolean): unknown {
+        return slot.set(notags ? scalarNotags(value) : scalarCopy(value));
+    },
+    incrementSlot(slot: {get(): unknown; set(value: unknown): unknown}, plus: boolean, pre: boolean): unknown {
+        const before = scalarCopy(slot.get());
+        const after = incrementScalar(slot.get(), plus);
+        slot.set(after);
+        return pre ? after : before;
+    },
+    scalarCopy,
+    scalarTruthy,
+    s2StringTruthy(value: unknown): boolean { return scalarPV(value).bytes().length !== 0; },
+    scalarLogical(op: "and" | "or", left: unknown, right: () => unknown): unknown {
+        return op === "and" ? scalarTruthy(left) ? right() : left : scalarTruthy(left) ? left : right();
+    },
+    scalarNumber,
+    scalarPV,
+    scalarInt(value: unknown): NativeNumber { return intCast(scalarNumber(value)); },
+    scalarCompare(kind: string, op: string, left: unknown, right: unknown): boolean {
+        const comparison = kind === "string" ? nativeStrings.compareStrings(scalarPV(left), scalarPV(right)) :
+            numericCompare(scalarNumber(left), scalarNumber(right));
+        switch (op) {
+            case "==": return comparison === 0;
+            case "!=": return comparison !== 0;
+            case "<": return comparison < 0;
+            case "<=": return comparison <= 0;
+            case ">": return comparison > 0;
+            case ">=": return comparison >= 0;
+            default: throw new Error("Unknown scalar comparison");
+        }
+    },
+    scalarNegate(value: unknown): NativeNumber { return arithmetic("-", NativeNumber.integer(0n), scalarNumber(value)); },
+    numericLiteral(lexeme: string): NativeNumber { return NativeNumber.literal(lexeme); },
+    scalarBinary(op: string, left: unknown, right: unknown): NativeString | NativeNumber {
+        if (op === "concat") return scalarConcat(left, right);
+        const a = scalarNumber(left), b = scalarNumber(right);
+        if (op === "/") return intCast(divide(a, b));
+        if (op === "%") return modulo(a, b);
+        if (op === "+" || op === "-" || op === "*") return arithmetic(op, a, b);
+        throw new Error("Unknown native scalar operator");
+    },
+    isContext(value: unknown): value is Context {
+        return typeof value === "object" && value !== null && contextBrands.has(value);
+    },
+    evaluateAs,
+    evaluationContext(): EvaluationMode { return evaluationMode; },
+    reverseNative(value: unknown): NativeString {
+        const pv=scalarPV(value);
+        return evaluationMode === "scalar" ? nativeStrings.reverseString(pv) : pv;
+    },
+    reverseInContext(context: Context, value: unknown): NativeString {
+        if (!runtime.isContext(context)) throw new Error("Invalid native evaluation Context");
+        return runtime.reverseNative(value);
+    },
     recoveryCheckpoint(context: Context): void { context.recoveryCheckpoint(); },
     makeHash(pairs: readonly (readonly [unknown, unknown])[]): Record<string, unknown> {
         const hash: Record<string, unknown> = Object.create(null);
-        for (const [key, value] of pairs) hash[String(key)] = value;
+        const identities = new Map<string, NativeString>();
+        for (const [key, value] of pairs) {
+            const encoded = nativeHashKey(key);
+            hash[encoded] = scalarCopy(value);
+            if (NativeString.is(key) || NativeNumber.is(key)) identities.set(encoded, scalarPV(key));
+        }
+        if (identities.size) hashIdentities.set(hash, identities);
         return hash;
     },
     prepareString(value: unknown): string {
         if (value === null || value === undefined) return "";
         if (object(value) && value[".isnull"]) return "";
+        if (NativeString.is(value) || NativeNumber.is(value)) return scalarPV(value) as unknown as string;
         return String(value);
     },
 
@@ -117,10 +250,12 @@ export const runtime = {
     hashKeys(value: unknown): string[] {
         if (value === null || value === undefined) return [];
         if (!object(value)) throw new Error("S2 hash foreach requires a hash");
-        return Object.keys(value);
+        const identities = hashIdentities.get(value);
+        return Object.keys(value).map(key => identities?.get(key)?.clone() ?? key) as string[];
     },
 
     characters(value: unknown): string[] {
+        if (NativeString.is(value)) return nativeStrings.byteCharacters(value) as unknown as string[];
         return Array.from(String(value ?? ""));
     },
 
@@ -130,11 +265,38 @@ export const runtime = {
         return value;
     },
 
+    *iterationSlots(value: unknown, kind: "array" | "hash" | "string") {
+        if (kind === "array") {
+            const values = runtime.asArray(value);
+            // Native foreach aliases each array element and observes changes to
+            // the remaining array while iterating. Do not clone the collection.
+            for (let index = 0; index < values.length; index++) {
+                yield runtime.memberSlot(values, NativeNumber.integer(BigInt(index)), "array");
+            }
+            return;
+        }
+        const values = kind === "hash" ? runtime.hashKeys(value) : runtime.characters(value);
+        for (const value of values) {
+            let current: unknown = scalarCopy(value);
+            yield {get: () => current, set: (next: unknown) => current = next};
+        }
+    },
+
     isDefined(value: unknown): boolean {
         return value !== undefined && value !== null && !(object(value) && value[".isnull"]);
     },
 
     makeRange(first: number, last: number): number[] {
+        if (NativeNumber.is(first) || NativeNumber.is(last)) {
+            const a = arrayIndex(scalarNumber(first)), b = arrayIndex(scalarNumber(last));
+            if (b < a) return [];
+            // The child memory/CPU limits govern allocation. This check is only
+            // the representation's real array-length limit, not a fixture cap.
+            if (b - a + 1n > 4294967295n) throw new Error("S2 range exceeds array transport bounds");
+            const values: NativeNumber[] = [];
+            for (let index = a; index <= b; index++) values.push(NativeNumber.integer(index));
+            return values as unknown as number[];
+        }
         if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last)) {
             throw new Error("S2 range requires safe integers in this slice");
         }
@@ -144,10 +306,12 @@ export const runtime = {
     },
 
     stringLength(value: string): number {
+        if (NativeString.is(value)) return nativeStrings.stringLength(value);
         return Buffer.byteLength(value, "utf8");
     },
 
     stringSubstr(value: string, start: number, length: number): string {
+        if (NativeString.is(value)) return nativeStrings.builtinSubstr(value, start, length) as unknown as string;
         const characters = Array.from(value);
         const offset = start < 0 ? Math.max(0, characters.length + start) : start;
         return characters.slice(offset, offset + length).join("");
@@ -158,10 +322,12 @@ export const runtime = {
     },
 
     reverseString(value: string): string {
+        if (NativeString.is(value)) return nativeStrings.reverseString(value) as unknown as string;
         return Array.from(value).reverse().join("");
     },
 
     notags(value: string): string {
+        if (NativeString.is(value)) return scalarNotags(value) as unknown as string;
         return value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
     },
 };
@@ -324,16 +490,43 @@ export const builtin = {
 
 const fixtureBuiltins: FixtureBuiltins = {
     _string__length(_context, value) {
-        return runtime.stringLength(value);
+        return NativeString.is(value) ? NativeNumber.integer(BigInt(nativeStrings.stringLength(value))) : runtime.stringLength(value);
+    },
+    _string__index(_context, value, needle, position) {
+        const offset = arrayIndex(scalarNumber(position));
+        if (offset > BigInt(nativeStrings.stringLength(scalarPV(value)))) return NativeNumber.integer(-1n);
+        return NativeNumber.integer(BigInt(nativeStrings.stringIndex(scalarPV(value), scalarPV(needle), Number(offset < 0n ? 0n : offset))));
     },
     _string__substr(_context, value, start, length) {
-        return runtime.stringSubstr(value, start, length);
+        if (!NativeString.is(value)) return runtime.stringSubstr(value, start, length);
+        const offset = arrayIndex(scalarNumber(start)), count = arrayIndex(scalarNumber(length));
+        const bound = BigInt(value.bytes().length);
+        if (offset > bound || offset < -bound) return NativeString.bytes(new Uint8Array());
+        return nativeStrings.builtinSubstr(value, Number(offset), Number(count > bound ? bound : count < -bound ? -bound : count));
+    },
+    _string__lower(context, value) { return nativeStrings.caseString(scalarPV(value), "lower",context.scalarProfile); },
+    _string__upper(context, value) { return nativeStrings.caseString(scalarPV(value), "upper",context.scalarProfile); },
+    _string__upperfirst(context, value) { return nativeStrings.caseString(scalarPV(value), "upperfirst",context.scalarProfile); },
+    _string__starts_with(_context, value, needle) { return nativeStrings.startsWith(scalarPV(value), scalarPV(needle)); },
+    _string__ends_with(_context, value, needle) { return nativeStrings.endsWith(scalarPV(value), scalarPV(needle)); },
+    _string__contains(_context, value, needle) { return nativeStrings.stringIndex(scalarPV(value), scalarPV(needle)) >= 0; },
+    _string__replace(_context, value, find, replacement) { return nativeStrings.replaceString(scalarPV(value), scalarPV(find), scalarPV(replacement)); },
+    _string__split(_context, value, separator) { return nativeStrings.splitString(scalarPV(value), scalarPV(separator)); },
+    _string__compare(_context, value, other) { return NativeNumber.integer(BigInt(nativeStrings.compareStrings(scalarPV(other), scalarPV(value)))); },
+    _string__repeat(_context, value, times) {
+        const pv = scalarPV(value), number = scalarNumber(times), wire = number.wire();
+        const count = wire.mode === "nv" ? Buffer.from(wire.value, "hex").readDoubleBE() : Number(BigInt(wire.value));
+        if (nativeStrings.stringLength(pv) * count > 5000) return NativeString.hostUtf8Bytes("[too large]");
+        if (!(count > 0) || !pv.bytes().length) return NativeString.bytes(new Uint8Array());
+        const chunks = Array.from({length: Math.trunc(count)}, () => pv.bytes());
+        return pv.flagged() ? NativeString.flagged(Buffer.concat(chunks)) : NativeString.bytes(Buffer.concat(chunks));
     },
 };
 
 export class Context {
     readonly prop: Record<string, unknown> = Object.create(null);
     readonly builtin: FixtureBuiltins;
+    readonly scalarProfile?: NativeProfile;
     private readonly functions = new Map<string, S2Function>();
     private readonly classes = new Map<string, string | undefined>();
     private readonly methodFrames: string[] = [];
@@ -341,14 +534,19 @@ export class Context {
     private deadline = 0;
     private functionCalls = 0;
     private printCalls = 0;
+    evaluationContext(): EvaluationMode { return evaluationMode; }
+    evaluateAs<T>(mode: EvaluationMode, operation: () => T): T { return evaluateAs(mode, operation); }
 
     constructor(
         layers: Layer[], private readonly write: (text: string) => void,
         properties?: Record<string, unknown>, callbacks?: FixtureBuiltins,
         private readonly safeOutput: (text: string) => string = runtime.notags,
         private readonly maxRecursion = 500,
+        private readonly nativeSink?: NativeSink,
     ) {
         if (!Number.isSafeInteger(maxRecursion) || maxRecursion < 1) throw new Error("Invalid S2 recursion bound");
+        this.scalarProfile=layers.find(layer=>layer.scalarProfile)?.scalarProfile;
+        contextBrands.add(this);
         for (const layer of layers) {
             for (const [name, implementation] of layer.functions) {
                 this.functions.set(name, implementation);
@@ -366,15 +564,14 @@ export class Context {
         // back to a lower layer's set. Perl-false scalar values bypass this check.
         for (const layer of layers) for (const [name, declaration] of layer.declarations) {
             const value = this.prop[name];
-            if (value === undefined || value === null || value === false || value === 0 ||
-                value === "" || value === "0") continue;
+            if (!scalarTruthy(value)) continue;
             const {values, allow_other} = declaration.attributes;
             if (!values || values === "0" || (allow_other && allow_other !== "0")) continue;
             const pairs = values.split("|");
             while (pairs[pairs.length - 1] === "") pairs.pop();
             const allowed = new Map<string, string | undefined>();
             for (let index = 0; index < pairs.length; index += 2) allowed.set(pairs[index]!, pairs[index + 1]);
-            const key = value === true ? "1" : String(value);
+            const key = value === true ? "1" : NativeString.is(value) || NativeNumber.is(value) ? legacyText(scalarPV(value)) : String(value);
             const label = allowed.get(key);
             if (!label || label === "0") delete this.prop[name];
         }
@@ -391,7 +588,8 @@ export class Context {
 
     print(value: unknown): void {
         if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
-        this.write(String(value));
+        if (this.nativeSink) this.nativeSink.raw(scalarPV(value));
+        else this.write(NativeString.is(value) || NativeNumber.is(value) ? legacyText(scalarPV(value)) : String(value));
     }
 
     objectIsa(value: unknown, type: string): boolean {
@@ -413,12 +611,14 @@ export class Context {
 
     toString(value: unknown): string {
         if (!runtime.isDefined(value)) return "";
-        return String(this.getMethod(value, "as_string()", { source: "<interpolation>" } as Layer, 0)(this, value));
+        const result = this.getMethod(value, "as_string()", { source: "<interpolation>" } as Layer, 0)(this, value);
+        return NativeString.is(result) || NativeNumber.is(result) ? result as unknown as string : String(result);
     }
 
     safePrint(value: unknown): void {
         if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
-        this.write(this.safeOutput(String(value)));
+        if (this.nativeSink) this.nativeSink.safe(scalarPV(value));
+        else this.write(this.safeOutput(NativeString.is(value) || NativeNumber.is(value) ? legacyText(scalarPV(value)) : String(value)));
     }
 
     getFunction(name: string): S2Function {
@@ -450,7 +650,7 @@ export class Context {
         this.callFrames.push(name);
         try {
             if (++this.functionCalls % 16 === 0) this.recoveryCheckpoint();
-            return implementation(context, ...args);
+            return scalarCopy(implementation(context, ...args.map(scalarCopy)));
         } finally { this.callFrames.pop(); }
     }
 
