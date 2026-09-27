@@ -110,7 +110,7 @@ export class Parser {
     }
     private prefix(): Expr {
         const t=this.take(); let x: Expr;
-        if (t.kind === "number") x={kind:"literal",value:Number(t.value)};
+        if (t.kind === "number") x={kind:"literal",value:Number.isSafeInteger(Number(t.value)) ? Number(t.value) : null,numeric:t.value};
         else if(t.kind === "string") x={kind:"literal",value:t.value};
         else if(t.kind === "variable") x={kind:"variable",name:t.value};
         else if(t.value === "undef") x={kind:"literal",value:null};
@@ -169,7 +169,13 @@ export class Parser {
             if(p === undefined || p < minimum) break;
             this.take();
             if(op === "?") {const yes=this.expr();this.need(":");left={kind:"conditional",test:left,yes,no:this.expr(p)};}
-            else left={kind:"binary",op,left,right:this.expr(op === "=" ? p : p+1)};
+            else {
+                const right=this.expr(op === "=" ? p : p+1);
+                if(op === ".") {
+                    if(left.kind === "concat")left.items.push(right);
+                    else left={kind:"concat",items:[left,right]};
+                } else left={kind:"binary",op,left,right};
+            }
         }
         return left;
     }
