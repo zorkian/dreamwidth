@@ -15,35 +15,16 @@ import {createHash, createHmac, timingSafeEqual} from "node:crypto";
 import {spawn,execFileSync} from "node:child_process";
 import {readFileSync, readdirSync, lstatSync, realpathSync} from "node:fs";
 import path from "node:path";
+import {CompilerQueue, type CompilerJobOptions} from "./compiler-queue";
 import {NativeProfile} from "../../runtime/native-profile";
 import {NUMERIC_PROFILE} from "../../runtime/native-number";
 import {ABI_VERSION, Layer, s2} from "../../runtime/s2runtime";
 
-export type LayerType = "core" | "i18nc" | "layout" | "i18n" | "theme" | "user";
-export interface ActiveLayerInput {
-    readonly id:number; readonly ownerId:number; readonly parentId:number; readonly type:LayerType;
-    readonly sourceBytes:Uint8Array|null;
-    // Exactly decoded/decompressed authoritative compdata, not its SQL encoding.
-    readonly activeCompiledBytes:Uint8Array; readonly compiledTime:number;
-}
-export interface ActiveStyleSnapshot {
-    readonly styleId:number; readonly systemUserId:number; readonly layers:readonly ActiveLayerInput[];
-}
-export interface LayerIdentity {
-    readonly id:number; readonly ownerId:number; readonly parentId:number; readonly type:LayerType;
-    readonly compiledTime:number; readonly untrusted:boolean;
-    readonly sourceSha256:string|null; readonly activeSha256:string;
-}
-export interface CompiledLayer extends LayerIdentity {
-    readonly variable:string; readonly code:string; readonly codeSha256:string;
-}
-export interface ProgramArtifact {
-    readonly schema:1; readonly abi:number; readonly compilerDigest:string;
-    readonly dependenciesDigest:string; readonly scalarProfile:NativeProfile; readonly layers:readonly CompiledLayer[];
-}
+export type {LayerType,ActiveLayerInput,ActiveStyleSnapshot,LayerIdentity,CompiledLayer,ProgramArtifact} from "./program";
+import type {LayerType,LayerIdentity,ActiveStyleSnapshot,ProgramArtifact} from "./program";
 export interface RecoveryDependency {
     readonly kind:"recovery"; readonly layerId:number;
-    readonly reason:"missing-source"|"active-source-correspondence";
+    readonly reason:"missing-source"|"active-source-correspondence"|"source-prerequisites";
 }
 export type CompilationResult = {readonly kind:"compiled";readonly program:ProgramArtifact}|RecoveryDependency;
 export interface CompilerConfig {
@@ -60,18 +41,11 @@ export class CompilerFailure extends Error {
 }
 function integer(value:number,min=0):boolean {return Number.isSafeInteger(value)&&value>=min&&value<=4294967295;}
 function capture(snapshot:ActiveStyleSnapshot):Capture {
-    if (!integer(snapshot.styleId)||!integer(snapshot.systemUserId,1)||!snapshot.layers.length) throw new CompilerFailure();
+    if (!integer(snapshot.styleId)||!integer(snapshot.systemUserId,1)) throw new CompilerFailure();
     let total=0;
-    const ids=new Set<number>();
-    const types=new Set<LayerType>();
-    const order:LayerType[]=["core","i18nc","layout","i18n","theme","user"];
-    let previous=-1;
     const layers=snapshot.layers.map(layer=> {
-        const rank=order.indexOf(layer.type);
         if(!integer(layer.id,1)||!integer(layer.ownerId,1)||!integer(layer.parentId)||
-            !integer(layer.compiledTime)||rank<=previous||ids.has(layer.id)||types.has(layer.type)) throw new CompilerFailure();
-        if(layer.type==="core" ? layer.parentId!==0 : !ids.has(layer.parentId)) throw new CompilerFailure();
-        previous=rank;ids.add(layer.id);types.add(layer.type);
+            !integer(layer.compiledTime)||!["core","i18nc","layout","i18n","theme","user"].includes(layer.type)) throw new CompilerFailure();
         const source=layer.sourceBytes===null?null:Buffer.from(layer.sourceBytes);
         const active=Buffer.from(layer.activeCompiledBytes);
         // MEDIUMBLOB capacity, plus a separate cumulative compiler-job budget.
@@ -83,7 +57,6 @@ function capture(snapshot:ActiveStyleSnapshot):Capture {
             sourceSha256:source===null?null:sha256(source),activeSha256:sha256(active),
             sourceBase64:source===null?null:source.toString("base64"),activeBase64:active.toString("base64")};
     });
-    if(layers[0]?.type!=="core")throw new CompilerFailure();
     return {styleId:snapshot.styleId,systemUserId:snapshot.systemUserId,layers};
 }
 function validateProfile(value:any):NativeProfile {
@@ -130,7 +103,7 @@ export class ArtifactCompiler {
     private readonly perl:string;
     private readonly isolation:string;
     private readonly dependencies:readonly {file:string;digest:string}[];
-    private running = 0;
+    private readonly queue=new CompilerQueue(2);
     constructor(private readonly config:CompilerConfig) {
         this.root=realpathSync(config.s2Root);
         this.script=path.join(this.root,"target/javascript/tools/compile-active.pl");
@@ -150,6 +123,8 @@ export class ArtifactCompiler {
             path.join(this.root,"target/javascript/runtime/native-number.ts"),
             path.join(this.root,"target/javascript/runtime/native-scalar.ts"),
             path.join(this.root,"target/javascript/runtime/native-profile.ts"),this.perl,this.isolation);
+        for(const name of ["s2runtime","native-string","native-number","native-scalar","native-profile"])
+            files.push(path.join(this.root,"target/javascript/dist/runtime",name+".js"));
         // Trusted installed profile extraction is a setup operation, never a
         // serving request or execution of persisted Perl. Use the same isolation.
         let extracted:any;
@@ -181,17 +156,28 @@ export class ArtifactCompiler {
         return sha256(JSON.stringify({schema:1,abi:ABI_VERSION,compiler:this.digest,...rest,
             layers:layers.map(({sourceBase64,activeBase64,...identity})=>identity)}));
     }
-    async compile(snapshot:ActiveStyleSnapshot):Promise<CompilationResult> {
+    async compile(snapshot:ActiveStyleSnapshot, options:CompilerJobOptions={}):Promise<CompilationResult> {
         this.assertDependencies();
         const input=capture(snapshot);const key=this.keyFor(input);
+        // Today's source checker prerequisites do not govern persisted active
+        // registration. Missing/changed metadata takes the recovery path.
+        const selected=new Set<number>(); let rank=-1;
+        const sourceReady=input.layers.length>0&&input.layers.every((layer,index)=>{
+            const current=["core","i18nc","layout","i18n","theme","user"].indexOf(layer.type);
+            const valid=current>rank&&!selected.has(layer.id)&&
+                (index===0?layer.type==="core"&&layer.parentId===0:selected.has(layer.parentId));
+            rank=current;selected.add(layer.id);return valid;
+        });
+        if(!sourceReady)return {kind:"recovery",layerId:input.layers[0]?.id??0,reason:"source-prerequisites"};
         const missing=input.layers.find(layer=>layer.sourceBase64===null);
         if(missing)return {kind:"recovery",layerId:missing.id,reason:"missing-source"};
-        const result=await this.job(input);
+        const result=await this.queue.run(signal=>this.job(input,signal),options);
         this.assertDependencies();
         if(result.kind==="recovery") {
             if(typeof result.layerId!=="number"||!input.layers.some(layer=>layer.id===result.layerId)||result.reason!=="active-source-correspondence")throw new CompilerFailure();
             return {kind:"recovery",layerId:result.layerId,reason:result.reason};
         }
+        if(result.kind==="failed")return {kind:"recovery",layerId:input.layers[0]!.id,reason:"source-prerequisites"};
         if(result.kind!=="compiled"||!Array.isArray(result.layers)||result.layers.length!==input.layers.length)throw new CompilerFailure();
         const layers=input.layers.map(({sourceBase64,activeBase64,...identity},index)=> {
                 const emitted=result.layers![index];
@@ -226,24 +212,24 @@ export class ArtifactCompiler {
             return freezeProgram(program);
         }catch{throw new CompilerFailure();}
     }
-    private job(input:Capture):Promise<JobResult> {
+    private job(input:Capture,signal:AbortSignal):Promise<JobResult> {
         // Compilation has a separate one-GiB per-job address-space budget. Two
         // simultaneous jobs bound aggregate allocation; busy is retryable, never
         // a permanent Unsupported classification of the selected S2 program.
-        if (this.running >= 2) return Promise.reject(new CompilerFailure());
-        this.running++;
         return new Promise((resolve,reject)=> {
             const child=spawn(this.isolation,[this.perl,this.script,path.join(this.root,"S2"),path.join(this.root,"S2.pm")],
                 {cwd:"/",env:{LANG:"C",TZ:"UTC"},stdio:["pipe","pipe","ignore"]});
-            let size=0;const chunks:Buffer[]=[];let done=false;
-            const fail=():void=> {if(!done){done=true;reject(new CompilerFailure());}child.kill("SIGKILL");};
+            let size=0;const chunks:Buffer[]=[];let done=false;let failed=false;
+            const fail=():void=> {if(!done){failed=true;child.kill("SIGKILL");}};
+            signal.addEventListener("abort",fail,{once:true});
+            if(signal.aborted)fail();
             const timer=setTimeout(fail,this.config.timeoutMs??60000);
             child.once("error",fail);child.stdin.once("error",fail);
-            child.stdout.on("data",(chunk:Buffer)=> {size+=chunk.length;if(size>(this.config.maxOutputBytes??67108864))fail();else chunks.push(chunk);});
+            child.stdout.on("data",(chunk:Buffer)=> {if(failed)return;size+=chunk.length;if(size>(this.config.maxOutputBytes??67108864))fail();else chunks.push(chunk);});
             child.once("close",code=> {
-                this.running--;
+                signal.removeEventListener("abort",fail);
                 clearTimeout(timer);if(done)return;done=true;
-                if(code!==0||!size){reject(new CompilerFailure());return;}
+                if(failed||code!==0||!size){reject(new CompilerFailure());return;}
                 try{resolve(JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks))));}
                 catch{reject(new CompilerFailure());}
             });
