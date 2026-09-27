@@ -28,6 +28,8 @@ import {GeneralUserAuthority} from "../live/domain/general-user-authority";
 import {GeneralPublicSession} from "../live/domain/general-public-session";
 import {NativeString} from "../runtime/native-string";
 import {config} from "../live/tests/fixtures";
+import {generalUserpicImage} from "../live/domain/general-userpic-image";
+import {prepareGeneralUserpicRoot} from "../live/domain/general-image-url";
 
 const source=`layerinfo type = core;
 property int num_items_recent; property int initialized; set initialized = 0;
@@ -35,14 +37,18 @@ property string text_module_customtext; set text_module_customtext = "Before ini
 class UserLite { var string user; var string username; function builtin equals(UserLite other):bool; }
 function builtin UserLite(string name):UserLite;
 function builtin get_url(UserLite user, string view):string;
-class Entry { var UserLite poster; var string subject; }
-class RecentPage { var string global_title; var string customtext_title; var UserLite journal; var Entry[] entries; function print(); }
-class EntryPage { var string global_title; var string customtext_title; var UserLite journal; var Entry entry; function print(); }
+class Image { var int width; var string url; }
+class User extends UserLite { var Image default_pic; }
+class Entry { var UserLite poster; var string subject; var Image userpic; }
+class Date { var int year; var int month; var int day; function builtin day_of_week():int; }
+class RecentPage { var string global_title; var string customtext_title; var User journal; var Entry[] entries; function print(); }
+class EntryPage { var string global_title; var string customtext_title; var User journal; var Entry entry; function print(); }
+function civil_day():Date { var Date d=new Date; $d.year=2026; $d.month=9; $d.day=27; return $d; }
 function label(string name):string { return "[" + $name + "]"; }
 function prop_init() { $*initialized++; $*num_items_recent = 3; $*text_module_customtext = "Initialized"; print "suppressed"; }
 function modules_init() {}
-function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.entries[0].poster, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.customtext_title; }
-function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.entry.poster, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.customtext_title; }
+function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.entries[0].poster, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entries[0].userpic.width=7; if (isnull $.entries[0].userpic) { print ":null"; } else { print ":object"; } }
+function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.entry.poster, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
 `;
 
 test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
@@ -56,12 +62,17 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
         S2::load_layer(101,$code,1);my %outputs;
         {package FactoryUrlUser;sub journal_base{'https://public.example.invalid'}}
         no warnings 'redefine';local *LJ::load_user=sub{$_[0] eq 'public_name'?bless({},'FactoryUrlUser'):undef};
+        my $picture_owner=bless {userid=>111,user=>'public_name',clusterid=>0,statusvis=>'V',defaultpicid=>17},'LJ::User';
+        local *LJ::load_userid=sub{die 'Unplanned picture owner' unless $_[0]==111;return $picture_owner};
+        local $LJ::USERPIC_ROOT='https://pics.example.invalid';
         for my $kind('recent','entry'){my $ctx=S2::make_context(101);S2::set_output(sub{});S2::set_output_safe(sub{});
             S2::run_code($ctx,'prop_init()');S2::run_code($ctx,'modules_init()');
             # Declared public model fields; native constructor semantics are independently qualified.
-            my $entry={_type=>'Entry',subject=>undef,poster=>{_type=>'UserLite',user=>'public_name',_u=>{userid=>111}}};
+            my $entry={_type=>'Entry',subject=>undef,poster=>{_type=>'UserLite',user=>'public_name',_u=>{userid=>111}},
+                userpic=>$kind eq 'entry'?LJ::S2::Null('Image'):undef};
             my $page={_type=>$kind eq 'recent'?'RecentPage':'EntryPage',global_title=>'Title',entry=>$entry,entries=>[$entry],
-                journal=>{_type=>'User',user=>'public_name',_u=>{userid=>111}},
+                journal=>{_type=>'User',user=>'public_name',_u=>{userid=>111},
+                    default_pic=>LJ::S2::Image_userpic($picture_owner,17,undef,13,15)},
                 customtext_title=>LJ::S2::escape_prop_value_ret($ctx->[S2::PROPS()]->{text_module_customtext},'plain')};
             my $out='';S2::set_output(sub{$out.=$_[0]});S2::set_output_safe(sub{$out.=$_[0]});
             S2::run_code($ctx,$page->{_type}.'::print()',$page);$outputs{$kind}=encode_base64($out,'');
@@ -104,7 +115,11 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
             const frame=await renderer.render("b".repeat(64),{
                 start:{version:1,transfer:coordinator.transfer(prepared),config,kind},
                 async select(count){assert.equal(count,3);assert.equal(selected,false);selected=true;
-                    return {kind,page:encodeGeneralModel({title:NativeString.hostUtf8Bytes("Title"),username:NativeString.hostUtf8Bytes("public_name")})};},
+                    const root=prepareGeneralUserpicRoot({base64:Buffer.from("https://pics.example.invalid").toString("base64"),utf8:false});
+                    const defaultPicture=generalUserpicImage({userid:111,picid:17,root:root.value,
+                        username:NativeString.hostUtf8Bytes("public_name"),width:13,height:15,description:undefined,keyword:undefined});
+                    return {kind,page:encodeGeneralModel({title:NativeString.hostUtf8Bytes("Title"),
+                        username:NativeString.hostUtf8Bytes("public_name"),defaultPicture})};},
                 async host(operation,parameters){
                     if(operation==="user-lite")return parentLoadUser(parameters,users);
                     assert.equal(operation,"user-url");return parentUserUrl(parameters,users);
