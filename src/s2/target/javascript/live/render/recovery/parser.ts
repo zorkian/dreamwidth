@@ -49,7 +49,48 @@ export class Parser {
                 if (value.kind !== "number" || constants[name] !== value.value) throw new RecoveryGap("Invalid historical constant");
             } else statements.push(this.statement());
         }
+        this.propagateEffectiveCOP(statements);
         return statements;
+    }
+    private propagateEffectiveCOP(statements: Stmt[]): void {
+        // Complete original-byte positions precede ordered effective sharing.
+        const voidCall=(statement:Stmt)=>statement.kind==='expr' &&
+            ((statement.expr.kind==='call' && statement.expr.name.startsWith('S2::Builtin::')) ||
+             (statement.expr.kind==='invoke' && !(statement.expr.callee.kind==='variable' &&
+                ['$S2::pout','$S2::pout_s'].includes(statement.expr.callee.name))));
+        const block=(body:Stmt[],share?:number,force?:number,directSub=false):number|undefined=>{
+            let last:number|undefined;
+            for(const child of body){
+                const single=body.length===1;
+                const override=single && (force!==undefined || (share!==undefined && voidCall(child)))
+                    ? force ?? share : undefined;
+                last=statement(child,override,single && child.kind==='if' ? share : undefined,
+                    directSub && child===body.at(-1) && child.kind==='if');
+            }
+            return last;
+        };
+        const statement=(node:Stmt,override?:number,inheritedShare?:number,terminal=false):number|undefined=>{
+            const effective=override ?? node.copLine;
+            node.copLine=effective;
+            if(node.kind==='if'){
+                const then=node.branches[0]!.body;
+                // Static direct-sub-final native rule; never propagate into nested blocks.
+                const elsifShare=terminal && then.length===1 ? then[0]!.copLine : effective;
+                block(then,inheritedShare ?? effective);
+                for(const branch of node.branches.slice(1))block(branch.body,elsifShare);
+                if(node.otherwise.length)block(node.otherwise);
+                return effective;
+            }
+            if(node.kind==='for')block(node.body,undefined,effective);
+            else if(node.kind==='while' || node.kind==='foreach' || node.kind==='block')block(node.body);
+            return effective;
+        };
+        const scan=(value:unknown):void=>{
+            if(!value || typeof value!=='object')return;
+            if('kind' in value && value.kind==='sub')block((value as Extract<Expr,{kind:'sub'}>).body,undefined,undefined,true);
+            for(const child of Object.values(value))scan(child);
+        };
+        scan(statements);
     }
     private block(): Stmt[] {
         this.need("{"); const body: Stmt[] = [];
@@ -75,17 +116,6 @@ export class Parser {
                 span.slice(i+1).some(next=>next.line>token.line));
             if(!literal)statement.copLine=before.endLine;
         }
-        const share=(body:Stmt[],line:number)=>{
-            if(body.length!==1)return;
-            const only=body[0]!;
-            if(only.kind==='if')only.branches.forEach(branch=>share(branch.body,line));
-            else if(only.kind==='expr' &&
-                ((only.expr.kind==='call' && only.expr.name.startsWith('S2::Builtin::')) ||
-                 (only.expr.kind==='invoke' && !(only.expr.callee.kind==='variable' &&
-                    ['$S2::pout','$S2::pout_s'].includes(only.expr.callee.name)))))only.copLine=line;
-        };
-        if(statement.kind==='if')statement.branches.forEach(branch=>share(branch.body,statement.copLine!));
-        if(statement.kind==='for' && statement.body.length===1)statement.body[0]!.copLine=statement.copLine;
         return statement;
     }
     private statementShape(): Stmt {

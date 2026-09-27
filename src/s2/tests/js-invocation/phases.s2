@@ -18,7 +18,35 @@ function up(string label): int { return mark($label); }
 function up_return(): int { if (mark("call-return-header")) { return up("up-then-return"); } return 0; }
 function helper(): int { return mark("return"); }
 function conditional_return(): int { if (mark("return-header")) { return mark("then-return"); } return 0; }
+function faildivide(): int { var int zero = 0; return 1 / $zero; }
+function upb(): bool { return mark("up-not-call") > 0; }
+function terminal_elsif() {
+    var int x = 1;
+    if (mark("false-terminal")) { $x = 1; }
+    elseif (mark("false-terminal-elsif")) { up("up-unexecuted-terminal"); }
+    elseif (mark("terminal-second-elsif")) { up("up-terminal-second-elsif"); }
+    else { mark("unexecuted-terminal-else"); }
+}
+function interior_elsif() {
+    var int x = 1;
+    if (mark("false-interior")) { $x = 1; }
+    elseif (mark("interior-elsif")) { up("up-interior-elsif"); }
+    mark("interior-following");
+}
+function two_statement_then() {
+    var int x = 1;
+    if (mark("false-two-then")) { $x = 1; $x = 2; }
+    elseif (mark("two-then-elsif")) { up("up-two-then-elsif"); }
+}
+function nested_last_elsif() {
+    var int x = 1;
+    if (mark("nested-last-outer")) {
+        if (mark("false-nested-last")) { $x = 1; }
+        elseif (mark("nested-last-elsif")) { up("up-nested-last-elsif"); }
+    }
+}
 function main() {
+    terminal_elsif(); interior_elsif(); two_statement_then(); nested_last_elsif();
     mark("expr");
     var int x = mark("decl");
     print mark("print");
@@ -36,6 +64,11 @@ function main() {
     if (mark("call-assign-header")) { $x = up("up-then-assign"); }
     if (mark("call-void-header")) { up("up-then-void"); }
     print up_return();
+    if (mark("not-header")) { not upb(); }
+    if (mark("negate-header")) { -mark("negate-call"); }
+    for (var int q = 0; $q < 1; $q++) { if (mark("for-if")) { mark("for-if-body"); } }
+    if (mark("false-nonshared-then")) { $x = 1; }
+    elseif (mark("nonshared-elsif")) { up("up-nonshared-elsif"); }
     if (mark("if")) { mark("then-single"); }
     if (mark("if-two")) { mark("then-one"); mark("then-two"); }
     if (mark("false-if")) { mark("unused"); }
