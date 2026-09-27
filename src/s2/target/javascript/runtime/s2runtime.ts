@@ -12,7 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import {raiseNativeExecutionStop} from './native-scalar';
+import {raiseNativeExecutionStop, nativeProgramError, isNativeProgramError} from './native-scalar';
 import {NativeSink, scalarPV, scalarNumber, scalarConcat, scalarTruthy, scalarNotags, scalarCopy, incrementScalar, legacyText, NativeString, NativeNumber} from "./native-scalar";
 
 import {arithmetic, divide, modulo, intCast, numericCompare, arrayIndex} from "./native-number";
@@ -691,7 +691,7 @@ export class Context {
 
     downcastObject(value: unknown, type: string, layer: Layer, line: number): unknown {
         if (runtime.isDefined(value) && !this.objectIsa(value, type)) {
-            throw new Error(`${layer.source}:${line}: cannot cast object to ${type}`);
+            throw nativeProgramError(`${layer.source}:${line}: cannot cast object to ${type}`);
         }
         return value;
     }
@@ -710,7 +710,7 @@ export class Context {
 
     getFunction(name: string): S2Function {
         const implementation = this.functions.get(name);
-        if (!implementation) throw new Error(`Undefined S2 function ${name}`);
+        if (!implementation) throw nativeProgramError(`Undefined S2 function ${name}`);
         return (context, ...args) => this.invoke(name, implementation, context, args);
     }
 
@@ -758,10 +758,10 @@ export class Context {
         dispatchClass?: string): S2Function {
         const location = `${layer.source}:${line}`;
         if (!object(value) || value[".isnull"]) {
-            throw new Error(`${location}: method ${name} called on null object`);
+            throw nativeProgramError(`${location}: method ${name} called on null object`);
         }
         const type = value[".type"];
-        if (typeof type !== "string") throw new Error(`${location}: object has no S2 class`);
+        if (typeof type !== "string") throw nativeProgramError(`${location}: object has no S2 class`);
 
         let current: string | undefined = superCall
             ? dispatchClass ?? this.classes.get(this.methodFrames[this.methodFrames.length - 1] ?? type)
@@ -784,7 +784,7 @@ export class Context {
             if (superCall && dispatchClass !== undefined) break;
             current = this.classes.get(current);
         }
-        throw new Error(`${location}: undefined method ${type}::${name}`);
+        throw nativeProgramError(`${location}: undefined method ${type}::${name}`);
     }
 
     /** Installed compiler/recovery only; source text cannot nominate filenames. */
@@ -813,7 +813,12 @@ export class Context {
 
     runNativeFunction(name: string, args: readonly unknown[] = [], origin: NativeRunOrigin = 'top-level'): unknown {
         // Never string-wrap an unknown inner failure; private stop identity survives.
-        return this.runBoundary(() => this.getFunction(name)(this, ...args), origin);
+        try { return this.runBoundary(() => this.getFunction(name)(this, ...args), origin); }
+        catch (error) {
+            if (isNativeProgramError(error))
+                throw nativeProgramError(`Died in S2::run_code running ${name}: ${error.message}`);
+            throw error;
+        }
     }
     runFunction(name: string): void { this.runNativeFunction(name); }
     runMethod(value: unknown, name: string): void {

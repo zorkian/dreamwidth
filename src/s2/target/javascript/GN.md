@@ -46,7 +46,12 @@ worker wall/heap bounds remain active even when the native gate lapses. Nested
 runs cannot cancel or extend the outer deadline, unlike native nested alarm
 cancellation. Outermost unwind cancels the program deadline before diagnostics.
 
-Private recursion/deadline stop identity survives nested runs. Unknown errors,
+Private recursion/deadline stop identity survives nested runs. Concrete null-method,
+cast, missing-class and undefined function/method errors carry a separate private
+program-error brand. Explicit function runs wrap only that brand with the native
+`Died in S2::run_code running <signature>:` prefix and rebrand the result.
+The trusted module guard lets the coordinator classify it; no factory or guard
+is exposed through the author runtime. Unknown errors,
 including JavaScript stack exhaustion, remain infrastructure failures and are
 never string-wrapped into an invented S2 diagnostic or partial-success response.
 

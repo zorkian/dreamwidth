@@ -31,7 +31,7 @@ sub source {open my $f,'<:raw',shift or die;local $/;return <$f>}
 sub octets {use bytes;return substr($_[0],0)}
 my @marks;
 {no warnings 'redefine';
- *S2::Builtin::LJ::mark=sub{my($ctx,$label)=@_;my@caller=caller;push@marks,{label=>$label,line=>$caller[2]};return $label=~/^false/ ? 0:1;};
+ *S2::Builtin::LJ::mark=sub{my($ctx,$label)=@_;my@caller=caller($label =~ /^up-/ ? 1 : 0);push@marks,{label=>$label,line=>$caller[2]};return $label=~/^false/ ? 0:1;};
  *LJ::get_dbh=sub{die 'DB forbidden'};
  *LJ::get_cluster_master=sub{die 'DB forbidden'};
 }
@@ -46,4 +46,11 @@ $backend->collectNativePositions(S2::OutputScalar->new(\$instrumented));
 die 'Native byte change' unless $code eq $instrumented;
 S2::load_layer(801,$code);my$ctx=S2::make_context(801);my$output='';S2::set_output(sub{$output.=$_[0]});S2::set_output_safe(sub{$output.=$_[0]});
 S2::run_code($ctx,'main()');
-print JSON::PP->new->canonical->encode({id=>801,source=>encode_base64($source,''),code=>encode_base64(octets($code),''),instrumentationUnchanged=>1,marks=>\@marks,output=>encode_base64(octets($output),'')});
+# Trusted host reentry invokes the real native null-method semantic throw site.
+my $plural = S2::get_func_num('plural()');
+my $outer = S2::get_func_num('outer()');
+$ctx->[S2::VTABLE]->{$plural} = sub { S2::get_object_func_num('Thing', undef, 'missing()', 801, 7, 0, $ctx) };
+$ctx->[S2::VTABLE]->{$outer} = sub { S2::run_function($ctx, 'plural()') };
+eval { S2::run_function($ctx, 'outer()') };
+my $nested_error = $@;
+print JSON::PP->new->canonical->encode({nestedError=>$nested_error,id=>801,source=>encode_base64($source,''),code=>encode_base64(octets($code),''),instrumentationUnchanged=>1,marks=>\@marks,output=>encode_base64(octets($output),'')});

@@ -21,11 +21,11 @@ import {tmpdir} from 'node:os';
 import {runInNewContext} from 'node:vm';
 import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
 import {Context,Layer,s2} from '../runtime/s2runtime';
-import {scalarPV,legacyText,isNativeExecutionStop} from '../runtime/native-scalar';
+import {scalarPV,legacyText,isNativeExecutionStop,isNativeProgramError,raiseNativeExecutionStop} from '../runtime/native-scalar';
 import {recoverActiveLayer} from '../live/render/recovery';
 import {createNativeOutput} from '../live/render/native-output';
 const native=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-invocation/native.pl')],
-    {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {id:number;code:string;source:string;marks:{label:string;line:number}[];output:string;instrumentationUnchanged:number};
+    {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {id:number;code:string;source:string;marks:{label:string;line:number}[];output:string;instrumentationUnchanged:number;nestedError:string};
 
 test('actual emitter COP phases through source-proven and original-byte recovery',async()=>{
     assert.equal(native.instrumentationUnchanged,1);
@@ -44,11 +44,11 @@ test('actual emitter COP phases through source-proven and original-byte recovery
             const original=s2.runtime.nativeCOP;
             // Trusted test observation of the ACTUAL private frame register; never an
             // alternate location/brand adapter or a production JS-stack inspection.
-            const top=(context:Context)=>(context as unknown as {callFrames:{cop:object}[]}).callFrames.at(-1)!.cop;
+            const top=(context:Context,depth=1)=>(context as unknown as {callFrames:{cop:object}[]}).callFrames.at(-depth)!.cop;
             s2.runtime.nativeCOP=(context,layer,line)=>{original(context,layer,line);sites.set(top(context),line);};
             try {
                 let output='';const context=new Context([...layers],value=>output+=value,undefined,{_mark:(ctx,label)=>{
-                    const text=legacyText(scalarPV(label));const line=sites.get(top(ctx));assert.ok(line,route+': missing COP '+text);
+                    const text=legacyText(scalarPV(label));const line=sites.get(top(ctx,text.startsWith('up-')?2:1));assert.ok(line,route+': missing COP '+text);
                     marks.push({label:text,line});return s2.runtime.numericLiteral(text.startsWith('false')?'0':'1');
                 }},undefined,500,undefined,{nowMilliseconds:()=>0});
                 context.runFunction('main()');
@@ -153,4 +153,26 @@ test('passing depth check refreshes window; lapse persists until explicit reentr
         now=302;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,150);
         ctx.runBoundary(()=>{assert.equal(state.lastDepthCheck,302);now=303;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,303);},'ordinal');
     });
+});
+
+
+test('nested program errors alone gain native run signature wrapping',()=>{
+    const prefix='Died in S2::run_code running outer(): Died in S2::run_code running plural(): ';
+    assert.ok(native.nestedError.startsWith(prefix+'Method called on null Thing object'),native.nestedError);
+    const layer=new Layer();
+    layer.registerFunction(['plural()'],()=>ctx=>ctx.getMethod(null,'missing()',layer,7)(ctx),20);
+    layer.registerFunction(['outer()'],()=>ctx=>ctx.runNativeFunction('plural()',[],'plural'),21);
+    let stop:unknown;try {raiseNativeExecutionStop('recursion');} catch(error) {stop=error;}
+    layer.registerFunction(['stop()'],()=>()=>{throw stop;},22);
+    const ctx=new Context([layer],()=>{},undefined,undefined,undefined,500,undefined,{nowMilliseconds:()=>0});
+    assert.throws(()=>ctx.runNativeFunction('outer()'),error=>isNativeProgramError(error) &&
+        error.message==='Died in S2::run_code running outer(): Died in S2::run_code running plural(): <unknown S2 layer>:7: method missing() called on null object');
+    assert.throws(()=>ctx.runNativeFunction('stop()'),error=>error===stop && isNativeExecutionStop(error) && !isNativeProgramError(error));
+    for(const error of [new Error('Died in S2::run_code running plural(): fake'),Object.assign(new Error('fake'),{programError:true}),new RangeError('fake')]) {
+        assert.equal(isNativeProgramError(error),false);
+        layer.functions.set('hostile()',()=>{throw error;});
+        // A newly assembled real Context uses the actual registered function.
+        const actual=new Context([layer],()=>{});
+        assert.throws(()=>actual.runNativeFunction('hostile()'),caught=>caught===error);
+    }
 });

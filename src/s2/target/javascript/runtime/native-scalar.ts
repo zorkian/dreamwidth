@@ -149,3 +149,14 @@ export function raiseNativeExecutionStop(kind: 'recursion' | 'deadline'): never 
 export function isNativeExecutionStop(value: unknown): value is Error {
     return typeof value === 'object' && value !== null && stops.has(value as Error);
 }
+
+const programErrors = new WeakSet<Error>();
+/** Installed semantic throw sites only; not exposed through the author runtime. */
+export function nativeProgramError(message: string): Error {
+    const error = new Error(message);
+    programErrors.add(error);
+    return error;
+}
+export function isNativeProgramError(value: unknown): value is Error {
+    return typeof value === 'object' && value !== null && programErrors.has(value as Error);
+}

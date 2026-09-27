@@ -100,9 +100,14 @@ sub collectNativePositions {
                     if ($only->isa('S2::NodeIfStmt')) {
                         $share->($only->{thenblock}, $cop);
                         $share->($_, $cop) for @{$only->{elseifblocks}};
-                    } elsif (!$only->isa('S2::NodeWhileStmt') && !$only->isa('S2::NodeForStmt') &&
-                        !$only->isa('S2::NodeForeachStmt')) {
-                        $only->{native_cop_line} = $cop;
+                    } elsif ($only->isa('S2::NodeExprStmt')) {
+                        my $expr = $only->{expr};
+                        $expr = $expr->{expr} while ref($expr) && $expr->{expr};
+                        # Only a void call is optimized to the if/elsif header.
+                        $only->{native_cop_line} = $cop if ref($expr) &&
+                            $expr->isa('S2::NodeTerm') &&
+                            ($expr->{type} == $S2::NodeTerm::FUNCCALL ||
+                             $expr->{type} == $S2::NodeTerm::METHCALL);
                     }
                 };
                 $share->($node->{thenblock}, $line);
