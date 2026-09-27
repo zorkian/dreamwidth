@@ -19,7 +19,7 @@ import type {NativePVFrame} from "../../runtime/native-string";
 
 // These names select installed source-derived handlers, not modules, SQL,
 // arbitrary translation keys or code supplied by the program.
-export type GeneralHostOperation = "user-lite" | "expand-user" | "template-error" |
+export type GeneralHostOperation = "user-lite" | "user-url" | "expand-user" | "template-error" |
     "video-error" | "markup-error" | "valid-stylesheet" | "embed-transform" |
     "expand-site-url" | "rewrite-blocked-href" | "normalize-image-url" | "standard-images";
 

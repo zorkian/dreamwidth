@@ -41,5 +41,8 @@ my @rows=(
     S2::Builtin::LJ::clean_css_classname($ctx,'evaluate eval'),
     S2::Builtin::LJ::alternate($ctx,'one','two'),
     S2::Builtin::LJ::alternate($ctx,'one','two'),
+    S2::Builtin::LJ::eurl($ctx,$input),
+    S2::Builtin::LJ::clean_url($ctx,"https://example.invalid/".pack('C',255)."\n"),
+    S2::Builtin::LJ::clean_url($ctx,'https://example.invalid/a\b'),
 );
 print JSON::PP->new->canonical->encode([map {{base64=>encode_base64($_,''),utf8=>utf8::is_utf8($_)?1:0}} @rows]);

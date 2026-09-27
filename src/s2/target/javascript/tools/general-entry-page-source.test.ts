@@ -52,7 +52,7 @@ test("outer Entry assembly gates disabled comments before projection",()=>{
     const layer=new Layer();layer.scalarProfile=profile;
     const context=new Context([layer],()=>{throw Error("Unexpected print");});
     context.prop._userpics_position=pv("none");
-    const journal:GeneralModel={".type":"UserLite"};let head=false,empty=false;
+    const journal:GeneralModel={".type":"UserLite"};let head=false,empty=false,commentHead=false;
     const page=generalEntryPageFromSource(context,{thread:pv("257"),page:{styleId:0,styleModtime:0,
         baseUrl:pv("/journal"),journal,journalType:pv("P"),ownerName:undefined,journalTitle:undefined,
         journalSubtitle:undefined,layoutName:undefined,themeName:undefined,layoutUrl:pv(""),getargs:[],
@@ -72,11 +72,13 @@ test("outer Entry assembly gates disabled comments before projection",()=>{
             expandEmbedded:value=>value,tagList:()=>({html:undefined,tags:[]}),recordPublicEntry(){},
             standardImage(){throw Error("No icon");},currents:()=>({values:[]}),groupNames:()=>pv("")},
         navigation:generalCommentNavigation(),prepareHead(){head=true;},
+        prepareCommentHead(){assert.equal(head,true);assert.equal(empty,true);commentHead=true;},
         comments(){throw Error("Disabled comment read");},emptyComments(){empty=true;
             return {permalink:pv("/261.html"),styledEntryUrl:pv("/261.html"),styleArgument:undefined,
                 flat:false,topOnly:false,pages:9,current:4,items:8,first:1,last:8,expandAll:false};},
     });
     assert.equal(page[".type"],"EntryPage");assert.equal(head,true);assert.equal(empty,true);
+    assert.equal(commentHead,true);
     assert.deepEqual(page._comments,[]);assert.equal((page._comment_pages as GeneralModel)._total,1);
     assert.equal(scalarPV(page._viewing_thread_id).bytes().toString(),"257");
 });
