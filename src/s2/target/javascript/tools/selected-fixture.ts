@@ -40,23 +40,28 @@ const globalTables = ["user","useridmap","userprop","userproplite","userproplist
 const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","s2compiled2","log2","logtext2","logprop2",
     "usertags","userkeywords","logtags","logtagsrecent","logkwsum","links","userpic2","userpicmap2","userpicmap3","talk2","talktext2","talkprop2"];
 
-export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>): Promise<void> {
+const publicLanguageTables = ["ml_langs","ml_items","ml_latest","ml_text"];
+
+export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>,
+    publicLanguage = false, publicUsers = false, publicEncodings = false): Promise<void> {
     assert.equal(process.env.LJHOME,"/workspaces/dreamwidth");
     const prefix = "s6_selected_" + randomBytes(8).toString("hex");
     const schemas = [prefix+"_g",prefix+"_seven",prefix+"_nineteen"];
     const created: string[] = [];
+    const selectedGlobalTables = [...globalTables, ...(publicLanguage ? publicLanguageTables : []),
+        ...(publicUsers ? ["identitymap"] : []), ...(publicEncodings ? ["codes"] : [])];
     const admin = await mysql.createConnection({socketPath:"/var/run/mysqld/mysqld.sock",user:"root"});
     let store: MysqlLiveStore | undefined;
     const table = (schema: string,name: string) => {
         assert.ok(schemas.includes(schema));
-        assert.ok((schema === schemas[0] ? globalTables : clusterTables).includes(name));
+        assert.ok((schema === schemas[0] ? selectedGlobalTables : clusterTables).includes(name));
         return `\`${schema}\`.\`${name}\``;
     };
     try {
         for (const [index,schema] of schemas.entries()) {
             assert.match(schema,/^s6_selected_[a-f0-9]{16}_(g|seven|nineteen)$/);
             await admin.query(`CREATE DATABASE \`${schema}\``); created.push(schema);
-            for (const name of index ? clusterTables : globalTables) {
+            for (const name of index ? clusterTables : selectedGlobalTables) {
                 const original = index ? "dw_cluster01" : "dw_global";
                 await admin.query(`CREATE TABLE ${table(schema,name)} LIKE \`${original}\`.\`${name}\``);
             }

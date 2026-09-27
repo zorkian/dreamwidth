@@ -40,6 +40,19 @@ function object(value: unknown, names: readonly string[]): Record<string, unknow
 
 export interface VerifiedRuntime { readonly root: string; readonly entry: string; readonly node: string }
 export function verifyRuntime(artifactPath: string): VerifiedRuntime {
+    return verifyRuntimeEntry(artifactPath, "app/dist/live/render/worker.js");
+}
+/** General programs arrive through private admission, independently of a stock artifact. */
+export function verifyGeneralRuntime(installationPath: string): VerifiedRuntime {
+    const stat = lstatSync(installationPath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096) throw new Unsupported();
+    const descriptor = object(JSON.parse(readFileSync(installationPath, "utf8")),
+        ["schema", "kind", "entry"]);
+    if (descriptor.schema !== 1 || descriptor.kind !== "general-s2-worker" ||
+        descriptor.entry !== "app/dist/live/render/general-worker.js") throw new Unsupported();
+    return verifyRuntimeEntry(installationPath, "app/dist/live/render/general-worker.js");
+}
+function verifyRuntimeEntry(artifactPath: string, expectedEntry: string): VerifiedRuntime {
     const root = resolve(artifactPath + ".runtime");
     if (realpathSync(root) !== root) throw new Unsupported();
     const rootStat = lstatSync(root);
@@ -56,7 +69,7 @@ export function verifyRuntime(artifactPath: string): VerifiedRuntime {
     const raw = object(JSON.parse(readFileSync(manifestPath, "utf8")), ["schema", "artifactSha256",
         "contentLockSha256", "nodeVersion", "nodeExecutable", "entryPath", "files"]);
     if (raw.schema !== 1 || raw.nodeVersion !== "24.21.0" || raw.nodeExecutable !== nodePath ||
-        raw.entryPath !== "app/dist/live/render/worker.js" || raw.artifactSha256 !== digest(artifactPath) ||
+        raw.entryPath !== expectedEntry || raw.artifactSha256 !== digest(artifactPath) ||
         raw.contentLockSha256 !== digest(resolve(__dirname, "../../../../../../content/package-lock.json")) ||
         !Array.isArray(raw.files) || raw.files.length === 0 || raw.files.length > 10000) {
         throw new Unsupported();
