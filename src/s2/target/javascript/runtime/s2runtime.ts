@@ -112,7 +112,26 @@ function nativeHashKey(value: unknown): string {
     return (key.utf8 ? "\u0000utf8:" : "\u0000pv:") + key.bytes.toString("hex");
 }
 
+interface OperandSlot { get(): unknown; set?(value: unknown): unknown; }
+const operandCells = new WeakMap<object, OperandSlot>();
+function readOperand(value: unknown): unknown {
+    return value !== null && typeof value === "object" && operandCells.has(value)
+        ? operandCells.get(value)!.get() : value;
+}
+function captureOperand(slot: OperandSlot): object {
+    const operand = Object.freeze({});
+    operandCells.set(operand, slot);
+    return operand;
+}
+
 export const runtime = {
+    captureOperand(slot: OperandSlot & {exists?(): boolean}): object {
+        return captureOperand(slot.exists && !slot.exists() ? {get: () => undefined} : slot);
+    },
+    readOperand,
+    operandList(operands: readonly unknown[]): unknown[] {
+        return operands.map(value => scalarCopy(readOperand(value)));
+    },
     pvBytes(hex: string): NativeString {
         if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error("Invalid native PV literal");
         return NativeString.bytes(Buffer.from(hex, "hex"));
@@ -128,6 +147,7 @@ export const runtime = {
             if (index < 0n) index += BigInt(receiver.length);
             property = index.toString();
             return {
+                exists: () => Object.hasOwn(receiver, property),
                 get: () => index < 0n || index >= BigInt(receiver.length) ? undefined : receiver[Number(index)],
                 set: (value: unknown) => {
                     if (index < 0n) throw new Error("Modification of non-creatable array value");
@@ -141,7 +161,7 @@ export const runtime = {
         }
         property = kind === "hash" ? nativeHashKey(key) : String(key);
         const target = receiver as Record<string, unknown>;
-        return {get: () => target[property], delete: () => {
+        return {exists: () => Object.hasOwn(target, property), get: () => target[property], delete: () => {
             hashIdentities.get(target)?.delete(property);
             return delete target[property];
         }, set: (value: unknown) => {
@@ -172,14 +192,16 @@ export const runtime = {
             for (const item of copy) target.push(item);
         } else target.push(scalarCopy(value));
     },
-    assignSlot(slot: {set(value: unknown): unknown}, value: unknown, notags: boolean): unknown {
-        return slot.set(notags ? scalarNotags(value) : scalarCopy(value));
+    assignSlot(slot: {get(): unknown; set(value: unknown): unknown}, value: unknown, notags: boolean,
+        operand = false): unknown {
+        const result = slot.set(notags ? scalarNotags(value) : scalarCopy(value));
+        return operand ? captureOperand(slot) : result;
     },
-    incrementSlot(slot: {get(): unknown; set(value: unknown): unknown}, plus: boolean, pre: boolean): unknown {
+    incrementSlot(slot: {get(): unknown; set(value: unknown): unknown}, plus: boolean, pre: boolean, operand = false): unknown {
         const before = scalarCopy(slot.get());
         const after = incrementScalar(slot.get(), plus);
         slot.set(after);
-        return pre ? after : before;
+        return pre ? operand ? captureOperand(slot) : after : before;
     },
     scalarCopy,
     scalarTruthy,
@@ -191,6 +213,7 @@ export const runtime = {
     scalarPV,
     scalarInt(value: unknown): NativeNumber { return intCast(scalarNumber(value)); },
     scalarCompare(kind: string, op: string, left: unknown, right: unknown): boolean {
+        left = readOperand(left); right = readOperand(right);
         const comparison = kind === "string" ? nativeStrings.compareStrings(scalarPV(left), scalarPV(right)) :
             numericCompare(scalarNumber(left), scalarNumber(right));
         switch (op) {
@@ -206,6 +229,7 @@ export const runtime = {
     scalarNegate(value: unknown): NativeNumber { return arithmetic("-", NativeNumber.integer(0n), scalarNumber(value)); },
     numericLiteral(lexeme: string): NativeNumber { return NativeNumber.literal(lexeme); },
     scalarBinary(op: string, left: unknown, right: unknown): NativeString | NativeNumber {
+        left = readOperand(left); right = readOperand(right);
         if (op === "concat") return scalarConcat(left, right);
         const a = scalarNumber(left), b = scalarNumber(right);
         if (op === "/") return intCast(divide(a, b));
@@ -215,10 +239,11 @@ export const runtime = {
     },
     scalarConcatChain(operands: readonly (() => unknown)[]): NativeString {
         if (!operands.length) return NativeString.bytes(new Uint8Array());
-        let value: unknown = evaluateAs("scalar", operands[0]!);
-        for (let index = 1; index < operands.length; index++) {
-            const right = evaluateAs("scalar", operands[index]!);
-            value = scalarConcat(value, right);
+        // Perl's multiconcat reads borrowed SVs only after every operand runs.
+        const captured = operands.map(operation => evaluateAs("scalar", operation));
+        let value: unknown = readOperand(captured[0]);
+        for (let index = 1; index < captured.length; index++) {
+            value = scalarConcat(value, readOperand(captured[index]));
         }
         return scalarPV(value);
     },
@@ -239,7 +264,8 @@ export const runtime = {
     makeHash(pairs: readonly (readonly [unknown, unknown])[]): Record<string, unknown> {
         const hash: Record<string, unknown> = Object.create(null);
         const identities = new Map<string, NativeString>();
-        for (const [key, value] of pairs) {
+        for (const [keyOperand, valueOperand] of pairs) {
+            const key = readOperand(keyOperand), value = readOperand(valueOperand);
             const encoded = nativeHashKey(key);
             hash[encoded] = scalarCopy(value);
             if (NativeString.is(key) || NativeNumber.is(key)) identities.set(encoded, scalarPV(key));

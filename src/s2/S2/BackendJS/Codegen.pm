@@ -25,6 +25,27 @@ sub asJS_context {
     $o->write("))");
 }
 
+# A borrowed native SV operand is distinct from a call-result temporary.
+# Capture its slot before evaluating later operands; receiver/key run once.
+sub asJS_operand {
+    my ($this, $bp, $o, $context) = @_;
+    $context ||= "scalar";
+    unless ($bp->{opts}{generalScalars}) { $this->asJS($bp, $o); return; }
+    if (ref($this) eq "S2::NodeExpr") {
+        $this->{expr}->asJS_operand($bp, $o, $context);
+    } elsif ($this->isa("S2::NodeTerm") && $this->{type} == $S2::NodeTerm::VARREF) {
+        $o->write("s2.runtime.captureOperand(");
+        $this->{var}->asJS_slot($bp, $o);
+        $o->write(")");
+    } elsif ($this->isa("S2::NodeTerm") && $this->{type} == $S2::NodeTerm::SUBEXPR) {
+        $this->{subExpr}->asJS_operand($bp, $o, $context);
+    } elsif ($this->isa("S2::NodeIncExpr") || $this->isa("S2::NodeAssignExpr")) {
+        $this->asJS($bp, $o, 1);
+    } else {
+        $this->asJS_context($bp, $o, $context);
+    }
+}
+
 sub asJS_bool {
     my ($this, $bp, $o) = @_;
     my $ck = $S2::CUR_COMPILER->{'checker'};
@@ -89,6 +110,19 @@ sub asJS {
     my ($this, $bp, $o, $parens, $initcomma) = @_;
     $parens = 1 unless defined $parens;
     $o->write("(") if $parens;
+    if ($bp->{opts}{generalScalars}) {
+        $o->write(",") if $initcomma;
+        $o->write($initcomma || $parens ? "...s2.runtime.operandList([" : "s2.runtime.operandList([");
+        my $first = 1;
+        for my $n (@{$this->{args}}) {
+            $o->write(",") unless $first;
+            $first = 0;
+            $n->asJS_operand($bp, $o, "list");
+        }
+        $o->write($initcomma || $parens ? "])" : "])[0]");
+        $o->write(")") if $parens;
+        return;
+    }
     my $didFirst = $initcomma ? 1 : 0;
     foreach my $n (@{$this->{'args'}}) {
         $o->write(", ") if $didFirst++;
@@ -114,10 +148,20 @@ sub asJS {
         for (my $i = 0; $i < $size; $i++) {
             $o->write(",") if $i;
             $o->write("[");
-            $this->{keys}[$i]->asJS_context($bp, $o, "list");
+            $this->{keys}[$i]->asJS_operand($bp, $o, "list");
             $o->write(",");
-            $this->{vals}[$i]->asJS_context($bp, $o, "list");
+            $this->{vals}[$i]->asJS_operand($bp, $o, "list");
             $o->write("]");
+        }
+        $o->write("])");
+        return;
+    }
+
+    if (!$isHash && $bp->{opts}{generalScalars}) {
+        $o->write("s2.runtime.operandList([");
+        for (my $i = 0; $i < $size; $i++) {
+            $o->write(",") if $i;
+            $this->{vals}[$i]->asJS_operand($bp, $o, "list");
         }
         $o->write("])");
         return;
@@ -140,7 +184,7 @@ sub asJS {
             $o->write(": ");
         }
         $o->write("s2.runtime.scalarCopy(") if $bp->{opts}{generalScalars};
-        $this->{vals}[$i]->asJS_context($bp, $o, "list");
+        $this->{vals}[$i]->asJS_operand($bp, $o, "list");
         $o->write(")") if $bp->{opts}{generalScalars};
         $first = 0;
     }
@@ -153,7 +197,7 @@ sub asJS {
 package S2::NodeAssignExpr;
 
 sub asJS {
-    my ($this, $bp, $o) = @_;
+    my ($this, $bp, $o, $operand) = @_;
 
     if ($bp->{opts}{generalScalars}) {
         $o->write("s2.runtime.assignSlot(");
@@ -162,7 +206,8 @@ sub asJS {
         $this->{rhs}->asJS_context($bp, $o, "scalar");
         my $notags = $bp->untrusted() && $this->{lhs}->isProperty() &&
             $this->{lhs}->getType()->equals($S2::Type::STRING);
-        $o->write($notags ? ",true)" : ",false)");
+        $o->write($notags ? ",true" : ",false");
+        $o->write($operand ? ",true)" : ",false)");
         return;
     }
     $this->{'lhs'}{'var'}{'varReturnType'} = undef;
@@ -237,9 +282,9 @@ sub asJS {
         my $kind = $this->{myType}->toString();
         my $op = $this->{op} == $S2::TokenPunct::EQ ? "==" : "!=";
         $o->write("s2.runtime.scalarCompare(" . $bp->quoteString($kind) . "," . $bp->quoteString($op) . ",");
-        $this->{lhs}->asJS_context($bp, $o, "scalar");
+        $this->{lhs}->asJS_operand($bp, $o, "scalar");
         $o->write(",");
-        $this->{rhs}->asJS_context($bp, $o, "scalar");
+        $this->{rhs}->asJS_operand($bp, $o, "scalar");
         $o->write(")");
         return;
     }
@@ -486,7 +531,7 @@ sub asJS {
 package S2::NodeIncExpr;
 
 sub asJS {
-    my ($this, $bp, $o) = @_;
+    my ($this, $bp, $o, $operand) = @_;
     die "Increment target is not a variable reference"
         unless $this->{'expr'}{'var'};
     if ($bp->{opts}{generalScalars}) {
@@ -494,7 +539,8 @@ sub asJS {
         $this->{expr}{var}->asJS_slot($bp, $o);
         my $plus = $this->{op}->getPunct() eq $S2::TokenPunct::INCR->getPunct();
         $o->write($plus ? ",true" : ",false");
-        $o->write($this->{bPre} ? ",true)" : ",false)");
+        $o->write($this->{bPre} ? ",true" : ",false");
+        $o->write($operand ? ",true)" : ",false)");
         return;
     }
     local $this->{'expr'}{'var'}{'varReturnType'} = undef;
@@ -583,9 +629,9 @@ sub asJS {
         my $op = $this->{op} == $S2::TokenPunct::MULT ? "*" :
             $this->{op} == $S2::TokenPunct::DIV ? "/" : "%";
         $o->write("s2.runtime.scalarBinary(" . $bp->quoteString($op) . ",");
-        $this->{lhs}->asJS_context($bp, $o, "scalar");
+        $this->{lhs}->asJS_operand($bp, $o, "scalar");
         $o->write(",");
-        $this->{rhs}->asJS_context($bp, $o, "scalar");
+        $this->{rhs}->asJS_operand($bp, $o, "scalar");
         $o->write(")");
         return;
     }
@@ -705,9 +751,9 @@ sub asJS {
             $this->{op} == $S2::TokenPunct::LTE ? "<=" :
             $this->{op} == $S2::TokenPunct::GT ? ">" : ">=";
         $o->write("s2.runtime.scalarCompare(" . $bp->quoteString($kind) . "," . $bp->quoteString($op) . ",");
-        $this->{lhs}->asJS_context($bp, $o, "scalar");
+        $this->{lhs}->asJS_operand($bp, $o, "scalar");
         $o->write(",");
-        $this->{rhs}->asJS_context($bp, $o, "scalar");
+        $this->{rhs}->asJS_operand($bp, $o, "scalar");
         $o->write(")");
         return;
     }
@@ -779,7 +825,7 @@ sub asJS {
             $this->{op} == $S2::TokenPunct::PLUS ? "+" : "-";
         if ($op eq "concat") {
             # Flatten only the left-associated string chain. Each operation is
-            # still completed before evaluating the next right operand.
+            # evaluated before the operator reads any captured operand.
             my @right;
             my $left = $this;
             while ($left->isa("S2::NodeSum") && $left->{myType}->equals($S2::Type::STRING)) {
@@ -792,16 +838,16 @@ sub asJS {
                 $o->write(",") unless $first;
                 $first = 0;
                 $o->write("()=> (");
-                $operand->asJS($bp, $o);
+                $operand->asJS_operand($bp, $o);
                 $o->write(")");
             }
             $o->write("])");
             return;
         }
         $o->write("s2.runtime.scalarBinary(" . $bp->quoteString($op) . ",");
-        $this->{lhs}->asJS_context($bp, $o, "scalar");
+        $this->{lhs}->asJS_operand($bp, $o, "scalar");
         $o->write(",");
-        $this->{rhs}->asJS_context($bp, $o, "scalar");
+        $this->{rhs}->asJS_operand($bp, $o, "scalar");
         $o->write(")");
         return;
     }

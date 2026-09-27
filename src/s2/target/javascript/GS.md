@@ -19,8 +19,22 @@ Source lowering carries scalar/list/void evaluation context. In particular,
 direct native print of one `reverse` argument leaves that argument unchanged,
 while assignment reverses its bytes. Array foreach aliases elements; string and
 hash-key foreach use temporary scalar cells. Assignment copies scalar state.
-String concat chains use flat scalar-context operand callbacks and complete each
-left-associated coercion before evaluating the next right operand. Array push
+Variable, property, field and element operands capture cells; calls and postfix
+increments produce snapshots. Prefix increment and assignment operands retain
+aliases. Binary operators read after both operands evaluate; flat string concat
+chains evaluate all operands before reading, as native multiconcat does. Argument
+lists and array/hash construction also evaluate their operands before copying.
+Captured receivers and keys run once. An initially absent element remains undef,
+while an existing undef element aliases later writes.
+
+Perl 5.34 can free borrowed argument-stack SVs when a later operand deletes an
+element or replaces its whole container. Those native results depend on arena
+reuse and are undefined. Here captured container/key cells remain memory-safe
+and deterministic: deletion reads undef, recreation reads the new same-key
+value, and replacing a container leaves the captured old container alive.
+This is an explicit native-undefined lifetime difference, not a refusal.
+
+Array push
 uses a statement-safe cell helper, evaluates its target and value once, and
 retains native scalar/list contexts without V8 spread-argument limits.
 
