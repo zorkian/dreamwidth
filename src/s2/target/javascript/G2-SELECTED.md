@@ -1,0 +1,17 @@
+# General selected bytes and public UserLite checkpoint
+
+This parent/helper checkpoint continues G2C; it does not complete ordinary general-worker serving. The reviewed encoding adapter is consumed through trusted setup extraction, original selected SQL witnesses remain unchanged, and only named post-source fields are available for later public model projection.
+
+## Source boundaries
+
+`TextUtil.pm` text conversion loads public encoding codes before checking owner oldenc for non-ASCII text. Undefined and ASCII text skip that lookup. `item_toutf8` converts subject/event and entry properties except the two binary crosspost properties. Comment conversion receives an empty property hash; retained comment properties remain parent-only. Missing/unsupported charset follows native text_out; supported converter exceptions and setup/source identity changes are terminal. The opaque setup profile binds installed producer, maps, adapter and shared scalar implementation. Extraction runs once under the unchanged network-denying launcher without site credentials or stored programs.
+
+`RecentPage.pm` selects/counts its window before skipping suspended entries or posters, then calls Entry_from_entryobj. `Entry::visible_to` gates direct Entry text and comments. The native selected path now captures header/status and two-way author identities before body reads, preserves its original pagination window, rereads these facts within the bracket, and includes hidden gating facts in final fingerprint verification. Only exact entry status S is suspended; ordinary other values remain native V. Author X with cluster zero retains public global facts without inventing a cluster lookup. Journal owner admission is unchanged. The older finite API keeps its existing behavior.
+
+`LJ::S2::UserLite` projects escaped public fields through explicitly supplied installed display-name and URL helpers. Its private native account pointer is represented by a request-issued parent handle and a worker WeakMap binding. Public mutations, copied objects and forged fields cannot create or change that binding. Equality compares original witnessed private userid, including native missing-account numeric zero semantics; it does not compare editable names. Other UserLite operations and actual installed hook assembly remain mandatory consumer work.
+
+## Evidence and remaining work
+
+Compact independent native tests cover UserLite field escaping, installed OpenID display behavior, private-account equality and Entry visibility. Actual guarded SQL compares invalid selected event bytes against native DBI/get_logtext2/item_toutf8, preserves originals, detects changed oldenc, and proves suspended body reads are skipped using missing-text sentinels. A hidden-author transition changes the final fingerprint; a fresh visible request recovers. Existing selected-loader regression remains enabled and passes.
+
+These tests distinguish native helpers, actual isolated SQL and fixed private transport controls. They do not claim real general-worker/main HTTP or browser acceptance. Approved original-byte body/subject cleaning, general Page/Entry models, installed public helpers, actual worker closure, request style selection, final native postprocessing and ordinary Recent/Entry serving remain required. The separately held subject component is not consumed. Native error/authority revocation response classification still belongs to that consumer follow-through. Generated encoding data remains outside Git and the database.
