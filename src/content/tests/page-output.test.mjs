@@ -25,7 +25,7 @@ function session(contentType='text/html',extra={}) {
  const output=createPageOutput({contentType,stylesheet:policy,limits:{maxInputBytes:1024*1024,maxOutputBytes:1024*1024,timeoutMs:1000},output:chunk=>chunks.push(chunk),checkDepth:()=>{},transformCss:chunk=>chunk,expandEmbed:chunk=>chunk,...extra});
  return {output,chunks,bytes:()=>Buffer.from(concatenate(chunks).bytes)};
 }
-for(const row of native) test(`native ${row.id}`,()=>{
+for(const row of native.filter(row=>!row.init)) test(`native ${row.id}`,()=>{
  assert.equal(row.ok,1);
  const {output,bytes}=session(row.ctype,{stylesheet:{...policy,cssProxy:row.cssProxy??null}});
  for(const [op,value,flag] of row.trace){
@@ -70,4 +70,25 @@ test('native print checkpoint cadence excludes buffered CSS prints',()=>{
 test('native false CSS proxy scalar does not create a destination',async()=>{
  const {stylesheetDestination}=await import('../dist/page-css.js');
  assert.equal(stylesheetDestination('https://outside.test/x.css',{...policy,cssProxy:'0'}),false);
+});
+
+for(const row of native.filter(row=>row.init))test(`native lifecycle ${row.id}`,()=>{
+ let checks=0,transforms=0;
+ const {output,bytes}=session(row.ctype,{initialization:true,checkDepth:()=>{checks++;},
+  transformCss:chunk=>{transforms++;return chunk;}});
+ const perform=trace=>{for(const [op,value] of trace){
+  const chunk={bytes:Buffer.from(value??''),utf8:false};
+  if(op==='safe')output.printSafe(chunk);else if(op==='raw')output.printRaw(chunk);
+  else if(op==='start')output.startCss();else output.endCss();
+ }};
+ perform(row.init);output.beginRendering();perform(row.render);output.finish();
+ assert.deepEqual(bytes(),Buffer.from(row.base64,'base64'));
+ assert.equal(checks,row.checks);assert.equal(transforms,row.transforms);
+});
+test('render binding is one-shot and suppressed input still obeys total bound',()=>{
+ const immediate=session();assert.throws(()=>immediate.output.beginRendering(),/already bound/);
+ const deferred=session('text/html',{initialization:true});deferred.output.beginRendering();
+ assert.throws(()=>deferred.output.beginRendering(),/already bound/);
+ const small=session('text/html',{initialization:true,limits:{maxInputBytes:1,maxOutputBytes:1,timeoutMs:1000}});
+ assert.throws(()=>small.output.printSafe({bytes:Buffer.from('xx'),utf8:false}),/input bound/);
 });

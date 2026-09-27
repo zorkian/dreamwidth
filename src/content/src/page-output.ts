@@ -48,6 +48,10 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
     const deadline=Date.now()+options.limits.timeoutMs;
     let inputBytes=0,outputBytes=0,finished=false,needFlush=false,cssDepth=0,printCount=0;
     let css: PageChunk[]=[];
+    let rendering=!options.initialization;
+    const suppressed=(_chunk: PageChunk)=>{};
+    let currentRaw:(chunk: PageChunk)=>void=suppressed, currentSafe=currentRaw;
+    let savedRaw=currentRaw,savedSafe=currentRaw;
     const check=()=>{if(finished)throw new Error("Page output already finished");if(Date.now()>deadline)throw new Error("Page output deadline");};
     const emit=(chunk: PageChunk)=>{
         check();const copy=copyChunk(chunk);outputBytes+=copy.bytes.length;
@@ -211,19 +215,27 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
     const write=(chunk: PageChunk,safeChannel: boolean)=>{
         check();const copy=copyChunk(chunk);inputBytes+=copy.bytes.length;
         if(inputBytes>options.limits.maxInputBytes)throw new Error("Page input bound");
-        if(cssDepth)css.push(copy);else (safeChannel?safe:raw)(copy);
+        (safeChannel?currentSafe:currentRaw)(copy);
     };
     const output: PageOutput={
         printRaw:chunk=>write(chunk,false),printSafe:chunk=>write(chunk,true),
-        startCss(){check();if(cssDepth++===0)css=[];},
+        beginRendering(){check();if(rendering)throw new Error("Page rendering already bound");
+            rendering=true;printCount=0;currentRaw=raw;currentSafe=safe;
+            if(options.contentType==='text/css')output.startCss();
+        },
+        startCss(){check();if(cssDepth++===0){css=[];savedRaw=currentRaw;savedSafe=currentSafe;
+            const capture=(chunk: PageChunk)=>{css.push(copyChunk(chunk));};
+            currentRaw=capture;currentSafe=capture;
+        }},
         endCss(){check();if(!cssDepth||--cssDepth!==0)return;
-            const buffer=concatenate(css);css=[];
+            currentRaw=savedRaw;currentSafe=savedSafe;
+            const buffer=concatenate(css);
             const cleaned=cleanPageCss(scalarView(buffer),true);
             const chunk=viewChunk(cleaned,cleaned===scalarView(buffer)&&buffer.utf8);
             const transformed=copyChunk(options.transformCss(chunk));
-            raw(concatenate([viewChunk('/* Cleaned CSS: */\n'),transformed,viewChunk('\n')]));
+            savedRaw(concatenate([viewChunk('/* Cleaned CSS: */\n'),transformed,viewChunk('\n')]));
         },
-        finish(){check();if(options.contentType==='text/css')output.endCss();
+        finish(){check();if(!rendering)throw new Error('Page rendering not bound');if(options.contentType==='text/css')output.endCss();
             if(html){if(literalTag!==null){
                 const name=literalTag,buffer=literalBuffer;
                 literalTag=null;literalBuffer='';
@@ -234,6 +246,6 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
             finished=true;
         },
     };
-    if(options.contentType==='text/css')output.startCss();
+    if(rendering){currentRaw=raw;currentSafe=safe;if(options.contentType==='text/css')output.startCss();}
     return output;
 }

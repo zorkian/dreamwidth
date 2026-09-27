@@ -115,4 +115,29 @@ for my $case (@cases) {
  my $ok=LJ::S2::s2_run(undef,$ctx,{contenttype=>$ctype},'trace',{});
  push @rows,{id=>$id,ctype=>$ctype,cssProxy=>$LJ::CSSPROXY,flag=>utf8::is_utf8($out)?1:0,ok=>$ok,base64=>encode_base64(octets($out),''),trace=>[map {[$_->[0],defined($_->[1])?encode_base64(octets($_->[1]),''):undef,defined($_->[1])&&utf8::is_utf8($_->[1])?1:0]} @trace]};
 }
+my @initcases=(
+ ['balanced', 'text/html', [['start'],['raw','p{color:red}'],['end']], [['raw','VISIBLE']]],
+ ['left_open', 'text/html', [['start'],['raw','p{color:red}']], [['raw','VISIBLE'],['end'],['raw','HIDDEN']]],
+ ['nested_rebind', 'text/html', [['start'],['raw','p{color:red}']], [['start'],['safe','VISIBLE'],['end'],['raw','ALSO'],['end'],['raw','HIDDEN']]],
+ ['balanced_then_capture', 'text/html', [['start'],['raw','p{color:red}'],['end']], [['start'],['raw','b{color:blue}'],['end'],['raw','VISIBLE']]],
+ ['open_css_entry', 'text/css', [['start'],['raw','p{color:red}']], [['raw','VISIBLE'],['end'],['raw','HIDDEN']]],
+ ['plain_open', 'text/plain', [['start'],['raw','p{color:red}']], [['safe','VISIBLE'],['end'],['raw','HIDDEN']]],
+);
+push @initcases,['checkpoint_after_rebind','text/html', [['start'],map {['raw','p{color:red}']} 1..8], [[map {['raw','X']} 1..8]->@*,['end'],[map {['raw','HIDDEN']} 1..8]->@*]];
+
+for my $case (@initcases) {
+ my($id,$ctype,$init,$trace)=@$case;
+ my $out=''; local $LJ::S2::ret_ref=\$out;
+ my $ctx=[];$ctx->[S2::SCRATCH]={trace=>$init};
+ my($checks,$suppressed,$transforms)=(0,0,0);
+ {no warnings 'redefine';local *S2::check_depth=sub {$checks++};local *LJ::Hooks::run_hook=sub {$transforms++};
+ S2::set_output(sub {$suppressed++});S2::set_output_safe(sub {$suppressed++});
+ S2::run_code($ctx,'init');
+ my %before=map {$_=>$ctx->[S2::SCRATCH]{$_}} qw(_css_depth _start_css_buffer);
+ $ctx->[S2::SCRATCH]{trace}=$trace;
+ my $ok=LJ::S2::s2_run(undef,$ctx,{contenttype=>$ctype},'trace',{});
+ push @rows,{id=>"init_$id",ctype=>$ctype,ok=>$ok,base64=>encode_base64(octets($out),''),flag=>utf8::is_utf8($out)?1:0,init=>$init,render=>$trace,checks=>$checks,suppressed=>$suppressed,transforms=>$transforms,
+ before=>\%before,after=>{map {$_=>$ctx->[S2::SCRATCH]{$_}} qw(_css_depth _start_css_buffer)}};
+ }
+}
 print JSON::PP->new->canonical->pretty->encode(\@rows);

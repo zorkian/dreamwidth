@@ -38,3 +38,12 @@ The fixed native checkpoint-failure trace proves exact bridge partial bytes and 
 Native NodeFunction.pm omits this prologue in standalone OO compiler output; persisted LJ deployment uses the non-OO registration envelope. Historical accepted closures without the prologue continue to enter through Context.invoke, with the same shared checkpoint ownership; no new trust classification is inferred from omission.
 
 S2.pm447–471 resets entry cadence on each run_function, including host re-entry from plural (LJ/S2.pm2909) and date ordinal (4072). G2 must use an explicit run boundary for those reset points. Native nested run_function cancels the outer alarm; JS deliberately retains its outer four-second deadline on nested entry, avoiding unbounded execution after re-entry. This protective divergence does not widen worker/page limits. Symbolic-frame versus native call-site recursion granularity remains separate general-runtime follow-through; no general call-site rewrite is made here.
+
+Initialization uses `initialization: true` and the same frozen sink supplied to
+Context from its construction. After prop_init/modules_init, the trusted
+coordinator calls `beginRendering()` once. This replaces the current printer
+pair without clearing saved CSS scratch; no temporary sink or second cleaner
+is used. The type remains fixed in options. An initialization failure can use
+the coordinator-classified diagnostic path without starting rendering or
+ending an implicit text/css entry. Actual source-proven and recovered programs
+exercise suppressed initialization and rendering on one Context/sink.
