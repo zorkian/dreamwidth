@@ -92,6 +92,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
             return {original:`onClick="Expander.make(this,'${input.journal.baseUrl}/${input.page.kind==='entry'?input.page.ditemid:0}.html${suffix}',-1,false);return false;"`,
                 replacement:`onClick="Expander.make(this,'${c.listenOrigin}/users/${input.journal.username}/${input.page.kind==='entry'?input.page.ditemid:0}.html${suffix}',-1,false);return false;"`};
         })():null;
+    let fontExpectation:{pageFont:string;entryColor:string}|undefined;
     const ctx = new Context(layers, text => {
         if (!printing) return;
         if(cssDepth) {
@@ -113,22 +114,36 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         _start_css:()=>{
             if(!input.journal.inlineStylesheet||++cssDepth>16)throw new Error("CSS capture limit");
             const typography=["module_heading","module_text","journal_title","journal_subtitle","entry_title","comment_title"];
-            if(typography.some(name=>["","_size","_units"].some(suffix=>
+            const baseTypography=["font_fallback","font_base_size","font_base_units"].some(key=>
+                Object.hasOwn(input.journal.customtextProperties??{},key));
+            if(baseTypography||typography.some(name=>["","_size","_units"].some(suffix=>
                 Object.hasOwn(input.journal.customtextProperties??{},"font_"+name+suffix)))) {
                 if(!content.fontFamily||!content.fontSize)throw new Unsupported();
-                for(const name of typography) {
-                    const family=String(ctx.prop["_font_"+name]??"");
+                const base=String(ctx.prop._font_base??""),fallback=String(ctx.prop._font_fallback??"");
+                for(const name of ["base",...typography]) {
+                    const specific=name==="base"?"":String(ctx.prop["_font_"+name]??"");
                     const size=String(ctx.prop["_font_"+name+"_size"]??"");
                     const units=String(ctx.prop["_font_"+name+"_units"]??"");
-                    if(family!=="")content.fontFamily(family);
+                    // Every actually emitted family piece, including inherited
+                    // fallback in contexts without a new specific override.
+                    for(const family of [specific,base,fallback])if(family!=="")content.fontFamily(family);
                     if(size!==""&&units!=="")content.fontSize(size+units);
+                }
+                if(baseTypography&&input.journal.layout==='easyread') {
+                    if(input.journal.theme!=='aqua')throw new Unsupported();
+                    const pageFont=String(ctx.getFunction("generate_font_css(string,string,string,string,string)")(
+                        ctx,"",base,fallback,String(ctx.prop._font_base_size??""),String(ctx.prop._font_base_units??"")));
+                    const entryColors=String(ctx.getFunction("generate_color_css(Color,Color,Color)")(
+                        ctx,ctx.prop._color_entry_text,ctx.prop._color_entry_background,ctx.prop._color_entry_border));
+                    if(!entryColors.startsWith("color: #cdc1ac;"))throw new Unsupported();
+                    fontExpectation={pageFont,entryColor:"color: #cdc1ac"};
                 }
             }
         },
         _end_css:()=>{
             if(!cssDepth)throw new Error("Unbalanced CSS capture");
             if(--cssDepth)return;
-            const css=content.stylesheet!(cssBuffer);cssBuffer="";ctx.print(css);
+            const css=content.stylesheet!(cssBuffer,fontExpectation);cssBuffer="";ctx.print(css);
         }}, text => {
         if(preparingCredit&&text.startsWith("<ul class='module-list'>")) {
             if(creditChunks.length||Buffer.byteLength(text)>65536||!text.endsWith('</ul>'))

@@ -274,6 +274,32 @@ test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and ident
    });
    try{assert.equal((await get()).statusCode,409);}finally{typographyMutation.mock.restore();}
    await set(typography);assert.equal((await get()).statusCode,200);
+   const baseWrapper=(fallback:string,size:string,units='em')=>placement.replace('1;\n# end.\n',
+     `register_set(980005,"font_base","");\nregister_set(980005,"font_fallback",${JSON.stringify(fallback)});\n`+
+     `register_set(980005,"font_base_size",${JSON.stringify(size)});\nregister_set(980005,"font_base_units",${JSON.stringify(units)});\n1;\n# end.\n`);
+   for(const [name,fallback,size] of [['family-size','serif','1.25'],['family-only','serif',''],['size-only','','1.25'],['neither','','']] as const) {
+     await set(baseWrapper(fallback,size));
+     for(const url of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+       const response=await get(url);assert.equal(response.statusCode,200,response.body);
+       const container=response.body.match(/#primary,#secondary,#tertiary,#footer\{([^}]+)\}/)![1]!;
+       assert.equal(container.includes('font-size:1.25em'),name==='family-size');
+       assert.equal(container.includes('color:#cdc1ac'),name!=='neither');
+       assert.ok(container.includes('background-color:#13383e'));assert.ok(!container.includes('font-family'));
+     }
+     if(process.env.S2_STYLES_BROWSER_OUTPUT&&['family-size','neither'].includes(name))
+       await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread',true,false,name);
+   }
+   for(const value of [baseWrapper('Georgia /*','1.25'),baseWrapper('serif','0/*'),baseWrapper('serif','1em/**/','')]) {
+     await set(value);const response=await get();
+     assert.equal(response.statusCode,value.includes('"font_base_units",""')?200:422,response.body);
+   }
+   await set(baseWrapper('serif','1.25'));assert.equal((await get()).statusCode,200);
+   const originalBaseRender=Renderer.prototype.render;
+   const baseMutation=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>) {
+     const html=await originalBaseRender.apply(this,args);await set(baseWrapper('serif','1.5'));return html;
+   });
+   try{assert.equal((await get()).statusCode,409);}finally{baseMutation.mock.restore();}
+   await set(baseWrapper('serif','1.25'));assert.equal((await get()).statusCode,200);
    await set(user);
    for(const [id,name] of [[900003,'rb'],[900004,'krja']] as const) {
      await admin.query(`INSERT INTO ${table(g,'user')} (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,dversion,caps) VALUES(?,?,0,'N','V','P','Credit','Y','all','N',1,10,2)`,[id,name]);

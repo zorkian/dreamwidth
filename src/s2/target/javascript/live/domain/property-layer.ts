@@ -23,6 +23,7 @@ export type CustomtextProperties = Partial<Record<
     "module_pagesummary_show" | "module_pagesummary_order" | "module_pagesummary_section" |
     "module_calendar_show" | "module_calendar_order" | "module_calendar_section" |
     "module_tags_section", string | number>> & Partial<Record<
+    "font_fallback" | "font_base_size" | "font_base_units" |
     "font_module_heading" | "font_module_heading_size" | "font_module_heading_units" |
     "font_module_text" | "font_module_text_size" | "font_module_text_units" |
     "font_journal_title" | "font_journal_title_size" | "font_journal_title_units" |
@@ -31,6 +32,7 @@ export type CustomtextProperties = Partial<Record<
     "font_comment_title" | "font_comment_title_size" | "font_comment_title_units", string>>;
 
 const types: Record<string,string> = {
+    font_fallback:"string", font_base_size:"string", font_base_units:"string",
     font_module_heading:"string", font_module_heading_size:"string", font_module_heading_units:"string",
     font_module_text:"string", font_module_text_size:"string", font_module_text_units:"string",
     font_journal_title:"string", font_journal_title_size:"string", font_journal_title_units:"string",
