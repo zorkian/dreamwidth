@@ -86,6 +86,7 @@ test("source configuration export preserves arbitrary endpoints, URL facts and p
     assert.deepEqual(config.app.entryContent.urls.knownHttpsSites, ["UPPER.example", "lower.example"]);
     assert.deepEqual(config.app.entryContent.urls.formDomainBanned, ["Banned.example", "blocked.example"]);
     assert.equal(config.app.entryContent.urls.imageProxy, "not-configured");
+    assert.equal(config.app.maxRecursion,500);
     assert.ok(!readFileSync(output, "utf8").includes("proxy.example"));
     assert.ok(!readFileSync(output, "utf8").includes("secret-salt"));
     assert.equal(config.placeholder.descriptor.altKey, "img.placeholder");
@@ -97,6 +98,14 @@ test("source configuration export preserves arbitrary endpoints, URL facts and p
     const linked = path.join(dir, "linked.json"); symlinkSync(output, linked);
     assert.equal(exportSite(home, linked).status, 1);
     assert.deepEqual(readFileSync(output), before);
+}));
+
+test("effective source recursion override exports and validates without DB access",()=>temporary(dir=>{
+    const home=fixture(dir,"$S2::MAX_RECURSION=50;");
+    const output=path.join(dir,"recursion.json");
+    const result=exportSite(home,output);
+    assert.equal(result.status,0,result.stderr);
+    assert.equal(readStartupConfig(output).app.maxRecursion,50);
 }));
 
 test("exported origins round-trip through startup validation in canonical form", () => temporary(dir => {

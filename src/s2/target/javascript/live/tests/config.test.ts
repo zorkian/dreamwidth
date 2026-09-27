@@ -20,6 +20,9 @@ import {config} from "./fixtures";
 
 test("public cleaner config accepts derived placeholder and exact host:port keys", () => {
     validateConfig(config);
+    validateConfig({...config,maxRecursion:500});
+    validateConfig({...config,maxRecursion:50});
+    for(const maxRecursion of [0,-1,1.5,NaN])assert.throws(()=>validateConfig({...config,maxRecursion}));
     validateConfig({...config, entryContent: {...config.entryContent,
         imagePlaceholder: {...config.entryContent.imagePlaceholder, alt: 'Image < & " café'},
         urls: {...config.entryContent.urls, knownHttpsSites: ["example.org"],

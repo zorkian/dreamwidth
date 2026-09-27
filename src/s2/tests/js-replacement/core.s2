@@ -1,0 +1,58 @@
+# core.s2
+#
+# Independent general S2 compiler/runtime fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+layerinfo type = "core";
+property string greeting;
+property int[][] matrix;
+property string{} labels;
+property string tone { values="red|Red|blue|Blue|false|0|dup|Accepted|dup|0|empty|"; }
+property string other { values="yes|Yes"; allow_other="1"; }
+property string zero { values="yes|Yes"; }
+property int calls;
+set greeting="base";
+set matrix=[[1,2],[3,4]];
+set labels={"constructor"=>"literal", "__proto__"=>"data", "dup"=>"old", "dup"=>"new"};
+set tone="red";
+set other="outside";
+set zero="0";
+set calls=0;
+class Base { function message() : string; }
+class Child extends Base { }
+class Grandchild extends Child { }
+function Base::message() : string { return "base"; }
+function Child::message() : string { return $super->message()+":child"; }
+function decorate(int value) : string { return "base"; }
+function marker() [notags] : string { return "base"; }
+function key() : string { $*calls++; return "computed"; }
+function depth(int n) : int {
+    if ($n == 0) { return 0; }
+    return 1 + depth($n - 1);
+}
+function main() {
+    print decorate(6);
+    var Child child=new Child;
+    print "|"+$child->message();
+    var Grandchild grandchild=new Grandchild;
+    print "|"+$grandchild->message();
+    print "|"+$*matrix[1][0]+"|"+$*labels{"constructor"}+"|"+$*labels{"__proto__"};
+    print "|"+marker();
+    var string{} empty;
+    $empty{"__proto__"}="stored";
+    var string{} literal={};
+    $literal{"constructor"}="value";
+    $literal{"removed"}="gone";
+    delete $literal{"removed"};
+    var string{} calculated={key()=>key()};
+    print "|"+$empty{"__proto__"}+"|"+$literal{"constructor"}+"|"+$calculated{"computed"}+"|"+$*calls+"|"+$*labels{"dup"};
+    foreach var string name ($literal) { print "|"+$name; }
+}
