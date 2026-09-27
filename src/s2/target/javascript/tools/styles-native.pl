@@ -57,4 +57,27 @@ for my$value("15em", "1.5em", "junk15em", "0", "bad", "15bogus", "-5px", "0em") 
       rendered=>defined($lite)?S2::Builtin::LJ::UserLite__ljuser(undef,$lite):'zvi'};
  }
 }
+{
+ $compiler=S2::Compiler->new({checker=>S2::Checker->new});
+ compile(readfile("$ENV{LJHOME}/styles/core2.s2"),'core',990001,'core');
+ my$layout=readfile("$ENV{LJHOME}/styles/easyread/layout.s2");
+ compile($layout,'layout',990002,'easyread');
+ my$all=readfile("$ENV{LJHOME}/styles/easyread/themes.s2");
+ my($source)=$all=~m{#NEWLAYER: easyread/aqua\n(.*?)(?=\n#NEWLAYER:|\z)}s;
+ die 'Missing Aqua' unless defined$source;
+ compile($source,'theme',990003,'aqua');
+ for my$case(['absent',undef,undef],['present','Georgia','#123456'],['empty','','']) {
+  for my$view(qw(recent entry)) {
+   my($name,$font,$color)=@$case;my$ctx=S2::make_context(990001,990002,990003);
+   $ctx->[S2::PROPS]->{font_base}=$font if defined$font;
+   $ctx->[S2::PROPS]->{color_page_background}=S2::Builtin::LJ::Color__Color($color) if defined$color;
+   S2::run_code($ctx,'prop_init()');LJ::S2::escape_all_props($ctx,[990001,990002,990003]);
+   my$css='';S2::set_output(sub{$css.=($_[0]//'')});S2::set_output_safe(sub{$css.=($_[0]//'')});
+   for my$fn(qw(Page::print_contextual_stylesheet() Page::print_default_stylesheet() print_stylesheet() Page::print_theme_stylesheet())) {
+    S2::run_code($ctx,$fn,{_type=>$view eq'entry'?'EntryPage':'RecentPage',view=>$view});
+   }
+   push@rows,{name=>'easyread',control=>$name,view=>$view,css=>$css,source=>$source,layoutSource=>$layout};
+  }
+ }
+}
 print JSON::PP->new->canonical->utf8->encode(\@rows);

@@ -58,7 +58,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     content={...originalContent,...(originalContent.customtext?{customtext(source:string) {
         const value=originalContent.customtext!(source);cleaned.add(value);return value;
     }}:{})};
-    const layers = instantiate(artifact,input.journal.theme);
+    const layers = instantiate(artifact,input.journal.theme,input.journal.layout);
     if(input.journal.inlineStylesheet&&(!content.stylesheet||!content.fontFamily||!["none","proxy-css-links-only"].includes(input.config.cssCleanerHookKind??"")))
         throw new Error("Missing qualified stylesheet cleaner/config");
     if(input.journal.customtextProperties) {

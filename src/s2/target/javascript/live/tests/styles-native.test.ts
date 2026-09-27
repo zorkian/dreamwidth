@@ -49,16 +49,30 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    else {assert.equal(value?.['.type'],'Color');assert.equal(value?._as_string,row.value.as_string);
      for(const channel of ['r','g','b'])assert.equal(value?.['_'+channel],row.value[channel]);}
  }
- for(const row of rows.filter((row:any)=>row.css)) {
+ for(const row of rows.filter((row:any)=>row.css&&row.name!=='easyread')) {
    const name=row.name;assert.equal(row.title,name==='dazzle'?'Dazzle':'Kelis');
    const css=cleanStockStylesheet(row.css);assert.ok(css.includes('.entry .inner,.module{padding:.5em}'));
    assert.ok(css.includes(name==='dazzle'?'#00eeff':'#f8f1e0'));
+ }
+ for(const row of rows.filter((row:any)=>row.name==='easyread')) {
+   assert.throws(()=>cleanStockStylesheet(row.css));
+   const css=cleanStockStylesheet(row.css,'easyread-aqua');
+   assert.ok(!css.includes('font-family:font-family'));
+   assert.ok(!css.includes('.metadata-label:first'));
+   assert.ok(css.includes('.module-content{font-family:'+(row.control==='present'?'Georgia':row.control==='empty'?'sans-serif':'APHont')));
+   for(const bad of [row.css+'p{broken:;',row.css.replace('font-family: font-family:','font-family: other:'),
+     row.css.replace('text-transform: uppercase','color: red'),row.css+'/* URL(foo) */',
+     row.css.replace('color: ;','color: red;')])assert.throws(()=>cleanStockStylesheet(bad,'easyread-aqua'));
  }
  for(const bad of [user.compiled+'print "BAD";',user.compiled.replace('Color__Color','other'),user.compiled.replace('#123456','javascript:bad')])assert.throws(()=>readPropertyLayer(bad,980005));
  for(const value of ['Georgia','Times New Roman','"Open Sans", Arial, serif'])validateStockFontFamily(value);
  for(const value of ['Arial; color:red','url(https://bad.invalid)','</style><script>x</script>','var(--font)'])assert.throws(()=>validateStockFontFamily(value));
  const artifact=validateArtifact(JSON.parse(readFileSync(process.env.S2_LIVE_TEST_ARTIFACT!,'utf8')));
- assert.equal(artifact.themes?.length,2);
+ assert.equal(artifact.themes?.length,artifact.layouts?3:2);
+ if(artifact.layouts)for(const change of [(a:any)=>a.layouts[0].code+='x',(a:any)=>a.layouts[0].sourceHash='0'.repeat(64),
+   (a:any)=>a.themes=a.themes.filter((theme:any)=>theme.name!=='aqua')]) {
+   const copy=structuredClone(artifact);change(copy);assert.throws(()=>validateArtifact(copy));
+ }
  for(const change of [(a:any)=>a.themes[0].code+='x',(a:any)=>a.themes[0].sourceHash='0'.repeat(64),(a:any)=>a.themes[1]=a.themes[0]]) {
    const copy=structuredClone(artifact);change(copy);assert.throws(()=>validateArtifact(copy));
  }
