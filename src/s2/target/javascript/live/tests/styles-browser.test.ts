@@ -17,9 +17,9 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false, typography=false,baseTypography?:string):Promise<void> {
+export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false, typography=false,baseTypography?:string,presentation?:{imageUrls:string[]}):Promise<void> {
     const baseOutput=process.env.S2_STYLES_BROWSER_OUTPUT;
-    const output=baseOutput&&layout?path.join(baseOutput,layout+(baseTypography?"-base-"+baseTypography:typography?"-typography":modules?"-modules":"")):baseOutput;
+    const output=baseOutput&&layout?path.join(baseOutput,layout+(presentation?"-presentation":baseTypography?"-base-"+baseTypography:typography?"-typography":modules?"-modules":"")):baseOutput;
     if(!output) return;
     const appOrigin="http://localhost:8080";
     const pageUrl=`http://localhost:${port}/users/ordinary6/76801.html`;
@@ -33,6 +33,13 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
     for(let index=0;index<queue.length;index++) {
         assert.ok(queue.length<=100,"Bounded observed stock resource closure");
         const url=queue[index]!;if(assets.has(url.href))continue;
+        if(presentation?.imageUrls.includes(url.href)) {
+            assert.equal(url.origin,new URL(pageUrl).origin);
+            assert.ok([...html.matchAll(/<img\b[^>]*src=["']([^"']+)["']/g)]
+                .some(match=>new URL(match[1]!.replaceAll("&amp;","&"),pageUrl).href===url.href));
+            assets.set(url.href,{body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0ioAAAAASUVORK5CYII=","base64"),
+                type:"image/png",source:"declared fixture inert PNG"});continue;
+        }
         assert.ok([new URL(pageUrl).origin,appOrigin].includes(url.origin),url.href);
         const source=new URL(url.pathname+url.search,appOrigin);
         assert.equal(source.origin,appOrigin);
@@ -90,7 +97,7 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             assert.ok(state.calendar?.includes('2026'));
             const calendar=state.moduleOrder.findIndex((name:string)=>name.includes('module-calendar'));
             const summary=state.moduleOrder.findIndex((name:string)=>name.includes('module-pagesummary'));
-            assert.ok(calendar>=0&&summary>calendar);assert.ok(!state.moduleOrder.some((name:string)=>name.includes('module-userprofile')));
+            assert.ok(calendar>=0&&summary>calendar);if(!presentation)assert.ok(!state.moduleOrder.some((name:string)=>name.includes('module-userprofile')));
         }else assert.equal(state.tagAfterCredit,true);
         if(typography) {
             assert.ok(state.typography['#header h1#title'].family.startsWith('Verdana'));
@@ -99,6 +106,28 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             assert.equal(state.typography['#header h1#title'].size,'32px');
             assert.equal(state.typography['.entry .entry-title'].size,'19.2px');
             assert.equal(state.typography['.module h2'].size,'20px');
+        }
+        let pictures:unknown;
+        if(presentation) {
+            pictures=await page.evaluate(()=>Object.fromEntries(['.entry .userpic img','.comment .userpic img','.module-userprofile img[src$="/11/900001"]'].map(selector=>{
+                const node=document.querySelector(selector) as HTMLImageElement; if(!node)return [selector,null];
+                return [selector,{src:node.src,widthAttribute:node.getAttribute('width'),heightAttribute:node.getAttribute('height'),
+                    usedWidth:node.getBoundingClientRect().width,usedHeight:node.getBoundingClientRect().height,
+                    float:getComputedStyle(node).cssFloat,alignment:getComputedStyle(node.parentElement!.parentElement!).textAlign}];})));
+            const observed=pictures as Record<string,any>;
+            assert.equal(observed['.entry .userpic img'].widthAttribute,'75.75');assert.equal(observed['.entry .userpic img'].heightAttribute,'74.25');
+            assert.equal(observed['.comment .userpic img'].widthAttribute,'50.5');assert.equal(observed['.comment .userpic img'].heightAttribute,'49.5');
+            assert.equal(observed['.module-userprofile img[src$="/11/900001"]'].widthAttribute,'101');
+            assert.equal(observed['.entry .userpic img'].alignment,'right');
+            assert.equal(observed['.comment .userpic img'].float,'right');
+            // Compare the same native decimal attributes in a diagnostic image;
+            // the browser, not our model, decides used numeric dimensions.
+            const nativeUsed=await page.evaluate(()=>{
+                const node=document.createElement('img');node.setAttribute('width','75.75');node.setAttribute('height','74.25');
+                document.body.append(node);const box=node.getBoundingClientRect();node.remove();return [box.width,box.height];
+            });
+            assert.deepEqual([observed['.entry .userpic img'].usedWidth,observed['.entry .userpic img'].usedHeight],nativeUsed);
+            assert.ok(presentation.imageUrls.every(url=>requested.has(url)));
         }
         let contrast:unknown;
         if(baseTypography) {
@@ -120,7 +149,7 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
         writeFileSync(path.join(output,"browser.json"),JSON.stringify({pageUrl,fixtureStyle:44,
             htmlSha256:createHash("sha256").update(html).digest("hex"),
             retainedPageSha256:null,screenshot:path.join(output,"entry-styles.png"),
-            baseTypography,contrast,stylesheetMapping:{inline:true,retainedJournalStylesheet:false},links:state,
+            baseTypography,contrast,presentation,pictures,stylesheetMapping:{inline:true,retainedJournalStylesheet:false},links:state,
             resources:[...requested].map(url=>({url,source:assets.get(url)!.source,
                 sha256:createHash("sha256").update(assets.get(url)!.body).digest("hex")})),failures},null,2)+"\n");
     }finally{await context.close();await browser.close();}
