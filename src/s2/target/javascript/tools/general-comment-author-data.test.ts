@@ -50,6 +50,19 @@ print encode_json(0+$comment->admin_post);$db->do('ROLLBACK');$db->disconnect;`;
         {encoding:'utf8',timeout:10000,maxBuffer:32768}));
 }
 
+function nativeMapKeywordWithoutId():unknown {
+    const source=String.raw`use strict;use warnings;no warnings 'once';
+use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
+require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::User::Icons;
+my $poster=bless {userid=>900999,dversion=>9},'LJ::User';
+no warnings 'redefine';
+local *LJ::User::get_userpic_info=sub{{mapkw=>{7=>'mapped'}}};
+local *LJ::User::resolve_mapid_redirects=sub{$_[1]};
+print encode_json([$poster->get_keyword_from_mapid(undef),$poster->get_keyword_from_mapid(7)]);`;
+    return JSON.parse(execFileSync('perl',['-e',source],
+        {encoding:'utf8',timeout:10000,maxBuffer:32768}));
+}
+
 test("general byte-view retains absent poster fallback and revokes it on public identity changes",{
     skip:process.env.S2_SELECTED_FIXTURE!=="1"
 },async()=>withSelectedFixture(async f=>{
@@ -183,6 +196,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(fields.loaded,true);assert.equal(fields.posterSuspended,true);
     assert.equal(fields.subject,undefined);assert.equal(fields.body,undefined);
     assert.equal(fields.pictureKeyword?.bytes().toString(),'changed-keyword');
+    assert.deepEqual(nativeMapKeywordWithoutId(),[null,'mapped']);
     const ctx=new Context([],()=>{throw Error('Unreached S2 print');});
     ctx.prop._userpics_position=NativeString.hostUtf8Bytes('none');
     const fixed=NativeString.hostUtf8Bytes;
@@ -244,5 +258,19 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         const ordinaryModel=generalCommentFromSource(ctx,{...input,
             ...ordinary.commentPublicFields(ordinaryComment)},modelOperations);
         assert.equal(ordinaryModel._admin_post,0);
+        // A page-loaded dversion-9 poster takes the mapid branch even when an
+        // old picture_keyword prop remains. Native lookup(undef) is undef.
+        await f.admin.query(`DELETE FROM ${f.table(f.c,"talkprop2")}
+            WHERE journalid=900001 AND jtalkid=77 AND tpropid=?`,[f.talkProp('picture_mapid')]);
+        await f.admin.query(`INSERT INTO ${f.table(f.c,"talkprop2")}(journalid,jtalkid,tpropid,value)
+            VALUES (900001,77,?,'legacy-should-not-win')`,[f.talkProp('picture_keyword')]);
+        assert.equal(await f.store.revalidateNativeSelectedFingerprint(revoked),false);
+        const legacy=await f.store.loadNativeSelectedSnapshot(request);assert.ok(legacy?.facts.comments);
+        const legacyComment=legacy.facts.comments.texts.find(row=>row.jtalkid===77)!;
+        assert.equal(legacy.facts.comments.authors.find(row=>row.userid===900999)?.dversion,10);
+        assert.equal(legacyComment.props.picture_mapid,undefined);
+        assert.equal(legacyComment.props.picture_keyword,'legacy-should-not-win');
+        const legacySelected=await GeneralSelectedText.prepare(legacy,noEncoding,authority);
+        assert.equal(legacySelected.commentPublicFields(legacyComment).pictureKeyword,undefined);
     } finally {await maintainers.close();}
 },false,false,false,true));
