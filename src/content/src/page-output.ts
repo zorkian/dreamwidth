@@ -29,10 +29,14 @@ import {cleanPageCss,stylesheetDestination} from "./page-css";
 const eat=new Set(["script","object","iframe","applet","embed","param"]);
 const literal=new Set(["script","style","xmp","textarea","title","plaintext"]);
 const linkRelations=new Set("icon shortcut alternate next prev index made start search top help up author edituri file-list previous home contents bookmark chapter section subsection appendix glossary copyright child".split(" "));
-const white=/[\x09-\x0d\x20\x85\xa0]/g;
+const white=/[\x09-\x0d\x20]/g;
 const angles=(s: string)=>s.replaceAll("<","&lt;").replaceAll(">","&gt;");
 const escape=(s: string)=>s.replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("'","&#39;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 function decodeAttr(value: string): string {
+    // HTML::Parser utf8_mode preserves a valid byte string; its attribute
+    // decoder upgrades the whole Latin1 scalar when those octets are invalid.
+    try {new TextDecoder("utf-8",{fatal:true}).decode(Uint8Array.from(value,c=>c.charCodeAt(0)));}
+    catch {value=encodedEntityView(value);}
     return value.replace(/&(?:#(?:[xX][0-9a-fA-F]+|[0-9]+)|[A-Za-z][A-Za-z0-9_]*);?/g,token=>{
         const decoded=decodeNativeEntities(token);
         return decoded===token ? token : encodedEntityView(decoded);
@@ -54,7 +58,8 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
         if(/lj-embed/i.test(value))chunk=copyChunk(options.expandEmbed(chunk));
         emit(chunk);
     };
-    let parserBytes=0;
+    let parserBytes=0,titleFallback=false;
+    let markupStart=0,markedSection=false;
     let source="",pendingText="",tagName="",attrName="",attrValue="",tagStart=0;
     let seq: string[]=[],attrs=new Map<string,string>();
     const eating: string[]=[];
@@ -71,9 +76,10 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
         if(style!==null){cleanerEmit(cleanPageCss(style,false));style=null;}
         cleanerEmit("</"+name+">");
     };
+    const closeFallbackTitle=()=>{if(titleFallback){titleFallback=false;endTag("title");}};
     const commitAttribute=()=>{seq.push(attrName);if(!attrs.has(attrName))attrs.set(attrName,decodeAttr(attrValue));attrValue="";};
     const startTag=(end: number,slash=false)=>{
-        flushText();let name=tagName.toLowerCase();
+        flushText();closeFallbackTitle();let name=tagName.toLowerCase().replace("<","");
         // HTML::Parser includes a nonclosing slash suffix in its tagname.
         // The maintained tokenizer provides the exact name end/raw tag span.
         const raw=source.slice(tagStart,end+1);
@@ -84,11 +90,12 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
         if(eat.has(name)||/^(g|fb):/.test(name))eating.push(name);
         if(!eating.length){
             let keep=true;
-            if(name==='meta'){
+            const cleanName=name.replace(/^.*:/s,'').replace(/[^a-zA-Z0-9_]/g,'');
+            if(cleanName==='meta'){
                 const equiv=(attrs.get('http-equiv')??'').toLowerCase().replace(/[\s\x0b]/,'');
                 keep=!/refresh|content-type|link|set-cookie/.test(equiv);
             }
-            if(name==='link'){
+            if(cleanName==='link'){
                 const rel=attrs.get('rel')??'',href=attrs.get('href')??'';
                 if(/\bstylesheet\b/i.test(rel)){
                     const destination=stylesheetDestination(href,options.stylesheet);
@@ -120,27 +127,47 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
         onattribname:(start,end)=>{attrName=source.slice(start,end).toLowerCase();attrValue='';},
         onattribdata:(start,end)=>{attrValue+=source.slice(start,end);},
         onattribentity:()=>{throw new Error("Unexpected tokenizer entity decode");},
-        onattribend:()=>commitAttribute(),
-        onopentagend:end=>startTag(end),onselfclosingtag:end=>startTag(end,true),
-        onclosetag:(start,end)=>endTag(source.slice(start,end).toLowerCase()),
-        ontext:(start,end)=>{pendingText+=source.slice(start,end);},
+        onattribend:quote=>{if(quote===0)attrValue=attrName;commitAttribute();},
+        onopentagend:end=>{startTag(end);markupStart=source.length;},onselfclosingtag:end=>{startTag(end,true);markupStart=source.length;},
+        onclosetag:(start,end)=>{closeFallbackTitle();endTag(source.slice(start,end).toLowerCase());markupStart=source.length;},
+        ontext:(start,end)=>{pendingText+=source.slice(start,end);markupStart=end;},
         ontextentity:()=>{throw new Error("Unexpected tokenizer text decode");},
-        oncomment:()=>flushText(),onprocessinginstruction:()=>flushText(),
-        ondeclaration:(start,end)=>{flushText();cleanerEmit('<!'+(source.slice(start,end).match(/"[^"]*"|'[^']*'|[^\s]+/g)??[]).map(angles).join(' ')+'>');},
-        oncdata:(start,end)=>{pendingText+=source.slice(start,end);},
+        oncomment:()=>{flushText();markupStart=source.length;},onprocessinginstruction:()=>{flushText();markupStart=source.length;},
+        ondeclaration:(start,end)=>{flushText();closeFallbackTitle();markupStart=source.length;if(source[start]==='[')return;cleanerEmit('<!'+(source.slice(start,end).match(/"[^"]*"|'[^']*'|[^\s]+/g)??[]).map(angles).join(' ')+'>');},
+        oncdata:(start,end)=>{
+            flushText();closeFallbackTitle();
+            // With marked_sections disabled native treats the opener through
+            // its first > as a discarded declaration, then parses the remainder.
+            const body=source.slice(start,end),cut=body.indexOf(">");
+            if(cut>=0)replay(body.slice(cut+1)+">");
+        },
         onend:()=>flushText(),
     };
     // XML lexical mode avoids HTML5 implied element handling and its hardcoded
     // literal set. Native literal spans are handled separately below.
     let tokenizer=new Tokenizer({xmlMode:true,decodeEntities:false},callbacks);
-    const feed=(value: string)=>{
+    const replay=(value: string)=>{
+        const savedSource=source,savedTokenizer=tokenizer,savedMarkupStart=markupStart;
+        source="";markupStart=0;tokenizer=new Tokenizer({xmlMode:true,decodeEntities:false},callbacks);
+        feed(value,false);tokenizer.end();
+        source=savedSource;tokenizer=savedTokenizer;markupStart=savedMarkupStart;
+    };
+    const feed=(value: string,charge=true)=>{
         // Feed one input unit until a completed native literal start switches
         // modes; token boundaries always come from the maintained tokenizer.
-        parserBytes+=value.length;
+        if(charge)parserBytes+=value.length;
         if(parserBytes>options.limits.maxInputBytes)throw new Error("Page parser input bound");
         for(let i=0;i<value.length;i++){
             if((i&1023)===0)check();
             const char=value[i]!;
+            if(markedSection){
+                // Native marked_sections is off: the declaration is discarded
+                // through its first >, including a CDATA opener. The tracked
+                // public-token boundary prevents matches in attributes/comments.
+                if(char==='>'){markedSection=false;source='';markupStart=0;
+                    tokenizer=new Tokenizer({xmlMode:true,decodeEntities:false},callbacks);}
+                continue;
+            }
             if(literalTag!==null){
                 literalBuffer+=char;
                 if(literalPrevious==='<' && char==='/')literalCandidateStart=literalBuffer.length-2;
@@ -167,6 +194,9 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
                 continue;
             }
             source+=char;tokenizer.write(char);
+            if(source.endsWith('<![CDATA[')&&source.length-9===markupStart){
+                flushText();closeFallbackTitle();markedSection=true;
+            }
         }
     };
     const html=/^text\/html/.test(options.contentType);
@@ -194,7 +224,13 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
             raw(concatenate([viewChunk('/* Cleaned CSS: */\n'),transformed,viewChunk('\n')]));
         },
         finish(){check();if(options.contentType==='text/css')output.endCss();
-            if(html){if(literalTag!==null){text(literalBuffer);literalBuffer='';}else tokenizer.end();}
+            if(html){if(literalTag!==null){
+                const name=literalTag,buffer=literalBuffer;
+                literalTag=null;literalBuffer='';
+                if(name==='style'||name==='script'){endTag(name);replay(buffer);}
+                else if(name==='title'){titleFallback=true;replay(buffer);flushText();closeFallbackTitle();}
+                else text(buffer);
+            }else tokenizer.end();}
             finished=true;
         },
     };

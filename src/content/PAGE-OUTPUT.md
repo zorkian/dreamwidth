@@ -56,6 +56,9 @@ CSS starts save both printer channels only at the outermost nesting depth.
 Both channels then append to one flag-aware buffer. The outermost end restores
 the channels and sends screened CSS through the saved raw path, including any
 pending HTML flush. Unmatched starts and ends follow the retained behavior.
+Unclosed style/script literals emit their native synthetic end before replaying
+remaining generic tokens; title ends at the first non-comment markup or EOF.
+Textarea, xmp and plaintext retain their separate literal EOF behavior.
 Native `CSS::Cleaner` screening leaves safe general CSS unchanged; it does not
 impose a stylesheet syntax catalog. `LJ::CSS::Cleaner` pre-hook behavior is
 separate from ordinary inline/style-element CSS. Stylesheet links follow the
@@ -76,6 +79,8 @@ Run in the devcontainer from `src/content`:
 npm run check
 npm run build
 node --test tests/page-output.test.mjs
+# After the normal S2 TypeScript build:
+node --test tests/page-output-stage.test.mjs
 ```
 
 The fixed native drivers load retained modules and source functions and execute
@@ -86,6 +91,12 @@ counterexamples, generic tags/CSS, nested printers, flags, and isolation. Source
 and shared-runtime integration, actual custom program rendering, browser safety,
 and installed application hooks are additional serving gates; these component
 tests do not claim that completion.
+
+The page session is exposed only through `@dreamwidth/content/page-output`,
+not the entry cleaner index imported by the stock worker. Its serving closure
+is not granted until integration. The stage test uses the actual normal
+`--easyread` compiler, closed stager, and production manifest verifier; its
+task-specific artifact path is printed and preserved for inspection.
 
 The production tokenizer dependency is MIT licensed; its locked transitive
 closure retains MIT and BSD notices. The semantic policy ports retain inherited

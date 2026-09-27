@@ -17,6 +17,10 @@
     "./native-entities": {
       "types": "./dist/native-entities.d.ts",
       "require": "./dist/native-entities.js"
+    },
+    "./page-output": {
+      "types": "./dist/page-output.d.ts",
+      "require": "./dist/page-output.js"
     }
   },
   "scripts": {
