@@ -56,7 +56,9 @@ export interface SourceCapabilities {
 }
 
 export interface SourceStyleConfiguration {
+    readonly siteSchemeInheritance?: readonly string[];
     readonly defaultStyle: Readonly<Record<string, string>>;
+    readonly defaultFeedStyle?: Readonly<Record<string, string>>;
     readonly layerRemap: Readonly<Record<string, number>>;
 }
 

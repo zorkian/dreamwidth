@@ -49,7 +49,8 @@ $DEFAULT_LANG='en'; @CLUSTERS=(7,9); %CLUSTER_PAIR_ACTIVE=(7=>'B');
 %DBINFO=(master=>{host=>'db.example.test',dbname=>'custom_global',user=>'fixture',pass=>'${secret}'},
   fallback=>{host=>'fallback.example.test',user=>'fixture',pass=>'${secret}',role=>{cluster9=>0}},
   other=>{sock=>'/tmp/example-mysql.sock',dbname=>'custom_cluster',user=>'fixture',pass=>'${secret}',role=>{cluster7b=>3,cluster9=>1}});
-$DEFAULT_STYLE={core=>'core2',layout=>'core2base/layout'}; %S2LID_REMAP=(4=>12);
+$DEFAULT_STYLE={core=>'core2',layout=>'core2base/layout'};
+$DEFAULT_FEED_STYLE={core=>'core2',layout=>'sitefeeds/layout',theme=>'sitefeeds/default'}; %S2LID_REMAP=(4=>12);
 $CAP_DEF{maxcomments}=0;
 %CAP=(1=>{s2viewentry=>0,maxcomments=>123},5=>{_name=>'_moveinprogress',readonly=>1,s2viewentry=>1});
 %KNOWN_HTTPS_SITES=('UPPER.example'=>1,'lower.example'=>1,'false.example'=>0);
@@ -107,6 +108,33 @@ test("effective source recursion override exports and validates without DB acces
     assert.equal(result.status,0,result.stderr);
     assert.equal(readStartupConfig(output).app.maxRecursion,50);
 }));
+
+test("trusted site-scheme setup exports actual default inheritance and rejects swallowed DB attempts", () => {
+    for (const dbAttempt of [false, true]) temporary(dir => {
+        const home = fixture(dir, `
+LJ::Hooks::register_hook('modify_scheme_list', sub {
+    my ($schemes, $merge) = @_;
+    @$schemes = ({scheme=>'fixture_child',parent=>'fixture_parent'}, {scheme=>'fixture_parent'});
+    $merge->(fixture_parent=>{parent=>'global'});
+    print '${secret}'; warn '${secret}';
+    ${dbAttempt ? "eval { DBI->connect('DBI:mysql:should-not-connect','private-user','private-password'); };" : ""}
+});
+`);
+        const output = path.join(dir, "schemes.json");
+        const result = exportSite(home, output);
+        if (!dbAttempt) assert.deepEqual(readStartupConfig(output).styles.defaultFeedStyle,
+            {core: "core2", layout: "sitefeeds/layout", theme: "sitefeeds/default"});
+        assert.ok(!result.stdout.includes(secret) && !result.stderr.includes(secret));
+        if (dbAttempt) {
+            assert.equal(result.status, 1);
+            assert.equal(existsSync(output), false);
+        } else {
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(readStartupConfig(output).styles.siteSchemeInheritance,
+                ["fixture_child", "fixture_parent", "global"]);
+        }
+    });
+});
 
 test("exported origins round-trip through startup validation in canonical form", () => temporary(dir => {
     const cases = [

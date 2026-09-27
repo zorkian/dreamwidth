@@ -145,8 +145,12 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
         const bit = record(item, ["bit", "value"]);
         integer(bit.bit, 0, 31); integer(bit.value, Number.MIN_SAFE_INTEGER);
     });
-    const styles = record(root.styles, ["defaultStyle", "layerRemap"]);
+    const styles = record(root.styles, ["defaultStyle", "layerRemap",
+        ...(Object.hasOwn(root.styles as object, "defaultFeedStyle") ? ["defaultFeedStyle"] : []),
+        ...(Object.hasOwn(root.styles as object, "siteSchemeInheritance") ? ["siteSchemeInheritance"] : [])]);
+    if (styles.siteSchemeInheritance !== undefined) list(styles.siteSchemeInheritance, item => text(item, 256));
     map(styles.defaultStyle, item => text(item));
+    if (styles.defaultFeedStyle !== undefined) map(styles.defaultFeedStyle, item => text(item));
     map(styles.layerRemap, item => integer(item, 1));
     return value as StandaloneStartupConfig;
 }

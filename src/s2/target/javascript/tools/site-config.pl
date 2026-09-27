@@ -30,6 +30,7 @@ BEGIN {
 }
 use LJ::Config;
 use LJ::Hooks;
+use DW::SiteScheme;
 use B qw(svref_2object);
 use Cwd qw(abs_path);
 use Digest::SHA qw(sha256_hex);
@@ -43,7 +44,7 @@ use URI;
 
 sub fail { die bless { message => $_[0] }, 'SiteConfigError'; }
 
-# No callback is executed or exported. This fixed source/provenance proof only
+# No CSS callback is executed or exported. This fixed source/provenance proof only
 # qualifies the core URL-rewriter; the worker separately forbids its raw trigger.
 sub css_hook_kind {
     LJ::Hooks::are_hooks('css_cleaner_transform');
@@ -176,6 +177,11 @@ sub export_config {
     my $tags_disabled = $LJ::DISABLED{tags};
     $tags_disabled = $tags_disabled->() if ref $tags_disabled eq 'CODE';
     fail('Hook discovery attempted a database connection') if $blocked_connections;
+    # Trusted setup data API: installed modify_scheme_list may shape the default
+    # anonymous inheritance. DBI attempts remain sticky failures, even if caught.
+    my @site_scheme = DW::SiteScheme->inheritance( DW::SiteScheme->default );
+    fail('Site scheme setup attempted a database connection') if $blocked_connections;
+    @site_scheme = map { string( $_, 256 ) } @site_scheme;
     my ( @sources, %pairs, %rules, @bits );
 
     for my $id ( sort keys %LJ::DBINFO ) {
@@ -357,7 +363,9 @@ sub export_config {
         },
         styles => {
             defaultStyle => scalar_map( $LJ::DEFAULT_STYLE, 0 ),
-            layerRemap   => scalar_map( \%LJ::S2LID_REMAP,  1 )
+            defaultFeedStyle => scalar_map( $LJ::DEFAULT_FEED_STYLE // {}, 0 ),
+            layerRemap   => scalar_map( \%LJ::S2LID_REMAP,  1 ),
+            siteSchemeInheritance => \@site_scheme
         },
     };
     fail('Configuration attempted a database connection') if $blocked_connections;
