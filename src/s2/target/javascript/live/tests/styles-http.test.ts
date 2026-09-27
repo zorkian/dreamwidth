@@ -138,3 +138,66 @@ test('actual theme/user property snapshots, stylesheet, isolation and final rere
    }finally{await otherApp.close();await other.close();}
  } finally {await app.close();await service.close();}
 }));
+
+test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and identity freshness',{
+ skip:process.env.S2_SELECTED_FIXTURE!=='1',timeout:120000},async t=>withSelectedFixture(async f=>{
+ const {admin,table,g,c,store}=f;
+ const run=spawnSync('perl',['tools/styles-native.pl'],{encoding:'utf8',timeout:20000});assert.equal(run.status,0,run.stderr);
+ const rows=JSON.parse(run.stdout),native=rows.find((row:any)=>row.name==='easyread');
+ const user=rows.find((row:any)=>row.compiled).compiled.replace('"module_tags_show",0','"module_tags_show",1').replace('"module_tags_order",-1','"module_tags_order",19');
+ const [coreRows]=await admin.query<any[]>(`SELECT s2lid,userid FROM ${table(g,'s2layers')} WHERE type='core'`);
+ const core=Number(coreRows[0].s2lid),system=Number(coreRows[0].userid);
+ for(const [id,type,parent,source] of [[990002,'layout',core,native.layoutSource],[990003,'theme',990002,native.source]] as const) {
+   await admin.query(`INSERT INTO ${table(g,'s2layers')} (s2lid,userid,b2lid,type) VALUES(?,?,?,?)`,[id,system,parent,type]);
+   await admin.query(`INSERT INTO ${table(g,'s2info')} (s2lid,infokey,value) VALUES(?,'type',?)`,[id,type]);
+   await admin.query(`INSERT INTO ${table(g,'s2source_inno')} (s2lid,s2code) VALUES(?,?)`,[id,source]);
+   await admin.query(`INSERT INTO ${table(g,'s2compiled')} (s2lid,comptime) VALUES(?,123)`,[id]);
+ }
+ await admin.query(`UPDATE ${table(c,'s2stylelayers2')} SET s2lid=990002 WHERE userid=900001 AND styleid=44 AND type='layout'`);
+ await admin.query(`INSERT INTO ${table(c,'s2stylelayers2')} (userid,styleid,type,s2lid) VALUES(900001,44,'theme',990003),(900001,44,'user',980005)`);
+ await admin.query(`INSERT INTO ${table(g,'s2layers')} (s2lid,userid,b2lid,type) VALUES(980005,900001,990002,'user')`);
+ await admin.query(`INSERT INTO ${table(g,'s2info')} (s2lid,infokey,value) VALUES(980005,'type','user')`);
+ await admin.query(`INSERT INTO ${table(g,'s2source_inno')} (s2lid,s2code) VALUES(980005,'STALE SOURCE')`);
+ const set=async(text:string)=>admin.query(`REPLACE INTO ${table(c,'s2compiled2')} (userid,s2lid,comptime,compdata) VALUES(900001,980005,123,?)`,[gzipSync(Buffer.from(text))]);await set(user);
+ await admin.query(`INSERT INTO ${table(c,'userkeywords')} (userid,kwid,keyword) VALUES(900001,1,'Visible tag')`);
+ await admin.query(`INSERT INTO ${table(c,'usertags')} (journalid,kwid,display) VALUES(900001,1,'1')`);
+ await admin.query(`INSERT INTO ${table(c,'logkwsum')} (journalid,kwid,security,entryct) VALUES(900001,1,9223372036854775808,1)`);
+ await admin.query(`UPDATE ${table(c,'log2')} SET replycount=2 WHERE journalid=900001 AND jitemid=300`);
+ for(const [id,state,body] of [[1,'A','Public EasyRead comment'],[2,'S','HIDDEN_EASYREAD_COMMENT']] as const) {
+   await admin.query(`INSERT INTO ${table(c,'talk2')} (journalid,jtalkid,nodetype,nodeid,parenttalkid,posterid,datepost,state) VALUES(900001,?,'L',300,0,0,'2026-09-26 01:00:00',?)`,[id,state]);
+   await admin.query(`INSERT INTO ${table(c,'talktext2')} (journalid,jtalkid,subject,body) VALUES(900001,?,'Comment',?)`,[id,body]);
+ }
+ const exported=mkdtempSync('/tmp/slice19-site-');let hook;
+ try {const output=path.join(exported,'site.json');const result=spawnSync('perl',['-I',path.join(process.env.LJHOME!,'cgi-bin'),'tools/site-config.pl','--output',output,'--artifact',process.env.S2_LIVE_TEST_ARTIFACT!,'--app-origin',config.canonicalAppOrigin,'--listen-origin',config.listenOrigin],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);hook=readStartupConfig(output).app.cssCleanerHookKind;}finally{rmSync(exported,{recursive:true,force:true});}
+ const cfg={...config,commentSettings:f.startup.commentSettings,cssCleanerHookKind:hook};
+ const service=await createAnonymousRecentService({repository:store,secretSource:store,config:cfg,capabilities:f.startup.capabilities,limits,artifact:{path:process.env.S2_LIVE_TEST_ARTIFACT!}});
+ const app=createLiveApp(cfg,service);if(process.env.S2_STYLES_BROWSER_OUTPUT)await app.listen({host:'127.0.0.1',port:8081});
+ const get=(url='/users/ordinary6/')=>app.inject({url,headers:{host:'localhost:8081'}});
+ try {
+   for(const url of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+     const baseline=await store.loadRawSnapshot(f.request('ordinary6',url.endsWith('.html')?{kind:'entry',ditemid:76801}:{kind:'recent',skip:0,itemshow:20}));assert.ok(baseline);
+     const response=await get(url);assert.equal(response.statusCode,200,response.body);
+     assert.ok(response.body.includes("class='theme-name'>Aqua</span>"));assert.ok(response.body.includes('>EasyRead</a>'));
+     assert.ok(response.body.includes('customize/?layoutid=990002'));assert.ok(!response.body.includes('font-family:font-family'));
+     assert.ok(!response.body.includes('HIDDEN_EASYREAD_COMMENT'));if(url.endsWith('.html'))assert.ok(response.body.includes('Public EasyRead comment'));
+     assert.equal(await store.revalidateFingerprint(baseline),true);
+   }
+   if(process.env.S2_STYLES_BROWSER_OUTPUT)await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread');
+   for(const [id,name] of [[900003,'rb'],[900004,'krja']] as const) {
+     await admin.query(`INSERT INTO ${table(g,'user')} (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,dversion,caps) VALUES(?,?,0,'N','V','P','Credit','Y','all','N',1,10,2)`,[id,name]);
+     await admin.query(`INSERT INTO ${table(g,'useridmap')} (userid,user) VALUES(?,?)`,[id,name]);
+   }
+   const present=await get();assert.equal(present.statusCode,200,present.body);assert.ok(present.body.includes("lj:user='rb'"));assert.ok(present.body.includes("lj:user='krja'"));
+   const mutate=async(query:string,values:unknown[])=>{const original=Renderer.prototype.render;const stub=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>){const html=await original.apply(this,args);await admin.query(query,values);return html;});try{assert.equal((await get()).statusCode,409);}finally{stub.mock.restore();}};
+   await mutate(`UPDATE ${table(g,'user')} SET statusvis='D' WHERE userid=900003`,[]);await admin.query(`UPDATE ${table(g,'user')} SET statusvis='V' WHERE userid=900003`);
+   await mutate(`UPDATE ${table(g,'s2compiled')} SET comptime=124 WHERE s2lid=990002`,[]);await admin.query(`UPDATE ${table(g,'s2compiled')} SET comptime=123 WHERE s2lid=990002`);
+   await mutate(`UPDATE ${table(c,'s2compiled2')} SET compdata=? WHERE userid=900001 AND s2lid=980005`,[gzipSync(Buffer.from(user.replace('Georgia','Arial')))]);await set(user);
+   await admin.query(`DELETE FROM ${table(c,'s2stylelayers2')} WHERE userid=900001 AND styleid=44 AND type='theme'`);assert.equal((await get()).statusCode,422);
+   await admin.query(`INSERT INTO ${table(c,'s2stylelayers2')} (userid,styleid,type,s2lid) VALUES(900001,44,'theme',990003)`);
+   for(const [query,restore] of [[`UPDATE ${table(g,'s2layers')} SET b2lid=0 WHERE s2lid=990003`,`UPDATE ${table(g,'s2layers')} SET b2lid=990002 WHERE s2lid=990003`],[`UPDATE ${table(g,'s2layers')} SET userid=900002 WHERE s2lid=990002`,`UPDATE ${table(g,'s2layers')} SET userid=${system} WHERE s2lid=990002`]]){await admin.query(query!);assert.equal((await get()).statusCode,422);await admin.query(restore!);}
+   await admin.query(`UPDATE ${table(g,'s2source_inno')} SET s2code=? WHERE s2lid=990003`,[rows.find((row:any)=>row.name==='dazzle').source]);
+   assert.equal((await get()).statusCode,422,'A Tabula theme cannot pair with EasyRead');
+   await admin.query(`UPDATE ${table(g,'s2source_inno')} SET s2code=? WHERE s2lid=990003`,[native.source]);
+   assert.equal((await get()).statusCode,200);
+ }finally{await app.close();await service.close();}
+}));

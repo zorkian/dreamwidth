@@ -27,7 +27,7 @@
 import type { Context } from "../../runtime/s2runtime";
 import type { RenderContentPreparation, RenderInput, ApprovedEntry, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
-import {THEMES} from "./theme-catalog";
+import {THEMES,EASYREAD} from "./theme-catalog";
 import {prepareComments} from "./comment-model";
 import { escapeHtml } from "./builtins";
 
@@ -36,7 +36,7 @@ function styleNames(input:RenderInput):Record<string,string> {
     if(!theme)return {layout_name:"Tabula Rasa",theme_name:"(Layout Default)",layout_url:""};
     const layoutid=input.journal.themeLayoutId;
     if(!Number.isSafeInteger(layoutid)||layoutid!<=0)throw new Error("Missing approved theme layout identity");
-    return {layout_name:"Tabula Rasa",theme_name:THEMES[theme].title,
+    return {layout_name:input.journal.layout==="easyread"?EASYREAD.title:"Tabula Rasa",theme_name:THEMES[theme].title,
         layout_url:`${input.config.siteRoot}/customize/?layoutid=${layoutid}`};
 }
 
