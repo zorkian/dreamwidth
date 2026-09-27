@@ -245,3 +245,20 @@ test("all native stock registrations plus Venture helpers and 2000-term recovery
     assert.equal(output.bytes().toString("base64"),oracle.long.outputBase64);
     assert.equal(output.bytes().length,2000);
 });
+
+test("only exact first generated entry prologue transfers counter ownership",()=>{
+    const prefix='S2::check_depth() if ++$S2::sub_ctr % $S2::depth_check_every == 0;';
+    for(const body of [
+        'my ($_ctx)=@_;my $x=$S2::sub_ctr;',
+        'my ($_ctx)=@_;my $x=$S2::depth_check_every;',
+        'my ($_ctx)=@_;S2::check_depth();',
+        'my ($_ctx)=@_;'+prefix,
+        prefix.replace('== 0','== 1')+'my ($_ctx)=@_;',
+        prefix.replace('++$S2::sub_ctr','$S2::sub_ctr++')+'my ($_ctx)=@_;',
+        prefix.replace('S2::check_depth()','S2::check_depth(1)')+'my ($_ctx)=@_;',
+        prefix+'my $notcontext=1;',
+        'my $S2::sub_ctr=0;',
+    ])assert.equal(recoverActiveLayer(input(envelope(`register_function(101,["main()"],sub{return sub{${body}};});`)),1).kind,'gap',body);
+    const {layer}=recovered(envelope(`register_function(101,["main()"],sub{return sub{${prefix}my ($_ctx)=@_;$S2::pout->("kept");};});`));
+    let output='';new Context([layer],value=>output+=value).runFunction('main()');assert.equal(output,'kept');
+});

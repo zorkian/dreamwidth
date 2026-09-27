@@ -144,7 +144,6 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 try {return args[0].getFunction(string(args[2][".type"])+"::"+string(args[3]))(args[0],args[2]);}
                 catch {return string(args[2]?.[".type"] ?? args[1] ?? "undef")+"::"+string(args[3])+" call failed.";}
             }
-            case "S2::check_depth": return s2.runtime.recoveryCheckpoint(context);
             case "int": return rt.scalarInt(args[0]);
             case "length": return rt.numericLiteral(String(rt.stringLength(args[0])));
             case "keys": return rt.hashKeys(args[0]);
@@ -164,7 +163,6 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             case "variable": {
                 if(x.name === "$S2::pout")return (v: any)=>env.context.print(v);
                 if(x.name === "$S2::pout_s")return (v: any)=>env.context.safePrint(v);
-                if(x.name === "$S2::depth_check_every")return 1;
                 return operand ? rt.captureOperand(lookup(env,x.name)) : lookup(env,x.name).get();
             }
             case "array": case "tuple": return list(x.items,env);
@@ -307,7 +305,6 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
         return undefined;
     };
     const root=environment();
-    root.vars.set("$S2::sub_ctr",makeCell(0));
     const constantValue = (x: Expr): any => evalAs(x,root,"scalar");
     const metadata = (value: any): any => {
         if(value === null || value === undefined || typeof value !== "object")return value;

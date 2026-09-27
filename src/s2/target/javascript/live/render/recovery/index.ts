@@ -29,8 +29,25 @@ const registrations = new Set(["register_layer", "set_layer_info", "register_cla
     "register_propgroup_name", "register_propgroup_props", "register_set"]);
 const helpers = new Set(["get_func_num", "get_object_func_num", "S2::Object::new", "S2::notags",
     "S2::check_defined", "S2::check_elements", "S2::get_characters", "S2::object_isa",
-    "S2::downcast_object", "S2::interpolate_object", "S2::check_depth", "int", "length", "keys",
+    "S2::downcast_object", "S2::interpolate_object", "int", "length", "keys",
     "scalar", "reverse", "pop", "push"]);
+
+// NodeFunction.pm327's non-OO prologue is already owned by Context.invoke.
+// Match closed AST shape, not source text or arbitrary conditional checkpoints.
+function canonicalEntryCheckpoint(statement: Stmt | undefined): boolean {
+    if(statement?.kind !== "if" || statement.branches.length !== 1 || statement.otherwise.length) return false;
+    const branch=statement.branches[0]!;
+    const test=branch.test;
+    if(test.kind !== "binary" || test.op !== "==" || test.right.kind !== "literal" ||
+        test.right.value !== 0 || test.left.kind !== "binary" || test.left.op !== "%") return false;
+    const increment=test.left.left, frequency=test.left.right;
+    if(increment.kind !== "unary" || increment.op !== "++" || increment.value.kind !== "variable" ||
+        increment.value.name !== "$S2::sub_ctr" || frequency.kind !== "variable" ||
+        frequency.name !== "$S2::depth_check_every") return false;
+    const call=branch.body[0];
+    return branch.body.length === 1 && call?.kind === "expr" && call.expr.kind === "call" &&
+        call.expr.name === "S2::check_depth" && call.expr.args.length === 0;
+}
 
 function validate(program: Stmt[], id: number): string[] {
     const host = new Set<string>();
@@ -39,8 +56,9 @@ function validate(program: Stmt[], id: number): string[] {
             case "literal": break;
             case "name": if(!["VTABLE","STATIC","PROPS"].includes(x.name))throw new RecoveryGap("Unknown generated constant");break;
             case "variable":
+                if(["$S2::sub_ctr","$S2::depth_check_every"].includes(x.name))throw new RecoveryGap("Counter outside canonical generated prologue");
                 if(x.name === "$_ctx" && !contextArgument)throw new RecoveryGap("Context is only a generated slot receiver or argument");
-                if(!scope.has(x.name) && !["$S2::pout","$S2::pout_s","$S2::sub_ctr","$S2::depth_check_every"].includes(x.name))throw new RecoveryGap("Unbound generated lexical " + x.name);
+                if(!scope.has(x.name) && !["$S2::pout","$S2::pout_s"].includes(x.name))throw new RecoveryGap("Unbound generated lexical " + x.name);
                 break;
             case "concat": case "array": case "tuple": x.items.forEach(v=>checkExpr(v,scope));break;
             case "hash": x.entries.forEach(([k,v])=>{checkExpr(k,scope);checkExpr(v,scope);});break;
@@ -56,8 +74,18 @@ function validate(program: Stmt[], id: number): string[] {
             case "conditional": checkExpr(x.test,scope);checkExpr(x.yes,scope);checkExpr(x.no,scope);break;
             case "declare":
                 if(x.value)checkExpr(x.value,scope);
-                x.names.forEach(n=>{scope.add(n);if(n.startsWith("@"))scope.add("$"+n.slice(1));});break;
-            case "sub": checkBody(x.body,new Set([...scope,"@_"]));break;
+                x.names.forEach(n=>{if(["$S2::sub_ctr","$S2::depth_check_every"].includes(n))throw new RecoveryGap("Reserved generated counter");scope.add(n);if(n.startsWith("@"))scope.add("$"+n.slice(1));});break;
+            case "sub": {
+                if(canonicalEntryCheckpoint(x.body[0])) {
+                    const declaration=x.body[1];
+                    if(declaration?.kind !== "expr" || declaration.expr.kind !== "declare" ||
+                        !declaration.expr.list || !declaration.expr.names.includes("$_ctx") ||
+                        declaration.expr.value?.kind !== "variable" || declaration.expr.value.name !== "@_")
+                        throw new RecoveryGap("Checkpoint outside generated function entry");
+                    x.body.shift();
+                }
+                checkBody(x.body,new Set([...scope,"@_"]));break;
+            }
             case "call": {
                 const builtin=/^S2::Builtin(?:::LJ)?::[A-Za-z_][A-Za-z0-9_]*$/.test(x.name);
                 if(!helpers.has(x.name) && !(top && registrations.has(x.name)) && !builtin)throw new RecoveryGap("Non-S2 capability " + x.name);
