@@ -57,14 +57,14 @@ export function preparationDiagnostic(error: Error | NativeString, signature?: "
     const kind = NativeString.is(error) ? undefined : nativeExecutionStopKind(error);
     if (kind === "deadline") return concatStrings(bytes("<b>Error preparing to run:</b> "), bytes(deadlineTemplate));
     const text = kind === "recursion" ? bytes((signature ? "Died in S2::run_code running " + signature + ": " : "") +
-        "Excessive recursion detected and stopped.\n") : errorText(error);
+        "Excessive recursion detected and stopped.\n" + (signature ? "\n" : "")) : errorText(error);
     return concatStrings(bytes("<b>Error preparing to run:</b> "), escapeNativeHtml(text));
 }
 export function renderDiagnostic(failure: GeneralRunFailure): NativeString {
     // Source S2.pm473 owns this fixed trusted template; author text never gains
     // template authority merely by resembling its wording.
     if (failure.kind === "deadline") return concatStrings(bytes("<b>Error running style:</b> "), bytes(deadlineTemplate.replaceAll("\n", "<br />\n")));
-    const text = failure.kind === "recursion" ? bytes("Died in S2::run_code running " + failure.signature + ": Excessive recursion detected and stopped.\n") : errorText(failure.error);
+    const text = failure.kind === "recursion" ? bytes("Died in S2::run_code running " + failure.signature + ": Excessive recursion detected and stopped.\n\n") : errorText(failure.error);
     const escaped = escapeNativeHtml(text);
     const original = escaped.bytes(), parts: Buffer[] = [];
     let start = 0;
