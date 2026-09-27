@@ -1,0 +1,37 @@
+# general-session.s2
+#
+# One-context initialization and data-resume fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = core;
+property int num_items_recent;
+property int init_count;
+property string label;
+property bool init_css;
+set num_items_recent = 20;
+set init_count = 0;
+set label = "<initial>";
+set init_css = false;
+function builtin start_css();
+function builtin end_css();
+class RecentPage { var string title; function print(); }
+class EntryPage { var string title; function print(); }
+function prop_init() {
+    $*init_count++; $*num_items_recent = 3; print "SUPPRESSED";
+    if ($*init_css) { start_css(); print "p { color: red; }"; }
+}
+function modules_init() { $*label = "<prepared>"; }
+function RecentPage::print() {
+    if ($*init_css) { print "DIRECT"; end_css(); print "SUPPRESSED_AFTER_CSS"; }
+    else { print $.title + ":" + $*num_items_recent + ":" + $*init_count + ":" + $*label; }
+}
+function EntryPage::print() { print $.title + ":" + $*init_count; }
