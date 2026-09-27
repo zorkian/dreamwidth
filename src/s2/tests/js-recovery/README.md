@@ -61,28 +61,49 @@ unbounded production compilation service or widen renderer permissions.
 From `src/s2/target/javascript` inside the owning devcontainer:
 
 ```sh
-node node_modules/typescript/bin/tsc --strict --noUncheckedIndexedAccess --esModuleInterop --module Node16 --target ES2022 --rootDir . --outDir artifacts/recovery-test tools/recovery.test.ts
-node --test artifacts/recovery-test/tools/recovery.test.js
+node node_modules/typescript/bin/tsc --noEmit
+node node_modules/typescript/bin/tsc
+node --test dist/tools/recovery.test.js
 ```
 
-The test adapter explicitly supplies the agreed metadata/checkpoint/hash ABI
-against the preserved base runtime. It does not stand in for integrated G1
-validation. `native.pl` compiles only the fixed maintained `program.s2` and
+All execution uses the installed shared runtime, private WeakSet Context brand,
+PV/number operations and byte sink. There is no test-only runtime/brand adapter.
+`native.pl` compiles raw bytes from only the maintained `program.s2` and
 `override.s2` fixtures and executes that trusted compiler output as an independent
-native oracle. It never executes stored compdata or accepts caller source.
-The fixed output checks cover custom overrides, inherited super aliases,
-properties, object fields, downcasts/null, loops/ranges, control flow,
-reverse/pop/push, Unicode and hash foreach without assuming native key order.
-Other tests cover historical records, safe/raw/notags, deletion, prototype keys,
-complete hostile suffixes, quoted token names and authoritative active digests.
+native oracle. It emits base64 program/output bytes and explicit UTF8 flags,
+never decoded program text or a Unicode-normalized expected result. Stored
+compdata and caller source never reach this oracle.
 
-The native wide-integer controls are 9007199254740993 and the product
-94906267*94906267 = 9007199515875289. Exact general integer ABI support is still
-required: literals beyond the current safe representation return a named gap;
-operations crossing it throw a named execution gap before rounded output.
-This is an explicit unfinished implementation edge, not a permanent supported
-integer subset. Cache and serving integration must expose this honestly and
-complete the shared integer semantics.
+The fixed byte expectations include literal 猫é, byte size/foreach/comparison,
+invalid-UTF8 scalar reversal and unchanged direct-print list-context reversal.
+Wide numeric lexemes remain strings until the installed IV/UV/NV implementation
+constructs them; 9007199254740993 and 94906267*94906267 are exact native controls.
+The source-proven and recovered forms of the same actual programs run through
+the same installed scalar/profile/Context/output ABI and match the independent
+raw native outputs. Source B or missing source prevents source correspondence,
+but recovery still executes the authoritative active A bytes. The coordinator
+attaches the trusted offline-extracted `ArtifactCompiler.scalarProfile`, which
+is available at setup without any current layer source; input blobs never
+supply a profile or Context brand. Profile/dependency/cache identity remains
+the trusted coordinator's responsibility.
+
+Operand capture, list/collection construction, lvalues and foreach aliases use
+the shared runtime cells. Numeric coercion, comparison, overflow and output do
+not introduce a second codec or a JS Number safe-range refusal. Flat concat IR
+preserves native delayed operand reads without nested JS expression/evaluator
+stack growth. Evaluation context is restored by the shared try/finally helper;
+assignment/arithmetic are scalar, calls/print arguments are list, expression
+statements are void, and returns inherit the caller.
+
+`stock-native.pl` compiles raw core2 plus all 58 current layout sources for
+registration coverage, then executes native Venture nested-comment count/font
+helpers and the same 2,000-term source workload used by the shared scalar tests.
+Recovered helpers and long output match those independent expectations. Its
+fixed trusted-source process has explicit memory/CPU/wall/output bounds and
+fresh compiler processes for layout graphs. It never executes stored blobs.
+Other tests retain historical records, exact aliases, safe/raw/notags, deletion,
+prototype keys, hostile suffixes, quoted token names and authoritative active
+digests, plus independent frontend/executor Context mutation/forgery controls.
 
 Stock catalog parse/lower and registration-instantiation runs are useful syntax
 coverage, not full page execution parity. Expanded native outputs, inventories,
