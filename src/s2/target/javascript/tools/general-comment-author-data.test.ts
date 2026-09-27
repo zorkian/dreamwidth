@@ -14,8 +14,54 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import {execFileSync} from "node:child_process";
 import {Kysely} from "kysely";
+import {MysqlPublicMaintainers} from "../live/data/public-maintainers";
+import {GeneralSelectedText} from "../live/domain/general-selected-text";
+import {generalCommentFromSource,type GeneralSuspendedCommentInput,
+    type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
+import type {GeneralPublicSession} from "../live/domain/general-public-session";
+import type {GeneralTextEncoding} from "../live/domain/general-text-encoding";
+import {NativeString,scalarPV,scalarTruthy} from "../runtime/native-scalar";
+import {Context,runtime} from "../runtime/s2runtime";
 import {withSelectedFixture} from "./selected-fixture";
+
+function nativeCommentOfficial(schema:string,posterId:number):number {
+    const source=String.raw`use strict;use warnings;no warnings 'once';
+use lib '/workspaces/dreamwidth/cgi-bin';use DBI;use JSON::PP;
+require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::Comment;
+my($schema,$posterid)=@ARGV;die 'Isolated schema required' unless $schema=~/\As6_selected_[a-f0-9]{16}_g\z/;
+my $db=DBI->connect("DBI:mysql:database=$schema;mysql_socket=/var/run/mysqld/mysqld.sock",'root','',
+ {RaiseError=>1,PrintError=>0,mysql_enable_utf8=>0});
+$db->do('SET SESSION TRANSACTION READ ONLY');$db->do('START TRANSACTION READ ONLY');
+my $journal=bless $db->selectrow_hashref('SELECT * FROM user WHERE userid=900001'),'LJ::User';
+my $row=$db->selectrow_hashref('SELECT * FROM user WHERE userid=?',undef,$posterid);
+my $poster=$row?bless($row,'LJ::User'):undef;
+{package FixtureComment;our @ISA=('LJ::Comment');
+ sub journal{$_[0]->{journal}}sub poster{$_[0]->{poster}}sub prop{1}
+ package FixtureCache;sub get{undef}sub set{$_[3]}}
+no warnings 'redefine';local *DW::Cache::request=sub{bless {},'FixtureCache'};
+local *LJ::_get_rel_memcache=sub{undef};local *LJ::_set_rel_memcache=sub{};
+local *LJ::get_db_reader=sub{$db};local *LJ::get_cluster_reader=sub{die 'Unexpected cluster relation'};
+local *LJ::run_hook=sub{die 'Unexpected relationship hook'};
+my $comment=bless {journal=>$journal,poster=>$poster},'FixtureComment';
+print encode_json(0+$comment->admin_post);$db->do('ROLLBACK');$db->disconnect;`;
+    return JSON.parse(execFileSync('perl',['-e',source,schema,String(posterId)],
+        {encoding:'utf8',timeout:10000,maxBuffer:32768}));
+}
+
+function nativeMapKeywordWithoutId():unknown {
+    const source=String.raw`use strict;use warnings;no warnings 'once';
+use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
+require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::User::Icons;
+my $poster=bless {userid=>900999,dversion=>9},'LJ::User';
+no warnings 'redefine';
+local *LJ::User::get_userpic_info=sub{{mapkw=>{7=>'mapped'}}};
+local *LJ::User::resolve_mapid_redirects=sub{$_[1]};
+print encode_json([$poster->get_keyword_from_mapid(undef),$poster->get_keyword_from_mapid(7)]);`;
+    return JSON.parse(execFileSync('perl',['-e',source],
+        {encoding:'utf8',timeout:10000,maxBuffer:32768}));
+}
 
 test("general byte-view retains absent poster fallback and revokes it on public identity changes",{
     skip:process.env.S2_SELECTED_FIXTURE!=="1"
@@ -37,12 +83,17 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         VALUES (900001,78,?,'PRIVATE_DELETED_PROP'),(900001,79,?,'PRIVATE_SCREENED_PROP')`,
     [f.talkProp('imported_from'),f.talkProp('imported_from')]);
     const request=f.request("ordinary6",{kind:"entry",ditemid:300*256+1});
+    const noEncoding={async item(){throw Error('Unreached charset conversion');}} as unknown as GeneralTextEncoding;
     // The existing retained API remains on its prior strict branch.
     await assert.rejects(f.store.loadRawSnapshot(request));
     const issued=await f.store.loadNativeSelectedSnapshot(request);assert.ok(issued?.facts.comments);
     assert.equal(issued.facts.comments.headers.find(row=>row.jtalkid===77)?.posterid,900999);
     assert.equal(issued.facts.comments.authors.some(row=>row.userid===900999),false);
     assert.equal(issued.facts.comments.texts.find(row=>row.jtalkid===77)?.body,"VISIBLE_MISSING_AUTHOR");
+    const missing=await GeneralSelectedText.prepare(issued,noEncoding);
+    const missingFields=missing.commentPublicFields(issued.facts.comments.texts.find(row=>row.jtalkid===77)!);
+    assert.equal(missingFields.posterLoaded,false);assert.equal(missingFields.posterId,900999);
+    assert.equal(missingFields.body?.bytes().toString(),'VISIBLE_MISSING_AUTHOR');
     assert.equal(await f.store.revalidateNativeSelectedFingerprint(issued),true);
     await f.admin.query(`INSERT INTO ${f.table(f.g,"user")}
         (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,
@@ -136,4 +187,90 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const globalZone=await f.store.loadNativeSelectedSnapshot(request);assert.ok(globalZone?.facts.comments);
     assert.equal(globalZone.facts.comments.authors.find(row=>row.userid===900999)?.timezone,'Europe/London');
     assert.equal(await f.store.revalidateNativeSelectedFingerprint(globalZone),true);
-}));
+    const selected=await GeneralSelectedText.prepare(globalZone,noEncoding);
+    const selectedComment=globalZone.facts.comments.texts.find(row=>row.jtalkid===77)!;
+    assert.equal(selected.comment(selectedComment).subject,undefined);
+    assert.equal(scalarTruthy(selected.commentAdminPost(selectedComment)),false);
+    assert.equal(nativeCommentOfficial(f.g,900999),0);
+    const fields=selected.commentPublicFields(selectedComment);
+    assert.equal(fields.loaded,true);assert.equal(fields.posterSuspended,true);
+    assert.equal(fields.subject,undefined);assert.equal(fields.body,undefined);
+    assert.equal(fields.pictureKeyword?.bytes().toString(),'changed-keyword');
+    assert.deepEqual(nativeMapKeywordWithoutId(),[null,'mapped']);
+    const ctx=new Context([],()=>{throw Error('Unreached S2 print');});
+    ctx.prop._userpics_position=NativeString.hostUtf8Bytes('none');
+    const fixed=NativeString.hostUtf8Bytes;
+    const input:GeneralSuspendedCommentInput={kind:'suspended-loaded',...fields,
+        talkid:77*256+1,ditemid:300*256+1,depth:1,journal:{'.type':'UserLite'},
+        datepostUnix:1015,entryLogtimeUnix:1000,permalinkUrl:fixed('/entry?thread=19713'),
+        replyUrl:fixed('/entry?replyto=19713'),parentUrl:undefined,threadrootUrl:undefined,
+        expandUrl:fixed('/entry?thread=19713'),jsExpandUrl:fixed('/entry?thread=19713&destination_thread=0'),
+        hasChildren:false,showableChildren:0,hideChildren:0,hiddenChild:0,echi:undefined,
+        lastTalkid:0,lastJournalId:0};
+    const modelOperations:GeneralCommentSourceOperations={
+        cleanComment(){throw Error('Suspended body cleaner output is redacted');},
+        dateTimeUnix:value=>({'.type':'DateTime',_value:value}),
+        posterTime:value=>({'.type':'DateTime',_value:value,_zone:globalZone.facts.comments!
+            .authors.find(row=>row.userid===900999)!.timezone}),
+        poster(){throw Error('Suspended author presentation is redacted');},
+        edit(){return {edited:1,url:fixed('/edit'),reason:selected.comment(selectedComment).props.edit_reason,
+            time:1020,threadrootUrl:fixed('/root')};},
+        subjectImage(){throw Error('Suspended icon is redacted');},
+        picture(){throw Error('Suspended image is redacted');},
+        esnEnabled(){return 0;},editCommentsEnabled(){return 0;}};
+    const model=generalCommentFromSource(ctx,input,modelOperations);
+    assert.equal(model._fromsuspended,1);assert.equal(model._full,0);
+    assert.equal(model._poster,undefined);assert.equal(scalarPV(model._text).bytes().toString(),'');
+    assert.equal((model._time_poster as {readonly _zone:string})._zone,'Europe/London');
+    assert.equal(scalarPV(runtime.memberSlot(model._metadata,fixed('picture_keyword'),'hash').get())
+        .bytes().toString(),'changed-keyword');
+    assert.equal(scalarPV(runtime.memberSlot(model._metadata,fixed('imported_from'),'hash').get())
+        .bytes().toString(),'Source &<');
+    await f.admin.query(`UPDATE ${f.table(f.g,"user")} SET journaltype='C' WHERE userid=900001`);
+    await f.admin.query(`INSERT INTO ${f.table(f.g,"reluser")}(userid,targetid,type)
+        VALUES (900001,900999,'A')`);
+    const maintainers=new MysqlPublicMaintainers(f.startup.database);
+    try {
+        const witnesses:Awaited<ReturnType<typeof maintainers.snapshot>>[]=[];
+        const authority={async entryMaintainer(journalId:number,posterId:number){
+            const witness=await maintainers.snapshot(journalId,posterId);
+            witnesses.push(witness);return witness.canManage;
+        }} as GeneralPublicSession;
+        const current=await f.store.loadNativeSelectedSnapshot(request);assert.ok(current?.facts.comments);
+        const official=await GeneralSelectedText.prepare(current,noEncoding,authority);
+        const officialComment=current.facts.comments.texts.find(row=>row.jtalkid===77)!;
+        assert.equal(scalarTruthy(official.commentAdminPost(officialComment)),true);
+        assert.equal(nativeCommentOfficial(f.g,900999),1);
+        const officialModel=generalCommentFromSource(ctx,{...input,
+            ...official.commentPublicFields(officialComment)},modelOperations);
+        assert.equal(officialModel._admin_post,1);
+        assert.ok(witnesses.some(row=>row.posterId===900999&&row.canManage));
+        await f.admin.query(`DELETE FROM ${f.table(f.g,"reluser")}
+            WHERE userid=900001 AND targetid=900999 AND type='A'`);
+        assert.equal(await f.store.revalidateNativeSelectedFingerprint(current),true);
+        assert.equal(await Promise.all(witnesses.map(witness=>maintainers.revalidate(witness)))
+            .then(values=>values.every(Boolean)),false);
+        const revoked=await f.store.loadNativeSelectedSnapshot(request);assert.ok(revoked?.facts.comments);
+        const ordinary=await GeneralSelectedText.prepare(revoked,noEncoding,authority);
+        const ordinaryComment=revoked.facts.comments.texts.find(row=>row.jtalkid===77)!;
+        assert.equal(scalarTruthy(ordinary.commentAdminPost(ordinaryComment)),false);
+        assert.equal(nativeCommentOfficial(f.g,900999),0);
+        const ordinaryModel=generalCommentFromSource(ctx,{...input,
+            ...ordinary.commentPublicFields(ordinaryComment)},modelOperations);
+        assert.equal(ordinaryModel._admin_post,0);
+        // A page-loaded dversion-9 poster takes the mapid branch even when an
+        // old picture_keyword prop remains. Native lookup(undef) is undef.
+        await f.admin.query(`DELETE FROM ${f.table(f.c,"talkprop2")}
+            WHERE journalid=900001 AND jtalkid=77 AND tpropid=?`,[f.talkProp('picture_mapid')]);
+        await f.admin.query(`INSERT INTO ${f.table(f.c,"talkprop2")}(journalid,jtalkid,tpropid,value)
+            VALUES (900001,77,?,'legacy-should-not-win')`,[f.talkProp('picture_keyword')]);
+        assert.equal(await f.store.revalidateNativeSelectedFingerprint(revoked),false);
+        const legacy=await f.store.loadNativeSelectedSnapshot(request);assert.ok(legacy?.facts.comments);
+        const legacyComment=legacy.facts.comments.texts.find(row=>row.jtalkid===77)!;
+        assert.equal(legacy.facts.comments.authors.find(row=>row.userid===900999)?.dversion,10);
+        assert.equal(legacyComment.props.picture_mapid,undefined);
+        assert.equal(legacyComment.props.picture_keyword,'legacy-should-not-win');
+        const legacySelected=await GeneralSelectedText.prepare(legacy,noEncoding,authority);
+        assert.equal(legacySelected.commentPublicFields(legacyComment).pictureKeyword,undefined);
+    } finally {await maintainers.close();}
+},false,false,false,true));

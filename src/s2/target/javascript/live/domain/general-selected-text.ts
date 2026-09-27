@@ -21,7 +21,7 @@
 // The inherited notice above applies to adapted LiveJournal portions.
 //
 
-import type {NativeSelectedSnapshot,RawEntry,RawCommentText} from "../contracts";
+import type {NativeSelectedSnapshot,RawEntry,RawCommentText,RawUserpics} from "../contracts";
 import {NativeString,hashKeyBytes} from "../../runtime/native-string";
 import {scalarTruthy,scalarNumber,NativeNumber} from "../../runtime/native-scalar";
 import {exactHostInteger} from "../../runtime/native-number";
@@ -40,6 +40,8 @@ export class GeneralSelectedText {
     private readonly entries=new WeakMap<RawEntry,ConvertedNativeItem>();
     private readonly comments=new WeakMap<RawCommentText,ConvertedNativeItem>();
     private readonly official=new WeakMap<RawEntry,boolean>();
+    private readonly officialComments=new WeakMap<RawCommentText,boolean>();
+    private readonly metadataOnlyComments=new WeakSet<RawCommentText>();
     private constructor(private readonly snapshot:NativeSelectedSnapshot) {
         if(snapshot.encoding!=="dbi-byte-view")throw Error("Invalid selected source encoding");
         for(const cell of snapshot.sources) {
@@ -81,12 +83,29 @@ export class GeneralSelectedText {
             const prefix="comment:"+comment.jtalkid;
             const props:Record<string,NativeString|undefined>=Object.create(null);
             for(const key of Object.keys(comment.props))props[key]=prepared.source(prefix+":"+key);
-            const subject=prepared.source(prefix+":subject");
+            const metadataOnly=!prepared.sources.has(prefix+":subject");
+            const header=snapshot.facts.comments?.headers.find(row=>row.jtalkid===comment.jtalkid);
+            if(!header)throw Error("Unselected comment header");
+            if(metadataOnly) {
+                const poster=snapshot.facts.comments?.authors.find(row=>row.userid===header.posterid);
+                if(!poster||poster.statusvis!=="S"||!['A','F'].includes(header.state)||
+                    comment.subject!==''||comment.body!==null)
+                    throw Error("Invalid suspended comment metadata witness");
+                prepared.metadataOnlyComments.add(comment);
+            }
+            const subject=metadataOnly?undefined:prepared.source(prefix+":subject");
             const text=comment.body===null?undefined:prepared.source(prefix+":body");
             // Native Talk passes an EMPTY prop hash to item_toutf8. Public
             // talkprops are retained, not converted with entry property rules.
-            const converted=scalarTruthy(props.unknown8bit)?await encoding.item(subject,text):{subject,text};
+            const converted=!metadataOnly&&scalarTruthy(props.unknown8bit)?
+                await encoding.item(subject,text):{subject,text};
             prepared.comments.set(comment,Object.freeze({...converted,props:Object.freeze(props)}));
+            let official=false;
+            if(snapshot.facts.owner.journaltype==='C'&&scalarTruthy(props.admin_post)) {
+                if(!authority)throw Error("Community maintainer authority is not installed");
+                official=await authority.entryMaintainer(snapshot.facts.owner.userid,header.posterid);
+            }
+            prepared.officialComments.set(comment,official);
         }
         return prepared;
     }
@@ -150,6 +169,9 @@ export class GeneralSelectedText {
         const pictures=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.userpics:
             this.snapshot.pictureAccounts?.find(selected=>selected.userid===userid)?.pictures;
         if(!pictures)throw Error("Selected picture facts are not installed");
+        return this.mapKeyword(userid,pictures,mapid);
+    }
+    private mapKeyword(userid:number,pictures:RawUserpics,mapid:NativeString):NativeString|undefined {
         const names=new Map<string,NativeString>(),redirects=new Map<string,string>();
         for(let index=0;index<pictures.mappings.length;index++) {
             const row=pictures.mappings[index]!,name=this.source(`picture-map:${userid}:${index}`);
@@ -293,5 +315,36 @@ export class GeneralSelectedText {
     }
     comment(comment:RawCommentText):ConvertedNativeItem {
         const value=this.comments.get(comment);if(!value)throw Error("Unselected comment text reference");return value;
+    }
+    /** Comment::admin_post requires community, existing poster and current can_manage. */
+    commentAdminPost(comment:RawCommentText):NativeNumber {
+        if(!this.comments.has(comment))throw Error("Unselected comment text reference");
+        return NativeNumber.integer(this.officialComments.get(comment)?1n:0n);
+    }
+    /** Parent-only selected fields; raw props and author account rows stay here. */
+    commentPublicFields(comment:RawCommentText):{
+        readonly state:'A'|'F'|'S'|'D';readonly show:boolean;readonly posterId:number;
+        readonly posterLoaded:boolean;readonly posterSuspended:boolean;readonly loaded:boolean;
+        readonly subject:NativeString|undefined;readonly body:NativeString|undefined;
+        readonly editor:NativeString|undefined;readonly preformatted:NativeString|undefined;
+        readonly importedFrom:NativeString|undefined;readonly pictureKeyword:NativeString|undefined;
+        readonly adminPost:NativeNumber;
+    } {
+        const converted=this.comment(comment),raw=this.snapshot.facts.comments;
+        const header=raw?.headers.find(row=>row.jtalkid===comment.jtalkid);
+        if(!header)throw Error("Unselected comment header");
+        if(!['A','F','S','D'].includes(header.state))throw Error("Invalid selected comment state");
+        const author=raw?.authors.find(row=>row.userid===header.posterid);
+        const props=converted.props;
+        const pictureKeyword=author&&author.dversion>=9?
+            scalarTruthy(props.picture_mapid)?this.mapKeyword(author.userid,author.pictures,props.picture_mapid!):
+                undefined:props.picture_keyword;
+        return Object.freeze({state:header.state as 'A'|'F'|'S'|'D',show:header.state==='A'||header.state==='F',
+            posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==='S',
+            loaded:comment.body!==null||this.metadataOnlyComments.has(comment),
+            subject:converted.subject?.clone(),body:converted.text?.clone(),
+            editor:props.editor?.clone(),preformatted:props.opt_preformatted?.clone(),
+            importedFrom:props.imported_from?.clone(),pictureKeyword:pictureKeyword?.clone(),
+            adminPost:this.commentAdminPost(comment)});
     }
 }
