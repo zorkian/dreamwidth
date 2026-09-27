@@ -115,3 +115,27 @@ source operation supplies its native event options. Both descriptor paths retain
 parent-issued current maintainer gate. SQL encoding/privacy and source/recovery worker
 proofs cover this assembly; complete installed content helpers and ordinary HTTP remain
 mandatory follow-through.
+
+Selected-picture preparation now reads only the issued journal owner and authors of
+selected visible entry bodies. Peer picture/map rows use their exact configured cluster
+and dversion, with identity/status/cluster facts in the global before/after bracket;
+cluster-zero actors add no picture-table reads. Original description and keyword byte
+cells remain parent-only and are included in final reread witnesses. Hidden entry targets
+and suspended entry authors return before peer picture reads. This does not project
+lookahead authors' pictures or private/unknown row fields to the child.
+
+Named picture operations preserve keyword/default selection, map redirect cycles,
+synthetic `pic#` keywords, exact captured ID spelling and flag, and direct missing-row
+skeletons. Picture states X/S are excluded from keyword selection but remain readable
+through native direct-row selection. Account X/S or cluster-zero skeletons lack loaded
+picture dimensions/description. The Image constructor receives raw `user` as username,
+including identity-account `ext_NNN` names, rather than display name or escaped UserLite
+text. Caller dimensions retain native truthy-value/row fallback; stored upload URLs are
+never serving URLs. Native caches are not shared across isolated requests.
+
+These controls establish selected SQL/source-to-Image preparation and native helper
+behavior, including mutation revocation and hidden-target no-read. The native resolver
+oracle uses an explicitly declared selected-row info provider; direct Userpic fallback
+and Image construction use the actual retained methods and isolated read-only SQL.
+Ordinary worker descriptor/provider binding, independent OG URL behavior, and original
+content cleaning remain required integration work; this is not full HTTP acceptance.
