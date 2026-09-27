@@ -53,11 +53,12 @@ export function generalDateCallbacks(operations: GeneralDateOperations): Record<
     }
     function token(ctx: Context, model: GeneralModel, name: string): unknown {
         const field = (key: string) => model['_' + key];
+        const alias = (key: string) => runtime.captureOperand(runtime.memberSlot(model, '_' + key, 'field'));
         switch (name) {
-            case 'm': return field('month');
-            case 'd': return field('day');
-            case 'yyyy': return field('year');
-            case 'H': return field('hour');
+            case 'm': return alias('month');
+            case 'd': return alias('day');
+            case 'yyyy': return alias('year');
+            case 'H': return alias('hour');
             case 'mm': return padded(field('month'));
             case 'dd': return padded(field('day'));
             case 'HH': return padded(field('hour'));
@@ -82,7 +83,7 @@ export function generalDateCallbacks(operations: GeneralDateOperations): Record<
                     values = ctx.prop[property] = [];
                 // Native undef property autovivifies an array before reading its index.
                 const key = name === 'mon' || name === 'month' ? field('month') : day(ctx, model);
-                return runtime.memberSlot(values, key, 'array').get();
+                return runtime.captureOperand(runtime.memberSlot(values, key, 'array'));
             }
             case 'dayord': return ctx.runNativeFunction('lang_ordinal(int)', [field('day')], 'ordinal');
             default: return undefined;
@@ -107,33 +108,38 @@ export function generalDateCallbacks(operations: GeneralDateOperations): Record<
         const real = property !== undefined && property !== null ? scalarPV(property) : !time && compareStrings(fmt, bytes('iso')) === 0 ? bytes('%%yyyy%%-%%mm%%-%%dd%%') : fmt;
         const parts = splitString(real, bytes('%%')).map((part, index) => index % 2 ? part : escapeNativeHtml(part));
         const compiled: Formatter = value => {
-            let output = bytes('');
+            const operands: unknown[] = [];
+            // Native join reads live field/element SVs only after the whole list,
+            // including arbitrary ordinal reentry. Computed tokens stay snapshots.
             for (const [index, part] of parts.entries()) {
                 if (!(index % 2)) {
-                    output = scalarConcat(output, part);
+                    operands.push(part);
                     continue;
                 }
                 const name = part.bytes().toString('latin1');
                 const kind = ['d', 'dd', 'dayord'].includes(name) ? 'day' : ['m', 'mm', 'mon', 'month'].includes(name) ? 'month' : ['yy', 'yyyy'].includes(name) ? 'year' : undefined;
                 if (!time && scalarTruthy(link) && kind) {
-                    output = scalarConcat(output, bytes('<a href="/'));
-                    output = scalarConcat(output, token(ctx, value, 'yyyy'));
-                    output = scalarConcat(output, bytes('/'));
+                    operands.push(bytes('<a href="/'));
+                    operands.push(token(ctx, value, 'yyyy'));
+                    operands.push(bytes('/'));
                     if (kind !== 'year') {
-                        output = scalarConcat(output, token(ctx, value, 'mm'));
-                        output = scalarConcat(output, bytes('/'));
+                        operands.push(token(ctx, value, 'mm'));
+                        operands.push(bytes('/'));
                     }
                     if (kind === 'day') {
-                        output = scalarConcat(output, token(ctx, value, 'dd'));
-                        output = scalarConcat(output, bytes('/'));
+                        operands.push(token(ctx, value, 'dd'));
+                        operands.push(bytes('/'));
                     }
-                    output = scalarConcat(output, bytes('">'));
-                    output = scalarConcat(output, token(ctx, value, name));
-                    output = scalarConcat(output, bytes('</a>'));
+                    operands.push(bytes('">'));
+                    operands.push(token(ctx, value, name));
+                    operands.push(bytes('</a>'));
                 }
                 else
-                    output = scalarConcat(output, token(ctx, value, name));
+                    operands.push(token(ctx, value, name));
             }
+            let output = bytes('');
+            for (const operand of runtime.operandList(operands))
+                output = scalarConcat(output, operand);
             return output;
         };
         slot.set(compiled);
