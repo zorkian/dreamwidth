@@ -82,6 +82,7 @@ function validate(program: Stmt[], id: number): string[] {
                         !declaration.expr.list || !declaration.expr.names.includes("$_ctx") ||
                         declaration.expr.value?.kind !== "variable" || declaration.expr.value.name !== "@_")
                         throw new RecoveryGap("Checkpoint outside generated function entry");
+                    x.entryLine=x.body[0]!.copLine;
                     x.body.shift();
                 }
                 checkBody(x.body,new Set([...scope,"@_"]));break;

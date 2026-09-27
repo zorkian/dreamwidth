@@ -201,7 +201,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 const slot=rt.memberSlot(base,field ? keyFor(base,key) : key,field ? "field" : x.container);
                 return operand ? rt.captureOperand(slot) : slot.get();
             }
-            case "sub": return (...args: any[]) => {
+            case "sub": { const fn=(...args: any[]) => {
                 const local=environment(env);
                 local.vars.set("@_",makeCell(args));
                 // Only native-style returned function bodies establish the executing
@@ -217,6 +217,9 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 const signal=run(x.body,local,false);
                 return signal?.kind === "return" ? signal.value : undefined;
             };
+                if(x.entryLine !== undefined)rt.nativeFunctionEntry(fn,layer,x.entryLine);
+                return fn;
+            }
             case "call": {
                 const args=["scalar","keys","reverse","pop","length","int"].includes(x.name) ? x.args.map(a=>evalAs(a,env,x.name === "reverse" ? "list" : "scalar")) :
                     x.name === "push" ? [evalExpr(x.args[0]!,env),...list(x.args.slice(1),env)] : list(x.args,env);
@@ -262,6 +265,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
     const run = (body: Stmt[], parent: Env, scoped=true): Signal|undefined => {
         const env=scoped ? environment(parent) : parent;
         for(const stmt of body) {
+            if(env.context && stmt.copLine !== undefined)rt.nativeCOP(env.context,layer,stmt.copLine);
             switch(stmt.kind) {
                 case "expr": evalAs(stmt.expr,env,"void");break;
                 case "block": {const signal=run(stmt.body,env);if(signal)return signal;break;}
@@ -274,12 +278,15 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 case "while": case "for": {
                     const scope=environment(env);
                     if(stmt.kind === "for")evalExpr(stmt.init,scope);
-                    while(truth(evalAs(stmt.test,scope,"scalar"))) {
-                        s2.runtime.recoveryCheckpoint(scope.context);
+                    while(truth((stmt.kind === "for" && stmt.copLine !== undefined
+                        ? (rt.nativeCOP(scope.context,layer,stmt.copLine),evalAs(stmt.test,scope,"scalar"))
+                        : evalAs(stmt.test,scope,"scalar")))) {
+                        s2.runtime.executionCheckpoint(scope.context);
                         const signal=run(stmt.body,scope);
                         if(signal?.kind === "return")return signal;
                         if(signal?.kind === "last")break;
-                        if(stmt.kind === "for")evalExpr(stmt.step,scope);
+                        if(signal?.kind === "next" && stmt.copLine !== undefined)rt.nativeCOP(scope.context,layer,stmt.copLine);
+                        if(stmt.kind === "for") {if(stmt.copLine !== undefined)rt.nativeCOP(scope.context,layer,stmt.copLine);evalExpr(stmt.step,scope);}
                     }
                     break;
                 }
@@ -291,7 +298,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                     const original=lookup(scope,variable.name);
                     try {
                         for(const slot of rt.iterationSlots(items,"array")) {
-                            s2.runtime.recoveryCheckpoint(scope.context);
+                            s2.runtime.executionCheckpoint(scope.context);
                             scope.vars.set(variable.name,slot);
                             const signal=run(stmt.body,scope);
                             if(signal?.kind === "return")return signal;

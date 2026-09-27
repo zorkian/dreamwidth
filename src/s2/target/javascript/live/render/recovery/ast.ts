@@ -12,7 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-export interface Token {value: string; kind: "word" | "variable" | "number" | "string" | "symbol" | "end"; offset: number;}
+export interface Token {value: string; kind: "word" | "variable" | "number" | "string" | "symbol" | "end"; offset: number; endOffset: number; line: number; endLine: number;}
 export type Expr =
     | {kind: "literal"; value: string | number | null; numeric?: string}
     | {kind: "concat"; items: Expr[]}
@@ -26,9 +26,9 @@ export type Expr =
     | {kind: "member"; base: Expr; key: Expr; container: "array" | "hash"}
     | {kind: "call"; name: string; args: Expr[]}
     | {kind: "invoke"; callee: Expr; args: Expr[]}
-    | {kind: "sub"; body: Stmt[]}
+    | {kind: "sub"; body: Stmt[]; entryLine?: number}
     | {kind: "declare"; names: string[]; list?: boolean; value?: Expr};
-export type Stmt =
+export type Stmt = (
     | {kind: "expr"; expr: Expr}
     | {kind: "block"; body: Stmt[]}
     | {kind: "if"; branches: {test: Expr; body: Stmt[]}[]; otherwise: Stmt[]}
@@ -36,5 +36,5 @@ export type Stmt =
     | {kind: "for"; init: Expr; test: Expr; step: Expr; body: Stmt[]}
     | {kind: "foreach"; variable: Expr; list: Expr; body: Stmt[]}
     | {kind: "return"; value?: Expr}
-    | {kind: "last" | "next"};
+    | {kind: "last" | "next"}) & {copLine?: number};
 export class RecoveryGap extends Error {}

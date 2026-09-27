@@ -52,6 +52,12 @@ sub compile_source {
     } elsif ($opts->{'format'} eq "javascript") {
         require S2::BackendJS;
         $this->{'checker'}->checkLayer($s2l);
+        if ($opts->{'generalScalars'}) {
+            my $positions = '';
+            my $native = S2::BackendPerl->new($s2l, $opts->{'layerid'}, $opts->{'untrusted'});
+            $native->setBuiltinPackage($opts->{'builtinPackage'}) if $opts->{'builtinPackage'};
+            $native->collectNativePositions(S2::OutputScalar->new(\$positions));
+        }
         $be = new S2::BackendJS($s2l, $opts->{'layerid'}, $opts->{'untrusted'}, {
             'propmeta' => 1, # FIXME: Don't hardcode this
             'generalHashes' => $opts->{'generalHashes'},
