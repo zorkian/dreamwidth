@@ -24,6 +24,7 @@ import type {BuiltinFunction, Context} from "../../runtime/s2runtime";
 import {NativeString, scalarPV, nativeProgramError} from "../../runtime/native-scalar";
 import {concatStrings, hashKeyBytes, caseString, replaceString, stringIndex} from "../../runtime/native-string";
 import {escapeNativeHtml} from "./general-diagnostics";
+import {generalCssCallbacks} from "./general-css-builtins";
 
 const bytes = (value: string): NativeString => NativeString.hostUtf8Bytes(value);
 function stripTags(value: NativeString): NativeString {
@@ -39,6 +40,7 @@ export function generalScalarCallbacks(environment: GeneralBuiltinEnvironment): 
     const alternate = new Map<string, boolean>();
     const anonymous = (): boolean => false;
     return {
+        ...generalCssCallbacks(),
         _get_page: () => environment.page(),
         _ehtml: (_ctx, value) => escapeNativeHtml(value),
         _etags: (_ctx, value) => replaceString(replaceString(scalarPV(value),bytes("<"),bytes("&lt;")),bytes(">"),bytes("&gt;")),
