@@ -310,6 +310,8 @@ export interface NativeSelectedSnapshot {
         readonly window:readonly {readonly jitemid:number;readonly anum:number;
             readonly eventtime:string;readonly countedSticky:boolean}[];
     };
+    /** Parent-only selected poster picture rows; never an arbitrary child account lookup. */
+    readonly pictureAccounts?:readonly {readonly userid:number;readonly pictures:RawUserpics}[];
     readonly undefinedEntryEvents: readonly number[];
     // Parent-only reached DB text cells, before unknown8bit/cleaner transforms.
     // Child projection must select approved public fields; never send this bag.

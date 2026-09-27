@@ -22,11 +22,14 @@
 //
 
 import type {NativeSelectedSnapshot,RawEntry,RawCommentText} from "../contracts";
-import {NativeString} from "../../runtime/native-string";
-import {scalarTruthy,NativeNumber} from "../../runtime/native-scalar";
+import {NativeString,hashKeyBytes} from "../../runtime/native-string";
+import {scalarTruthy,scalarNumber,NativeNumber} from "../../runtime/native-scalar";
+import {exactHostInteger} from "../../runtime/native-number";
 import type {GeneralEntryContentInput} from "./general-entry-content";
 import type {GeneralEntrySourceInput} from "./general-entry-from-source";
 import type {GeneralEntryPageEntryInput} from "./general-entry-page-source";
+import {generalUserpicImage} from "./general-userpic-image";
+import type {GeneralModel} from "./general-model-primitives";
 import {generalMysqlDateParts} from "./general-model-date";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
 import type {GeneralPublicSession} from "./general-public-session";
@@ -97,6 +100,125 @@ export class GeneralSelectedText {
             title:this.source(`link:${owner}:${index}:title`),
             url:this.source(`link:${owner}:${index}:url`),
             hover:this.source(`link:${owner}:${index}:hover`)})));
+    }
+    /** Named direct Userpic row fields, retaining original DBI description bytes. */
+    ownerPicture(picId:number):{readonly userid:number;readonly picid:number;
+        readonly width:number|undefined;readonly height:number|undefined;
+        readonly description:NativeString|undefined}|undefined {
+        return this.pictureFields(this.snapshot.facts.owner.userid,picId);
+    }
+    /** Native get_picid_from_keyword: direct default differs from usable keyword rows. */
+    pictureId(userid:number,keyword?:NativeString):number|NativeString {
+        const account=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.owner:
+            this.snapshot.facts.posters.find(poster=>poster.userid===userid);
+        if(!account)throw Error("Unselected picture account");
+        const fallback=account.defaultpicid;
+        if(keyword===undefined||account.clusterid===0)return fallback;
+        const pictures=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.userpics:
+            this.snapshot.pictureAccounts?.find(selected=>selected.userid===userid)?.pictures;
+        if(!pictures)throw Error("Selected picture facts are not installed");
+        const usable=new Map(pictures.pictures.filter(row=>row.state!=="X"&&row.state!=="S")
+            .map(row=>[String(row.picid),row.picid]));
+        const key=(value:NativeString)=>{const native=hashKeyBytes(value);
+            return (native.utf8?"utf8:":"bytes:")+native.bytes.toString("hex");};
+        const keywords=new Map<string,number>();
+        for(let index=0;index<pictures.mappings.length;index++) {
+            const row=pictures.mappings[index]!;
+            const name=this.source(`picture-map:${userid}:${index}`);
+            // Source skips malformed rows before registering any mapping.
+            if(name!==undefined&&(name.bytes().length===0||/[\r\n\0]/.test(name.bytes().toString("latin1"))))continue;
+            if(name===undefined||!row.picid||!usable.has(String(row.picid)))continue;
+            keywords.set(key(name),row.picid);
+        }
+        const selected=keywords.get(key(keyword));
+        if(selected)return selected;
+        // Native hash lookup keeps capture spelling: pic#001 is not pic#1.
+        // Non-ASCII digit captures cannot equal canonical integer row keys.
+        const capture=/^pic#([0-9]+)\n?(?![\s\S])/.exec(keyword.bytes().toString("latin1"));
+        if(capture&&usable.has(capture[1]!)) {
+            const bytes=Buffer.from(capture[1]!,"ascii");
+            return keyword.flagged()?NativeString.flagged(bytes):NativeString.bytes(bytes);
+        }
+        return fallback;
+    }
+    /** Native map redirect traversal preserves hash-key spelling and cycle => mapid 0. */
+    pictureMapKeyword(userid:number,mapid:NativeString):NativeString|undefined {
+        const account=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.owner:
+            this.snapshot.facts.posters.find(poster=>poster.userid===userid);
+        if(!account)throw Error("Unselected picture account");
+        if(account.clusterid===0||account.dversion<9)return undefined;
+        const pictures=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.userpics:
+            this.snapshot.pictureAccounts?.find(selected=>selected.userid===userid)?.pictures;
+        if(!pictures)throw Error("Selected picture facts are not installed");
+        const names=new Map<string,NativeString>(),redirects=new Map<string,string>();
+        for(let index=0;index<pictures.mappings.length;index++) {
+            const row=pictures.mappings[index]!,name=this.source(`picture-map:${userid}:${index}`);
+            if(name!==undefined&&(name.bytes().length===0||/[\r\n\0]/.test(name.bytes().toString("latin1"))))continue;
+            if(row.redirectMapid)redirects.set(String(row.mapid??""),String(row.redirectMapid));
+            else names.set(String(row.mapid??""),name??NativeString.bytes(Buffer.from("pic#"+(row.picid??""))));
+        }
+        const native=hashKeyBytes(mapid);
+        // All stored map IDs are canonical integer hash keys. A flagged wide
+        // key is distinct; a downgradable flagged key uses its native bytes.
+        let current=native.utf8?"":native.bytes.toString("latin1");
+        const seen=new Set([current]);
+        while(redirects.has(current)) {
+            current=redirects.get(current)!;
+            if(seen.has(current)){current="0";break;}
+            seen.add(current);
+        }
+        return names.get(current)?.clone();
+    }
+    /** Entry::userpic_kw then new_from_keyword/default; no uploaded URL is involved. */
+    entryPicture(entry:RawEntry,root:NativeString):{readonly image:GeneralModel;readonly keyword:NativeString|undefined} {
+        const converted=this.entry(entry);
+        const account=entry.posterid===this.snapshot.facts.owner.userid?this.snapshot.facts.owner:
+            this.snapshot.facts.posters.find(poster=>poster.userid===entry.posterid);
+        if(!account)throw Error("Unselected picture account");
+        const keyword=account.dversion>=9?(scalarTruthy(converted.props.picture_mapid)?
+            this.pictureMapKeyword(entry.posterid,converted.props.picture_mapid!):undefined):
+            converted.props.picture_keyword;
+        const id=this.pictureId(entry.posterid,keyword);
+        return Object.freeze({image:this.resolvedPictureImage(entry.posterid,id,root,keyword),keyword});
+    }
+    /** Selected owner/poster source only, never a raw account lookup from the worker. */
+    pictureFields(userid:number,picId:number):{readonly userid:number;readonly picid:number;
+        readonly width:number|undefined;readonly height:number|undefined;
+        readonly description:NativeString|undefined}|undefined {
+        if(!Number.isSafeInteger(picId)||picId<0||picId>4294967295)
+            throw Error("Invalid selected picture identity");
+        if(!picId)return undefined;
+        const owner=this.snapshot.facts.owner.userid;
+        if(userid!==owner&&!this.snapshot.facts.entries.some(entry=>entry.posterid===userid))
+            throw Error("Unselected picture account");
+        const pictures=userid===owner?this.snapshot.facts.userpics:
+            this.snapshot.pictureAccounts?.find(account=>account.userid===userid)?.pictures;
+        if(!pictures)throw Error("Selected picture facts are not installed");
+        const row=pictures.pictures.find(picture=>picture.userid===userid&&picture.picid===picId);
+        // Image_userpic constructs a skeleton for an absent direct row. Native
+        // width/height/description are then undefined, not a default row's data.
+        return Object.freeze({userid,picid:picId,width:row?.width,height:row?.height,
+            description:row?this.source(`picture:${userid}:${picId}`)?.clone():undefined});
+    }
+    /** Parent caller resolved picid; native caller dimensions use || row fallback. */
+    resolvedPictureImage(userid:number,picId:number|NativeString,root:NativeString,keyword?:NativeString,
+        width?:unknown,height?:unknown):GeneralModel {
+        const account=userid===this.snapshot.facts.owner.userid?this.snapshot.facts.owner:
+            this.snapshot.facts.posters.find(poster=>poster.userid===userid);
+        if(!account)throw Error("Unselected picture account");
+        const fields=this.pictureFields(userid,exactHostInteger(scalarNumber(picId),0,4294967295));
+        // Userpic::get returns before any direct row lookup for is_expunged
+        // (status X OR cluster0) or suspended users. A newly-created skeleton
+        // retains its picid/owner, but has no dimensions/description. Picture
+        // state X/S itself is different and does not prevent its direct load.
+        const readable=account.statusvis!=="X"&&account.statusvis!=="S"&&account.clusterid!==0;
+        return generalUserpicImage({userid,picid:picId,root,
+            // Display.pm aliases username to raw user, even ext_NNN identities;
+            // neither display_name nor escaped UserLite text is substituted.
+            username:NativeString.bytes(Buffer.from(account.user,"latin1")),
+            width:scalarTruthy(width)?width:readable?fields?.width:undefined,
+            height:scalarTruthy(height)?height:readable?fields?.height:undefined,
+            description:readable?fields?.description:undefined,keyword});
     }
     /** Raw user props have no charset transform in Account.pm preload_props. */
     pageText():{readonly ownerName:NativeString|undefined;readonly journalTitle:NativeString|undefined;

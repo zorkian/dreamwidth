@@ -218,6 +218,7 @@ interface NativeSnapshotEvidence {
     readonly oldEncoding: number;
     readonly stickyEntryCount: number;
     readonly recentSelection: NativeSelectedSnapshot["recentSelection"];
+    readonly pictureAccounts:NativeSelectedSnapshot["pictureAccounts"];
     readonly undefinedEvents: readonly number[];
     readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
 }
@@ -394,6 +395,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         const evidence = this.nativeSnapshots.get(facts)!;
         const snapshot: NativeSelectedSnapshot = Object.freeze({encoding: "dbi-byte-view", facts,
             oldEncoding: evidence.oldEncoding, stickyEntryCount:evidence.stickyEntryCount, recentSelection:evidence.recentSelection,
+            pictureAccounts:evidence.pictureAccounts,
             undefinedEntryEvents: evidence.undefinedEvents, sources: evidence.sources});
         // Preserve the issued request independently of mutable parent projection
         // work. Neither a copied wrapper nor a different store can issue authority.
@@ -524,6 +526,26 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         const comments=frozenRequest.page.kind==='entry' && enabled ?
             await this.loadComments(ownerId,clusterId,selected.entries[0]!.jitemid,frozenRequest,
                 unsigned(before.facts.owner.caps,16),byteView) : undefined;
+        const pictureRaw=new RawFields(byteView);
+        const pictureAccounts:{userid:number;pictures:RawUserpics}[]=[];
+        if(byteView&&authorFacts) {
+            // Only authors of bodies that passed selected-entry visibility add
+            // picture dependencies. Hidden/lookahead authors never cause these
+            // cluster reads. The global author bracket below includes identity,
+            // status, cluster and dversion before/after these selected reads.
+            const posterIds=[...new Set(selected.entries.map(entry=>entry.posterid))].sort((a,b)=>a-b);
+            for(const id of posterIds) {
+                if(id===ownerId)continue;
+                const account=authorFacts.find(facts=>number(facts.owner.userid,1)===id);
+                if(!account)throw new SnapshotError("unavailable");
+                const cluster=number(account.owner.clusterid);
+                const pictures=cluster?await this.databases.snapshot(cluster,
+                    ["userpic2","userkeywords",number(account.owner.dversion)>=9?"userpicmap3":"userpicmap2"],connection=>
+                        this.loadUserpics(connection,id,number(account.owner.dversion),pictureRaw)):
+                    {pictures:[],mappings:[]};
+                pictureAccounts.push({userid:id,pictures});
+            }
+        }
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
         const after = await this.databases.snapshot(undefined,
             needsMoods ? [...globalTables,"moods","moodthemes","moodthemedata"] : globalTables, async connection => {
@@ -545,17 +567,17 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         });
         const effectiveStyle = after.style && selected.compiled ? {...after.style,layers:after.style.layers.map(layer=>
             layer.type==='user'?{...layer,compiledTime:selected.compiled!.time,propertyCompiled:selected.compiled!.text}:layer)} : after.style;
-        const rawFields = [...after.raw, ...selected.raw];
+        const rawFields = [...after.raw, ...selected.raw,...pictureRaw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors,
-            ...(byteView ? [number(before.facts.owner.oldenc),visibility,authorFacts] : [])];
+            ...(byteView ? [number(before.facts.owner.oldenc),visibility,authorFacts,pictureAccounts] : [])];
         const result: RawJournalSnapshot = {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
         if (byteView) {
-            const sources = [...after.raw.sources, ...selected.raw.sources, ...(comments?.sources ?? [])];
+            const sources = [...after.raw.sources, ...selected.raw.sources,...pictureRaw.sources, ...(comments?.sources ?? [])];
             const recentSelection = visibility && selected.selection.kind==="recent" ? Object.freeze({
                 showStickies: selected.selection.pageSkip===0,
                 window: Object.freeze(visibility.window.rows.map(row=>Object.freeze({
@@ -563,7 +585,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                     countedSticky:visibility.activeIds.includes(String(number(row.jitemid,1)*256+number(row.anum,0,255)))})))
             }) : undefined;
             this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), stickyEntryCount:stickyRows.length,
-                recentSelection, undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
+                recentSelection,pictureAccounts:Object.freeze(pictureAccounts.map(account=>Object.freeze(account))),
+                undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
                 sources: Object.freeze(sources.map(([key,value]) => Object.freeze({key,
                     value: value === undefined ? null : Object.freeze({base64: Buffer.from(value).toString("base64"), utf8: false as const})})))});
         }
