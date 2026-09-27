@@ -281,7 +281,13 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !integer(userLayer.compiledTime)||!userLayer.propertyCompiled)throw new Unsupported();
         customtextProperties=readPropertyLayer(userLayer.propertyCompiled,userLayer.s2lid);
     }
-    const inlineStylesheet=!!theme||!!customtextProperties&&["color_page_background","font_base","module_tags_show","module_tags_order"].some(key=>Object.hasOwn(customtextProperties!,key));
+    // Both qualified layouts declare exactly these section containers. Native
+    // modules_init retains source-order collisions and assignment-time indices.
+    for(const [key,value] of Object.entries(customtextProperties??{})) {
+        if(/^module_(?:userprofile|links|pagesummary|calendar|tags)_section$/.test(key)&&!["none","one","two"].includes(String(value)))throw new Unsupported();
+    }
+    const inlineStylesheet=!!theme||!!customtextProperties&&Object.keys(customtextProperties).some(key=>
+        key==="color_page_background"||key==="font_base"||/^module_(?:userprofile|links|pagesummary|calendar|tags)_/.test(key));
     if(inlineStylesheet&&!["none","proxy-css-links-only"].includes(config.cssCleanerHookKind??""))throw new Unsupported();
     const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
     for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {
