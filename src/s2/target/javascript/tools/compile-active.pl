@@ -45,12 +45,29 @@ eval {
         }
         # /d uses ASCII-native Perl classes for byte scalars and Unicode classes
         # for flagged scalars. Preserve the installed interpreter's versioned data.
-        for my $spec (['word', 'PerlWord', 'Word'], ['space', 'PerlSpace', 'Space']) {
+        for my $spec (['word', 'PerlWord', 'Word'], ['space', 'PerlSpace', 'Space'], ['digit', 'PosixDigit', 'Digit']) {
             my @byte = map { 0 + $_ } Unicode::UCD::prop_invlist($spec->[1]);
             my @unicode = map { 0 + $_ } Unicode::UCD::prop_invlist($spec->[2]);
             die "profile" unless @byte && @unicode;
             $profile{$spec->[0]} = {byte => \@byte, unicode => \@unicode};
         }
+        # Extract this exact /d regex rather than infer folding from casing.
+        # Profile data stays compact; no character scan runs during serving.
+        my %letters;
+        for my $mode ('byte', 'unicode') {
+            my @ranges;
+            my $previous = 0;
+            my $last = $mode eq 'byte' ? 255 : 0x10ffff;
+            for my $point (0 .. $last) {
+                my $character = chr($point);
+                utf8::upgrade($character) if $mode eq 'unicode';
+                my $member = $character =~ /[a-z]/i ? 1 : 0;
+                if ($member != $previous) { push @ranges, $point; $previous = $member; }
+            }
+            push @ranges, $last + 1 if $previous;
+            $letters{$mode} = \@ranges;
+        }
+        $profile{asciiLetterInsensitive} = \%letters;
         my @sources;
         for my $name (sort keys %INC) {
             next unless $name =~ m{^(?:Unicode/|unicore/|Config)};
