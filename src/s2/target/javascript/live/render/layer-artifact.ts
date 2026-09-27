@@ -15,7 +15,8 @@ import {createHash, createHmac, timingSafeEqual} from "node:crypto";
 import {spawn,execFileSync} from "node:child_process";
 import {readFileSync, readdirSync, lstatSync, realpathSync} from "node:fs";
 import path from "node:path";
-import {CompilerQueue, type CompilerJobOptions} from "./compiler-queue";
+import {CompilerQueue,CompilerCancelled, type CompilerJobOptions} from "./compiler-queue";
+import {checkInstalled,pinInstalled,type InstalledFile} from "./installed-files";
 import {NativeProfile} from "../../runtime/native-profile";
 import {NUMERIC_PROFILE} from "../../runtime/native-number";
 import {ABI_VERSION, Layer, s2} from "../../runtime/s2runtime";
@@ -26,7 +27,11 @@ export interface RecoveryDependency {
     readonly kind:"recovery"; readonly layerId:number;
     readonly reason:"missing-source"|"active-source-correspondence"|"source-prerequisites";
 }
-export type CompilationResult = {readonly kind:"compiled";readonly program:ProgramArtifact}|RecoveryDependency;
+export interface DeterministicGap {
+    readonly kind:"gap";readonly deterministic:true;readonly layerId:number;readonly reason:string;
+    readonly compilerDigest:string;readonly recoveryDigest:string;readonly dependenciesDigest:string;
+}
+export type CompilationResult = {readonly kind:"compiled";readonly program:ProgramArtifact}|RecoveryDependency|DeterministicGap;
 export interface CompilerConfig {
     readonly s2Root:string; readonly perl:string; readonly isolationExecutable:string;
     readonly timeoutMs?:number; readonly maxOutputBytes?:number;
@@ -102,7 +107,7 @@ export class ArtifactCompiler {
     private readonly root:string;
     private readonly perl:string;
     private readonly isolation:string;
-    private readonly dependencies:readonly {file:string;digest:string}[];
+    private readonly dependencies:readonly InstalledFile[];
     private readonly queue=new CompilerQueue(2);
     constructor(private readonly config:CompilerConfig) {
         this.root=realpathSync(config.s2Root);
@@ -141,14 +146,16 @@ export class ArtifactCompiler {
                 typeof source.digest!=="string"||sha256(readFileSync(source.file))!==source.digest)throw new CompilerFailure();
             files.push(realpathSync(source.file));
         }
-        this.dependencies=files.map(file=>({file,digest:sha256(readFileSync(file))}));
+        for(const name of ["layer-artifact","installed-files","compiler-queue"]){
+            files.push(path.join(this.root,"target/javascript/live/render",name+".ts"),
+                path.join(this.root,"target/javascript/dist/live/render",name+".js"));
+        }
+        this.dependencies=files.map(pinInstalled);
         this.digest=sha256(JSON.stringify({abi:ABI_VERSION,scalarABI:NUMERIC_PROFILE,profile:this.scalarProfile,files:this.dependencies.map(({file,digest})=>[
             file.startsWith(this.root+path.sep)?path.relative(this.root,file):path.basename(file),digest])}));
     }
-    private assertDependencies():void {
-        for(const dependency of this.dependencies) {
-            if(sha256(readFileSync(dependency.file))!==dependency.digest)throw new CompilerFailure();
-        }
+    private assertDependencies(full=false):void {
+        try{checkInstalled(this.dependencies,full);}catch{throw new CompilerFailure();}
     }
     key(snapshot:ActiveStyleSnapshot):string {this.assertDependencies();return this.keyFor(capture(snapshot));}
     private keyFor(input:Capture):string {
@@ -157,7 +164,7 @@ export class ArtifactCompiler {
             layers:layers.map(({sourceBase64,activeBase64,...identity})=>identity)}));
     }
     async compile(snapshot:ActiveStyleSnapshot, options:CompilerJobOptions={}):Promise<CompilationResult> {
-        this.assertDependencies();
+        this.assertDependencies(true);
         const input=capture(snapshot);const key=this.keyFor(input);
         // Today's source checker prerequisites do not govern persisted active
         // registration. Missing/changed metadata takes the recovery path.
@@ -172,7 +179,7 @@ export class ArtifactCompiler {
         const missing=input.layers.find(layer=>layer.sourceBase64===null);
         if(missing)return {kind:"recovery",layerId:missing.id,reason:"missing-source"};
         const result=await this.queue.run(signal=>this.job(input,signal),options);
-        this.assertDependencies();
+        this.assertDependencies(true);
         if(result.kind==="recovery") {
             if(typeof result.layerId!=="number"||!input.layers.some(layer=>layer.id===result.layerId)||result.reason!=="active-source-correspondence")throw new CompilerFailure();
             return {kind:"recovery",layerId:result.layerId,reason:result.reason};
@@ -190,6 +197,7 @@ export class ArtifactCompiler {
     // Cache authentication is issued by the private local producer root. A caller
     // cannot import a plain artifact or bless it with its own code/source hashes.
     encode(program:ProgramArtifact,secret:Buffer):string {
+        this.assertDependencies(true);
         if(!issued.has(program)||program.compilerDigest!==this.digest)throw new CompilerFailure();
         const payload=JSON.stringify(program);
         return JSON.stringify({payload,mac:createHmac("sha256",secret).update(payload).digest("hex")});
@@ -229,7 +237,7 @@ export class ArtifactCompiler {
             child.once("close",code=> {
                 signal.removeEventListener("abort",fail);
                 clearTimeout(timer);if(done)return;done=true;
-                if(failed||code!==0||!size){reject(new CompilerFailure());return;}
+                if(failed||code!==0||!size){reject(signal.aborted?new CompilerCancelled():new CompilerFailure());return;}
                 try{resolve(JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks))));}
                 catch{reject(new CompilerFailure());}
             });

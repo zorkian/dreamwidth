@@ -12,7 +12,12 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-export interface CompilerJobOptions {readonly signal?:AbortSignal; readonly deadline?:number;}
+export interface CompilerJobOptions {
+    readonly signal?:AbortSignal;
+    readonly deadline?:number;
+    // Optional source-proof hint only; never the shared job cancellation bound.
+    readonly proofDeadline?:number;
+}
 export class CompilerCancelled extends Error {constructor(){super("S2 compiler job cancelled");}}
 interface Waiting {start:()=>void;reject:(error:Error)=>void;controller:AbortController;timer?:ReturnType<typeof setTimeout>;detach:()=>void;started:boolean;}
 export class CompilerQueue {
