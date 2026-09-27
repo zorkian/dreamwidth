@@ -21,6 +21,10 @@
     "./page-output": {
       "types": "./dist/page-output.d.ts",
       "require": "./dist/page-output.js"
+    },
+    "./general-contexts": {
+      "types": "./dist/general-contexts.d.ts",
+      "require": "./dist/general-contexts.js"
     }
   },
   "scripts": {

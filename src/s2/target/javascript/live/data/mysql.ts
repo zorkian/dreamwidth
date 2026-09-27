@@ -29,7 +29,7 @@ import type { LiveStoreConfig } from "../startup-types";
 import {resolvePlaceholder} from "../domain/placeholder";
 import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
-    RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
+    RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, SelectedDataRepository, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
     PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags, RawComments, RawCommentHeader, RawCommentAuthor, RawCommentText,
 } from "../contracts";
@@ -67,6 +67,11 @@ const CLUSTER_TABLES = [
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
     "links", "userpic2", "userpicmap2", "userpicmap3",
 ] as const;
+// Program authority is independently captured by MysqlActivePrograms. Selected
+// data reads must not interpret a former catalog/property-layer representation.
+const SELECTED_GLOBAL_TABLES = ["user", "useridmap", "userprop", "userproplist",
+    "logproplist", "sysban"] as const;
+const SELECTED_CLUSTER_TABLES = CLUSTER_TABLES.filter(table => table !== "s2stylelayers2");
 
 function unsupported(): never { throw new SnapshotError("unsupported"); }
 
@@ -192,7 +197,7 @@ function header(row: Row, journalid: number): RawEntryHeader {
         replycount: number(row.replycount), compressed: requiredString(row.compressed)};
 }
 
-export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, PlaceholderResolver {
+export class MysqlLiveStore implements RawRecentRepository, SelectedDataRepository, LocalSecretSource, PlaceholderResolver {
     private constructor(private readonly databases: PrimaryDatabases,
         private readonly config: LiveStoreConfig) {}
 
@@ -268,7 +273,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         }
         return result;
     }
-    private async clusterSettings(connection: Connection, id: number, facts: GlobalFacts): Promise<ClusterSettings> {
+    private async clusterSettings(connection: Connection, id: number, facts: GlobalFacts,
+        includeStyle = true): Promise<ClusterSettings> {
         const ids = facts.propertyNames.map(row => number(row.upropid, 1));
         const properties: Row[] = [];
         if (ids.length) {
@@ -283,7 +289,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             properties.push(...lite, ...blob);
         }
         const settings = this.settings(facts, {properties, layers: []}, []);
-        const styleId = selectedStyleId(settings);
+        const styleId = includeStyle ? selectedStyleId(settings) : 0;
         const layers = styleId ? (await sql<Row>`SELECT type,s2lid FROM s2stylelayers2
             WHERE userid = ${id} AND styleid = ${styleId} ORDER BY type,s2lid LIMIT 9`.execute(connection)).rows : [];
         if (layers.length > 8) unsupported();
@@ -314,11 +320,19 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
     }
 
     async loadRawSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
+        return this.loadSnapshot(request, true);
+    }
+    async loadSelectedSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
+        return this.loadSnapshot(request, false);
+    }
+    private async loadSnapshot(request: RawPageRequest, includeStyle: boolean): Promise<RawJournalSnapshot | null> {
+        const globalTables = includeStyle ? GLOBAL_TABLES : SELECTED_GLOBAL_TABLES;
+        const clusterTables = includeStyle ? CLUSTER_TABLES : SELECTED_CLUSTER_TABLES;
         if (!/^[a-z0-9_]{1,25}$/.test(request.username)) unsupported();
         number(request.calendarNow.year, 1, 9999); number(request.calendarNow.month, 1, 12);
         if(request.page.kind==='entry')validateCommentQuery(request.page.comments);
         const frozenRequest = structuredClone(request);
-        const initial = await this.databases.snapshot(undefined, GLOBAL_TABLES,
+        const initial = await this.databases.snapshot(undefined, globalTables,
             connection => this.globalFacts(connection, request.username));
         if (!initial) return null;
         const ownerId = number(initial.owner.userid, 1), clusterId = number(initial.owner.clusterid, 1);
@@ -326,21 +340,21 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         if (caps & BigInt(this.config.capabilities.moveInProgressMask)) unsupported();
         // Planning reads only public settings/style IDs. A second cluster
         // snapshot below must match them; no private body is loaded in planning.
-        const plan = await this.databases.snapshot(clusterId, CLUSTER_TABLES, async connection => {
+        const plan = await this.databases.snapshot(clusterId, clusterTables, async connection => {
             if (frozenRequest.page.kind === "entry" &&
                 !await this.loadWindow(connection, ownerId, frozenRequest)) return null;
-            return this.clusterSettings(connection, ownerId, initial);
+            return this.clusterSettings(connection, ownerId, initial, includeStyle);
         });
         if (!plan) return null;
-        const before = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
+        const before = await this.databases.snapshot(undefined, globalTables, async connection => {
             const facts = await this.globalFacts(connection, request.username);
             if (!facts || digest(facts) !== digest(initial)) unsupported();
             const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
-            const style = await this.loadStyle(connection, owner, plan, raw);
+            const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             return {facts, style, raw, themeAuthors:await this.loadThemeAuthors(connection,style)};
         });
-        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...CLUSTER_TABLES,"s2compiled2"] : CLUSTER_TABLES, async connection => {
-            const current = await this.clusterSettings(connection, ownerId, before.facts);
+        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
+            const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
             if (!window) return null;
@@ -391,11 +405,11 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 unsigned(before.facts.owner.caps,16)) : undefined;
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
         const after = await this.databases.snapshot(undefined,
-            needsMoods ? [...GLOBAL_TABLES,"moods","moodthemes","moodthemedata"] : GLOBAL_TABLES, async connection => {
+            needsMoods ? [...globalTables,"moods","moodthemes","moodthemedata"] : globalTables, async connection => {
             const facts = await this.globalFacts(connection, request.username);
             if (!facts || digest(facts) !== digest(before.facts)) unsupported();
             const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
-            const style = await this.loadStyle(connection, owner, plan, raw);
+            const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
@@ -413,6 +427,15 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
+    }
+    async revalidateSelectedFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
+        try {
+            const fresh = await this.loadSelectedSnapshot(snapshot.request);
+            return fresh !== null && fresh.fingerprint === snapshot.fingerprint;
+        } catch (error) {
+            if (error instanceof SnapshotError && error.kind === "unsupported") return false;
+            throw error;
+        }
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
