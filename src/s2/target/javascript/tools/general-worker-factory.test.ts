@@ -37,12 +37,12 @@ test("installed factory retains one private navigation authority and requires so
         propertyCleaner(){throw Error("No cleaner substitution");},
         output(){throw Error("No output substitution");},seesControlStrip:()=>false,
         recentInput(){throw boundary;},entryInput(_value,value,session,start){
-            inputBindings=value;inputSession=session;inputStart=start;return undefined!;},
+            inputBindings=value;inputSession=session;inputStart=start;return {page:{}} as never;},
         recentOperations(){throw Error("Invalid descriptor must not prepare operations");},
         entryOperations(_session,_start,value){bindings=value;throw prepared;},
     });
     // Only the adapter boundary is exercised here; no admitted program executes.
-    const session={context:undefined} as unknown as GeneralProgramSession;
+    const session={context:{prop:{}}} as unknown as GeneralProgramSession;
     assert.throws(()=>factory.preparePage(session,{kind:"recent"} as GeneralWorkerStart,{}),error=>error===boundary);
     const start={kind:"entry"} as GeneralWorkerStart;
     assert.throws(()=>factory.preparePage(session,start,{}),error=>error===prepared);

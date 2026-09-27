@@ -101,3 +101,17 @@ Focused guarded SQL/native controls cover personal/community, self-account, a di
 maintainer, demotion, a missing poster and reversed relationship direction. This is an
 installed parent authority/projection proof, not completed ordinary cleaner or HTTP
 acceptance. Native cache behavior remains explicitly deferred.
+
+The installed factory now obtains Page's customtext fallback values from its own
+executed, escaped Context properties after initialization. A stale caller-provided
+fallback cannot replace active `prop_init` results. The mandatory Page second clean
+remains in place. A closed source/recovered worker control compares its resulting title
+against native property escaping; its declared HTML-empty fixture does not exercise or
+replace the held original HTML/subject cleaner.
+
+Direct Entry selected descriptors share only the issued, witnessed public header with
+Recent. They omit Recent-only cut, no-body and forced-mood inputs; the actual direct Entry
+source operation supplies its native event options. Both descriptor paths retain the same
+parent-issued current maintainer gate. SQL encoding/privacy and source/recovery worker
+proofs cover this assembly; complete installed content helpers and ordinary HTTP remain
+mandatory follow-through.

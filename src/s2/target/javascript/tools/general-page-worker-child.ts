@@ -15,7 +15,8 @@
 import {GeneralWorkerChannel} from "../live/render/general-worker-channel";
 import {executeGeneralWorker} from "../live/render/general-worker-execution";
 import {generalWorkerFactory} from "../live/render/general-worker-factory";
-import {NativeString} from "../runtime/native-scalar";
+import {NativeString,scalarPV} from "../runtime/native-scalar";
+import {escapeGeneralPlainProperty} from "@dreamwidth/content/general-contexts";
 import {generalCommentInfo,generalImage,generalNull,type GeneralModel} from "../live/domain/general-model-primitives";
 import type {GeneralPageInput} from "../live/domain/general-page-model";
 import type {GeneralEntryPageEntryInput} from "../live/domain/general-entry-page-source";
@@ -36,7 +37,7 @@ function page(value:unknown,bindings:GeneralWorkerPublicBindings):GeneralPageInp
         ownerName:row.title,journalTitle:undefined,journalSubtitle:undefined,layoutName:undefined,
         themeName:undefined,layoutUrl:pv(""),getargs:[],viewingStyleOptions:undefined,viewUrls:[],links:[],
         customtext:{title:undefined,url:undefined,content:undefined},
-        customtextDefaults:{title:undefined,url:undefined,content:undefined},showControlStrip:0,
+        customtextDefaults:{title:pv("stale caller default"),url:undefined,content:undefined},showControlStrip:0,
         isCanary:0,noMobileCookie:0,sessionMessages:undefined,headContent:pv(""),canUseNetwork:0,activeEntries:[]};
 }
 function entry():GeneralEntrySourceInput {
@@ -57,6 +58,10 @@ function entryOperations(bindings:GeneralWorkerPublicBindings) {
         cleanEvent:noContent,expandEmbedded:(value:NativeString|undefined)=>value,
         transformAdult:(value:NativeString|undefined)=>value,recordPublicEntry(){}};
 }
+function escapeProperty(value:unknown,mode:"plain"|"html"):unknown {
+    if(mode==="plain")return value===undefined?undefined:NativeString.fromFrame(escapeGeneralPlainProperty(scalarPV(value).frame()));
+    if(value!==undefined)noContent();return value;
+}
 executeGeneralWorker(channel,generalWorkerFactory(channel,{
     propertyCleaner(){return {clean:noContent};},seesControlStrip:()=>false,
     output(){return {contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
@@ -68,11 +73,11 @@ executeGeneralWorker(channel,generalWorkerFactory(channel,{
             selectionHead:pv(""),feedTagQuery:pv(""),linkAttributes:[]}};},
     entryInput(value,bindings){return {page:page(value,bindings),entry:{...entry(),mode:undefined} as GeneralEntryPageEntryInput,thread:undefined};},
     recentOperations(_session,_start,bindings){return {
-        page:{clockSeconds:()=>0,escapeProperty(value){if(value!==undefined)noContent();return value;}},
+        page:{clockSeconds:()=>0,escapeProperty},
         entry:()=>entryOperations(bindings),recent:{standardImage:kind=>generalImage(pv("/declared/"+kind),20,18,pv("")),
             makeLink:generalMakeLink,eventDisplayed(){}}};},
     entryOperations(_session,_start,bindings){return {
-        page:{clockSeconds:()=>0,escapeProperty(value){if(value!==undefined)noContent();return value;}},
+        page:{clockSeconds:()=>0,escapeProperty},
         entry:entryOperations(bindings),prepareHead(){},prepareCommentHead(){},comments:noContent,
         emptyComments(){return {permalink:pv("/261.html"),styledEntryUrl:pv("/261.html"),styleArgument:undefined,
             flat:false,topOnly:false,pages:1,current:1,items:0,first:undefined,last:undefined,expandAll:false};}};},

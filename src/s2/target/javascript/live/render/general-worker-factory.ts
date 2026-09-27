@@ -79,9 +79,18 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
             ...images.callbacks,...navigation.callbacks};},
         propertyCleaner:services.propertyCleaner,output:services.output,
         preparePage(session,start,approved){
-            if(start.kind==="recent")return generalRecentPageFromSource(session.context,
-                services.recentInput(approved,bindings,session,start),services.recentOperations(session,start,bindings));
-            return generalEntryPageFromSource(session.context,services.entryInput(approved,bindings,session,start),{
+            // Native Page fallback reads the properties AFTER initialization and
+            // declared-property escaping, before its own second property clean.
+            const customtextDefaults={title:session.context.prop._text_module_customtext,
+                url:session.context.prop._text_module_customtext_url,
+                content:session.context.prop._text_module_customtext_content};
+            if(start.kind==="recent") {
+                const input=services.recentInput(approved,bindings,session,start);
+                return generalRecentPageFromSource(session.context,
+                    {...input,page:{...input.page,customtextDefaults}},services.recentOperations(session,start,bindings));
+            }
+            const input=services.entryInput(approved,bindings,session,start);
+            return generalEntryPageFromSource(session.context,{...input,page:{...input.page,customtextDefaults}},{
                 ...services.entryOperations(session,start,bindings),navigation});
         },
         beginRendering(session){images.beginRendering(session.context);},

@@ -26,6 +26,7 @@ import {NativeString} from "../../runtime/native-string";
 import {scalarTruthy,NativeNumber} from "../../runtime/native-scalar";
 import type {GeneralEntryContentInput} from "./general-entry-content";
 import type {GeneralEntrySourceInput} from "./general-entry-from-source";
+import type {GeneralEntryPageEntryInput} from "./general-entry-page-source";
 import {generalMysqlDateParts} from "./general-model-date";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
 import type {GeneralPublicSession} from "./general-public-session";
@@ -127,20 +128,37 @@ export class GeneralSelectedText {
         readonly permalinkUrl:NativeString;readonly adultContentLevel:NativeString;
         readonly content:Pick<GeneralEntryContentInput,"suspendMessage"|"noEntryBody"|"noHtml"|"cutUrl"|"cutDisable">;
     }):GeneralEntrySourceInput {
-        const converted=this.entry(entry),owner=this.snapshot.facts.owner;
-        if(entry.journalid!==owner.userid)throw Error("Selected entry journal mismatch");
+        const owner=this.snapshot.facts.owner;
         const bytes=(value:string)=>NativeString.bytes(Buffer.from(value,"latin1"));
         return Object.freeze({journalId:entry.journalid,posterId:entry.posterid,
-            permalinkUrl:options.permalinkUrl.clone(),adultContentLevel:options.adultContentLevel.clone(),
-            dateparts:generalMysqlDateParts(entry.eventtime),systemDateparts:generalMysqlDateParts(entry.logtime),
-            security:bytes(entry.security),allowmask:bytes(entry.allowmask),
-            adminPost:NativeNumber.integer(this.official.get(entry)?1n:0n),
+            ...this.entryHeader(entry,options.permalinkUrl,options.adultContentLevel),
             forceMoodtheme:bytes(owner.optForceMoodtheme),
             content:Object.freeze({...this.entryFormatting(entry),
                 suspendMessage:options.content.suspendMessage,noEntryBody:options.content.noEntryBody,
                 noHtml:options.content.noHtml,cutUrl:options.content.cutUrl.clone(),cutDisable:options.content.cutDisable,
                 journalName:bytes(owner.user),jitemid:entry.jitemid,ditemid:entry.jitemid*256+entry.anum,
                 isSyndicated:NativeNumber.integer(owner.journaltype==="Y"?1n:0n)})});
+    }
+    /** Direct Entry omits Recent-only cut/no-body/forced-mood inputs. */
+    entryPageSource(entry:RawEntry,options:{
+        readonly permalinkUrl:NativeString;readonly adultContentLevel:NativeString;
+        readonly mode:unknown;readonly suspendMessage:unknown;readonly noHtml:unknown;
+    }):GeneralEntryPageEntryInput {
+        const owner=this.snapshot.facts.owner,bytes=(value:string)=>NativeString.bytes(Buffer.from(value,"latin1"));
+        return Object.freeze({...this.entryHeader(entry,options.permalinkUrl,options.adultContentLevel),mode:options.mode,
+            content:Object.freeze({...this.entryFormatting(entry),suspendMessage:options.suspendMessage,noHtml:options.noHtml,
+                journalName:bytes(owner.user),jitemid:entry.jitemid,ditemid:entry.jitemid*256+entry.anum,
+                isSyndicated:NativeNumber.integer(owner.journaltype==="Y"?1n:0n)})});
+    }
+    private entryHeader(entry:RawEntry,permalinkUrl:NativeString,adultContentLevel:NativeString):
+        Omit<GeneralEntrySourceInput,"journalId"|"posterId"|"forceMoodtheme"|"content"> {
+        this.entry(entry);
+        if(entry.journalid!==this.snapshot.facts.owner.userid)throw Error("Selected entry journal mismatch");
+        const bytes=(value:string)=>NativeString.bytes(Buffer.from(value,"latin1"));
+        return {permalinkUrl:permalinkUrl.clone(),adultContentLevel:adultContentLevel.clone(),
+            dateparts:generalMysqlDateParts(entry.eventtime),systemDateparts:generalMysqlDateParts(entry.logtime),
+            security:bytes(entry.security),allowmask:bytes(entry.allowmask),
+            adminPost:NativeNumber.integer(this.official.get(entry)?1n:0n)};
     }
     entry(entry:RawEntry):ConvertedNativeItem {
         const value=this.entries.get(entry);if(!value)throw Error("Unselected entry text reference");return value;
