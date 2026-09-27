@@ -114,7 +114,7 @@ function visit(root, relative = '', files = []) {
     return files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
 
-function validatePreviousStage(root) {
+function validatePreviousStage(root, expectedEntry = entryPath) {
     const rootStat = fs.lstatSync(root);
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || (rootStat.mode & 0o022)) {
         fail('existing stage is not a readonly managed directory');
@@ -125,16 +125,18 @@ function validatePreviousStage(root) {
         fail('existing manifest is writable by group or others');
     }
     const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-    if (manifest.schema !== 1 || manifest.entryPath !== entryPath ||
+    if (manifest.schema !== 1 || manifest.entryPath !== expectedEntry ||
         manifest.nodeExecutable !== '/opt/dw-node24/bin/node' ||
         !Array.isArray(manifest.files)) {
         fail('existing stage does not have the pinned manifest shape');
     }
     const actualFiles = visit(root).filter(file => file.path !== 'manifest.json');
     if (JSON.stringify(actualFiles) !== JSON.stringify(manifest.files) ||
-        !actualFiles.some(file => file.path === entryPath) ||
+        !actualFiles.some(file => file.path === expectedEntry) ||
         !actualFiles.some(file =>
-            file.path === 'app/node_modules/@dreamwidth/content/dist/index.js')) {
+            file.path === (expectedEntry === entryPath
+                ? 'app/node_modules/@dreamwidth/content/dist/index.js'
+                : 'app/node_modules/@dreamwidth/content/dist/page-output.js'))) {
         fail('existing stage inventory differs from its manifest');
     }
     assertOwner(root);
@@ -212,21 +214,40 @@ export function stageRuntime(artifact, sources = {}) {
     // only by the closed-stage mechanics test before the real worker lands.
     const workerDist = sources.s2Dist || s2Dist;
     const contentDist = sources.contentDist || path.join(contentRoot, 'dist');
+    const general = sources.general === true;
+    const workerEntry = general ? 'live/render/general-worker.js' : 'live/render/worker.js';
+    const selectedEntryPath = general ? `app/dist/${workerEntry}` : entryPath;
     const nodeExecutable = checkNode();
     if (!path.isAbsolute(artifact)) fail('artifact path must be absolute');
     mustRegular(artifact);
+    if (general) {
+        if (fs.statSync(artifact).size > 4096) fail('general installation descriptor too large');
+        const descriptor = JSON.parse(fs.readFileSync(artifact, 'utf8'));
+        if (Object.keys(descriptor).sort().join(',') !== 'entry,kind,schema'
+            || descriptor.schema !== 1 || descriptor.kind !== 'general-s2-worker'
+            || descriptor.entry !== selectedEntryPath) fail('invalid general installation descriptor');
+    }
     const lock = path.join(contentRoot, 'package-lock.json');
     const packageJson = path.join(contentRoot, 'package.json');
     mustRegular(lock);
     mustRegular(packageJson);
-    mustRegular(path.join(contentDist, 'index.js'));
-    mustRegular(path.join(contentDist, 'contracts.js'));
+    if (!general) {
+        mustRegular(path.join(contentDist, 'index.js'));
+        mustRegular(path.join(contentDist, 'contracts.js'));
+    }
     const artifactSha256 = fileDigest(artifact);
     const contentLockSha256 = fileDigest(lock);
-    const modules = collectModules(workerDist, 'live/render/worker.js',
-        new Set(['@dreamwidth/content']));
-    const contentModules = collectModules(contentDist, 'index.js',
-        new Set(['css-tree', 'dompurify', 'jsdom', 'markdown-it']));
+    const exports = general ? {
+        './general-contexts': './dist/general-contexts.js',
+        './page-output': './dist/page-output.js',
+    } : { '.': './dist/index.js' };
+    const modules = collectModules(workerDist, workerEntry,
+        new Set(Object.keys(exports).map(name => name === '.' ? '@dreamwidth/content'
+            : `@dreamwidth/content/${name.slice(2)}`)));
+    const contentModules = [...new Set(Object.values(exports).flatMap(target =>
+        collectModules(contentDist, target.slice('./dist/'.length),
+            new Set(general ? ['css-tree', 'htmlparser2']
+                : ['css-tree', 'dompurify', 'jsdom', 'markdown-it']))))].sort();
     const finalRoot = `${artifact}.runtime`;
     const tempRoot = fs.mkdtempSync(`${finalRoot}.${artifactSha256.slice(0, 12)}.` +
         `${contentLockSha256.slice(0, 12)}.tmp-`);
@@ -253,7 +274,7 @@ export function stageRuntime(artifact, sources = {}) {
         fs.mkdirSync(packageTarget, { recursive: true });
         fs.writeFileSync(path.join(packageTarget, 'package.json'),
             JSON.stringify({ name: '@dreamwidth/content', private: true, type: 'commonjs',
-                main: './dist/index.js', exports: { '.': './dist/index.js' } }) + '\n');
+                ...(!general ? {main: './dist/index.js'} : {}), exports }) + '\n');
         for (const relative of contentModules) {
             const target = path.join(packageTarget, 'dist', relative);
             fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -290,7 +311,7 @@ export function stageRuntime(artifact, sources = {}) {
         chmodTree(app);
         const files = visit(tempRoot);
         const manifest = { schema: 1, artifactSha256, contentLockSha256,
-            nodeVersion, nodeExecutable, entryPath, files };
+            nodeVersion, nodeExecutable, entryPath: selectedEntryPath, files };
         fs.writeFileSync(path.join(tempRoot, 'manifest.json.tmp'),
             `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o444 });
         fs.renameSync(path.join(tempRoot, 'manifest.json.tmp'),
@@ -298,7 +319,7 @@ export function stageRuntime(artifact, sources = {}) {
         fs.chmodSync(tempRoot, 0o555);
         assertOwner(tempRoot);
         if (fs.existsSync(finalRoot)) {
-            validatePreviousStage(finalRoot);
+            validatePreviousStage(finalRoot, selectedEntryPath);
             backupRoot = `${finalRoot}.old-${process.pid}`;
             if (fs.existsSync(backupRoot)) fail('stale staging backup exists');
             fs.renameSync(finalRoot, backupRoot);
@@ -324,6 +345,10 @@ export function stageRuntime(artifact, sources = {}) {
             console.error(`Private staging cleanup failed: ${String(cleanupError)}`);
         }
     }
+}
+
+export function stageGeneralRuntime(installation, sources = {}) {
+    return stageRuntime(installation, {...sources, general: true});
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -40,6 +40,32 @@ function hexBytes(hex: unknown, maxBytes: number): Buffer {
     return Buffer.from(hex, "hex");
 }
 
+export interface LegacyPayload {
+    readonly storedBytes: Buffer;
+    readonly originalBytes: Buffer;
+    readonly payloadBytes: Buffer | undefined;
+}
+
+/** Native DBI byte PV followed by text_uncompress; no character decoding. */
+export function decodeLegacyPayload(storedHex: unknown, recoveredHex: unknown,
+    roundtripHex: unknown, maxStoredBytes: number, maxDecodedBytes: number,
+    mayBeGzip: boolean): LegacyPayload {
+    const {storedBytes, originalBytes} = decodeLegacyBytes(
+        storedHex, recoveredHex, roundtripHex, maxStoredBytes, maxStoredBytes);
+    let payloadBytes: Buffer | undefined = originalBytes;
+    if (mayBeGzip && originalBytes[0] === 0x1f && originalBytes[1] === 0x8b) {
+        try {payloadBytes = gunzipSync(originalBytes, {maxOutputLength: maxDecodedBytes + 1});}
+        catch (error) {
+            // A corrupt native memGunzip result is undef. Output-limit failure
+            // remains infrastructure; it must not masquerade as corrupt data.
+            if ((error as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") throw new SnapshotError("unavailable");
+            payloadBytes = undefined;
+        }
+    }
+    if (payloadBytes && payloadBytes.length > maxDecodedBytes) throw new SnapshotError("unsupported");
+    return {storedBytes, originalBytes, payloadBytes};
+}
+
 // MySQL's latin1 is cp1252 with mappings for the otherwise undefined C1 bytes.
 // HEX(CONVERT(column USING latin1)) reverses the DBI connection conversion.
 // Re-converting that result to utf8mb4 must equal the stored bytes, so an

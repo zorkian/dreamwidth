@@ -161,7 +161,7 @@ test("positive typed spamreport count refuses entry before render and leaves act
         assert.equal(rechecks, 0);
         const recent = await service.serve({...common, skip: 0, skipPresent: false});
         assert.equal(recent.ok, true);
-        if (recent.ok) assert.ok(recent.html.includes('Live sample 1 café'));
+        if (recent.ok) assert.ok(Buffer.from(recent.html).toString("utf8").includes('Live sample 1 café'));
         assert.equal(secrets, 1);
         assert.equal(rechecks, 1);
     } finally {await service.close();}

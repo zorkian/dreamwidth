@@ -119,11 +119,12 @@ export function createLiveApp(
         if (!result.ok) return fail(reply, result.reason);
         // The service has just completed its independent primary recheck.
         // Buffer and enqueue synchronously; no subsequent awaited work.
-        const body = Buffer.from(result.html, "utf8");
+        const body = typeof result.html === "string"
+            ? Buffer.from(result.html, "utf8") : Buffer.from(result.html);
         commonHeaders(reply, "private, no-store")
             .code(200)
             .type("text/html; charset=utf-8")
-            .header("Content-Length", String(body.length));
+            .header("Content-Length", String(result.contentLength ?? body.length));
         if (result.setCookie !== null) reply.header("Set-Cookie", result.setCookie);
         return reply.send(decision.request.method === "HEAD" ? "" : body);
     });

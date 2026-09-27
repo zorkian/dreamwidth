@@ -182,7 +182,7 @@ test("revocation during real child rendering prevents all HTML; next request see
         assert.equal(rechecked, true);
         const next = await service.serve(request);
         assert.equal(next.ok, true);
-        if (next.ok) assert.ok(!next.html.includes("Live sample"));
+        if (next.ok) assert.ok(!Buffer.from(next.html).toString("utf8").includes("Live sample"));
     } finally {await service.close();}
 });
 test("fresh recheck I/O failure, unsupported snapshot, absent key and closed service fail safely", async () => {
@@ -226,9 +226,9 @@ test("explicit skip zero preserves canonical request echoes without changing sel
         const result = await service.serve({...request, skipPresent: true});
         assert.equal(result.ok, true);
         if (result.ok) {
-            assert.ok(result.html.includes('value="http://localhost:8080/users/s2js_slice3/?skip=0"'));
-            assert.ok(result.html.includes('args=skip%3D0&view='));
-            assert.ok(result.html.includes('Live sample 2'));
+            assert.ok(Buffer.from(result.html).toString("utf8").includes('value="http://localhost:8080/users/s2js_slice3/?skip=0"'));
+            assert.ok(Buffer.from(result.html).toString("utf8").includes('args=skip%3D0&view='));
+            assert.ok(Buffer.from(result.html).toString("utf8").includes('Live sample 2'));
         }
     } finally {await service.close();}
 });

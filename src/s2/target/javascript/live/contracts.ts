@@ -280,6 +280,44 @@ export interface RawRecentRepository {
     close(): Promise<void>;
 }
 
+// General serving binds this data witness to a separate ActiveProgramSnapshot.
+// A selected snapshot alone never grants program or publication authority.
+// Parent-only source byte view: string code units reversibly carry DBI octets.
+// This is NOT Unicode display text and must never use a UTF8 String output
+// adapter. General projection imports only approved fields into NativePVFrame.
+export interface NativeJournalAuthority {
+    readonly userid: number;
+    readonly username: string;
+    readonly clusterid: number;
+    readonly status: string;
+    readonly statusvis: string;
+    readonly journaltype: string;
+    readonly dversion: number;
+    readonly caps: string;
+    readonly oldEncoding: number;
+    readonly publicSettings: PublicSettings | null;
+    readonly fingerprint: string;
+}
+export interface NativeSelectedSnapshot {
+    readonly encoding: "dbi-byte-view";
+    readonly oldEncoding: number; // source user.oldenc, parent-only conversion authority
+    readonly facts: RawJournalSnapshot;
+    readonly undefinedEntryEvents: readonly number[];
+    // Parent-only reached DB text cells, before unknown8bit/cleaner transforms.
+    // Child projection must select approved public fields; never send this bag.
+    readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
+}
+export interface NativeSelectedDataRepository {
+    loadNativeSelectedSnapshot(request: RawPageRequest): Promise<NativeSelectedSnapshot | null>;
+    revalidateNativeSelectedFingerprint(snapshot: NativeSelectedSnapshot): Promise<boolean>;
+}
+
+export interface SelectedDataRepository {
+    loadSelectedSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null>;
+    revalidateSelectedFingerprint(snapshot: RawJournalSnapshot): Promise<boolean>;
+    close(): Promise<void>;
+}
+
 export interface PlaceholderResolutionSpec {
     readonly descriptor: {
         readonly src: string;
@@ -338,7 +376,7 @@ export interface AnonymousEntryRequest {
 export type LiveFailure = "not-found" | "unsupported" | "changed" | "unavailable";
 export type LiveResult =
     | { readonly ok: false; readonly reason: LiveFailure }
-    | { readonly ok: true; readonly html: string; readonly setCookie: string | null };
+    | { readonly ok: true; readonly html: string | Uint8Array; readonly contentLength?: number; readonly setCookie: string | null };
 
 export interface AnonymousRecentService {
     // HEAD performs the same authorization/render/recheck as GET. Server strips

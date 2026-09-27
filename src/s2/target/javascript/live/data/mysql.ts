@@ -29,14 +29,14 @@ import type { LiveStoreConfig } from "../startup-types";
 import {resolvePlaceholder} from "../domain/placeholder";
 import type {
     LocalSecret, LocalSecretSource, PublicSettingName, PublicSettings, RawEntry,
-    RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, RawStyle, RawUser,
+    RawMoods, RawFeatureCounts, RawJournalSnapshot, RawRecentRepository, SelectedDataRepository, NativeSelectedSnapshot, NativeJournalAuthority, RawStyle, RawUser,
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
     PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags, RawComments, RawCommentHeader, RawCommentAuthor, RawCommentText,
 } from "../contracts";
 import {selectComments,commentCapability,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
-import { decodeLegacyText, decodeLegacyBytes } from "./legacy-text";
+import { decodeLegacyText, decodeLegacyBytes, decodeLegacyPayload } from "./legacy-text";
 
 type Connection = ReadConnection;
 type Row = SqlRow;
@@ -67,6 +67,11 @@ const CLUSTER_TABLES = [
     "usertags", "userkeywords", "logtags", "logtagsrecent", "logkwsum",
     "links", "userpic2", "userpicmap2", "userpicmap3",
 ] as const;
+// Program authority is independently captured by MysqlActivePrograms. Selected
+// data reads must not interpret a former catalog/property-layer representation.
+const SELECTED_GLOBAL_TABLES = ["user", "useridmap", "userprop", "userproplist",
+    "logproplist", "sysban"] as const;
+const SELECTED_CLUSTER_TABLES = CLUSTER_TABLES.filter(table => table !== "s2stylelayers2");
 
 function unsupported(): never { throw new SnapshotError("unsupported"); }
 
@@ -119,6 +124,18 @@ function sortedRecord(record: Readonly<Record<string, string | null>>): [string,
 }
 
 type RawField = readonly [key: string, storedHex: string, originalHex: string];
+class RawFields extends Array<RawField> {
+    readonly undefinedEvents: number[] = [];
+    readonly sources = new Map<string, Uint8Array | undefined>();
+    constructor(readonly byteView: boolean) {super();}
+}
+function decodedText(raw: RawField[], ...args: Parameters<typeof decodeLegacyText>): ReturnType<typeof decodeLegacyText> & {nativeUndefined?: boolean} {
+    if (!(raw instanceof RawFields) || !raw.byteView) return decodeLegacyText(...args);
+    const payload = decodeLegacyPayload(...args);
+    // Reversible internal byte view only. General model adapters MUST import
+    // these code units as octets, never print or UTF8-encode this string.
+    return {...payload, text: payload.payloadBytes?.toString("latin1") ?? "", nativeUndefined: payload.payloadBytes === undefined};
+}
 
 function decodedColumn(
     row: Row, field: string, key: string, rawFields: RawField[],
@@ -130,9 +147,11 @@ function decodedColumn(
     if (stored === null && original === null && roundtrip === null) {
         if (!nullable) unsupported();
         rawFields.push([key, "<NULL>", "<NULL>"]);
+        if (rawFields instanceof RawFields && rawFields.byteView) rawFields.sources.set(key, undefined);
         return null;
     }
-    const decoded = decodeLegacyText(stored, original, roundtrip, maxBytes, maxBytes, false);
+    const decoded = decodedText(rawFields, stored, original, roundtrip, maxBytes, maxBytes, false);
+    if (rawFields instanceof RawFields && rawFields.byteView) rawFields.sources.set(key, Buffer.from(decoded.text,"latin1"));
     rawFields.push([
         key, decoded.storedBytes.toString("hex"), decoded.originalBytes.toString("hex"),
     ]);
@@ -192,7 +211,18 @@ function header(row: Row, journalid: number): RawEntryHeader {
         replycount: number(row.replycount), compressed: requiredString(row.compressed)};
 }
 
-export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, PlaceholderResolver {
+interface NativeSnapshotEvidence {
+    readonly oldEncoding: number;
+    readonly undefinedEvents: readonly number[];
+    readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
+}
+
+export class MysqlLiveStore implements RawRecentRepository, SelectedDataRepository, LocalSecretSource, PlaceholderResolver {
+    private readonly journalIssued = new WeakMap<NativeJournalAuthority, {readonly username: string; readonly digest: string}>();
+    private readonly nativeSnapshots = new WeakMap<RawJournalSnapshot, NativeSnapshotEvidence>();
+    private readonly nativeIssued = new WeakMap<NativeSelectedSnapshot, {
+        readonly request: RawPageRequest; readonly fingerprint: string; readonly digest: string;
+    }>();
     private constructor(private readonly databases: PrimaryDatabases,
         private readonly config: LiveStoreConfig) {}
 
@@ -231,7 +261,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const owners = (await sql<Row>`SELECT userid,user,clusterid,status,statusvis,journaltype,
             HEX(name) AS name_stored, HEX(CONVERT(name USING latin1)) AS name_original,
             HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
-            opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,defaultpicid,dversion,
+            opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,defaultpicid,dversion,oldenc,
             CAST(caps AS CHAR) AS caps
             FROM user WHERE BINARY user = BINARY ${username} LIMIT 2`.execute(connection)).rows;
         if (!owners.length) return null;
@@ -268,7 +298,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         }
         return result;
     }
-    private async clusterSettings(connection: Connection, id: number, facts: GlobalFacts): Promise<ClusterSettings> {
+    private async clusterSettings(connection: Connection, id: number, facts: GlobalFacts,
+        includeStyle = true): Promise<ClusterSettings> {
         const ids = facts.propertyNames.map(row => number(row.upropid, 1));
         const properties: Row[] = [];
         if (ids.length) {
@@ -283,7 +314,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             properties.push(...lite, ...blob);
         }
         const settings = this.settings(facts, {properties, layers: []}, []);
-        const styleId = selectedStyleId(settings);
+        const styleId = includeStyle ? selectedStyleId(settings) : 0;
         const layers = styleId ? (await sql<Row>`SELECT type,s2lid FROM s2stylelayers2
             WHERE userid = ${id} AND styleid = ${styleId} ORDER BY type,s2lid LIMIT 9`.execute(connection)).rows : [];
         if (layers.length > 8) unsupported();
@@ -314,37 +345,106 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
     }
 
     async loadRawSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
+        return this.loadSnapshot(request, true);
+    }
+    async loadSelectedSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null> {
+        return this.loadSnapshot(request, false);
+    }
+    /** Before program init: journal identity/settings only, never entry/comment text. */
+    async loadNativeJournalAuthority(username: string): Promise<NativeJournalAuthority | null> {
+        if (!/^[a-z0-9_]+$/.test(username) || username.length > 262144) unsupported();
+        const before = await this.databases.snapshot(undefined, SELECTED_GLOBAL_TABLES,
+            connection => this.globalFacts(connection, username));
+        if (!before) return null;
+        const row = before.owner, userid = number(row.userid, 1), clusterid = number(row.clusterid);
+        if (BigInt(unsigned(row.caps,16)) & BigInt(this.config.capabilities.moveInProgressMask)) {
+            throw new SnapshotError("unavailable");
+        }
+        // A purged account needs no invented cluster lookup. Native rejects it
+        // before S2 initialization; preserve its identity for the trusted gate.
+        const cluster = clusterid ? await this.databases.snapshot(clusterid,
+            ["userproplite2","userpropblob"], connection => this.clusterSettings(connection,userid,before,false)) : null;
+        const after = await this.databases.snapshot(undefined, SELECTED_GLOBAL_TABLES,
+            connection => this.globalFacts(connection,username));
+        if (!after || digest(before) !== digest(after)) throw new SnapshotError("unavailable");
+        const raw = new RawFields(true);
+        const settings = cluster ? this.settings(after,cluster,raw) : null;
+        const result: NativeJournalAuthority = Object.freeze({userid,username:requiredString(row.user),clusterid,
+            status:requiredString(row.status),statusvis:requiredString(row.statusvis),
+            journaltype:requiredString(row.journaltype),dversion:number(row.dversion),caps:unsigned(row.caps,16),
+            oldEncoding:number(row.oldenc),publicSettings:settings,fingerprint:digest([before,cluster])});
+        this.journalIssued.set(result,{username,digest:digest(result)});
+        return result;
+    }
+    async revalidateNativeJournalAuthority(snapshot: NativeJournalAuthority): Promise<boolean> {
+        const issued = this.journalIssued.get(snapshot);
+        if (!issued || digest(snapshot) !== issued.digest) return false;
+        const fresh = await this.loadNativeJournalAuthority(issued.username);
+        return fresh !== null && fresh.fingerprint === snapshot.fingerprint;
+    }
+    async loadNativeSelectedSnapshot(request: RawPageRequest): Promise<NativeSelectedSnapshot | null> {
+        const facts = await this.loadSnapshot(request, false, true);
+        if (!facts) return null;
+        const evidence = this.nativeSnapshots.get(facts)!;
+        const snapshot: NativeSelectedSnapshot = Object.freeze({encoding: "dbi-byte-view", facts,
+            oldEncoding: evidence.oldEncoding,
+            undefinedEntryEvents: evidence.undefinedEvents, sources: evidence.sources});
+        // Preserve the issued request independently of mutable parent projection
+        // work. Neither a copied wrapper nor a different store can issue authority.
+        this.nativeIssued.set(snapshot, {request: structuredClone(facts.request),
+            fingerprint: facts.fingerprint, digest: digest(snapshot)});
+        return snapshot;
+    }
+    async revalidateNativeSelectedFingerprint(snapshot: NativeSelectedSnapshot): Promise<boolean> {
+        const issued = this.nativeIssued.get(snapshot);
+        if (!issued || digest(snapshot) !== issued.digest) return false;
+        const fresh = await this.loadNativeSelectedSnapshot(issued.request);
+        return fresh !== null && fresh.facts.fingerprint === issued.fingerprint;
+    }
+    private async loadSnapshot(request: RawPageRequest, includeStyle: boolean, byteView = false): Promise<RawJournalSnapshot | null> {
+        const globalTables = includeStyle ? GLOBAL_TABLES : SELECTED_GLOBAL_TABLES;
+        const clusterTables = includeStyle ? CLUSTER_TABLES : SELECTED_CLUSTER_TABLES;
         if (!/^[a-z0-9_]{1,25}$/.test(request.username)) unsupported();
         number(request.calendarNow.year, 1, 9999); number(request.calendarNow.month, 1, 12);
         if(request.page.kind==='entry')validateCommentQuery(request.page.comments);
         const frozenRequest = structuredClone(request);
-        const initial = await this.databases.snapshot(undefined, GLOBAL_TABLES,
+        const initial = await this.databases.snapshot(undefined, globalTables,
             connection => this.globalFacts(connection, request.username));
         if (!initial) return null;
+        if (byteView && (["D","S","X"].includes(requiredString(initial.owner.statusvis)) ||
+            number(initial.owner.clusterid) === 0 || initial.owner.journaltype === "I")) unsupported();
         const ownerId = number(initial.owner.userid, 1), clusterId = number(initial.owner.clusterid, 1);
         const caps = BigInt(unsigned(initial.owner.caps, 16));
         if (caps & BigInt(this.config.capabilities.moveInProgressMask)) unsupported();
         // Planning reads only public settings/style IDs. A second cluster
         // snapshot below must match them; no private body is loaded in planning.
-        const plan = await this.databases.snapshot(clusterId, CLUSTER_TABLES, async connection => {
+        const plan = await this.databases.snapshot(clusterId, clusterTables, async connection => {
+            if (byteView) {
+                const settings = await this.clusterSettings(connection,ownerId,initial,includeStyle);
+                const adult = this.settings(initial,settings,new RawFields(true)).adult_content;
+                if (adult && adult !== "0" && adult !== "none") unsupported();
+                if (frozenRequest.page.kind === "entry" &&
+                    !await this.loadWindow(connection,ownerId,frozenRequest)) return null;
+                return settings;
+            }
             if (frozenRequest.page.kind === "entry" &&
                 !await this.loadWindow(connection, ownerId, frozenRequest)) return null;
-            return this.clusterSettings(connection, ownerId, initial);
+            return this.clusterSettings(connection, ownerId, initial, includeStyle);
         });
         if (!plan) return null;
-        const before = await this.databases.snapshot(undefined, GLOBAL_TABLES, async connection => {
+        const before = await this.databases.snapshot(undefined, globalTables, async connection => {
             const facts = await this.globalFacts(connection, request.username);
             if (!facts || digest(facts) !== digest(initial)) unsupported();
-            const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
-            const style = await this.loadStyle(connection, owner, plan, raw);
+            const raw = new RawFields(byteView), owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
+            const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             return {facts, style, raw, themeAuthors:await this.loadThemeAuthors(connection,style)};
         });
-        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...CLUSTER_TABLES,"s2compiled2"] : CLUSTER_TABLES, async connection => {
-            const current = await this.clusterSettings(connection, ownerId, before.facts);
+        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
+            const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
             if (!window) return null;
-            const raw: RawField[] = [];
+            const raw = new RawFields(byteView);
             const loaded = await this.loadEntries(connection, ownerId, window.rows,
                 window.rows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
             const statusId = before.facts.logNames.find(row => row.name === "statusvis")?.propid;
@@ -388,14 +488,14 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             !truth(target.props.opt_nocomments)&&!truth(target.props.opt_nocomments_maintainer);
         const comments=frozenRequest.page.kind==='entry' && enabled ?
             await this.loadComments(ownerId,clusterId,selected.entries[0]!.jitemid,frozenRequest,
-                unsigned(before.facts.owner.caps,16)) : undefined;
+                unsigned(before.facts.owner.caps,16),byteView) : undefined;
         const needsMoods = selected.entries.some(entry => !!entry.props.current_moodid && entry.props.current_moodid !== "0");
         const after = await this.databases.snapshot(undefined,
-            needsMoods ? [...GLOBAL_TABLES,"moods","moodthemes","moodthemedata"] : GLOBAL_TABLES, async connection => {
+            needsMoods ? [...globalTables,"moods","moodthemes","moodthemedata"] : globalTables, async connection => {
             const facts = await this.globalFacts(connection, request.username);
             if (!facts || digest(facts) !== digest(before.facts)) unsupported();
-            const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
-            const style = await this.loadStyle(connection, owner, plan, raw);
+            const raw = new RawFields(byteView), owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
+            const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
@@ -408,11 +508,28 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const rawFields = [...after.raw, ...selected.raw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
-            plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors];
-        return {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
+            plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors,
+            ...(byteView ? [number(before.facts.owner.oldenc)] : [])];
+        const result: RawJournalSnapshot = {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
+        if (byteView) {
+            const sources = [...after.raw.sources, ...selected.raw.sources, ...(comments?.sources ?? [])];
+            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
+                sources: Object.freeze(sources.map(([key,value]) => Object.freeze({key,
+                    value: value === undefined ? null : Object.freeze({base64: Buffer.from(value).toString("base64"), utf8: false as const})})))});
+        }
+        return result;
+    }
+    async revalidateSelectedFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
+        try {
+            const fresh = await this.loadSelectedSnapshot(snapshot.request);
+            return fresh !== null && fresh.fingerprint === snapshot.fingerprint;
+        } catch (error) {
+            if (error instanceof SnapshotError && error.kind === "unsupported") return false;
+            throw error;
+        }
     }
     async revalidateFingerprint(snapshot: RawJournalSnapshot): Promise<boolean> {
         try {
@@ -808,17 +925,23 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             const subjectNull = row.subject_stored === null;
             if (subjectNull !== (row.subject_original === null) ||
                 subjectNull !== (row.subject_roundtrip === null)) unsupported();
-            const subject = decodeLegacyText(
+            const subject = decodedText(rawFields,
                 subjectNull ? "" : row.subject_stored,
                 subjectNull ? "" : row.subject_original,
                 subjectNull ? "" : row.subject_roundtrip,
                 8192, 1024, false,
             );
-            const event = decodeLegacyText(
+            const event = decodedText(rawFields,
                 row.event_stored, row.event_original, row.event_roundtrip,
                 131072, 65536, true,
             );
-            totalDecoded += Buffer.byteLength(subject.text) + Buffer.byteLength(event.text);
+            totalDecoded += (rawFields instanceof RawFields && rawFields.byteView) ?
+                subject.text.length + event.text.length : Buffer.byteLength(subject.text) + Buffer.byteLength(event.text);
+            if (rawFields instanceof RawFields && rawFields.byteView) {
+                if (event.nativeUndefined) rawFields.undefinedEvents.push(id);
+                rawFields.sources.set("entry:"+id+":subject", subjectNull ? undefined : Buffer.from(subject.text,"latin1"));
+                rawFields.sources.set("entry:"+id+":event", event.nativeUndefined ? undefined : Buffer.from(event.text,"latin1"));
+            }
             if (totalDecoded > 2097152) unsupported();
             textById.set(id, { subject: subject.text, event: event.text });
             rawText.set(id, [
@@ -894,7 +1017,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         return { entries, rawText };
     }
 
-    private async loadComments(ownerId:number,clusterId:number,nodeid:number,request:RawPageRequest,caps:string):Promise<{data:RawComments;fingerprint:string}|undefined> {
+    private async loadComments(ownerId:number,clusterId:number,nodeid:number,request:RawPageRequest,caps:string,byteView=false):Promise<{data:RawComments;fingerprint:string;sources:readonly [string, Uint8Array | undefined][]}|undefined> {
         if(request.page.kind!=='entry')unsupported();
         const readHeaders=async(connection:Connection):Promise<RawCommentHeader[]>=>{
             const rows=(await sql<Row>`SELECT jtalkid,parenttalkid,posterid,state,datepost
@@ -943,7 +1066,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         const byAuthor=new Map(global.authors.map(row=>[number(row.userid,1),row]));
         const authorized=(id:number):boolean=>{const h=headers.find(h=>h.jtalkid===id)!;return !h.posterid||byAuthor.get(h.posterid)?.statusvis!=='S';};
         const full=selection.fullIds.filter(authorized),subjects=selection.subjectIds.filter(authorized);
-        const selectedIds=[...full,...subjects];const raw:RawField[]=[];
+        const selectedIds=[...full,...subjects];const raw = new RawFields(byteView);
         const texts=await this.databases.snapshot(clusterId,['talk2','talktext2','talkprop2'],async connection=>{
             if(digest(await readHeaders(connection))!==digest(headers))unsupported();
             if(!selectedIds.length)return [] as RawCommentText[];
@@ -973,7 +1096,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             let total=0;
             return rows.map(row=>{
                 const id=number(row.jtalkid,1),props=values.get(id)!;
-                if(props.unknown8bit&&props.unknown8bit!=='0')unsupported();
+                if(!byteView&&props.unknown8bit&&props.unknown8bit!=='0')unsupported();
                 const subject=decodedColumn(row,'subject','comment:'+id+':subject',raw,8192,true)??'';
                 const body=full.includes(id)?decodedColumn(row,'body','comment:'+id+':body',raw,65536,false):null;
                 total+=Buffer.byteLength(subject)+Buffer.byteLength(body??'');if(total>2097152)unsupported();
@@ -1023,7 +1146,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
         });
         if(digest(after)!==digest(global))unsupported();
         const data={headers,authors,texts};
-        return {data,fingerprint:digest([data,global,raw])};
+        return {data,fingerprint:digest([data,global,raw]),sources:[...raw.sources]};
     }
 
 
