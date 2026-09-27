@@ -55,6 +55,17 @@ export function convertMarkdown(source: string, maxBytes: number, maxTokens = 40
         if (state.level > maxDepth) throw new UnsupportedContent();
         return skip.call(this, state);
     };
+    const escapes = parser.inline.ruler.getRules("").filter(rule => rule.name === "escape");
+    if (escapes.length !== 1) throw new UnsupportedContent();
+    const escape = escapes[0]!;
+    parser.inline.ruler.at("escape", function (this: unknown, state, silent): boolean {
+        // Classic Markdown leaves this pair for the subsequent native mention
+        // pass. Declining only this match preserves both bytes as text; every
+        // other escape, including escaped backslashes, uses the original rule.
+        if (state.src.charCodeAt(state.pos) === 92 && state.src.charCodeAt(state.pos + 1) === 64)
+            return false;
+        return escape.call(this, state, silent);
+    });
     // The pinned package exposes rules through Ruler.getRules. Its maintained
     // backticks rule is named backtick; require exactly that function identity.
     const rules = parser.inline.ruler.getRules("").filter(rule => rule.name === "backtick");

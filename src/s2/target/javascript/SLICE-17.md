@@ -48,7 +48,9 @@ A delegate around the original backticks rule inspects only source spans actuall
 consumed into emitted code_inline tokens: multiline/edge-LF code spans refuse
 because classic Markdown retains their visible newline while CommonMark replaces
 it with space. Ordinary paragraph line breaks beside single-line code remain
-supported. No rule, prototype or shared parser is mutated.
+supported. No prototype or shared parser is mutated. An instance-local delegate declines only
+the exact backslash-at match in the maintained escape rule, preserving both bytes
+for native-order mention processing. All other escape grammar remains maintained.
 
 Block `div.ljcut` supports full Entry content and Recent omission. Inline cuts under
 paragraph ancestry refuse under the existing cut boundary. Raw HTML with decoded
@@ -108,7 +110,7 @@ S2_SELECTED_FIXTURE=1 S2_LIVE_TEST_ARTIFACT=/tmp/markdown-check/stock.json \
   /opt/dw-node24/bin/node --test dist/tools/editors-http.test.js
 ```
 
-The native provider keeps all31 prior editor records and separately supplies23
+The native provider keeps all31 prior editor records and separately supplies27
 compact Markdown records. The actual isolated SQL/current-child HTTP test covers
 explicit aliases and inference, private/usemask invalid bytes and foreign journal
 isolation, independent OG and editor/source during-render409 with exact restore.

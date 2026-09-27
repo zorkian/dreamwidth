@@ -73,6 +73,14 @@ test("display and inert helper independently select original Markdown context", 
         assert.deepEqual(cleaner.clean({body:"x @name",format:"markdown0",context}),
             {kind:"failure",reason:"unsupported"});
         assert.equal(cleaner.clean({body:"`@name`",format:"markdown0",context}).kind,"ok");
+        for (const [source,expected] of [["x \\@name","<p>x @name</p>\n"],
+            ["\\@name at start","<p>@name at start</p>\n"]]) {
+            const displayed=cleaner.clean({body:source,format:"markdown0",context});
+            assert.equal(displayed.kind,"ok");assert.equal(displayed.fragment.html,expected);
+            const helper=cleaner.metadata({subject:"Title",entry:{body:"!markdown\n"+source,
+                format:"html_raw0",context}});
+            assert.equal(helper.kind,"ok");assert.equal(helper.metadata.eventText,expected);
+        }
     } finally { cleaner.close(); }
 });
 

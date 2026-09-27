@@ -163,6 +163,10 @@ if ( @ARGV && $ARGV[0] eq '--markdown' ) {
         [ 'mention', { editor => 'markdown0' }, undef, 'x @name' ],
         [ 'code_mention', { editor => 'markdown0' }, undef, '`@name`' ],
         [ 'escaped_mention', { editor => 'markdown0' }, undef, 'x\@name' ],
+        [ 'escaped_space', { editor => 'markdown0' }, undef, 'x \@name' ],
+        [ 'escaped_start', { editor => 'markdown0' }, undef, '\@name at start' ],
+        [ 'magic_escaped_space', {}, undef, "!markdown\nx \\\@name" ],
+        [ 'magic_escaped_start', {}, undef, "!markdown\n\\\@name at start" ],
         [ 'email', { editor => 'markdown0' }, undef, '<mail@example.invalid>' ],
         [ 'unsafe_link', { editor => 'markdown0' }, undef, '[label](javascript:alert(1))' ],
         [ 'block_cut', { editor => 'markdown0' }, undef, '<div class="ljcut">hidden **raw**</div>' ],
@@ -171,7 +175,7 @@ if ( @ARGV && $ARGV[0] eq '--markdown' ) {
         [ 'literal_attribute', { editor => 'markdown0' }, undef, '`<div markdown="1">`' ],
         [ 'false', { editor => 'markdown0' }, undef, '0' ],
         [ 'auth', { editor => 'markdown0' }, undef, '[help](https://example.invalid/see_request?id=1&auth=TOKEN&x=2)' ],
-        [ 'preview_email', {}, undef, '!markdown' . "\n" . ('x' x 270) . ' <mail@example.invalid>' ],
+        [ 'preview_email', {}, undef, '!markdown' . "\n" . ('x' x 250) . ' <mail@example.invalid>' ],
     );
 }
 my $base     = "a\nhttp://example.invalid/?a=1&b=2\nmail\@example.invalid\n";

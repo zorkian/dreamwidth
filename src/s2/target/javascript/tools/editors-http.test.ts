@@ -197,6 +197,19 @@ test('current Markdown child renders selected originals with independent OG and 
         const raw=await get(address.port,'/users/ordinary6/76801.html');assert.equal(raw.status,200);
         assert.ok(raw.body.includes('!markdown\n**Independent OG**'));
         assert.ok(raw.body.includes('&lt;p&gt;&lt;strong&gt;Independent OG&lt;/strong&gt;&lt;/p&gt;'));
+        for(const source of ['x \\@name','\\@name at start']){
+            await setEditor('markdown0');await setBody(source);
+            const explicit=await get(address.port,'/users/ordinary6/');assert.equal(explicit.status,200);
+            assert.ok(explicit.body.includes(source.replace('\\@','@')));
+            await setEditor(null);await setBody('!markdown\n'+source);
+            const baseline=await store.loadRawSnapshot(f.request('ordinary6'));assert.ok(baseline);
+            for(const path of ['/users/ordinary6/','/users/ordinary6/76801.html']){
+                const page=await get(address.port,path);assert.equal(page.status,200,page.body);
+                assert.ok(page.body.includes(source.replace('\\@','@')));
+                if(path.endsWith('.html'))assert.ok(page.body.includes('&lt;p&gt;'+source.replace('\\@','@')+'&lt;/p&gt;'));
+            }
+            assert.equal((await store.loadRawSnapshot(f.request('ordinary6')))!.fingerprint,baseline.fingerprint);
+        }
         await setEditor('markdown0');await setBody('**Freshness Markdown**');
         const baseline=await store.loadRawSnapshot(f.request('ordinary6'));assert.ok(baseline);
         for(const change of ['source','editor']){
