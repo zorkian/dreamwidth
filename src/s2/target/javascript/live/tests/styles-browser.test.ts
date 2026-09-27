@@ -17,9 +17,9 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false, typography=false):Promise<void> {
+export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false, typography=false,baseTypography?:string):Promise<void> {
     const baseOutput=process.env.S2_STYLES_BROWSER_OUTPUT;
-    const output=baseOutput&&layout?path.join(baseOutput,layout+(typography?"-typography":modules?"-modules":"")):baseOutput;
+    const output=baseOutput&&layout?path.join(baseOutput,layout+(baseTypography?"-base-"+baseTypography:typography?"-typography":modules?"-modules":"")):baseOutput;
     if(!output) return;
     const appOrigin="http://localhost:8080";
     const pageUrl=`http://localhost:${port}/users/ordinary6/76801.html`;
@@ -67,6 +67,9 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
         assert.equal((await page.goto(pageUrl,{waitUntil:"networkidle"})).status(),200);
         const state=await page.evaluate(()=>({background:getComputedStyle(document.body).backgroundColor,
             font:getComputedStyle(document.body).fontFamily,
+            bodySize:getComputedStyle(document.body).fontSize,
+            primarySize:getComputedStyle(document.querySelector('#primary')!).fontSize,
+            primaryColor:getComputedStyle(document.querySelector('#primary')!).color,
             moduleFont:getComputedStyle(document.querySelector('.module-content')!).fontFamily,
             sectionOrder:[...document.querySelectorAll('#secondary,#primary,#tertiary')].map(node=>node.id),
             padding:getComputedStyle(document.querySelector('.entry .inner')!).padding,
@@ -79,7 +82,7 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             tagAfterCredit:!!(document.querySelector('.module-credit')!.compareDocumentPosition(document.querySelector('.module-tags_list, .module-tags_cloud, .module-tags_multilevel')!)&Node.DOCUMENT_POSITION_FOLLOWING),
             journalStyles:[...document.querySelectorAll('link[rel=stylesheet]')].map(node=>(node as HTMLLinkElement).href).filter(url=>/\/res\//.test(url))}));
         assert.equal(state.background,'rgb(18, 52, 86)');
-        if(layout==='easyread'){assert.equal(state.font,'"Times New Roman"');assert.ok(state.moduleFont.startsWith('Georgia'));assert.deepEqual(state.sectionOrder,['secondary','primary','tertiary']);}
+        if(layout==='easyread'){assert.equal(state.font,'"Times New Roman"');if(!baseTypography)assert.ok(state.moduleFont.startsWith('Georgia'));assert.deepEqual(state.sectionOrder,['secondary','primary','tertiary']);}
         else{assert.ok(state.font.includes('Georgia'));assert.equal(state.padding,'8px');}
         assert.deepEqual(state.journalStyles,[]);
         assert.ok(state.tags?.includes('Visible tag'));
@@ -97,6 +100,18 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             assert.equal(state.typography['.entry .entry-title'].size,'19.2px');
             assert.equal(state.typography['.module h2'].size,'20px');
         }
+        let contrast:unknown;
+        if(baseTypography) {
+            assert.equal(state.bodySize,baseTypography==='family-size'?'20px':'16px');
+            assert.equal(state.primarySize,baseTypography==='family-size'?'25px':'16px');
+            assert.equal(state.primaryColor,'rgb(205, 193, 172)');
+            assert.ok(state.typography['.module-content'].family.endsWith('serif')||baseTypography==='neither');
+            contrast=await page.evaluate(()=>{
+                document.body.style.color='rgb(255, 0, 0)';return getComputedStyle(document.querySelector('#primary')!).color;
+            });
+            assert.equal(contrast,baseTypography==='neither'?'rgb(255, 0, 0)':'rgb(205, 193, 172)');
+            await page.evaluate(()=>{document.body.style.removeProperty('color');});
+        }
         mkdirSync(output,{recursive:true});
         await page.screenshot({path:path.join(output,"entry-styles.png"),fullPage:true});
 
@@ -105,7 +120,7 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
         writeFileSync(path.join(output,"browser.json"),JSON.stringify({pageUrl,fixtureStyle:44,
             htmlSha256:createHash("sha256").update(html).digest("hex"),
             retainedPageSha256:null,screenshot:path.join(output,"entry-styles.png"),
-            stylesheetMapping:{inline:true,retainedJournalStylesheet:false},links:state,
+            baseTypography,contrast,stylesheetMapping:{inline:true,retainedJournalStylesheet:false},links:state,
             resources:[...requested].map(url=>({url,source:assets.get(url)!.source,
                 sha256:createHash("sha256").update(assets.get(url)!.body).digest("hex")})),failures},null,2)+"\n");
     }finally{await context.close();await browser.close();}

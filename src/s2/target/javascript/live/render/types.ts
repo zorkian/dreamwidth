@@ -128,7 +128,7 @@ export type RenderPage =
 // consumes body HTML in body context and inert metadata at the escaped OG
 // attribute boundary. Neither fragment nor helper string returns to the parent.
 export interface RenderContentPreparation {
-    stylesheet?(source:string):string;
+    stylesheet?(source:string,expectation?:{pageFont:string;entryColor:string}):string;
     fontFamily?(source:string):void;
     fontSize?(source:string):void;
     customtext?(source:string):string;

@@ -129,4 +129,20 @@ for my$value("15em", "1.5em", "junk15em", "0", "bad", "15bogus", "-5px", "0em") 
   my($name,@args)=@$case;push @rows,{name=>'typography-helper',case=>$name,args=>\@args,output=>S2::run_function($ctx,'generate_font_css(string,string,string,string,string)',@args)};
  }
 }
+{
+ my $source='layerinfo type = "user"; set font_fallback = "serif"; set font_base_size = "1.25"; set font_base_units = "em";';
+ my $output='';$compiler->compile_source({source=>\$source,type=>'user',layerid=>990007,output=>\$output,format=>'perl',builtinPackage=>'S2::Builtin::LJ'});
+ S2::load_layer(990007,$output,123);
+ for my $case(['family-size','serif','1.25'],['family-only','serif',''],['size-only','','1.25'],['neither','',''],['tabula-control','serif','1.25']) {
+  my($name,$fallback,$size)=@$case;
+  my @layers=$name eq 'tabula-control'?(980001,980002,980003,990007):(990001,990002,990003,990007);
+  my $ctx=S2::make_context(@layers);my $p=$ctx->[S2::PROPS];
+  $p->{font_base}='';$p->{font_fallback}=$fallback;$p->{font_base_size}=$size;
+  S2::run_code($ctx,'prop_init()');LJ::S2::escape_all_props($ctx,\@layers);
+  my $css='';S2::set_output(sub{$css.=$_[0]});S2::set_output_safe(sub{$css.=$_[0]});
+  for my $fn(qw(Page::print_contextual_stylesheet() Page::print_default_stylesheet() print_stylesheet() Page::print_theme_stylesheet())){S2::run_code($ctx,$fn,{_type=>'RecentPage',view=>'recent'});}
+  push @rows,{name=>'base-typography',case=>$name,compiled=>$output,css=>$css,
+   pageFont=>S2::run_function($ctx,'generate_font_css(string,string,string,string)',map{$p->{$_}}qw(font_base font_fallback font_base_size font_base_units))};
+ }
+}
 print JSON::PP->new->canonical->utf8->encode(\@rows);

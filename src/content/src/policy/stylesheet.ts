@@ -70,14 +70,31 @@ export function validateStockFontSize(source:string):void {
 // Only the qualified EasyRead+Aqua stock generator has this native-invalid
 // output. Browser CSSOM discards these complete declarations/rule. Account for
 // every error/Raw by maintained source locations before omitting anything.
-function omitEasyReadInvalid(source:string):string {
+export interface StockFontExpectation {pageFont:string;entryColor:string}
+function omitEasyReadInvalid(source:string,expectation?:StockFontExpectation):string {
+    let family:string|undefined,size:string|undefined;
+    if(expectation) {
+        if(expectation.entryColor!=="color: #cdc1ac")throw new UnsupportedContent();
+        const font=tree.parse(expectation.pageFont,{context:"declarationList",positions:true,
+            onParseError(){throw new UnsupportedContent();}});
+        tree.walk(font,node=>{
+            if(node.type!=="Declaration")return;
+            if(node.value.type!=="Value"||!node.loc)throw new UnsupportedContent();
+            const value=expectation.pageFont.slice(node.loc.start.offset+node.property.length+2,node.loc.end.offset);
+            if(node.property==="font-family"&&family===undefined){validateStockFontFamily(value);family=value;}
+            else if(node.property==="font-size"&&size===undefined){validateStockFontSize(value);size=value;}
+            else throw new UnsupportedContent();
+        });
+        if(expectation.pageFont!==(family===undefined?"":`font-family: ${family}; `)+
+            (size===undefined?"":`font-size: ${size};`))throw new UnsupportedContent();
+    }
     const errors:{offset:number;message:string}[]=[];
     const ast=tree.parse(source,{context:"stylesheet",positions:true,
         onParseError(error){errors.push({offset:error.offset,message:error.message});}});
     const ranges:{start:number;end:number}[]=[];
     const fontOffsets:number[]=[];
     const fonts=new Set<string>();
-    let separators=0,colors=0,firstRules=0,count=0,depth=0;
+    let separators=0,colors=0,firstRules=0,emptyFonts=0,count=0,depth=0;
     const span=(node:tree.CssNode):{start:number;end:number}=>{
         if(!node.loc)throw new UnsupportedContent();
         return {start:node.loc.start.offset,end:node.loc.end.offset};
@@ -89,20 +106,40 @@ function omitEasyReadInvalid(source:string):string {
             const location=span(node);
             if(this.declaration?.property==="font-family"&&
                 ["#primary,#secondary,#tertiary,#footer","body"].includes(selector)&&
-                node.value.startsWith("font-family: ")&&!fonts.has(selector)) {
-                const family=node.value.slice("font-family: ".length);
-                validateStockFontFamily(family);
-                // The generator immediately emits its fixed size after the
-                // malformed family; never remove siblings through a Raw span.
-                if(!source.slice(location.end).startsWith("; font-size: 1em;"))throw new UnsupportedContent();
+                !fonts.has(selector)) {
                 const declaration=span(this.declaration);
-                if(source.slice(declaration.start,location.start)!=="font-family: ")throw new UnsupportedContent();
-                fonts.add(selector);fontOffsets.push(location.start+"font-family".length);
-                ranges.push({...declaration,end:declaration.end+1});
-            } else if(!this.declaration&&selector==="body"&&node.value===";"&&
-                source.slice(location.start-15,location.start)==="font-size: 1em;") {
+                if(source.slice(declaration.start,location.start)!==(expectation&&family===undefined&&size===undefined?"font-family: \n    ":"font-family: "))throw new UnsupportedContent();
+                if(expectation) {
+                    const neither=family===undefined&&size===undefined;
+                    const expected=family!==undefined?`font-family: ${family}`:
+                        size!==undefined?`font-size: ${size}`:expectation.entryColor;
+                    if(source.slice(declaration.start,declaration.end)!=="font-family: "+(neither?"\n    ":"")+expected||neither&&selector==="body")throw new UnsupportedContent();
+                    const prefix=family!==undefined?"font-family":size!==undefined?"font-size":"color";
+                    fontOffsets.push(location.start+prefix.length);
+                    const tail=family!==undefined?(size===undefined?"; ":`; font-size: ${size};`):";";
+                    if(!source.slice(declaration.end).startsWith(tail))throw new UnsupportedContent();
+                    if(neither&&source.slice(declaration.start,declaration.end)!==
+                        "font-family: \n    "+expectation.entryColor)throw new UnsupportedContent();
+                } else {
+                    if(!node.value.startsWith("font-family: "))throw new UnsupportedContent();
+                    validateStockFontFamily(node.value.slice("font-family: ".length));
+                    if(!source.slice(location.end).startsWith("; font-size: 1em;"))throw new UnsupportedContent();
+                    fontOffsets.push(location.start+"font-family".length);
+                }
+                if(source[declaration.end]!==";")throw new UnsupportedContent();
+                fonts.add(selector);ranges.push({...declaration,end:declaration.end+1});
+            } else if(!this.declaration&&selector==="body"&&node.value===";") {
+                const preceding=expectation?.pageFont??"font-family: unused; font-size: 1em;";
+                if(expectation&&preceding===""||!source.slice(0,location.start).endsWith(
+                    expectation?preceding:"font-size: 1em;"))throw new UnsupportedContent();
                 separators++;ranges.push(location);
             } else throw new UnsupportedContent();
+        }
+        if(expectation&&family===undefined&&size===undefined&&node.type==="Declaration"&&node.property==="font-family"&&
+            node.value.type==="Value"&&node.value.children.isEmpty) {
+            const location=span(node);
+            if(selector!=="body"||source.slice(location.start,location.end)!=="font-family: "||source[location.end]!==";")throw new UnsupportedContent();
+            emptyFonts++;ranges.push({...location,end:location.end+1});
         }
         if(node.type==="Declaration"&&node.property==="color"&&node.value.type==="Value"&&node.value.children.isEmpty) {
             if(selector!==".ContextualPopup a:hover")throw new UnsupportedContent();
@@ -115,21 +152,23 @@ function omitEasyReadInvalid(source:string):string {
             firstRules++;ranges.push(span(node));
         }
     },leave(){depth--;}});
-    if(fonts.size!==2||separators!==1||colors!==1||firstRules!==1||errors.length!==2||
+    const neither=expectation!==undefined&&family===undefined&&size===undefined;
+    if(fonts.size!==(neither?1:2)||emptyFonts!==(neither?1:0)||separators!==(neither?0:1)||colors!==1||firstRules!==1||errors.length!==(neither?1:2)||
         errors.some(error=>error.message!=="Unexpected input"||!fontOffsets.includes(error.offset))||
-        new Set(errors.map(error=>error.offset)).size!==2)throw new UnsupportedContent();
+        new Set(errors.map(error=>error.offset)).size!==(neither?1:2))throw new UnsupportedContent();
     let result=source;
     for(const range of ranges.sort((a,b)=>b.start-a.start))result=result.slice(0,range.start)+result.slice(range.end);
     return result;
 }
 
-export function cleanStockStylesheet(source:string, policy?:"easyread-aqua"):string {
+export function cleanStockStylesheet(source:string, policy?:"easyread-aqua",expectation?:StockFontExpectation):string {
     if(Buffer.byteLength(source)>65536)throw new UnsupportedContent();
     safeText(source);
     // The qualified retained ProxyCSSLinks callback scans raw strings/comments,
     // not CSS nodes. It is an identity only without this literal byte trigger.
     if(/\burl\(/i.test(source))throw new UnsupportedContent();
-    if(policy==="easyread-aqua")source=omitEasyReadInvalid(source);
+    if(expectation&&policy!=="easyread-aqua")throw new UnsupportedContent();
+    if(policy==="easyread-aqua")source=omitEasyReadInvalid(source,expectation);
     let count=0,depth=0;
     const ast=tree.parse(source,{context:"stylesheet",parseCustomProperty:true,
         onParseError(){throw new UnsupportedContent();}});
