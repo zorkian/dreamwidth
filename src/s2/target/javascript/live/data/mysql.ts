@@ -217,6 +217,7 @@ function header(row: Row, journalid: number): RawEntryHeader {
 interface NativeSnapshotEvidence {
     readonly oldEncoding: number;
     readonly stickyEntryCount: number;
+    readonly recentSelection: NativeSelectedSnapshot["recentSelection"];
     readonly undefinedEvents: readonly number[];
     readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
 }
@@ -392,7 +393,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         if (!facts) return null;
         const evidence = this.nativeSnapshots.get(facts)!;
         const snapshot: NativeSelectedSnapshot = Object.freeze({encoding: "dbi-byte-view", facts,
-            oldEncoding: evidence.oldEncoding, stickyEntryCount:evidence.stickyEntryCount,
+            oldEncoding: evidence.oldEncoding, stickyEntryCount:evidence.stickyEntryCount, recentSelection:evidence.recentSelection,
             undefinedEntryEvents: evidence.undefinedEvents, sources: evidence.sources});
         // Preserve the issued request independently of mutable parent projection
         // work. Neither a copied wrapper nor a different store can issue authority.
@@ -555,7 +556,14 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
         if (byteView) {
             const sources = [...after.raw.sources, ...selected.raw.sources, ...(comments?.sources ?? [])];
-            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), stickyEntryCount:stickyRows.length, undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
+            const recentSelection = visibility && selected.selection.kind==="recent" ? Object.freeze({
+                showStickies: selected.selection.pageSkip===0,
+                window: Object.freeze(visibility.window.rows.map(row=>Object.freeze({
+                    jitemid:number(row.jitemid,1),anum:number(row.anum,0,255),eventtime:civilTime(row.eventtime),
+                    countedSticky:visibility.activeIds.includes(String(number(row.jitemid,1)*256+number(row.anum,0,255)))})))
+            }) : undefined;
+            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), stickyEntryCount:stickyRows.length,
+                recentSelection, undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
                 sources: Object.freeze(sources.map(([key,value]) => Object.freeze({key,
                     value: value === undefined ? null : Object.freeze({base64: Buffer.from(value).toString("base64"), utf8: false as const})})))});
         }

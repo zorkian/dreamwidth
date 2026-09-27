@@ -304,6 +304,12 @@ export interface NativeSelectedSnapshot {
     readonly facts: RawJournalSnapshot;
     /** Leading displayed sticky entries; the original pagination window is unchanged. */
     readonly stickyEntryCount?:number;
+    /** Source-counted window, including skipped sticky/hidden headers, never their text. */
+    readonly recentSelection?:{
+        readonly showStickies:boolean;
+        readonly window:readonly {readonly jitemid:number;readonly anum:number;
+            readonly eventtime:string;readonly countedSticky:boolean}[];
+    };
     readonly undefinedEntryEvents: readonly number[];
     // Parent-only reached DB text cells, before unknown8bit/cleaner transforms.
     // Child projection must select approved public fields; never send this bag.

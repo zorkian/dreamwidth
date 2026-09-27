@@ -14,6 +14,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import {projectGeneralRecentSelection} from "../live/domain/general-recent-selection";
 import {execFileSync} from "node:child_process";
 import {withSelectedFixture} from "./selected-fixture";
 
@@ -45,6 +46,10 @@ test("actual sticky selection prepends visible old/window entries without hidden
         await set("257,76545");
         const first=await recent();assert.ok(first);assert.equal(first.stickyEntryCount,2);
         assert.deepEqual(first.facts.entries.map(entry=>entry.jitemid),[1,299,300,298]);
+        const projected=projectGeneralRecentSelection(first,entry=>({id:entry.jitemid}));
+        assert.deepEqual(projected.stickyEntries,[{id:1},{id:299}]);
+        assert.deepEqual(projected.window.map(cell=>[cell.entry?.id,cell.countedSticky]),[[300,false],[undefined,true],[298,false]]);
+        assert.equal(projected.hasLookahead,true);assert.equal(projected.showStickies,true);
         assert.equal(first.facts.selection.kind,"recent");
         if(first.facts.selection.kind==="recent")assert.deepEqual(first.facts.selection.window.map(row=>row.jitemid),[298,299,300,297]);
         assert.equal(await store.revalidateNativeSelectedFingerprint(first),true);
@@ -60,6 +65,10 @@ test("actual sticky selection prepends visible old/window entries without hidden
         assert.equal(mismatch.facts.entries[0]?.jitemid,1);
         assert.equal(mismatch.facts.entries[0]?.anum,5);
         assert.equal(mismatch.facts.entries.filter(entry=>entry.jitemid===1).length,2);
+        const mismatchProjection=projectGeneralRecentSelection(mismatch,entry=>({id:entry.jitemid,anum:entry.anum}));
+        const repeated=mismatchProjection.window.find(cell=>cell.entry?.id===1)!.entry!;
+        assert.deepEqual(repeated,{id:1,anum:5});
+        assert.notEqual(repeated,mismatchProjection.stickyEntries[0]);
         const [nativeRows]=await admin.query(`SELECT * FROM ${table(c,"log2")} WHERE journalid=900001 AND jitemid=1`);
         const loadingOracle=String.raw`use strict;use warnings;no warnings 'once';
             use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
@@ -84,6 +93,8 @@ test("actual sticky selection prepends visible old/window entries without hidden
         await admin.query(`DELETE FROM ${table(c,"logtext2")} WHERE journalid=900001 AND jitemid IN (1,299)`);
         const hidden=await recent();assert.ok(hidden);assert.equal(hidden.stickyEntryCount,0);
         assert.deepEqual(hidden.facts.entries.map(entry=>entry.jitemid),[300,298]);
+        const reached:number[]=[];projectGeneralRecentSelection(hidden,entry=>{reached.push(entry.jitemid);return entry.jitemid;});
+        assert.deepEqual(reached,[300,298]);
         assert.equal(hidden.sources.some(cell=>/^entry:(?:1|299):(?:subject|event)$/.test(cell.key)),false);
         assert.equal(await store.revalidateNativeSelectedFingerprint(first),false);
         assert.equal(await store.revalidateNativeSelectedFingerprint(hidden),true);
