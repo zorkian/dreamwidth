@@ -14,10 +14,14 @@
 
 import test from 'node:test';
 import {execFileSync} from 'node:child_process';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {ArtifactCompiler} from '../live/render/layer-artifact';
 import {nativeCharacterClass, type NativeProfile} from '../runtime/native-profile';
 import assert from 'node:assert/strict';
 import {NativeString, NativeOutput, byteCharacters, reverseString, concatStrings,
-    builtinSubstr, caseString, endsWith, splitString} from '../runtime/native-string';
+    builtinSubstr, caseString, endsWith, splitString, characterCodepoint} from '../runtime/native-string';
 import {NativeNumber, arithmetic, divide, numericCompare, arrayIndex, intCast,
     incrementNumber} from '../runtime/native-number';
 import {Context, runtime} from '../runtime/s2runtime';
@@ -130,4 +134,95 @@ test('installed Perl /d character classes preserve byte flags and Unicode versio
     assert.equal(nativeCharacterClass(profile, 'word', 0x1c89, true), false);
     assert.equal(nativeCharacterClass(profile, 'word', -1, true), false);
     assert.equal(nativeCharacterClass(profile, 'space', 1.5, true), false);
+});
+
+
+test('installed digit profile matches independent /d byte and flagged regex', () => {
+    const extracted = JSON.parse(execFileSync('perl', ['tools/compile-active.pl'], {
+        input: JSON.stringify({profileOnly: true}), encoding: 'utf8', timeout: 10000,
+        maxBuffer: 1048576,
+    }));
+    const profile: NativeProfile = extracted.profile;
+    const unicode = [0x30, 0x39, 0x3a, 0xb2, 0x660, 0x6f9, 0x966, 0x969,
+        0x2160, 0xff10, 0x1d7ce, 0x1e950, 0x11f50, 0x1e4f0, 0x10ffff];
+    const rows = [...Array.from({length:256}, (_,cp)=>[cp,0]), ...unicode.map(cp=>[cp,1])];
+    const native = JSON.parse(execFileSync('perl', ['-MJSON::PP', '-e', `
+        my $rows=JSON::PP->new->decode(do {local $/;<STDIN>});my @out;
+        for my $row (@$rows) {my $s=chr($row->[0]);utf8::upgrade($s) if $row->[1];
+            push @out, ($s =~ /\\d/ ? 1:0);}
+        print JSON::PP->new->encode(\\@out);
+    `], {input:JSON.stringify(rows),encoding:'utf8',timeout:5000,maxBuffer:65536}));
+    for (const [i,[cp,flag]] of rows.entries())
+        assert.equal(nativeCharacterClass(profile,'digit',cp!,!!flag),!!native[i],`U+${cp!.toString(16)} flag${flag}`);
+    assert.deepEqual(profile.digit.byte,[48,58]);
+    assert.equal(nativeCharacterClass(profile,'digit',0x11f50,true),false);
+    assert.equal(nativeCharacterClass(profile,'digit',0x1e4f0,true),false);
+});
+
+
+test('native ASCII-letter /i class is distinct from upper/lower conversion', () => {
+    const extracted = JSON.parse(execFileSync('perl', ['tools/compile-active.pl'], {
+        input:JSON.stringify({profileOnly:true}),encoding:'utf8',timeout:10000,maxBuffer:1048576,
+    }));
+    const profile: NativeProfile = extracted.profile;
+    const rows = [...Array.from({length:256},(_,cp)=>[cp,0]),
+        ...[0x41,0x5a,0x61,0x7a,0xdf,0x130,0x131,0x17f,0x212a,0xe9,0x1c89].map(cp=>[cp,1])];
+    const native = JSON.parse(execFileSync('perl',['-MJSON::PP','-e',`
+        my $rows=JSON::PP->new->decode(do{local $/;<STDIN>});my @out;
+        for my $row (@$rows){my $s=chr($row->[0]);utf8::upgrade($s) if $row->[1];
+            push @out,($s =~ /[a-z]/i ? 1:0);}
+        print JSON::PP->new->encode(\\@out);
+    `],{input:JSON.stringify(rows),encoding:'utf8',timeout:5000,maxBuffer:65536}));
+    for(const [i,[cp,flag]] of rows.entries())
+        assert.equal(nativeCharacterClass(profile,'asciiLetterInsensitive',cp!,!!flag),!!native[i]);
+    assert.equal(nativeCharacterClass(profile,'asciiLetterInsensitive',0x17f,true),true);
+    assert.equal(nativeCharacterClass(profile,'asciiLetterInsensitive',0x212a,true),true);
+    assert.equal(nativeCharacterClass(profile,'asciiLetterInsensitive',0x131,true),false);
+});
+
+
+test('characterCodepoint uses branded native spans without decoding replacement', () => {
+    assert.equal(characterCodepoint(NativeString.bytes(Buffer.from([255]))),255n);
+    assert.equal(characterCodepoint(NativeString.hostUnicode('猫')),0x732bn);
+    assert.equal(characterCodepoint(NativeString.hostUnicode('😀')),0x1f600n);
+    const raw = JSON.parse(execFileSync('perl',['-MJSON::PP','-e',`
+        my $s=chr(0x100000000); utf8::upgrade($s);my $hex;
+        {use bytes;$hex=unpack('H*',substr($s,0));}
+        print JSON::PP->new->encode([$hex,ord($s).'']);
+    `],{encoding:'utf8',timeout:5000,maxBuffer:65536}));
+    assert.equal(characterCodepoint(NativeString.flagged(Buffer.from(raw[0],'hex'))),BigInt(raw[1]));
+    const extracted = JSON.parse(execFileSync('perl',['tools/compile-active.pl'],{
+        input:JSON.stringify({profileOnly:true}),encoding:'utf8',timeout:10000,maxBuffer:1048576}));
+    assert.equal(nativeCharacterClass(extracted.profile,'digit',Number(BigInt(raw[1])),true),false);
+    assert.throws(()=>characterCodepoint(NativeString.bytes(Buffer.alloc(0))));
+    assert.throws(()=>characterCodepoint(NativeString.bytes(Buffer.from([1,2]))));
+    assert.throws(()=>characterCodepoint(NativeString.hostUnicode('ab')));
+    assert.throws(()=>characterCodepoint(Object.create(NativeString.prototype)));
+});
+
+
+test('compiler validates and binds new native classes in the installed profile', () => {
+    const extracted = JSON.parse(execFileSync('perl',['tools/compile-active.pl'],{
+        input:JSON.stringify({profileOnly:true}),encoding:'utf8',timeout:10000,maxBuffer:1048576}));
+    const directory = mkdtempSync(join(tmpdir(),'gcss-profile-'));
+    const fixture = join(directory,'profile.json'), launcher = join(directory,'profile-launcher');
+    // A fixed test producer lets the actual constructor exercise its boundary;
+    // it is never installed or used as a compilation/serving authority.
+    writeFileSync(launcher,'#!'+process.execPath+'\nprocess.stdout.write(require("node:fs").readFileSync('+JSON.stringify(fixture)+'));\n',{mode:0o755});
+    const instantiate = () => new ArtifactCompiler({s2Root:resolve('../..'),perl:'/usr/bin/perl',isolationExecutable:launcher});
+    try {
+        writeFileSync(fixture,JSON.stringify(extracted));
+        const original = instantiate();
+        assert.deepEqual(original.scalarProfile.digit,extracted.profile.digit);
+        assert.ok(Object.isFrozen(original.scalarProfile.asciiLetterInsensitive.unicode));
+        for(const kind of ['digit','asciiLetterInsensitive']) {
+            const missing = structuredClone(extracted);delete missing.profile[kind];
+            writeFileSync(fixture,JSON.stringify(missing));assert.throws(instantiate);
+            const malformed = structuredClone(extracted);malformed.profile[kind].byte=[48,48];
+            writeFileSync(fixture,JSON.stringify(malformed));assert.throws(instantiate);
+        }
+        const changed = structuredClone(extracted);changed.profile.digit.byte=[48,57];
+        writeFileSync(fixture,JSON.stringify(changed));
+        assert.notEqual(instantiate().digest,original.digest);
+    } finally {rmSync(directory,{recursive:true,force:true});}
 });

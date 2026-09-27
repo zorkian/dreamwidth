@@ -83,7 +83,7 @@ function validateProfile(value:any):NativeProfile {
         }
         Object.freeze(map.ranges);Object.freeze(map.values);Object.freeze(map);
     }
-    for(const name of ["word","space"]) {
+    for(const name of ["word","space","digit","asciiLetterInsensitive"]) {
         const classes=value[name];
         if(!classes||typeof classes!=="object")throw new CompilerFailure();
         for(const mode of ["byte","unicode"]) {
