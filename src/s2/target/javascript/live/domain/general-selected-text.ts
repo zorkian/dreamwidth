@@ -336,8 +336,9 @@ export class GeneralSelectedText {
         if(!['A','F','S','D'].includes(header.state))throw Error("Invalid selected comment state");
         const author=raw?.authors.find(row=>row.userid===header.posterid);
         const props=converted.props;
-        const pictureKeyword=author&&author.dversion>=9&&scalarTruthy(props.picture_mapid)?
-            this.mapKeyword(author.userid,author.pictures,props.picture_mapid!):props.picture_keyword;
+        const pictureKeyword=author&&author.dversion>=9?
+            scalarTruthy(props.picture_mapid)?this.mapKeyword(author.userid,author.pictures,props.picture_mapid!):
+                undefined:props.picture_keyword;
         return Object.freeze({state:header.state as 'A'|'F'|'S'|'D',show:header.state==='A'||header.state==='F',
             posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==='S',
             loaded:comment.body!==null||this.metadataOnlyComments.has(comment),
