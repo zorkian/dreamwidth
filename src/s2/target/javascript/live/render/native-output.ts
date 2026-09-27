@@ -14,6 +14,7 @@
 
 import {createPageOutput} from '@dreamwidth/content/page-output';
 import {NativeOutput, NativeString, type NativePVFrame} from '../../runtime/native-string';
+import {isNativeExecutionStop} from '../../runtime/native-scalar';
 import {type NativeSink} from '../../runtime/native-scalar';
 
 export type NativeOutputOptions = Omit<Parameters<typeof createPageOutput>[0], 'output'>;
@@ -36,7 +37,10 @@ export function createNativeOutput(options: NativeOutputOptions): NativePageOutp
     function operate<T>(operation: () => T): T {
         if (state !== 'open') throw new Error('Native page output is terminal');
         try { return operation(); }
-        catch (error) { state = 'failed'; throw error; }
+        catch (error) {
+            if (!isNativeExecutionStop(error)) state = 'failed';
+            throw error;
+        }
     }
     const sink: NativeSink = Object.freeze({
         ownsPrintCheckpoints: true as const,

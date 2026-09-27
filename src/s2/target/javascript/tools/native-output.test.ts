@@ -21,6 +21,7 @@ import {tmpdir} from 'node:os';
 import {runInNewContext} from 'node:vm';
 import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
 import {recoverActiveLayer} from '../live/render/recovery';
+import {isNativeExecutionStop} from '../runtime/native-scalar';
 import {createNativeOutput, type NativeOutputOptions} from '../live/render/native-output';
 import {Context,Layer,s2} from '../runtime/s2runtime';
 import {NativeString} from '../runtime/native-string';
@@ -61,7 +62,7 @@ test('runtime error omits eof and terminalizes open CSS',()=>{
     assert.throws(()=>page.finish(),/terminal/);
 });
 
-interface Oracle {sources:string[];codes:string[];ok:number;base64:string;flag:number;
+interface Oracle {recursive:{ok:number;base64:string};sources:string[];codes:string[];ok:number;base64:string;flag:number;
     errors:{id:string;ctype:string;ok:number;base64:string;flag:number}[];}
 const oracle=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-native-output/native.pl')],
     {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as Oracle;
@@ -71,7 +72,17 @@ test('native program error completion preserves pending marker/CSS ordering with
         const page=createNativeOutput({...options(),contentType:row.ctype});
         if(row.id==='pending')page.sink.safe(bytes('<a href="tail'));
         else if(row.id==='nested'){page.startCss();page.startCss();page.sink.safe(bytes('p{color:red}'));}
-        else page.sink.safe(bytes('p{color:red}'));
+        else if(row.id==='css')page.sink.safe(bytes('p{color:red}'));
+        else {
+            let ctx:Context;const layer=new Layer();
+            layer.functions.set('main()',()=>{for(let n=0;n<8;n++)ctx.print(bytes('x'));});
+            const checkpointPage=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
+            ctx=new Context([layer],()=>{},undefined,undefined,undefined,1,checkpointPage.sink);
+            assert.throws(()=>ctx.runFunction('main()'),isNativeExecutionStop);
+            const result=checkpointPage.runtimeError(bytes('<b>Error running style:</b> fixed failure<br />\n'));
+            assert.deepEqual(Buffer.from(result.bytes),Buffer.from(row.base64,'base64'));
+            continue;
+        }
         const result=page.runtimeError(bytes('<b>Error running style:</b> fixed failure<br />\n'));
         assert.deepEqual(Buffer.from(result.bytes),Buffer.from(row.base64,'base64'),row.id);
         assert.equal(result.utf8,!!row.flag);assert.throws(()=>page.sink.raw(bytes('late')),/terminal/);
@@ -104,12 +115,32 @@ test('source-proven and recovered actual program preserves defining-layer safe/r
             const layer=runInNewContext(result.code+';recovered_layer;',{s2},{timeout:5000}) as Layer;
             layer.scalarProfile=compiler.scalarProfile;return layer;
         });
-        for(const layers of [instantiateProgram(compiled.program),recovered]) {
+        for(const [route,layers] of [instantiateProgram(compiled.program),recovered].entries()) {
             let ctx:Context;const page=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
             ctx=new Context(layers,()=>{throw Error('legacy output used');},undefined,undefined,undefined,500,page.sink);
             ctx.runFunction('main()');const output=page.finish();
             assert.deepEqual(Buffer.from(output.bytes),Buffer.from(oracle.base64,'base64'));
             assert.equal(output.utf8,!!oracle.flag);
+            let recursiveContext:Context;
+            const recursivePage=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
+            recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,recursivePage.sink);
+            let stopped:unknown;try{recursiveContext.runFunction('recursive()');}catch(error){stopped=error;}
+            assert.equal(isNativeExecutionStop(stopped),true);
+            const diagnostic=bytes('<b>Error running style:</b> Died in S2::run_code running recursive(): Excessive recursion detected and stopped.<br />\n<br />\n');
+            assert.equal(oracle.recursive.ok,0);
+            const partial=Buffer.from(recursivePage.runtimeError(diagnostic).bytes);
+            const nativePartial=Buffer.from(oracle.recursive.base64,'base64');
+            // Existing Context function-name recursion differs from native caller-location
+            // counting. Preserve the exact independent discrepancy, not normalized parity.
+            assert.equal(nativePartial.length,277);
+            console.log(JSON.stringify({proof:'actual-recursion-count-gap',route:route===0?'source':'recovered',configuredRecursion:50,actualBase64:partial.toString('base64'),nativeBase64:nativePartial.toString('base64'),actualBytes:partial.length,nativeBytes:nativePartial.length}));
+            assert.deepEqual(partial.subarray(partial.indexOf(60)),nativePartial.subarray(nativePartial.indexOf(60)));
+            assert.equal(partial.subarray(0,partial.indexOf(60)).every(byte=>byte===120),true);
+            const capture=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
+            capture.startCss();
+            recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,capture.sink);
+            assert.throws(()=>recursiveContext.runFunction('recursive()'),isNativeExecutionStop);
+            assert.deepEqual(Buffer.from(capture.runtimeError(diagnostic).bytes),Buffer.alloc(0));
         }
     } finally {rmSync(directory,{recursive:true,force:true});}
 });
@@ -129,4 +160,28 @@ test('legacy/default sink cadence remains Context-owned; declaration captured on
     const ordinary=new Context([],()=>{},undefined,undefined,undefined,500,sink);
     ordinary.recoveryCheckpoint=()=>{checks++;};sink.ownsPrintCheckpoints=true;
     for(let n=0;n<8;n++)ordinary.print(bytes('x'));assert.equal(checks,3);
+});
+
+test('private execution-stop authority cannot be forged by author-like error data',()=>{
+    for(const error of [new Error('Excessive S2 recursion'),new Error('S2 execution timed out'),
+        Object.assign(new Error('stop'),{nativeExecutionStop:true}),Object.create(Error.prototype)]) {
+        assert.equal(isNativeExecutionStop(error),false);
+        const page=createNativeOutput(options(()=>{throw error;}));
+        for(let n=0;n<7;n++)page.sink.raw(bytes('x'));
+        assert.throws(()=>page.sink.raw(bytes('x')));
+        assert.throws(()=>page.runtimeError(bytes('diagnostic')),/terminal/);
+    }
+});
+test('actual Context deadline cancels before diagnostic eighth-print checkpoint',{timeout:10000},()=>{
+    const layer=new Layer();let ctx:Context;
+    layer.functions.set('main()',()=>{
+        for(let n=0;n<7;n++)ctx.print(bytes('x'));
+        const until=performance.now()+4100;while(performance.now()<until){}
+        ctx.recoveryCheckpoint();
+    });
+    const page=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
+    ctx=new Context([layer],()=>{},undefined,undefined,undefined,500,page.sink);
+    assert.throws(()=>ctx.runFunction('main()'),isNativeExecutionStop);
+    // This raw diagnostic is print eight and must not revive the cancelled alarm.
+    assert.deepEqual(Buffer.from(page.runtimeError(bytes('diagnostic')).bytes),Buffer.from('xxxxxxxdiagnostic'));
 });
