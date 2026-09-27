@@ -71,7 +71,8 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
             my $printed='';S2::set_output(sub{$printed.=$_[0]});S2::set_output_safe(sub{$printed.=$_[0]});
             S2::run_code($ctx,'RecentPage::print()',$p);push @outputs,encode_base64($printed,'');
             push @out,{entries=>[map{{id=>$_->{itemid},type=>$_->{_type},new=>$_->{new_day},end=>$_->{end_day}}}@{$p->{entries}}],
-                nav=>$p->{nav},head=>$p->{head_content},feeds=>$p->{data_links_order}};
+                nav=>$p->{nav},head=>$p->{head_content},feeds=>$p->{data_links_order},
+                links=>{map{$_=>{url=>$p->{data_link}{$_}{url},caption=>$p->{data_link}{$_}{caption}}}qw(rss atom)}};
         }print encode_json({rows=>\@out,outputs=>\@outputs,source=>encode_base64($original,''),code=>encode_base64($code,'')});`;
     const native=JSON.parse(execFileSync("perl",["-e",script],{encoding:"utf8",timeout:10000}));
     const directory=mkdtempSync(path.join(tmpdir(),"g2c-recent-context-"));
@@ -95,7 +96,11 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
         const nav=Object.fromEntries(Object.entries(page._nav as GeneralModel).map(([key,value])=>[
             key===".type"?"_type":key.slice(1),NativeString.is(value)?value.bytes().toString():value]));
         assert.deepEqual({entries:(page._entries as GeneralModel[]).map(e=>({id:e._itemid,type:e[".type"],new:e._new_day,end:e._end_day})),
-            nav,head:scalarPV(page._head_content).bytes().toString(),feeds:(page._data_links_order as NativeString[]).map(v=>v.bytes().toString())},native.rows[index]);
+            nav,head:scalarPV(page._head_content).bytes().toString(),feeds:(page._data_links_order as NativeString[]).map(v=>v.bytes().toString()),
+            links:Object.fromEntries(runtime.hashKeys(page._data_link).map(key=>{
+                const link=runtime.memberSlot(page._data_link,key,"hash").get() as GeneralModel;
+                return [scalarPV(key).bytes().toString(),{url:scalarPV(link._url).bytes().toString(),caption:scalarPV(link._caption).bytes().toString()}];
+            }))},native.rows[index]);
         assert.deepEqual(displayed,skip===0?[513,769]:[257,513,769]);
         assert.equal(runtime.hashKeys(page._data_link).length,2);
         for(const missing of [false,true]) {
