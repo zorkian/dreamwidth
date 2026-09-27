@@ -74,7 +74,9 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
         "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
         "appleTouchIcon", "facebookPreviewIcon", ...(Object.hasOwn(root.app as object,"commentSettings")?["commentSettings"]:[]),
         ...(Object.hasOwn(root.app as object,"cssCleanerHookKind")?["cssCleanerHookKind"]:[]),
-        ...(Object.hasOwn(root.app as object,"headIconHookConfigured")?["headIconHookConfigured"]:[])]);
+        ...(Object.hasOwn(root.app as object,"headIconHookConfigured")?["headIconHookConfigured"]:[]),
+        ...(Object.hasOwn(root.app as object,"maxRecursion")?["maxRecursion"]:[])]);
+    if(app.maxRecursion!==undefined)integer(app.maxRecursion,1);
     if(app.cssCleanerHookKind!==undefined&&(typeof app.cssCleanerHookKind!=="string"||!["none","proxy-css-links-only","unsupported"].includes(app.cssCleanerHookKind)))invalid();
     if(app.headIconHookConfigured!==undefined)boolean(app.headIconHookConfigured);
     if(app.commentSettings!==undefined) {

@@ -374,6 +374,8 @@ export interface JournalUrlConfiguration {
 }
 
 export interface PublicAppConfig {
+    // Effective site S2::MAX_RECURSION; legacy snapshots use DW's default500.
+    readonly maxRecursion?: number;
     readonly commentSettings?:{readonly pageSize:number;readonly threadPoint:number;readonly maxSubjects:number};
     // Public source facts and startup-resolved placeholder text, never HTML.
     // This private viewer defers proxying, even if the retained app enables it.

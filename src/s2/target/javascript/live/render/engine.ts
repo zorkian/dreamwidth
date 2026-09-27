@@ -153,7 +153,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         if(cssDepth){cssBuffer+=text;if(Buffer.byteLength(cssBuffer)>65536)throw new Error("Stylesheet byte limit");return "";}
         return finalized.has(text)?text:cleanTrustedSafeChunk(text, {
         href: String(page._stylesheet_url), decision: 1,
-    });});
+    });}, c.maxRecursion ?? 500);
     // The pinned core2 stack has no core1 renamed properties. Group overrides
     // still come from compiled source defaults, never from a prepared fixture.
     for (const [key, value] of Object.entries(ctx.prop._grouped_property_override ?? {})) {

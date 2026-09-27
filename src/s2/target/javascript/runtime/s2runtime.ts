@@ -346,7 +346,9 @@ export class Context {
         layers: Layer[], private readonly write: (text: string) => void,
         properties?: Record<string, unknown>, callbacks?: FixtureBuiltins,
         private readonly safeOutput: (text: string) => string = runtime.notags,
+        private readonly maxRecursion = 500,
     ) {
+        if (!Number.isSafeInteger(maxRecursion) || maxRecursion < 1) throw new Error("Invalid S2 recursion bound");
         for (const layer of layers) {
             for (const [name, implementation] of layer.functions) {
                 this.functions.set(name, implementation);
@@ -426,14 +428,15 @@ export class Context {
     }
 
     recoveryCheckpoint(): void {
-        // Native run_function defaults to four seconds and check_depth's default
-        // repeated-frame threshold is fifty. Recovered loops call this same seam;
+        // Native run_function defaults to four seconds. DW configuration sets
+        // MAX_RECURSION to500, overriding check_depth's standalone fallback50.
+        // Recovered loops call this same seam;
         // the outer worker deadline remains an independent fail-stop boundary.
         if (this.deadline && performance.now() > this.deadline) throw new Error("S2 execution timed out");
         const counts = new Map<string, number>();
         for (const frame of this.callFrames) {
             const count = (counts.get(frame) ?? 0) + 1;
-            if (count >= 50) throw new Error("Excessive S2 recursion");
+            if (count >= this.maxRecursion) throw new Error("Excessive S2 recursion");
             counts.set(frame, count);
         }
     }
