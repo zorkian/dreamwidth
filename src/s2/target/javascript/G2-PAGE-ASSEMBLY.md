@@ -42,3 +42,25 @@ its private URL callback. Disabled comments take the empty navigation path befor
 projection, preserving the no-read boundary; independent original-source head/OG remains
 a mandatory operation. This is source assembly, not a claim that installed comment cleaning
 or the ordinary production worker registry is finished.
+
+The installed factory now assembles scalar, CSS, Date, public UserLite, standard-image
+and navigation hosts once per request. Its constructors and callbacks share the same
+private bindings. Recent and direct Entry preparation run after initialization in that
+same Context. The post-comment `LJ_cmtinfo`/resource head operation is mandatory even
+when comments are disabled, separate from the earlier head/OG operation.
+
+A closed-worker control executes custom functions through both matched-source and
+missing-source recovery routes, resumes with the initialized item count, prepares the
+Page/Entry model, and calls the typed parent public-user URL helper. Its native byte
+comparison uses declared empty original content and fixed public providers. It proves
+factory execution and private transport, not installed original-cleaner, SQL, resource,
+ordinary HTTP or browser parity. Source validators and original cleaners remain required
+services; there is no identity-cleaner default. The verifier admits only the exact pure
+model closure and continues to reject parent selected-data modules and unknown files.
+
+Plural hosts enter the explicit native plural run boundary and retain native cached
+forms, whitespace splitting, first-only substitution and HTML escaping. Public `get_url`
+uses the editable public username, while equality still uses the private account binding.
+The native `clean_url` host preserves its narrow source behavior; it is not the final
+HTML safety authority. Tests preflight every named maintained source and emitted test
+file before invoking Node; earlier test logs remain unchanged.

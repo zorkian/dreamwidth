@@ -17,6 +17,8 @@ import type {PublicUserFacts} from "../data/public-users";
 import type {GeneralPublicSession} from "./general-public-session";
 import {prepareGeneralUserLite,type GeneralUserLiteModel,type PublicUserLiteOperations} from "./general-user-model";
 import {NativeString} from "../../runtime/native-string";
+import {concatStrings} from "../../runtime/native-string";
+import {compareStrings} from "../../runtime/native-string";
 
 export interface PreparedPublicUser {
     readonly model: GeneralUserLiteModel;
@@ -34,6 +36,15 @@ export class GeneralUserAuthority {
         const account = randomBytes(32).toString("hex");
         this.accounts.set(account,snapshot.user);
         return Object.freeze({model,account});
+    }
+    /** get_url reloads the editable public name, rather than using private _u. */
+    async url(name:NativeString,view:NativeString):Promise<NativeString> {
+        const snapshot=await this.session.user(name);
+        if(!snapshot?.user)return NativeString.bytes(Buffer.alloc(0));
+        const pv=NativeString.hostUtf8Bytes;
+        if(compareStrings(view,pv("userinfo"))===0)view=pv("profile");
+        if(compareStrings(view,pv("recent"))===0)view=pv("");
+        return concatStrings(concatStrings(this.operations.journalBase(snapshot.user),pv("/")),view);
     }
     /** Native equality reads private userid, never editable public names. */
     equals(left: string | null, right: string | null): boolean {

@@ -87,8 +87,12 @@ test("manifest admits the four reviewed scalar modules but rejects another inven
     });
 });
 
-test("manifest admits only the named pure model dependency outside render/policy", () => {
-    for (const name of ["general-model-primitives.js", "unapproved-model.js"]) fixture((artifact, root, manifest) => {
+test("manifest admits exact installed model modules and excludes parent data authority", () => {
+    const allowed=["general-model-primitives.js","general-navigation-url.js","general-comment-navigation.js",
+        "general-page-assembly.js","general-page-model.js","general-model-date.js","general-model-links.js",
+        "general-entry-from-source.js","general-entry-page-source.js","general-entry-content.js",
+        "general-entry-model.js","general-recent-from-source.js"];
+    for (const name of [...allowed,"general-selected-text.js","general-recent-selection.js","unapproved-model.js"]) fixture((artifact, root, manifest) => {
         modes(root, 0o755, 0o444);
         const file = "app/dist/live/domain/" + name;
         mkdirSync(dirname(join(root, file)), {recursive: true});
@@ -97,7 +101,7 @@ test("manifest admits only the named pure model dependency outside render/policy
         rewrite(root, {...manifest, files: [...manifest.files,
             {path: file, sha256: hash(code), bytes: Buffer.byteLength(code)}]});
         modes(root, 0o555, 0o444);
-        if (name === "general-model-primitives.js") assert.equal(verifyGeneralRuntime(artifact).root, root);
+        if (allowed.includes(name)) assert.equal(verifyGeneralRuntime(artifact).root, root);
         else assert.throws(() => verifyGeneralRuntime(artifact));
     }, true);
 });

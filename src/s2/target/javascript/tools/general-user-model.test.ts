@@ -17,7 +17,9 @@ import test from "node:test";
 import {execFileSync} from "node:child_process";
 import {NativeString} from "../runtime/native-string";
 import {prepareGeneralUserLite} from "../live/domain/general-user-model";
-import {parentLoadUser} from "../live/render/general-user-host";
+import {parentLoadUser,parentUserUrl} from "../live/render/general-user-host";
+import {generalNativeHostValue} from "../live/render/general-native-host-result";
+import {decodeGeneralString} from "../live/render/general-site-url-client";
 import {decodePreparedUser} from "../live/render/general-user-client";
 import {encodeScalar} from "../runtime/native-scalar";
 import {nativePublicDisplayName} from "../live/domain/general-user-display";
@@ -115,6 +117,23 @@ test("parent-issued accounts remain request-private and carry the final user wit
     const other=new GeneralUserAuthority(session,operations);
     assert.throws(()=>other.account(prepared.account));
     assert.equal(Object.hasOwn(prepared.model,"account"),false);
+    const nativeUrls=JSON.parse(execFileSync("perl",["-e",String.raw`use strict;use warnings;
+        use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
+        BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};*DBI::connect_cached=sub{die 'DB forbidden'};}
+        require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::S2;
+        {package UrlUser;sub journal_base{'https://public.example.invalid'}}
+        no warnings 'redefine';local *LJ::load_user=sub{$_[0] eq 'public_name'?bless({},'UrlUser'):undef};
+        print encode_json([map {S2::Builtin::LJ::get_url(undef,{user=>'public_name'},$_)}
+            ('userinfo','recent','tag/?q=a&b')]);`],{encoding:"utf8",timeout:10000}));
+    const urls=[];
+    for(const view of ["userinfo","recent","tag/?q=a&b"]) {
+        const reply=await parentUserUrl({name:encodeScalar(NativeString.hostUtf8Bytes("public_name")),
+            view:encodeScalar(NativeString.hostUtf8Bytes(view))},authority);
+        urls.push(generalNativeHostValue(reply,decodeGeneralString).bytes().toString());
+    }
+    assert.deepEqual(urls,nativeUrls);
+    await assert.rejects(parentUserUrl({name:encodeScalar(NativeString.hostUtf8Bytes("public_name")),
+        view:encodeScalar(NativeString.hostUtf8Bytes("recent")),userid:111},authority));
     current=false;
     assert.equal(await session.finish(async()=>{throw Error("Stale user must prevent private release");}),false);
 });
