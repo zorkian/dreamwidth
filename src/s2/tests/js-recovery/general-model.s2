@@ -1,0 +1,47 @@
+# general-model.s2
+#
+# Installed public model and private-helper execution fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = core;
+property int num_items_recent;
+property int init_count;
+property string init_name;
+set num_items_recent = 20;
+set init_count = 0;
+set init_name = "";
+class Date { var int year; var int month; var int day; function builtin compare(Date other):int; }
+class Image { var string url; var int width; var int height; var string alttext; }
+class Link { var string url; var string caption; var Image icon; }
+class UserLite { var string user; var string username; var string name; function builtin equals(UserLite other):bool; }
+function builtin UserLite(string name):UserLite;
+class RecentPage { var string title; var Image image; var Link link; var Date date; var Date other; var UserLite user; function print(); }
+class EntryPage { var string title; var Image image; var Link link; var Date date; var Date other; var UserLite user; function print(); }
+function prop_init() {
+    $*init_count++; $*num_items_recent = 3;
+    var UserLite initial = UserLite("public_name");
+    $*init_name = $initial.username;
+    print "SUPPRESSED";
+}
+function modules_init() { $*init_name = $*init_name + ":prepared"; }
+function RecentPage::print() {
+    print "recent:" + $.title + ":" + $*init_count + ":" + $*init_name + ":" + $.user.user;
+    print ":" + $.date->compare($.other) + ":" + $.image.width + "x" + $.image.height + ":" + $.link.icon.url;
+    var UserLite alias = $.user;
+    $alias.user = "mutated-public";
+    var UserLite loaded = UserLite("public_name");
+    print ":"; if ($alias->equals($loaded)) { print "1"; } else { print "0"; }
+}
+function EntryPage::print() {
+    print "entry:" + $.title + ":" + $*init_count + ":" + $*init_name + ":" + $.user.user;
+    print ":" + $.date->compare($.other) + ":" + $.image.width + "x" + $.image.height + ":" + $.link.icon.url;
+}
