@@ -12,6 +12,8 @@
 # 'perldoc perlartistic' or 'perldoc perlgpl'.
 #
 layerinfo type = "core";
+function target_index() : int { print "K"; return 0; }
+function pushed_value() : string { print "V"; return "third"; }
 function main() {
     var string bytes = "猫é";
     print size $bytes;
@@ -32,6 +34,11 @@ function main() {
     var int remaining = 2;
     while ($remaining) { print "|"+$remaining; $remaining--; }
     for (var int counter = 2; $counter; $counter--) { print "|"+$counter; }
+    var string[][] targets = [["seed"]];
+    push $targets[target_index()], pushed_value();
+    print "|"+$targets[0][1];
+    print "|" + (reverse $bytes) + "|";
+    print "a" + pushed_value() + "z";
     var string{} keys = {$wide=>"wide", 9007199254740992=>"near"};
     print "|"+$keys{$wide}+"|"+$keys{9007199254740992};
     if ($wide == 9007199254740992) { print "|equal"; } else { print "|unequal"; }
