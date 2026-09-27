@@ -13,6 +13,10 @@
     "./contracts": {
       "types": "./dist/contracts.d.ts",
       "require": "./dist/contracts.js"
+    },
+    "./native-entities": {
+      "types": "./dist/native-entities.d.ts",
+      "require": "./dist/native-entities.js"
     }
   },
   "scripts": {
@@ -23,6 +27,7 @@
   "dependencies": {
     "css-tree": "3.2.1",
     "dompurify": "3.4.16",
+    "htmlparser2": "10.0.0",
     "jsdom": "30.1.1",
     "markdown-it": "15.0.2"
   },
