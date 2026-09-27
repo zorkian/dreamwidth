@@ -17,7 +17,7 @@ import test from "node:test";
 import {execFileSync} from "node:child_process";
 import path from "node:path";
 import {NativeString,scalarPV} from "../runtime/native-scalar";
-import {generalDateTimeParts,generalDateTimeClock} from "../live/domain/general-model-date";
+import {generalDateTimeParts,generalDateTimeClock,generalMysqlDateParts} from "../live/domain/general-model-date";
 import type {NativeProfile} from "../runtime/native-profile";
 
 test("DateTime_parts preserves native split/coercion and anonymous clock is UTC",()=>{
@@ -44,4 +44,23 @@ test("DateTime_parts preserves native split/coercion and anonymous clock is UTC"
     assert.deepEqual(inputs.map(input=>project(generalDateTimeParts(input===undefined?undefined:NativeString.hostUtf8Bytes(input),profile))),native.parts);
     const clock=generalDateTimeClock(1790506804);
     assert.deepEqual(Object.fromEntries(fields.map(field=>[field,Number(scalarPV(clock[field==="_dayofweek"?field:"_"+field]).bytes().toString())])),native.clock);
+});
+
+test("selected civil timestamps retain native UTC Entry date-parts bytes",()=>{
+    const inputs=["2026-09-27 12:03:04","2000-02-29 23:59:59","1969-12-31 00:00:00",
+        "1000-01-01 00:00:00","9999-12-31 23:59:59"];
+    const script=String.raw`use strict;use warnings;use lib '/workspaces/dreamwidth/cgi-bin';
+        use JSON::PP;use MIME::Base64 qw(encode_base64);
+        BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};
+        *DBI::connect_cached=sub{die 'DB forbidden'};}
+        require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';local $/;my $inputs=decode_json(<STDIN>);
+        print encode_json([map{my $value=LJ::alldatepart_s2($_);
+            {base64=>encode_base64($value,''),utf8=>utf8::is_utf8($value)?1:0}}@$inputs]);`;
+    const native=JSON.parse(execFileSync("perl",["-e",script],{
+        input:JSON.stringify(inputs),encoding:"utf8",timeout:10000}));
+    assert.deepEqual(inputs.map(value=>{
+        const frame=generalMysqlDateParts(value);
+        return {base64:frame.bytes().toString("base64"),utf8:frame.flagged()?1:0};
+    }),native);
+    assert.throws(()=>generalMysqlDateParts("2026-02-30 00:00:00"));
 });

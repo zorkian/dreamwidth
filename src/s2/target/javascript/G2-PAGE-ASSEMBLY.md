@@ -64,3 +64,22 @@ uses the editable public username, while equality still uses the private account
 The native `clean_url` host preserves its narrow source behavior; it is not the final
 HTML safety authority. Tests preflight every named maintained source and emitted test
 file before invoking Node; earlier test logs remain unchanged.
+
+Approved source projection receives the same initialized session, request start and
+private public bindings used by the renderer. It can load the owner through the fixed
+public-user helper, then prepare the native User fields from named approved picture and
+website values. User promotion preserves the privately issued account handle on the new
+model; copied or fabricated UserLite inputs cannot acquire it. No private account facts
+are added to the public model. The closed-worker control now also compares that owner's
+identity with the independently loaded poster through the actual native equality host.
+
+Parent selected-text preparation now projects named Entry constructor and cleaner inputs
+from the issued selected-entry reference. Transformed subject/event/editor/preformatted
+values retain their native bytes and flags; original SQL witnesses remain separate.
+Journal/poster IDs, actual anum-derived external ID, source UTC civil date parts, security,
+allowmask and admin-post scalar are projected explicitly. Adult-content resolution and
+request cleaner options remain required named caller inputs. Neither raw logprops nor
+opaque crosspost data is copied into this input, including extra fields on a caller's
+options object. Independent retained-native date controls and the existing actual SQL
+encoding/privacy fixture qualify this projection; they do not establish ordinary content
+cleaning or complete HTTP serving.

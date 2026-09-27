@@ -16,6 +16,11 @@ import type {GeneralInstalledOperations,GeneralWorkerStart} from "./general-work
 import type {GeneralWorkerChannel} from "./general-worker-channel";
 import type {GeneralProgramSession} from "./general-session";
 import {GeneralUserBindings} from "./general-user-bindings";
+import {workerLoadUser} from "./general-user-client";
+import type {NativeString} from "../../runtime/native-scalar";
+import {generalUser} from "../domain/general-model-user";
+import type {GeneralModel} from "../domain/general-model-primitives";
+import {PrivateTransportError} from "./private-transport";
 import {generalUserConstructor} from "./general-user-builtins";
 import {GeneralStandardImageClient} from "./general-standard-images-client";
 import {generalImageCallbacks,type GeneralImageCallbacks} from "./general-image-builtins";
@@ -29,6 +34,10 @@ import {generalRecentPageFromSource,generalEntryPageFromSource,
 
 export interface GeneralWorkerPublicBindings {
     readonly users:GeneralUserBindings;
+    /** Creates the public model and binds its private account in this same factory. */
+    loadUser(name:NativeString):unknown;
+    prepareUser(lite:GeneralModel,defaultPic:GeneralModel,websiteUrl:unknown,
+        websiteName:unknown):GeneralModel;
     readonly images:GeneralImageCallbacks;
     readonly navigation:GeneralCommentNavigation;
 }
@@ -37,8 +46,10 @@ export interface GeneralWorkerFactoryServices {
     readonly output:GeneralInstalledOperations["output"];
     seesControlStrip(start:GeneralWorkerStart):unknown;
     /** Validate named authorized source descriptors, never cast an arbitrary resume graph. */
-    recentInput(value:unknown):GeneralRecentPageSourceInput;
-    entryInput(value:unknown):GeneralEntryPageSourceInput;
+    recentInput(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
+        start:GeneralWorkerStart):GeneralRecentPageSourceInput;
+    entryInput(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
+        start:GeneralWorkerStart):GeneralEntryPageSourceInput;
     recentOperations(session:GeneralProgramSession,start:GeneralWorkerStart,
         bindings:GeneralWorkerPublicBindings):GeneralRecentPageOperations;
     entryOperations(session:GeneralProgramSession,start:GeneralWorkerStart,
@@ -52,7 +63,15 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
     const images=generalImageCallbacks({sourceFacts:()=>source.sourceFacts(),
         translate:key=>source.translate(key),escapeUrl:generalEscapeUrl});
     const navigation=generalCommentNavigation();
-    const bindings:GeneralWorkerPublicBindings=Object.freeze({users,images,navigation});
+    const bindings:GeneralWorkerPublicBindings=Object.freeze({users,images,navigation,
+        loadUser:(name:NativeString)=>workerLoadUser(channel,users,name),
+        prepareUser(lite:GeneralModel,picture:GeneralModel,url:unknown,name:unknown){
+            const account=users.account(lite);
+            if(account===undefined)throw new PrivateTransportError();
+            const user=generalUser(lite,picture,url,name);
+            users.bind(user,account);
+            return user;
+        }});
     return {
         builtins(start,page){return {...generalScalarCallbacks({page,
             seesControlStrip:()=>services.seesControlStrip(start)}),
@@ -61,8 +80,8 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
         propertyCleaner:services.propertyCleaner,output:services.output,
         preparePage(session,start,approved){
             if(start.kind==="recent")return generalRecentPageFromSource(session.context,
-                services.recentInput(approved),services.recentOperations(session,start,bindings));
-            return generalEntryPageFromSource(session.context,services.entryInput(approved),{
+                services.recentInput(approved,bindings,session,start),services.recentOperations(session,start,bindings));
+            return generalEntryPageFromSource(session.context,services.entryInput(approved,bindings,session,start),{
                 ...services.entryOperations(session,start,bindings),navigation});
         },
         beginRendering(session){images.beginRendering(session.context);},

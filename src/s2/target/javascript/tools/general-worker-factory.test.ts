@@ -30,18 +30,34 @@ test("installed factory retains one private navigation authority and requires so
     const boundary=new Error("Invalid approved descriptor");
     const prepared=new Error("Prepared operations captured");
     let bindings:GeneralWorkerPublicBindings|undefined;
+    let inputBindings:GeneralWorkerPublicBindings|undefined;
+    let inputSession:GeneralProgramSession|undefined;
+    let inputStart:GeneralWorkerStart|undefined;
     const factory=generalWorkerFactory(new GeneralWorkerChannel("a".repeat(64)),{
         propertyCleaner(){throw Error("No cleaner substitution");},
         output(){throw Error("No output substitution");},seesControlStrip:()=>false,
-        recentInput(){throw boundary;},entryInput(){return undefined!;},
+        recentInput(){throw boundary;},entryInput(_value,value,session,start){
+            inputBindings=value;inputSession=session;inputStart=start;return undefined!;},
         recentOperations(){throw Error("Invalid descriptor must not prepare operations");},
         entryOperations(_session,_start,value){bindings=value;throw prepared;},
     });
     // Only the adapter boundary is exercised here; no admitted program executes.
     const session={context:undefined} as unknown as GeneralProgramSession;
     assert.throws(()=>factory.preparePage(session,{kind:"recent"} as GeneralWorkerStart,{}),error=>error===boundary);
-    assert.throws(()=>factory.preparePage(session,{kind:"entry"} as GeneralWorkerStart,{}),error=>error===prepared);
+    const start={kind:"entry"} as GeneralWorkerStart;
+    assert.throws(()=>factory.preparePage(session,start,{}),error=>error===prepared);
     assert.ok(bindings);
+    assert.equal(inputBindings,bindings);
+    assert.equal(inputSession,session);
+    assert.equal(inputStart,start);
+    assert.equal(typeof bindings.loadUser,"function");
+    const lite={".type":"UserLite",_user:pv("owner")},picture={".type":"Image",".isnull":true};
+    bindings.users.bind(lite,"b".repeat(64));
+    const owner=bindings.prepareUser(lite,picture,pv("/site?x&y"),pv("<site>"));
+    assert.equal(owner[".type"],"User");
+    assert.equal(bindings.users.account(owner),bindings.users.account(lite));
+    assert.equal(bindings.users.account({...owner}),undefined);
+    assert.throws(()=>bindings!.prepareUser({...lite},picture,undefined,undefined));
     const range=bindings.navigation.itemRange({_current:1,_total:2},n=>pv("page="+
         scalarPV(n).bytes().toString("ascii")));
     const registry=factory.builtins({kind:"entry"} as GeneralWorkerStart,()=>undefined,()=>session);

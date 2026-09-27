@@ -15,9 +15,8 @@
 import {GeneralWorkerChannel} from "../live/render/general-worker-channel";
 import {executeGeneralWorker} from "../live/render/general-worker-execution";
 import {generalWorkerFactory} from "../live/render/general-worker-factory";
-import {workerLoadUser} from "../live/render/general-user-client";
 import {NativeString} from "../runtime/native-scalar";
-import {generalCommentInfo,generalImage,type GeneralModel} from "../live/domain/general-model-primitives";
+import {generalCommentInfo,generalImage,generalNull,type GeneralModel} from "../live/domain/general-model-primitives";
 import type {GeneralPageInput} from "../live/domain/general-page-model";
 import type {GeneralEntryPageEntryInput} from "../live/domain/general-entry-page-source";
 import type {GeneralEntrySourceInput} from "../live/domain/general-entry-from-source";
@@ -27,12 +26,13 @@ import type {GeneralWorkerPublicBindings} from "../live/render/general-worker-fa
 const pv=NativeString.hostUtf8Bytes,channel=new GeneralWorkerChannel(process.env.S2_PRIVATE_JOB!);
 let username:NativeString;
 const noContent=()=>{throw Error("Declared empty-content fixture reached an original cleaner");};
-function page(value:unknown):GeneralPageInput {
+function page(value:unknown,bindings:GeneralWorkerPublicBindings):GeneralPageInput {
     if(!value||typeof value!=="object"||Object.keys(value).length!==2||
         !NativeString.is((value as Record<string,unknown>).username)||
         !NativeString.is((value as Record<string,unknown>).title))throw Error("Invalid fixed source descriptor");
     const row=value as {username:NativeString;title:NativeString};username=row.username;
-    return {styleId:0,styleModtime:0,baseUrl:pv("/journal"),journal:{".type":"User"},journalType:pv("P"),
+    const journal=bindings.prepareUser(bindings.loadUser(username) as GeneralModel,generalNull("Image"),undefined,undefined);
+    return {styleId:0,styleModtime:0,baseUrl:pv("/journal"),journal,journalType:pv("P"),
         ownerName:row.title,journalTitle:undefined,journalSubtitle:undefined,layoutName:undefined,
         themeName:undefined,layoutUrl:pv(""),getargs:[],viewingStyleOptions:undefined,viewUrls:[],links:[],
         customtext:{title:undefined,url:undefined,content:undefined},
@@ -50,7 +50,7 @@ function entry():GeneralEntrySourceInput {
 }
 function entryOperations(bindings:GeneralWorkerPublicBindings) {
     return {features:{memories:false,tellafriend:false,esn:false},
-        user:()=>workerLoadUser(channel,bindings.users,username) as GeneralModel,
+        user:()=>bindings.loadUser(username) as GeneralModel,
         picture:()=>undefined,moodtheme:()=>undefined,tagList:()=>({html:undefined,tags:[]}),
         commentInfo:()=>generalCommentInfo({_count:0,_enabled:0}),standardImage:noContent,
         currents:()=>({values:[]}),groupNames:()=>pv(""),cleanSubject:noContent,
@@ -62,11 +62,11 @@ executeGeneralWorker(channel,generalWorkerFactory(channel,{
     output(){return {contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
         stylesheet:{domain:"example.org",webDomain:"www.example.org",statPrefix:"https://static.example.org",
             trustedHosts:{},cssCleanerEnabled:true,cssProxy:null},transformCss:noContent,expandEmbed:noContent};},
-    recentInput(value){return {page:page(value),selection:{skip:0,itemshow:3,maxskip:97,showStickies:false,
+    recentInput(value,bindings){return {page:page(value,bindings),selection:{skip:0,itemshow:3,maxskip:97,showStickies:false,
         stickyEntries:[],window:[{entry:entry(),countedSticky:false,datePrefix:pv("2026 09 27")}],
         hasLookahead:false},navigation:{filterActive:false,filterName:pv(""),filterTags:undefined,
             selectionHead:pv(""),feedTagQuery:pv(""),linkAttributes:[]}};},
-    entryInput(value){return {page:page(value),entry:{...entry(),mode:undefined} as GeneralEntryPageEntryInput,thread:undefined};},
+    entryInput(value,bindings){return {page:page(value,bindings),entry:{...entry(),mode:undefined} as GeneralEntryPageEntryInput,thread:undefined};},
     recentOperations(_session,_start,bindings){return {
         page:{clockSeconds:()=>0,escapeProperty(value){if(value!==undefined)noContent();return value;}},
         entry:()=>entryOperations(bindings),recent:{standardImage:kind=>generalImage(pv("/declared/"+kind),20,18,pv("")),

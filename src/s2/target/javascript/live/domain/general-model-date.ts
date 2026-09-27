@@ -30,6 +30,20 @@ import type {GeneralModel} from "./general-model-primitives";
 function numeric(value:unknown):NativeNumber {
     return arithmetic("+",scalarNumber(value),NativeNumber.integer(0n));
 }
+
+/** LJ::alldatepart_s2 for an already validated SQL civil timestamp, in UTC. */
+export function generalMysqlDateParts(value:string):NativeString {
+    if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value))
+        throw Error("Invalid approved civil timestamp");
+    const year=Number(value.slice(0,4)),month=Number(value.slice(5,7)),day=Number(value.slice(8,10));
+    const hour=Number(value.slice(11,13)),minute=Number(value.slice(14,16)),second=Number(value.slice(17,19));
+    const date=new Date(0);
+    date.setUTCFullYear(year,month-1,day);date.setUTCHours(hour,minute,second,0);
+    if(year<1000||date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||
+        date.getUTCDate()!==day||date.getUTCHours()!==hour||date.getUTCMinutes()!==minute||
+        date.getUTCSeconds()!==second)throw Error("Invalid approved civil timestamp");
+    return NativeString.bytes(Buffer.from(value.replace(/[-:]/g," ")+" "+date.getUTCDay(),"ascii"));
+}
 /** Native split /\s+/ has leading empties and drops trailing empties. */
 function dateParts(value:unknown,profile:NativeProfile):NativeString[] {
     const input=scalarPV(value),flag=input.flagged();

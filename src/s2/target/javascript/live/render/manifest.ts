@@ -32,7 +32,7 @@ const runtimeFiles = new Set([
 // source witnesses and configuration loaders are not worker dependencies.
 const generalModelFiles = new Set([
     "general-model-primitives", "general-navigation-url", "general-comment-navigation",
-    "general-page-assembly", "general-page-model", "general-model-date", "general-model-links",
+    "general-page-assembly", "general-page-model", "general-model-date", "general-model-links", "general-model-user",
     "general-entry-from-source", "general-entry-page-source", "general-entry-content",
     "general-entry-model", "general-recent-from-source",
 ].map(name => "app/dist/live/domain/" + name + ".js"));

@@ -89,7 +89,7 @@ test("manifest admits the four reviewed scalar modules but rejects another inven
 
 test("manifest admits exact installed model modules and excludes parent data authority", () => {
     const allowed=["general-model-primitives.js","general-navigation-url.js","general-comment-navigation.js",
-        "general-page-assembly.js","general-page-model.js","general-model-date.js","general-model-links.js",
+        "general-page-assembly.js","general-page-model.js","general-model-date.js","general-model-links.js","general-model-user.js",
         "general-entry-from-source.js","general-entry-page-source.js","general-entry-content.js",
         "general-entry-model.js","general-recent-from-source.js"];
     for (const name of [...allowed,"general-selected-text.js","general-recent-selection.js","unapproved-model.js"]) fixture((artifact, root, manifest) => {
