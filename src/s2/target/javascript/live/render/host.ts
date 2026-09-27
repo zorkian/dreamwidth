@@ -239,6 +239,13 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
         addBadges(comment.replies);
     }};
     addBadges(input.journal.comments?.roots??[]);
+    const themeUsers:Record<string,unknown>=Object.create(null);
+    for(const row of input.journal.themeAuthors??[]) {
+        const author=row.author;
+        themeUsers[row.name]=author?{'.type':'UserLite',host_userid:author.userid}:null;
+        if(author)userBadges[String(author.userid)]=badge({...input,journal:{...input.journal,
+            username:author.username,userid:author.userid,baseUrl:journalBase(author.username,input.config)}},author);
+    }
     const disabled = (path: string, text: string, title: string) => ({
         image: `${c.imgPrefix}/silk/profile/${path}.png`, width: 20, height: 18, text, title, url: "",
     });
@@ -253,7 +260,7 @@ export function hostData(input: RenderInput, page: S2Object, monday: boolean): S
         owner_user: input.journal.username, owner_userid: input.journal.userid,
         siteroot: c.siteRoot, app_origin: c.canonicalAppOrigin,
         control_strip_html: controlStrip(input), script_tags_html: resourceBody(input),
-        ljuser_html: badge(input), user_badges:userBadges, visible_tags: input.journal.sidebarTags.map(tag=>prepareTagDetail(tag,input.journal.baseUrl)), user_links: userLinks, quickreply_div: "",
+        theme_users:themeUsers, ljuser_html: badge(input), user_badges:userBadges, visible_tags: input.journal.sidebarTags.map(tag=>prepareTagDetail(tag,input.journal.baseUrl)), user_links: userLinks, quickreply_div: "",
         viewer_sees_control_strip: input.journal.showControlStrip,
         has_quickreply: true, s2quickreply: true, comments_need_access: false,
         memories_enabled: true, tellafriend_enabled: true,

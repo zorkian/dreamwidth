@@ -80,6 +80,11 @@ export interface ApprovedComments {
 
 export interface ApprovedJournal {
     readonly comments?:ApprovedComments;
+    readonly themeAuthors?: readonly {readonly name:string;readonly author:{readonly userid:number;readonly username:string;
+        readonly badgeKind:"personal"|"staff";readonly badgeDeleted:boolean}|null}[];
+    readonly theme?: import("./theme-catalog").ThemeName;
+    readonly themeLayoutId?: number;
+    readonly inlineStylesheet?: boolean;
     readonly customtextProperties?: import("../domain/property-layer").CustomtextProperties;
     readonly customtextStored?: {readonly title:string|null;readonly url:string|null;readonly content:string|null};
     readonly userid: number;
@@ -122,6 +127,8 @@ export type RenderPage =
 // consumes body HTML in body context and inert metadata at the escaped OG
 // attribute boundary. Neither fragment nor helper string returns to the parent.
 export interface RenderContentPreparation {
+    stylesheet?(source:string):string;
+    fontFamily?(source:string):void;
     customtext?(source:string):string;
     comment?(comment:ApprovedComment,entryUrl:string):string;
     subject(entry: ApprovedEntry, entryUrl: string, source?: string): SubjectPreparation;
@@ -145,6 +152,7 @@ export interface RenderInput {
 export interface Artifact {
     readonly schema: 1;
     readonly abi: 1;
+    readonly themes?: readonly {readonly name: import("./theme-catalog").ThemeName; readonly sourceHash:string; readonly code:string;}[];
     readonly layers: readonly {
         readonly source: string;
         readonly sourceHash: string;

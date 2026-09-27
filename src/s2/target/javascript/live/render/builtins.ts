@@ -77,6 +77,21 @@ export function formatPlainSubject(rawEntry: unknown, rawOptions: unknown,
     return `<a title="${attribute}" href="${item.permalink_url}"${cssClass}${style}>${recent}</a>`;
 }
 
+// Native S2.pm4909-4934 deliberately extracts an unanchored integer prefix.
+// Decimal input is not ordinary floating-point multiplication.
+export function cssMultiplyLength(value:string,multiplier:number):string {
+    if(!Number.isSafeInteger(multiplier)||Math.abs(multiplier)>10000||value.length>1024)
+        throw new Error("Unsupported CSS multiplier");
+    const match=/([0-9]+)([^\n]+)/.exec(value);
+    const length=match?Number(match[1]):0;
+    if(!Number.isSafeInteger(length)||!Number.isSafeInteger(length*multiplier))throw new Error("CSS length limit");
+    const result=(String(length*multiplier)+(match?.[2]??'')).replace(/^[ \t\r\n\f\v]+|[ \t\r\n\f\v]+$/g,'');
+    if(['larger','smaller','xx-small','x-small','small','medium','large','x-large','xx-large','auto','inherit'].includes(result))return result;
+    const valid=/^[+-]?(?:[0-9]*\.)?[0-9]+([a-z]+|%)$/.exec(result);
+    if(valid&&['em','ex','px','in','cm','mm','pt','pc','%'].includes(valid[1]!))return result;
+    return /^(?:0*\.)?0+$/.test(result)?'0':'';
+}
+
 export function callbacks(page: Data, host: Data): Record<string, BuiltinFunction> {
     const alternates = new Map<string, boolean>();
     let quickreplyPrinted = false;
@@ -302,6 +317,10 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
                 url: link.url ?? "", caption: caption ?? "", icon, extra: {},
             });
         },
+        _UserLite:(_ctx,name)=>{
+            if(typeof name!=='string'||!host.theme_users||!Object.hasOwn(host.theme_users,name))throw new Error("Unplanned theme user");
+            return host.theme_users[name]??{'.type':'UserLite','.isnull':true};
+        },
         _UserLite__ljuser: (_ctx, user, color) => {
             const person = record(user, "S2 ljuser");
             if (!host.user_badges?.[String(person.host_userid)] ||
@@ -410,6 +429,7 @@ export function callbacks(page: Data, host: Data): Record<string, BuiltinFunctio
         },
         _ehtml: (_ctx, text) => escape(text),
         _striphtml: (_ctx, text) => String(text).replace(/<.*?>/g, ""),
+        _string__css_multiply_length: (_ctx,text,multiplier)=>cssMultiplyLength(String(text),Number(multiplier)),
         _string__contains: (_ctx, text, part) => String(text).includes(String(part)),
         _weekdays: ctx => ctx.prop._reg_firstdayofweek === "monday"
             ? [2, 3, 4, 5, 6, 7, 1] : [1, 2, 3, 4, 5, 6, 7],
