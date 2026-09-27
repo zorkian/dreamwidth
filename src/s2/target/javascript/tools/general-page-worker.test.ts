@@ -31,17 +31,17 @@ import {config} from "../live/tests/fixtures";
 
 const source=`layerinfo type = core;
 property int num_items_recent; property int initialized; set initialized = 0;
-class UserLite { var string user; var string username; }
+class UserLite { var string user; var string username; function builtin equals(UserLite other):bool; }
 function builtin UserLite(string name):UserLite;
 function builtin get_url(UserLite user, string view):string;
 class Entry { var UserLite poster; var string subject; }
-class RecentPage { var string global_title; var Entry[] entries; function print(); }
-class EntryPage { var string global_title; var Entry entry; function print(); }
+class RecentPage { var string global_title; var UserLite journal; var Entry[] entries; function print(); }
+class EntryPage { var string global_title; var UserLite journal; var Entry entry; function print(); }
 function label(string name):string { return "[" + $name + "]"; }
 function prop_init() { $*initialized++; $*num_items_recent = 3; print "suppressed"; }
 function modules_init() {}
-function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.entries[0].poster, "recent"); }
-function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.entry.poster, "recent"); }
+function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.entries[0].poster, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } }
+function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.entry.poster, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } }
 `;
 
 test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
@@ -58,8 +58,9 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
         for my $kind('recent','entry'){my $ctx=S2::make_context(101);S2::set_output(sub{});S2::set_output_safe(sub{});
             S2::run_code($ctx,'prop_init()');S2::run_code($ctx,'modules_init()');
             # Declared public model fields; native constructor semantics are independently qualified.
-            my $entry={_type=>'Entry',subject=>undef,poster=>{_type=>'UserLite',user=>'public_name'}};
-            my $page={_type=>$kind eq 'recent'?'RecentPage':'EntryPage',global_title=>'Title',entry=>$entry,entries=>[$entry]};
+            my $entry={_type=>'Entry',subject=>undef,poster=>{_type=>'UserLite',user=>'public_name',_u=>{userid=>111}}};
+            my $page={_type=>$kind eq 'recent'?'RecentPage':'EntryPage',global_title=>'Title',entry=>$entry,entries=>[$entry],
+                journal=>{_type=>'User',user=>'public_name',_u=>{userid=>111}}};
             my $out='';S2::set_output(sub{$out.=$_[0]});S2::set_output_safe(sub{$out.=$_[0]});
             S2::run_code($ctx,$page->{_type}.'::print()',$page);$outputs{$kind}=encode_base64($out,'');
         }print encode_json({code=>encode_base64($code,''),outputs=>\%outputs});`],
