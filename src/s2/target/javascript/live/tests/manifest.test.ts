@@ -19,8 +19,10 @@ import {chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
     readdirSync, rmSync, symlinkSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {dirname, join, resolve} from "node:path";
-import {verifyRuntime} from "../render/manifest";
+import {verifyRuntime, verifyGeneralRuntime} from "../render/manifest";
 import type {RenderWorkerManifest} from "@dreamwidth/content/contracts";
+
+type FixtureManifest = Omit<RenderWorkerManifest, "entryPath"> & {entryPath:string};
 
 function hash(value: Buffer | string): string {return createHash("sha256").update(value).digest("hex");}
 function modes(path: string, directories: number, files: number): void {
@@ -31,16 +33,17 @@ function modes(path: string, directories: number, files: number): void {
         for (const name of readdirSync(path)) modes(join(path, name), directories, files);
     } else chmodSync(path, files);
 }
-function fixture(run: (artifact: string, root: string, manifest: RenderWorkerManifest) => void): void {
+function fixture(run: (artifact: string, root: string, manifest: FixtureManifest) => void, general = false): void {
     const temporary = mkdtempSync(join(tmpdir(), "dw-render-manifest-test-"));
     const artifact = join(temporary, "stock.json");
     const root = artifact + ".runtime";
-    const entryPath = "app/dist/live/render/worker.js";
+    const entryPath = general ? "app/dist/live/render/general-worker.js" : "app/dist/live/render/worker.js";
     const code = "// Synthetic manifest admission fixture; never executed.\n";
-    writeFileSync(artifact, "Synthetic artifact for independent manifest checks\n");
+    writeFileSync(artifact, general ? JSON.stringify({schema:1,kind:"general-s2-worker",entry:entryPath}) :
+        "Synthetic artifact for independent manifest checks\n");
     mkdirSync(dirname(join(root, entryPath)), {recursive: true});
     writeFileSync(join(root, entryPath), code);
-    const manifest: RenderWorkerManifest = {schema: 1, artifactSha256: hash(readFileSync(artifact)),
+    const manifest: FixtureManifest = {schema: 1, artifactSha256: hash(readFileSync(artifact)),
         contentLockSha256: hash(readFileSync(resolve(__dirname, "../../../../../../content/package-lock.json"))),
         nodeVersion: "24.21.0", nodeExecutable: "/opt/dw-node24/bin/node", entryPath,
         files: [{path: entryPath, sha256: hash(code), bytes: Buffer.byteLength(code)}]};
@@ -82,6 +85,21 @@ test("manifest admits the four reviewed scalar modules but rejects another inven
         if (extra) assert.throws(() => verifyRuntime(artifact));
         else assert.equal(verifyRuntime(artifact).root, root);
     });
+});
+
+test("manifest admits only the named pure model dependency outside render/policy", () => {
+    for (const name of ["general-model-primitives.js", "unapproved-model.js"]) fixture((artifact, root, manifest) => {
+        modes(root, 0o755, 0o444);
+        const file = "app/dist/live/domain/" + name;
+        mkdirSync(dirname(join(root, file)), {recursive: true});
+        const code = "// Synthetic admission-only model fixture\n";
+        writeFileSync(join(root, file), code);
+        rewrite(root, {...manifest, files: [...manifest.files,
+            {path: file, sha256: hash(code), bytes: Buffer.byteLength(code)}]});
+        modes(root, 0o555, 0o444);
+        if (name === "general-model-primitives.js") assert.equal(verifyGeneralRuntime(artifact).root, root);
+        else assert.throws(() => verifyGeneralRuntime(artifact));
+    }, true);
 });
 
 test("manifest rejects non-traversable and writable directories even when root could read them", () => {
