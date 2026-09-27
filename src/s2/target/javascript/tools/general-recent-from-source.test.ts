@@ -28,7 +28,8 @@ import {NativeString,scalarPV} from "../runtime/native-scalar";
 import {generalRecentHead} from "../live/domain/general-recent-head";
 import {generalMakeLink,generalEscapeUrl} from "../live/domain/general-navigation-url";
 import {runtime} from "../runtime/s2runtime";
-import {generalRecentFromSource} from "../live/domain/general-recent-from-source";
+import {generalRecentPageFromSource} from "../live/domain/general-page-assembly";
+import type {GeneralEntrySourceInput} from "../live/domain/general-entry-from-source";
 import type {GeneralModel} from "../live/domain/general-model-primitives";
 const pv=NativeString.hostUtf8Bytes;
 test("Recent retains native sticky counting, current-entry day flags and maxskip navigation",async()=>{
@@ -55,23 +56,26 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
             sub sticky_entry_active_ids{257}sub recent_items{map{{itemid=>$_,anum=>1,posterid=>500}}1..4}}
         {package RecentEntry;sub visible_to{1}sub poster{bless{},'RecentPoster'}sub is_suspended_for{0}}
         {package RecentPoster;sub is_suspended{0}}
+        my @effects;
         no warnings 'redefine';local $LJ::SITENAMESHORT='DW';local $LJ::MAX_SCROLLBACK_LASTN=6;
-        local *LJ::S2::Page=sub{{_type=>'Page',base_url=>'/journal',head_content=>''}};
-        local *LJ::S2::Image_std=sub{{_type=>'Image',url=>$_[0]}};
+        local *LJ::S2::Page=sub{push @effects,'page';return {_type=>'Page',base_url=>'/journal',head_content=>''}};
+        local *LJ::S2::Image_std=sub{push @effects,'image:'.$_[0];return {_type=>'Image',url=>$_[0]}};
         local *LJ::need_res=sub{};local *LJ::S2::tracking_popup_js=sub{''};local *LJ::Talk::init_s2journal_js=sub{};
         local *LJ::Talk::init_s2journal_shortcut_js=sub{};local *LJ::Lang::ml=sub{''};local *LJ::robot_meta_tags=sub{''};
-        local *LJ::Hooks::run_hook=sub{0};local *LJ::Entry::new=sub{my($class,$u,%args)=@_;my $id=$args{ditemid};
+        local *LJ::Hooks::run_hook=sub{push @effects,'event:'.$_[1]{id} if $_[0] eq 'notify_event_displayed';return 0};
+        local *LJ::Entry::new=sub{my($class,$u,%args)=@_;my $id=$args{ditemid};
             bless {id=>$id,eventtime=>$id==769?'2026-09-27 01:00:00':'2026-09-26 00:00:00'},'RecentEntry'};
-        local *LJ::S2::Entry_from_entryobj=sub{{_type=>'Entry',itemid=>$_[1]{id},new_day=>0,end_day=>0}};
+        local *LJ::S2::Entry_from_entryobj=sub{push @effects,'entry:'.$_[1]{id};
+            return {_type=>'Entry',itemid=>$_[1]{id},new_day=>0,end_day=>0}};
         local *LJ::alldatepart_s2=sub{my $v=shift;$v=~s/[-:]/ /g;$v};
-        my @out;for my $skip(0,3){my $ctx=S2::make_context(101);S2::set_output(sub{});S2::set_output_safe(sub{});
+        my @out;for my $skip(0,3){@effects=();my $ctx=S2::make_context(101);S2::set_output(sub{});S2::set_output_safe(sub{});
             S2::run_code($ctx,'prop_init()');S2::run_code($ctx,'modules_init()');
             my $u=bless{community=>$skip==3?1:0},'RecentUser';my $p=LJ::S2::RecentPage($u,undef,
             {ctx=>$ctx,getargs=>{skip=>$skip}});
             my $printed='';S2::set_output(sub{$printed.=$_[0]});S2::set_output_safe(sub{$printed.=$_[0]});
             S2::run_code($ctx,'RecentPage::print()',$p);push @outputs,encode_base64($printed,'');
             push @out,{entries=>[map{{id=>$_->{itemid},type=>$_->{_type},new=>$_->{new_day},end=>$_->{end_day}}}@{$p->{entries}}],
-                nav=>$p->{nav},head=>$p->{head_content},feeds=>$p->{data_links_order},
+                nav=>$p->{nav},head=>$p->{head_content},feeds=>$p->{data_links_order},effects=>[@effects],
                 links=>{map{$_=>{url=>$p->{data_link}{$_}{url},caption=>$p->{data_link}{$_}{caption}}}qw(rss atom)}};
         }print encode_json({rows=>\@out,outputs=>\@outputs,source=>encode_base64($original,''),code=>encode_base64($code,'')});`;
     const native=JSON.parse(execFileSync("perl",["-e",script],{encoding:"utf8",timeout:10000}));
@@ -82,31 +86,11 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
     const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
     for(const [index,skip] of [0,3].entries()) {
-        const entry=(id:number):GeneralModel=>({".type":"Entry",_itemid:id,_new_day:0,_end_day:0});
-        const displayed:number[]=[];
-        const page=generalRecentFromSource({page:{".type":"Page",_base_url:pv("/journal"),_head_content:pv("")},
-            skip,itemshow:3,maxskip:3,hasLookahead:true,showStickies:skip===0,stickyEntries:[entry(257)],
-            window:[257,513,769].map(id=>({entry:entry(id),countedSticky:id===257,
-                datePrefix:pv(id===769?"2026 09 27":"2026 09 26")})),
-            filterActive:0,filterName:pv(""),filterTags:0,feedTagQuery:pv(""),linkAttributes:[],
-            selectionHead:generalRecentHead({isCommunity:skip===3,siteNameShort:pv("DW"),canonicalJournalBase:pv("/journal"),
-                robotMarkup:pv(""),icbm:undefined,cutLabels:{expanded:pv(""),collapsed:pv(""),collapseAll:pv(""),expandAll:pv("")}})}, {
-            standardImage:kind=>({".type":"Image",_url:pv(kind)}),eventDisplayed:e=>{displayed.push(e._itemid as number);},
-            makeLink:generalMakeLink});
-        const nav=Object.fromEntries(Object.entries(page._nav as GeneralModel).map(([key,value])=>[
-            key===".type"?"_type":key.slice(1),NativeString.is(value)?value.bytes().toString():value]));
-        assert.deepEqual({entries:(page._entries as GeneralModel[]).map(e=>({id:e._itemid,type:e[".type"],new:e._new_day,end:e._end_day})),
-            nav,head:scalarPV(page._head_content).bytes().toString(),feeds:(page._data_links_order as NativeString[]).map(v=>v.bytes().toString()),
-            links:Object.fromEntries(runtime.hashKeys(page._data_link).map(key=>{
-                const link=runtime.memberSlot(page._data_link,key,"hash").get() as GeneralModel;
-                return [scalarPV(key).bytes().toString(),{url:scalarPV(link._url).bytes().toString(),caption:scalarPV(link._caption).bytes().toString()}];
-            }))},native.rows[index]);
-        assert.deepEqual(displayed,skip===0?[513,769]:[257,513,769]);
-        assert.equal(runtime.hashKeys(page._data_link).length,2);
         for(const missing of [false,true]) {
             const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,
                 type:"core",compiledTime:1,sourceBytes:missing?null:Buffer.from(native.source,"base64"),
                 activeCompiledBytes:Buffer.from(native.code,"base64")}]});
+            let page:GeneralModel;
             const session=new GeneralProgramSession(coordinator.transfer(prepared),config,
                 generalScalarCallbacks({page:()=>page,seesControlStrip:()=>false}),{
                 contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
@@ -117,6 +101,57 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
             const initialized=session.initialize({clean(){throw Error("Fixture has no rich initialization property");}});
             assert.equal(initialized.kind,"initialized");
             if(initialized.kind==="initialized")assert.equal(initializedRecentCount(initialized.recentCount),3);
+            const entry=(id:number):GeneralEntrySourceInput=>({journalId:500,posterId:500,
+                permalinkUrl:pv("/journal/"+id+".html"),dateparts:pv("2026 09 26 00 00 00 06"),
+                systemDateparts:pv("2026 09 26 00 00 00 06"),security:pv("public"),allowmask:0,
+                adultContentLevel:pv(""),adminPost:0,forceMoodtheme:undefined,
+                content:{subject:undefined,event:undefined,journalName:pv("journal"),ditemid:id,jitemid:id>>8,
+                    editor:undefined,preformatted:0,importSourceDefined:false,isSyndicated:0,
+                    logtimeMysql:pv("2026-09-26 00:00:00"),suspendMessage:0,noEntryBody:0,noHtml:0,
+                    cutUrl:pv("/journal/"+id+".html"),cutDisable:0}});
+            const displayed:number[]=[],effects:string[]=[],journal:GeneralModel={".type":"User"};
+            let clocked=false;
+            page=generalRecentPageFromSource(session.context,{page:{styleId:0,styleModtime:0,
+                baseUrl:pv("/journal"),journal,journalType:pv(skip===3?"C":"P"),ownerName:undefined,
+                journalTitle:undefined,journalSubtitle:undefined,layoutName:undefined,themeName:undefined,
+                layoutUrl:pv(""),getargs:[],viewingStyleOptions:undefined,viewUrls:[],links:[],
+                customtext:{title:undefined,url:undefined,content:undefined},
+                customtextDefaults:{title:undefined,url:undefined,content:undefined},
+                showControlStrip:0,isCanary:0,noMobileCookie:0,sessionMessages:[],headContent:pv(""),
+                canUseNetwork:0,activeEntries:[]},
+                selection:{skip,itemshow:3,maxskip:3,hasLookahead:true,showStickies:skip===0,stickyEntries:[entry(257)],
+                    window:[257,513,769].map(id=>({entry:entry(id),countedSticky:id===257,
+                        datePrefix:pv(id===769?"2026 09 27":"2026 09 26")}))},
+                navigation:{filterActive:0,filterName:pv(""),filterTags:0,feedTagQuery:pv(""),linkAttributes:[],
+                    selectionHead:generalRecentHead({isCommunity:skip===3,siteNameShort:pv("DW"),canonicalJournalBase:pv("/journal"),
+                        robotMarkup:pv(""),icbm:undefined,cutLabels:{expanded:pv(""),collapsed:pv(""),collapseAll:pv(""),expandAll:pv("")}})}}, {
+                page:{clockSeconds(){if(!clocked){clocked=true;effects.push("page");}return 1790467200;},
+                    // This fixture has no property content. Preserve native's
+                    // undef early return, never provide an identity HTML cleaner.
+                    escapeProperty(value){assert.equal(value,undefined);return undefined;}},
+                entry(input){effects.push("entry:"+input.content.ditemid);return {
+                    features:{memories:false,tellafriend:false,esn:false},
+                    cleanSubject(){throw Error("No fixture subject");},cleanEvent(){throw Error("No fixture event");},
+                    expandEmbedded(value){assert.equal(value,undefined);return undefined;},
+                    transformAdult(value){assert.equal(value,undefined);return undefined;},
+                    user:()=>journal,picture:()=>undefined,moodtheme:()=>0,
+                    tagList:()=>({html:undefined,tags:[]}),commentInfo:()=>({".type":"CommentInfo",_count:0,_enabled:0}),
+                    standardImage(){throw Error("Public fixture has no security icon");},
+                    currents:()=>({values:[]}),groupNames:()=>pv("")};},
+                recent:{standardImage:kind=>{effects.push("image:"+kind);return {".type":"Image",_url:pv(kind)};},
+                    eventDisplayed:e=>{const id=Number(scalarPV(e._itemid).bytes().toString());displayed.push(id);effects.push("event:"+id);},
+                    makeLink:generalMakeLink}});
+            const nav=Object.fromEntries(Object.entries(page._nav as GeneralModel).map(([key,value])=>[
+                key===".type"?"_type":key.slice(1),NativeString.is(value)?value.bytes().toString():value]));
+            assert.deepEqual({entries:(page._entries as GeneralModel[]).map(e=>({id:Number(scalarPV(e._itemid).bytes().toString()),type:e[".type"],
+                    new:Number(scalarPV(e._new_day).bytes().toString()),end:Number(scalarPV(e._end_day).bytes().toString())})),
+                nav,head:scalarPV(page._head_content).bytes().toString(),feeds:(page._data_links_order as NativeString[]).map(v=>v.bytes().toString()),effects,
+                links:Object.fromEntries(runtime.hashKeys(page._data_link).map(key=>{
+                    const link=runtime.memberSlot(page._data_link,key,"hash").get() as GeneralModel;
+                    return [scalarPV(key).bytes().toString(),{url:scalarPV(link._url).bytes().toString(),caption:scalarPV(link._caption).bytes().toString()}];
+                }))},native.rows[index]);
+            assert.deepEqual(displayed,skip===0?[513,769]:[257,513,769]);
+            assert.equal(runtime.hashKeys(page._data_link).length,2);
             session.beginRender();const frame=session.completePage(page,"recent",()=>{throw Error("Unexpected diagnostic");});
             assert.equal(session.context,sameContext);
             assert.equal(Buffer.from(frame.bytes).toString("base64"),native.outputs[index]);

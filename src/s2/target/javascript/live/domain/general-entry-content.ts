@@ -45,7 +45,7 @@ export interface GeneralEntryEventOptions {
     readonly journal:NativeString;readonly ditemid:unknown;
     readonly isSyndicated:unknown;readonly isImported:boolean;
     readonly editor:NativeString|undefined;readonly logtimeMysql:NativeString;
-    readonly cutUrl:NativeString;readonly cutDisable:unknown;
+    readonly cutUrl:NativeString|undefined;readonly cutDisable:unknown;
 }
 export interface GeneralEntryContentOperations {
     // Installed original-source cleaners. No identity or scalar-only fallback.
