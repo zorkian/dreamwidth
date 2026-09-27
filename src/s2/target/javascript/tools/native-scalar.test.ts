@@ -23,6 +23,24 @@ import {Context, runtime} from '../runtime/s2runtime';
 const n = NativeNumber.literal;
 const text = (value: NativeNumber) => value.pv().bytes().toString('utf8');
 
+test('captured operand cells are branded, once-bound and safe across native-undefined deletion', () => {
+    const pv = NativeString.hostUtf8Bytes;
+    let container: Record<string, unknown> = {x: pv('a')};
+    const original = container;
+    const slot = runtime.memberSlot(container, 'x', 'field');
+    const operand = runtime.captureOperand(slot);
+    container = {x: pv('new')};
+    assert.equal(runtime.scalarPV(runtime.scalarBinary('concat', operand, pv('X'))).bytes().toString(), 'aX');
+    delete original.x;
+    assert.equal(runtime.scalarPV(runtime.scalarBinary('concat', operand, pv('X'))).bytes().toString(), 'X');
+    original.x = pv('b');
+    assert.equal(runtime.scalarPV(runtime.scalarBinary('concat', operand, pv('X'))).bytes().toString(), 'bX');
+    const missing = runtime.captureOperand(runtime.memberSlot(original, 'missing', 'field'));
+    original.missing = pv('later');
+    assert.equal(runtime.scalarPV(runtime.scalarBinary('concat', missing, pv('X'))).bytes().toString(), 'X');
+    assert.equal(runtime.readOperand({get: () => pv('forged')}) instanceof NativeString, false);
+});
+
 test('raw native PV keeps byte foreach, reverse, clone and final output exact', () => {
     const source = Buffer.from('猫é');
     const value = NativeString.bytes(source);

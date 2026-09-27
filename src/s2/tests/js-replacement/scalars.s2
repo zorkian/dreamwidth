@@ -12,9 +12,62 @@
 # 'perldoc perlartistic' or 'perldoc perlgpl'.
 #
 layerinfo type = "core";
+class AliasBox { var string value; }
+property string alias_text;
+set alias_text = "a";
+property int alias_number;
+set alias_number = 1;
+function change_alias() : string { $*alias_text = "b"; return "X"; }
+function bump_alias() : int { $*alias_number = 10; return 2; }
+function put_alias(string{} values) : string { $values{"x"} = "b"; return "X"; }
+function first_alias(string first, string second) : string { return $first; }
+function alias_key() : string { print "Q"; return "x"; }
+function change_field(AliasBox box) : string { $box.value = "b"; return "X"; }
+function change_element(string[] values) : string { $values[0] = "b"; return "X"; }
+function alias_operands() {
+    $*alias_text = "a";
+    print "|alias:" + $*alias_text + change_alias();
+    $*alias_text = "a";
+    print "|pre" + $*alias_text + change_alias();
+    $*alias_number = 1;
+    print "|" + ($*alias_number + bump_alias());
+    $*alias_number = 1;
+    if ($*alias_number < bump_alias()) { print "|lt"; } else { print "|ge"; }
+    $*alias_text = "a";
+    $*alias_text = $*alias_text + change_alias();
+    print "|assigned:" + $*alias_text;
+    var int local_value = 1;
+    print "|" + ($local_value + ++$local_value);
+    $local_value = 1;
+    print "|" + ($local_value + $local_value++);
+    $*alias_number = 1;
+    print "|" + (++$*alias_number + bump_alias());
+    $*alias_number = 1;
+    print "|" + ($*alias_number++ + bump_alias());
+    var string{} missing = {};
+    print "|missing:" + $missing{"x"} + put_alias($missing);
+    var string{} existing = {};
+    $existing{"x"} = $existing{"absent"};
+    print "|undef:" + $existing{"x"} + put_alias($existing);
+    $*alias_text = "a";
+    print "|arg:" + first_alias($*alias_text, change_alias());
+    $*alias_text = "a";
+    var string[] captured = [$*alias_text, change_alias()];
+    print "|list:" + $captured[0];
+    $existing{"x"} = "a";
+    print "|key:" + $existing{alias_key()} + put_alias($existing);
+    var AliasBox box = new AliasBox;
+    $box.value = "a";
+    print "|field:" + $box.value + change_field($box);
+    var string[] elements = ["a"];
+    print "|element:" + $elements[0] + change_element($elements);
+    $*alias_text = "a";
+    print "|assign-result:" + ($*alias_text = "c") + change_alias();
+}
 function target_index() : int { print "K"; return 0; }
 function pushed_value() : string { print "V"; return "third"; }
 function main() {
+    alias_operands();
     var string bytes = "猫é";
     print size $bytes;
     foreach var string byte ($bytes) { print "["+$byte+"]"; }
