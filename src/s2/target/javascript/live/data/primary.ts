@@ -94,6 +94,19 @@ export function primaryTransport(source: Pick<ConfiguredDatabaseSource, "host" |
     return {host: source.host, ...(source.port === null ? {} : {port: source.port})};
 }
 
+// Data-dependent property storage is selected inside the same read-only snapshot.
+// Validate only the tables actually read; unused legacy tables are not dependencies.
+export async function requireTransactionalTables(connection: ReadConnection,
+    tables: readonly string[]): Promise<void> {
+    if (!tables.length) return;
+    if (new Set(tables).size !== tables.length) invalid();
+    const engines = (await sql<SqlRow>`SELECT TABLE_NAME AS name, ENGINE AS engine
+        FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN (${sql.join(tables)}) AND TABLE_TYPE = 'BASE TABLE'
+    `.execute(connection)).rows;
+    if (engines.length !== tables.length || engines.some(row => row.engine !== "InnoDB")) invalid();
+}
+
 export class PrimaryDatabases {
     private readonly pools = new Map<string, ReadConnection>();
     private closed = false;
@@ -154,15 +167,7 @@ export class PrimaryDatabases {
                     try {
                         const database = (await sql<SqlRow>`SELECT DATABASE() AS dbname`.execute(connection)).rows[0];
                         if (database?.dbname !== source.database) invalid();
-                        if (tables.length) {
-                            const engines = (await sql<SqlRow>`SELECT TABLE_NAME AS name, ENGINE AS engine
-                                FROM information_schema.TABLES WHERE TABLE_SCHEMA = ${source.database}
-                                AND TABLE_NAME IN (${sql.join(tables)}) AND TABLE_TYPE = 'BASE TABLE'
-                            `.execute(connection)).rows;
-                            if (engines.length !== tables.length || engines.some(row => row.engine !== "InnoDB")) {
-                                invalid();
-                            }
-                        }
+                        await requireTransactionalTables(connection, tables);
                         return await read(connection);
                     } finally { await sql`ROLLBACK`.execute(connection); }
                 });
