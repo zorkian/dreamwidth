@@ -21,12 +21,31 @@ function object(value: unknown): value is S2Object {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function cloneData(value: unknown, seen = new Map<object, unknown>()): unknown {
+    if (typeof value !== "object" || value === null) return value;
+    if (seen.has(value)) return seen.get(value);
+    const copy: unknown[] | S2Object = Array.isArray(value) ? [] : Object.create(null);
+    seen.set(value, copy);
+    if (Array.isArray(value)) (copy as unknown[]).length = value.length;
+    for (const key of Object.keys(value)) {
+        (copy as S2Object)[key] = cloneData((value as S2Object)[key], seen);
+    }
+    return copy;
+}
+
 export class Layer {
     source = "<unknown S2 layer>";
     readonly info: Record<string, string> = Object.create(null);
     readonly functions = new Map<string, S2Function>();
     readonly properties = new Map<string, unknown>();
     readonly classes = new Map<string, string | undefined>();
+    readonly declarations = new Map<string, {type: string; attributes: Readonly<Record<string, string>>}>();
+    readonly propertyUses: string[] = [];
+    readonly hiddenProperties = new Set<string>();
+    readonly propertyGroups = new Map<string, readonly string[]>();
+    readonly propertyGroupNames = new Map<string, string>();
+    readonly classMetadata = new Map<string, Readonly<Record<string, unknown>>>();
+    readonly globalFunctions = new Map<string, {returntype:string;docstring:string;attrs:string}>();
 
     setLayerInfo(key: string, value: string): void {
         this.info[key] = value;
@@ -36,19 +55,30 @@ export class Layer {
         this.classes.set(name, parent);
     }
 
+    registerClassMetadata(name: string, nativeData: Record<string, unknown>): void {
+        this.classMetadata.set(name, cloneData(nativeData) as Record<string, unknown>);
+        this.registerClass(name, typeof nativeData.parent === "string" ? nativeData.parent : undefined);
+    }
+
+    registerGlobalFunction(signature: string, returntype: string, docstring: string, attrs: string): void {
+        this.globalFunctions.set(signature, {returntype, docstring, attrs});
+    }
+
     registerFunction(names: string[], factory: () => S2Function): void {
         const implementation = factory();
         for (const name of names) this.functions.set(name, implementation);
     }
 
-    registerProperty(_name: string, _type: string, _attributes: object): void {
-        // Metadata does not affect execution in this fixture-only slice.
+    registerProperty(name: string, type: string, attributes: object): void {
+        this.declarations.set(name, {type, attributes: Object.freeze({...attributes})});
     }
 
-    hideProperty(_name: string): void {}
-    useProperty(_name: string): void {}
-    namePropGroup(_name: string, _displayName: string): void {}
-    registerPropGroup(_name: string, _members: string[]): void {}
+    hideProperty(name: string): void { this.hiddenProperties.add(name); }
+    useProperty(name: string): void { this.propertyUses.push(name); }
+    namePropGroup(name: string, displayName: string): void { this.propertyGroupNames.set(name, displayName); }
+    registerPropGroup(name: string, members: string[]): void {
+        this.propertyGroups.set(name, Object.freeze([...members]));
+    }
 
     setProperty(name: string, value: unknown): void {
         this.properties.set(name, value);
@@ -56,6 +86,12 @@ export class Layer {
 }
 
 export const runtime = {
+    recoveryCheckpoint(context: Context): void { context.recoveryCheckpoint(); },
+    makeHash(pairs: readonly (readonly [unknown, unknown])[]): Record<string, unknown> {
+        const hash: Record<string, unknown> = Object.create(null);
+        for (const [key, value] of pairs) hash[String(key)] = value;
+        return hash;
+    },
     prepareString(value: unknown): string {
         if (value === null || value === undefined) return "";
         if (object(value) && value[".isnull"]) return "";
@@ -301,6 +337,10 @@ export class Context {
     private readonly functions = new Map<string, S2Function>();
     private readonly classes = new Map<string, string | undefined>();
     private readonly methodFrames: string[] = [];
+    private readonly callFrames: string[] = [];
+    private deadline = 0;
+    private functionCalls = 0;
+    private printCalls = 0;
 
     constructor(
         layers: Layer[], private readonly write: (text: string) => void,
@@ -311,11 +351,30 @@ export class Context {
             for (const [name, implementation] of layer.functions) {
                 this.functions.set(name, implementation);
             }
-            for (const [name, value] of layer.properties) this.prop[name] = value;
+            // A program may reuse a cached artifact, never mutable request state.
+            // Composite/class values retain their data shape and graph identity.
+            for (const [name, value] of layer.properties) this.prop[name] = cloneData(value);
             for (const [name, parent] of layer.classes) this.classes.set(name, parent);
         }
         if (properties) {
             for (const [name, value] of Object.entries(properties)) this.prop[`_${name}`] = value;
+        }
+        // S2::make_context checks every declaring layer after merging sets. Labels
+        // are not enum values, and invalid values disappear rather than falling
+        // back to a lower layer's set. Perl-false scalar values bypass this check.
+        for (const layer of layers) for (const [name, declaration] of layer.declarations) {
+            const value = this.prop[name];
+            if (value === undefined || value === null || value === false || value === 0 ||
+                value === "" || value === "0") continue;
+            const {values, allow_other} = declaration.attributes;
+            if (!values || values === "0" || (allow_other && allow_other !== "0")) continue;
+            const pairs = values.split("|");
+            while (pairs[pairs.length - 1] === "") pairs.pop();
+            const allowed = new Map<string, string | undefined>();
+            for (let index = 0; index < pairs.length; index += 2) allowed.set(pairs[index]!, pairs[index + 1]);
+            const key = value === true ? "1" : String(value);
+            const label = allowed.get(key);
+            if (!label || label === "0") delete this.prop[name];
         }
         const functions: FixtureBuiltins = { ...fixtureBuiltins, ...callbacks };
         this.builtin = new Proxy(functions, {
@@ -329,6 +388,7 @@ export class Context {
     }
 
     print(value: unknown): void {
+        if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
         this.write(String(value));
     }
 
@@ -355,16 +415,44 @@ export class Context {
     }
 
     safePrint(value: unknown): void {
+        if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
         this.write(this.safeOutput(String(value)));
     }
 
     getFunction(name: string): S2Function {
         const implementation = this.functions.get(name);
         if (!implementation) throw new Error(`Undefined S2 function ${name}`);
-        return implementation;
+        return (context, ...args) => this.invoke(name, implementation, context, args);
     }
 
-    getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false): S2Function {
+    recoveryCheckpoint(): void {
+        // Native run_function defaults to four seconds and check_depth's default
+        // repeated-frame threshold is fifty. Recovered loops call this same seam;
+        // the outer worker deadline remains an independent fail-stop boundary.
+        if (this.deadline && performance.now() > this.deadline) throw new Error("S2 execution timed out");
+        const counts = new Map<string, number>();
+        for (const frame of this.callFrames) {
+            const count = (counts.get(frame) ?? 0) + 1;
+            if (count >= 50) throw new Error("Excessive S2 recursion");
+            counts.set(frame, count);
+        }
+    }
+
+    private invoke(name: string, implementation: S2Function, context: Context, args: unknown[]): unknown {
+        if (!this.callFrames.length) {
+            this.deadline = performance.now() + 4000;
+            this.functionCalls = 0;
+            this.printCalls = 0;
+        }
+        this.callFrames.push(name);
+        try {
+            if (++this.functionCalls % 16 === 0) this.recoveryCheckpoint();
+            return implementation(context, ...args);
+        } finally { this.callFrames.pop(); }
+    }
+
+    getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false,
+        dispatchClass?: string): S2Function {
         const location = `${layer.source}:${line}`;
         if (!object(value) || value[".isnull"]) {
             throw new Error(`${location}: method ${name} called on null object`);
@@ -373,7 +461,7 @@ export class Context {
         if (typeof type !== "string") throw new Error(`${location}: object has no S2 class`);
 
         let current: string | undefined = superCall
-            ? this.classes.get(this.methodFrames[this.methodFrames.length - 1] ?? type)
+            ? dispatchClass ?? this.classes.get(this.methodFrames[this.methodFrames.length - 1] ?? type)
             : type;
         while (current !== undefined) {
             const definingClass = current;
@@ -382,12 +470,15 @@ export class Context {
                 return (context, ...args) => {
                     this.methodFrames.push(definingClass);
                     try {
-                        return implementation(context, ...args);
+                        return this.invoke(`${definingClass}::${name}`, implementation, context, args);
                     } finally {
                         this.methodFrames.pop();
                     }
                 };
             }
+            // Native super lookup uses the checker-emitted class unchanged.
+            // Do not mask a missing exact alias with another ancestor lookup.
+            if (superCall && dispatchClass !== undefined) break;
             current = this.classes.get(current);
         }
         throw new Error(`${location}: undefined method ${type}::${name}`);
