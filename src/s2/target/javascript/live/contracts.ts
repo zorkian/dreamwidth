@@ -280,6 +280,14 @@ export interface RawRecentRepository {
     close(): Promise<void>;
 }
 
+// General serving binds this data witness to a separate ActiveProgramSnapshot.
+// A selected snapshot alone never grants program or publication authority.
+export interface SelectedDataRepository {
+    loadSelectedSnapshot(request: RawPageRequest): Promise<RawJournalSnapshot | null>;
+    revalidateSelectedFingerprint(snapshot: RawJournalSnapshot): Promise<boolean>;
+    close(): Promise<void>;
+}
+
 export interface PlaceholderResolutionSpec {
     readonly descriptor: {
         readonly src: string;
@@ -338,7 +346,7 @@ export interface AnonymousEntryRequest {
 export type LiveFailure = "not-found" | "unsupported" | "changed" | "unavailable";
 export type LiveResult =
     | { readonly ok: false; readonly reason: LiveFailure }
-    | { readonly ok: true; readonly html: string; readonly setCookie: string | null };
+    | { readonly ok: true; readonly html: string | Uint8Array; readonly setCookie: string | null };
 
 export interface AnonymousRecentService {
     // HEAD performs the same authorization/render/recheck as GET. Server strips
