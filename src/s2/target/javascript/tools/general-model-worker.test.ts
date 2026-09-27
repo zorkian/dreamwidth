@@ -24,6 +24,7 @@ import {ProgramCoordinator} from "../live/render/program-coordinator";
 import {GeneralRenderer} from "../live/render/general-child";
 import {verifyGeneralRuntime} from "../live/render/manifest";
 import {GeneralPublicSession} from "../live/domain/general-public-session";
+import {GeneralMlRequestContext} from "../live/domain/public-translation";
 import {GeneralUserAuthority} from "../live/domain/general-user-authority";
 import {parentLoadUser} from "../live/render/general-user-host";
 import {encodeGeneralModel} from "../live/render/general-model-wire";
@@ -136,7 +137,8 @@ test("closed real worker preserves native models and private UserLite across ini
             }},programs,coordinator,renderer,config,{
                 helpers(){
                     const session=new GeneralPublicSession(users,{async snapshot():Promise<never>{throw Error("No fixed model translation");},
-                        async revalidate(){return true;}},compiler.scalarProfile,25);
+                        async revalidate(){return true;}},compiler.scalarProfile,25,undefined,
+                        new GeneralMlRequestContext(NativeString.hostUtf8Bytes("en"),NativeString.hostUtf8Bytes("en"),undefined));
                     const authority=new GeneralUserAuthority(session,{displayName:()=>NativeString.hostUtf8Bytes("Public & Name"),
                         journalBase:()=>NativeString.hostUtf8Bytes("https://public.example.invalid/base"),tellFriend:false});
                     return {session,async host(operation,parameters,phase){

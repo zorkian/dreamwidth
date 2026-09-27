@@ -26,20 +26,20 @@ import {NativeString,scalarPV} from "../../runtime/native-scalar";
 import {concatStrings} from "../../runtime/native-string";
 import {generalLink,type GeneralModel} from "./general-model-primitives";
 
-export interface GeneralRecentWindowItem {
+export interface GeneralRecentWindowItem<T=GeneralModel> {
     // An absent prepared entry means a source visibility check skipped it.
     // It still contributes to the source pagination count.
-    readonly entry:GeneralModel|undefined;
+    readonly entry:T|undefined;
     readonly datePrefix:NativeString;
     readonly countedSticky:boolean;
 }
-export interface GeneralRecentInput {
+export interface GeneralRecentInput<T=GeneralModel> {
     readonly page:GeneralModel;
     readonly skip:number;readonly itemshow:number;readonly maxskip:number;
     readonly hasLookahead:boolean;
     readonly showStickies:boolean;
-    readonly stickyEntries:readonly GeneralModel[];
-    readonly window:readonly GeneralRecentWindowItem[];
+    readonly stickyEntries:readonly T[];
+    readonly window:readonly GeneralRecentWindowItem<T>[];
     readonly filterActive:unknown;readonly filterName:NativeString;readonly filterTags:unknown;
     // Source head helpers run before the selection/entry loop. This is their
     // complete prepared contribution, not stored HTML authorized by this model.
@@ -57,6 +57,15 @@ const pv=NativeString.hostUtf8Bytes;
 const add=(left:unknown,right:unknown)=>concatStrings(scalarPV(left),scalarPV(right));
 /** No SQL or content callbacks here: only authorized prepared Entry references. */
 export function generalRecentFromSource(input:GeneralRecentInput,operations:GeneralRecentOperations):GeneralModel {
+    return prepareGeneralRecentFromSource(input,{...operations,prepareEntry:entry=>entry});
+}
+export interface GeneralRecentPreparationOperations<T> extends GeneralRecentOperations {
+    /** Installed Entry_from_entryobj operation, never a callback from IPC. */
+    prepareEntry(input:T):GeneralModel;
+}
+/** Prepare entries in native source order, interleaved with display notification. */
+export function prepareGeneralRecentFromSource<T>(input:GeneralRecentInput<T>,
+    operations:GeneralRecentPreparationOperations<T>):GeneralModel {
     const page=input.page;
     page[".type"]="RecentPage";page._view=pv("recent");page._entries=[];
     page._filter_active=input.filterActive;page._filter_name=input.filterName;page._filter_tags=input.filterTags;
@@ -66,14 +75,15 @@ export function generalRecentFromSource(input:GeneralRecentInput,operations:Gene
         operations.standardImage(kind as "rss"|"atom"))]));
     page._data_links_order=[pv("rss"),pv("atom")];
     const entries=page._entries as GeneralModel[];
-    if(input.showStickies)for(const entry of input.stickyEntries) {
+    if(input.showStickies)for(const source of input.stickyEntries) {
+        const entry=operations.prepareEntry(source);
         entry[".type"]="StickyEntry";entry._sticky_entry_icon=operations.standardImage("sticky-entry");entries.push(entry);
     }
     let lastdate=pv(""),itemnum=0;
     for(const item of input.window) {
         itemnum++;
         if(input.showStickies&&item.countedSticky||item.entry===undefined)continue;
-        const entry=item.entry;
+        const entry=operations.prepareEntry(item.entry);
         // RecentPage.pm assigns $lastentry to the CURRENT entry before the
         // day comparison. Preserve that source behavior, not an inferred fix.
         const changed=!runtime.scalarCompare("string","==",item.datePrefix,lastdate);

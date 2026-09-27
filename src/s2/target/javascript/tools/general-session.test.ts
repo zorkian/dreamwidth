@@ -66,10 +66,7 @@ test("native init count drives data resume in the same source/recovered Context"
                 "recent",()=>{throw Error("Byte fixture must not need diagnostic");});
             assert.equal(Buffer.from(raw.bytes).toString("base64"),oracle.bytesOutput);
 
-            let cssSession:GeneralProgramSession;
-            cssSession=new GeneralProgramSession(coordinator.transfer(prepared),config,{
-                _start_css:()=>cssSession.startCss(),_end_css:()=>cssSession.endCss(),
-            },outputOptions);
+            const cssSession=new GeneralProgramSession(coordinator.transfer(prepared),config,{},outputOptions);
             cssSession.context.prop._init_css=NativeNumber.integer(1n);
             assert.equal(cssSession.initialize({clean(){throw Error("Unexpected CSS fixture property clean");}}).kind,"initialized");
             cssSession.beginRender();
