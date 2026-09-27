@@ -21,6 +21,7 @@ import test from "node:test";
 import { parseStartupArgs, readStartupConfig, StartupConfigError, validateStartupConfig }
     from "../live/server/startup-config";
 
+import {decodeScalar,encodeScalar,scalarNumber,scalarPV,NativeNumber,NativeString} from "../runtime/native-scalar";
 import {prepareGeneralImageUrlFacts} from "../live/domain/general-image-url";
 
 const repo = path.resolve(process.cwd(), "../../../..");
@@ -373,4 +374,37 @@ $DISABLED{tellafriend}=sub{die 'unexpected arguments' if @_;return 1;};$DISABLED
     const rejected=exportSite(unsafeHome,path.join(dir,"unsafe.json"));
     assert.notEqual(rejected.status,0);assert.equal(existsSync(path.join(dir,"unsafe.json")),false);
     assert.match(rejected.stderr,/Feature setup attempted a database connection/);
+}));
+
+test("standard image setup preserves native scalar kinds, flags, absence and private boundaries",()=>temporary(dir=>{
+    const home=fixture(dir,`require LJ::Global::Img;require Scalar::Util;
+my $src=chr(0xe9);utf8::upgrade($src);
+$LJ::DEFAULT_LANG='en';$LJ::LANGS[0]='debug';
+$LJ::Img::img{rss}={src=>$src,width=>9007199254740993,height=>Scalar::Util::dualvar(2,'02'),alt=>'fixture.alt'};
+$LJ::Img::img{atom}={src=>'',width=>'0',height=>1.25,alt=>''};
+$LJ::Img::img{'sticky-entry'}={};`);
+    const output=path.join(dir,"images.json"),result=exportSite(home,output);
+    assert.equal(result.status,0,result.stderr);assert.equal(result.stderr,"");
+    assert.ok(!result.stdout.includes(secret));assert.equal(statSync(output).mode&0o777,0o600);
+    const config=readStartupConfig(output),facts=config.standardImages!;
+    assert.deepEqual(config.nativeLanguageContext,{defaultLang:{base64:"ZW4=",utf8:false},
+        firstLang:{base64:"ZGVidWc=",utf8:false}});
+    assert.equal(facts.images.length,23);
+    const rss=facts.images.find(image=>image.name==="rss")!;
+    assert.deepEqual(rss.src,{base64:"w6k=",utf8:true});
+    const width=decodeScalar(rss.width!);assert.ok(NativeNumber.is(width));assert.equal(width.wire().value,"9007199254740993");
+    const height=decodeScalar(rss.height!);assert.ok(NativeString.is(height));
+    assert.equal(scalarPV(height).bytes().toString(),"02");assert.equal(scalarNumber(height).wire().value,"2");
+    assert.deepEqual(encodeScalar(height),rss.height);
+    const atom=facts.images.find(image=>image.name==="atom")!;
+    assert.equal(scalarPV(decodeScalar(atom.width!)).bytes().toString(),"0");
+    assert.equal(scalarNumber(decodeScalar(atom.height!)).wire().value,"3ff4000000000000");
+    const absent=facts.images.find(image=>image.name==="sticky-entry")!;
+    assert.deepEqual([absent.src,absent.width,absent.height,absent.altKey],[null,null,null,null]);
+    for(const mutate of [(v:any)=>v.standardImages.images.push(v.standardImages.images[0]),
+        (v:any)=>v.standardImages.images[0].width={kind:"pv",base64:"!",utf8:false},
+        (v:any)=>v.standardImages.prefix.utf8="false",
+        (v:any)=>v.nativeLanguageContext.firstLang.base64="!"]) {
+        const copy=JSON.parse(JSON.stringify(config));mutate(copy);assert.throws(()=>validateStartupConfig(copy));
+    }
 }));

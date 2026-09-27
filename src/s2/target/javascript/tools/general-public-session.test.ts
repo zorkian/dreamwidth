@@ -21,6 +21,7 @@ import type {NativeProfile} from "../runtime/native-profile";
 import {canonicalPublicUsername, GeneralPublicSession} from "../live/domain/general-public-session";
 import type {PublicUserSnapshot} from "../live/data/public-users";
 import type {PublicTranslationSnapshot} from "../live/data/public-translations";
+import {GeneralMlRequestContext,type GeneralMlLookup} from "../live/domain/public-translation";
 
 const root=path.resolve("../..");
 const profile=JSON.parse(execFileSync("perl",["tools/compile-active.pl",root,path.join(root,"S2.pm")],{
@@ -46,12 +47,19 @@ test("all helper witnesses precede final authority and session cannot reopen",as
     const translation:PublicTranslationSnapshot={name:"video",language:"en",value:NativeString.hostUtf8Bytes("text"),fingerprint:"text"};
     let current=true;
     const users={async snapshot(name:string){order.push("user:"+name);return user;},async revalidate(value:PublicUserSnapshot){assert.equal(value,user);order.push("check-user");return current;}};
-    const translations={async snapshot(){order.push("translation");return translation;},async revalidate(value:PublicTranslationSnapshot){assert.equal(value,translation);order.push("check-translation");return true;}};
-    const session=new GeneralPublicSession(users,translations,profile,25);
+    const translations={async snapshot(){order.push("translation");return translation;},
+        async snapshotContext(context:GeneralMlLookup){assert.equal(context.kind,"lookup");
+            assert.equal(context.kind==="lookup"&&context.code?.bytes().toString(),"image.alt");order.push("image-translation");return translation;},
+        async revalidate(value:PublicTranslationSnapshot){assert.equal(value,translation);order.push("check-translation");return true;}};
+    const session=new GeneralPublicSession(users,translations,profile,25,undefined,
+        new GeneralMlRequestContext(NativeString.hostUtf8Bytes("en"),NativeString.hostUtf8Bytes("debug"),undefined));
     assert.equal(await session.user(NativeString.hostUtf8Bytes("@invalid")),null);
     await session.user(NativeString.hostUtf8Bytes("ARBITRARY"));await session.translation("video");
+    await session.imageTranslation(NativeString.hostUtf8Bytes("image.alt"));
+    session.afterContextInitialization();
+    assert.throws(()=>session.afterContextInitialization());
     assert.equal(await session.finish(async()=>{order.push("authority");return true;}),true);
-    assert.deepEqual(order,["user:arbitrary","translation","check-user","check-translation","authority"]);
+    assert.deepEqual(order,["user:arbitrary","translation","image-translation","check-user","check-translation","check-translation","authority"]);
     await assert.rejects(session.user(NativeString.hostUtf8Bytes("other")),/closed/);
     await assert.rejects(session.finish(async()=>true),/closed/);
     const changed=new GeneralPublicSession(users,translations,profile,25);await changed.user(NativeString.hostUtf8Bytes("arbitrary"));current=false;

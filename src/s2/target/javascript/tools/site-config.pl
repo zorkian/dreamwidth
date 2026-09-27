@@ -87,6 +87,29 @@ sub public_scalar_frame {
     return { base64 => encode_base64($bytes, ''), utf8 => truth($flag) };
 }
 
+# Preserve the installed scalar kind instead of JSON's lossy wide-number bridge.
+sub public_scalar_wire {
+    my ($value) = @_;
+    return undef unless defined $value;
+    fail('Invalid public scalar configuration') if ref $value;
+    my $sv = svref_2object(\$value);
+    my $flags = $sv->FLAGS;
+    my $number;
+    if ($flags & B::SVf_IOK()) {
+        my $unsigned = $flags & B::SVf_IVisUV();
+        $number = {mode => $unsigned ? 'uv' : 'iv', value => '' . ($unsigned ? $sv->UV : $sv->IV)};
+    } elsif ($flags & B::SVf_NOK()) {
+        $number = {mode => 'nv', value => unpack('H*', pack('d>', $sv->NV))};
+    }
+    if ($flags & B::SVf_POK()) {
+        my $frame = public_scalar_frame($value);
+        if ($number) { $number->{original} = $frame; }
+        return {kind => 'pv', %$frame, $number ? (numericCache => $number) : ()};
+    }
+    return {kind => 'number', number => $number} if $number;
+    return {kind => 'pv', %{public_scalar_frame($value)}};
+}
+
 sub string {
     my ( $value, $limit ) = @_;
     $limit ||= 4096;
@@ -277,6 +300,22 @@ sub export_config {
         push @bits, { bit => 0 + $bit, value => number( $c->{s2viewentry} ) }
             if defined $c->{s2viewentry};
     }
+    # Image_std uses these installed public descriptors; alt selection and its
+    # request-local cache remain in the same admitted child Context.
+    my @standard_image_names = qw(security-protected security-private security-groups
+        adult-nsfw adult-18 sticky-entry admin-post btn_del btn_freeze btn_unfreeze
+        btn_scr btn_unscr editcomment editentry edittags tellfriend memadd prev_entry
+        next_entry track untrack atom rss);
+    my @standard_images;
+    for my $name (@standard_image_names) {
+        my $image = $LJ::Img::img{$name};
+        fail('Invalid standard image configuration') if defined $image && ref $image ne 'HASH';
+        push @standard_images, {name => $name,
+            src => defined $image->{src} ? public_scalar_frame($image->{src}) : undef,
+            width => public_scalar_wire($image->{width}),
+            height => public_scalar_wire($image->{height}),
+            altKey => defined $image->{alt} ? public_scalar_frame($image->{alt}) : undef};
+    }
     my $image = $LJ::Img::img{placeholder};
     fail('Invalid placeholder configuration') unless ref $image eq 'HASH';
     my @language_files = grep { defined $_ } map { LJ::resolve_file($_) }
@@ -321,6 +360,11 @@ sub export_config {
     } sort { $a <=> $b } keys %readonly_clusters;
     fail('Too many author readonly clusters') if @readonly_clusters > 4096;
     my $config = {
+        nativeLanguageContext => {
+            defaultLang => public_scalar_frame($LJ::DEFAULT_LANG),
+            firstLang => public_scalar_frame($LJ::LANGS[0]),
+        },
+        standardImages => {prefix => public_scalar_frame($LJ::IMGPREFIX // ''), images => \@standard_images},
         schema       => 1,
         sourceFeatureFlags => \%source_features,
         sourceFeatureFlagsIdentity => $feature_identity,

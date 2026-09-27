@@ -21,7 +21,7 @@ import type {NativePVFrame} from "../../runtime/native-string";
 // arbitrary translation keys or code supplied by the program.
 export type GeneralHostOperation = "user-lite" | "expand-user" | "template-error" |
     "video-error" | "markup-error" | "valid-stylesheet" | "embed-transform" |
-    "expand-site-url" | "rewrite-blocked-href" | "normalize-image-url";
+    "expand-site-url" | "rewrite-blocked-href" | "normalize-image-url" | "standard-images";
 
 export class GeneralWorkerChannel {
     private state: "new" | "initialize" | "render" | "complete" | "failed" = "new";

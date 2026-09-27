@@ -50,6 +50,9 @@ export interface GeneralInstalledOperations {
     // The resume graph contains ONLY approved public source fields. Original
     // content cleaning and helper eval effects remain in the credential-free child.
     preparePage(session:GeneralProgramSession,start:GeneralWorkerStart,approved:unknown):unknown;
+    // Native s2_run resets its resource cache after Page preparation. This
+    // trusted coordinator hook retains already-prepared Image aliases.
+    beginRendering(session:GeneralProgramSession,start:GeneralWorkerStart):void;
     output(start:GeneralWorkerStart):Omit<NativeOutputOptions,"checkDepth"|"initialization">;
 }
 /** Installed callbacks are code, never fields or module names supplied over IPC. */
@@ -73,6 +76,7 @@ export function executeGeneralWorker(channel:GeneralWorkerChannel,operations:Gen
         (page as Record<string,unknown>)[".type"]!==(start.kind==="recent"?"RecentPage":"EntryPage")) {
         throw new PrivateTransportError();
     }
+    operations.beginRendering(session,start);
     session.beginRender();
     channel.result(session.completePage(page,start.kind,renderDiagnostic));
 }

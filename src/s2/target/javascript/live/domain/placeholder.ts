@@ -31,7 +31,8 @@ function missing(value: string | null): boolean {
 
 // LangDatFile.pm reads raw LF-delimited lines, with dot-stuffed multiline values.
 // Preserve its ordered overwrites and metadata suffix handling; do not normalize CRLF.
-export function placeholderFileValue(source: string, key: string): string | null {
+export function placeholderFileValue(source: string, key: string,
+    fold:(value:string)=>string=value=>value.toLowerCase()): string | null {
     const values = new Map<string, string>();
     const lines = source.match(/[^\n]*\n|[^\n]+$/g) ?? [];
     let code = "", text = "";
@@ -56,9 +57,9 @@ export function placeholderFileValue(source: string, key: string): string | null
             action = true;
         } else if (/[^\x09-\x0d\x20]/.test(line)) unsupported();
         if (code.includes("|")) { code = code.replace(/\|([^\n]+)/, ""); action = true; }
-        if (action) values.set(code.toLowerCase(), text);
+        if (action) values.set(fold(code), text);
     }
-    return values.get(key.toLowerCase()) ?? null;
+    return values.get(fold(key)) ?? null;
 }
 
 function fileValue(file: string, key: string): {value: string | null; modified: number} | null {

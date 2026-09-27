@@ -19,8 +19,33 @@ import {mkdtempSync,writeFileSync,utimesSync,rmSync} from "node:fs";
 import path from "node:path";
 import {tmpdir} from "node:os";
 import {NativeString} from "../runtime/native-string";
-import {selectPublicTranslation,interpolatePublicTranslation} from "../live/domain/public-translation";
+import {selectPublicTranslation,interpolatePublicTranslation,GeneralMlRequestContext} from "../live/domain/public-translation";
 const bytes=(value:string)=>NativeString.hostUtf8Bytes(value);
+test("request language fallback precedes S2 reset and scope survives the merge",()=>{
+    const rows=[{defaultLang:"",firstLang:"debug",scope:"Scope"},
+        {defaultLang:"0",firstLang:"debug",scope:""},{defaultLang:"en",firstLang:"debug",scope:"Scope"}];
+    const oracle=JSON.parse(execFileSync("perl",["-e",String.raw`
+        use strict;use JSON::PP;
+        BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};}
+        require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::Lang;
+        my $context;no warnings 'redefine';local *LJ::Lang::request_context=sub{$context};
+        local $/;my $rows=decode_json(<STDIN>);my @out;for my $row(@$rows){
+            local $LJ::DEFAULT_LANG=$row->{defaultLang};local $LJ::LANGS[0]=$row->{firstLang};
+            my $getter=sub{encode_json({kind=>'lookup',language=>$_[0],code=>$_[1]})};
+            $context={lang=>$LJ::DEFAULT_LANG||$LJ::LANGS[0],scope=>$row->{scope},getter=>$getter};
+            my @phase;for(0,1){$context->{lang}=$LJ::DEFAULT_LANG if $_;
+                my $value=LJ::Lang::ml('.image');push @phase,$value eq '.image'?{kind=>'debug',value=>$value}:decode_json($value);}
+            push @out,\@phase;}print encode_json(\@out);`],{input:JSON.stringify(rows),encoding:"utf8",timeout:10000}));
+    const actual=rows.map(row=>{
+        const context=new GeneralMlRequestContext(bytes(row.defaultLang),bytes(row.firstLang),bytes(row.scope));
+        const render=()=>{const value=context.resolve(bytes(".image"));return value.kind==="debug"?
+            {kind:value.kind,value:value.value?.bytes().toString()}:
+            {kind:value.kind,language:value.language?.bytes().toString(),code:value.code?.bytes().toString()};};
+        const before=render();context.afterContextInitialization();const after=render();
+        assert.throws(()=>context.afterContextInitialization());return [before,after];
+    });
+    assert.deepEqual(actual,oracle);
+});
 test("installed ML precedence and vars retain native bytes without persistence",async()=>{
     const directory=mkdtempSync(path.join(tmpdir(),"s2-public-language-"));
     const code="cleanhtml.error.template";
