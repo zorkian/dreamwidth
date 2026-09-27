@@ -102,3 +102,24 @@ The production tokenizer dependency is MIT licensed; its locked transitive
 closure retains MIT and BSD notices. The semantic policy ports retain inherited
 LiveJournal GPL notices. No expanded matrix, generated oracle output, or built
 JavaScript is tracked.
+
+## Initialization printer lifecycle
+
+The default session starts rendering immediately. With `initialization: true`,
+raw and safe prints use suppressed callbacks until the coordinator calls
+`beginRendering()` exactly once. The content type is fixed at construction.
+Suppressed safe prints never feed the page parser. The same session and sink
+remain in use across initialization and rendering.
+
+Active printer callbacks are separate from CSS scratch depth, buffer and saved
+callbacks (LJ/S2.pm897–900, 2794–2833, 324–331). A zero-to-one CSS capture saves
+the actual current pair; nested starts only increment. Render binding replaces
+the pair and resets print cadence without clearing scratch. Thus an open init
+capture does not capture rendering prints; its final end restores the saved
+suppressed pair. CSS cleanup and the trusted transform still run, including
+when their output is suppressed. Input bounds count all writes; suppressed and
+captured writes do not invent print checkpoints. A text/css render binding
+starts one capture after rebinding. Success eof still belongs to the single
+page cleaner; runtime errors continue through the current raw printer without
+eof. Initialization failures must not bind rendering or end a CSS entry that
+was never started.

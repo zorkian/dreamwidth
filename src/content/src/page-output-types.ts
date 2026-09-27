@@ -28,6 +28,7 @@ export interface StylesheetPolicy {
 }
 export interface PageOutputOptions {
     readonly contentType: string;
+    readonly initialization?: boolean;
     readonly limits: PageOutputLimits;
     readonly stylesheet: StylesheetPolicy;
     readonly output: (chunk: PageChunk) => void;
@@ -38,6 +39,7 @@ export interface PageOutputOptions {
     readonly expandEmbed: (chunk: PageChunk) => PageChunk;
 }
 export interface PageOutput {
+    beginRendering(): void;
     printRaw(chunk: PageChunk): void;
     printSafe(chunk: PageChunk): void;
     startCss(): void;
