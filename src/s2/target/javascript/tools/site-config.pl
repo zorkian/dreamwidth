@@ -190,6 +190,31 @@ sub export_config {
     fail('Hook discovery attempted a database connection') if $blocked_connections;
     # Trusted setup data API: installed modify_scheme_list may shape the default
     # anonymous inheritance. DBI attempts remain sticky failures, even if caught.
+    # is_enabled lives in ljlib rather than an importable narrow module. Load
+    # installed code only after ordinary Config has completed, under the sticky
+    # no-connect tripwire and the exporter's suppressed diagnostic streams.
+    require "$ENV{LJHOME}/cgi-bin/ljlib.pl";
+    my %source_features = map { $_ => truth( LJ::is_enabled($_) ) }
+        qw(memories tellafriend esn);
+    fail('Feature setup attempted a database connection') if $blocked_connections;
+    # Bind the setup facts to the installed source/bootstrap/configuration read
+    # closure. Only its digest leaves this process; no source or secret values.
+    my %feature_files;
+    for my $file ( __FILE__, values %INC, @LJ::CONFIG_FILES ) {
+        next if !defined $file || ref $file || !-f $file;
+        my $real = abs_path($file);
+        fail('Cannot resolve installed feature dependency') unless defined $real;
+        $feature_files{$real} = 1;
+    }
+    my @feature_sources;
+    for my $file ( sort keys %feature_files ) {
+        open my $source, '<:raw', $file or fail('Cannot read installed feature dependency');
+        local $/;
+        my $bytes = <$source>;
+        close $source or fail('Cannot read installed feature dependency');
+        push @feature_sources, [ $file, sha256_hex($bytes) ];
+    }
+    my $feature_identity = sha256_hex( JSON::PP->new->canonical->utf8->encode(\@feature_sources) );
     my @site_scheme = DW::SiteScheme->inheritance( DW::SiteScheme->default );
     fail('Site scheme setup attempted a database connection') if $blocked_connections;
     @site_scheme = map { string( $_, 256 ) } @site_scheme;
@@ -297,6 +322,8 @@ sub export_config {
     fail('Too many author readonly clusters') if @readonly_clusters > 4096;
     my $config = {
         schema       => 1,
+        sourceFeatureFlags => \%source_features,
+        sourceFeatureFlagsIdentity => $feature_identity,
         nativePublicUrls => {
             siteDomain => public_scalar_frame( $LJ::DOMAIN // '' ),
             knownHttpsSites => [ map { public_scalar_frame($_) }
