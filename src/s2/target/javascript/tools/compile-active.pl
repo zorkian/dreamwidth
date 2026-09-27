@@ -43,6 +43,14 @@ eval {
             die "profile" unless $format eq 'al' && $default == 0;
             $profile{$spec->[0]} = {ranges => $ranges, values => [map { ref($_) eq 'ARRAY' ? [map {0 + $_} @$_] : 0 + $_ } @$values]};
         }
+        # /d uses ASCII-native Perl classes for byte scalars and Unicode classes
+        # for flagged scalars. Preserve the installed interpreter's versioned data.
+        for my $spec (['word', 'PerlWord', 'Word'], ['space', 'PerlSpace', 'Space']) {
+            my @byte = map { 0 + $_ } Unicode::UCD::prop_invlist($spec->[1]);
+            my @unicode = map { 0 + $_ } Unicode::UCD::prop_invlist($spec->[2]);
+            die "profile" unless @byte && @unicode;
+            $profile{$spec->[0]} = {byte => \@byte, unicode => \@unicode};
+        }
         my @sources;
         for my $name (sort keys %INC) {
             next unless $name =~ m{^(?:Unicode/|unicore/|Config)};
