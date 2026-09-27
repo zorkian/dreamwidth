@@ -55,6 +55,7 @@ sub compile_source {
         $be = new S2::BackendJS($s2l, $opts->{'layerid'}, $opts->{'untrusted'}, {
             'propmeta' => 1, # FIXME: Don't hardcode this
             'generalHashes' => $opts->{'generalHashes'},
+            'generalScalars' => $opts->{'generalScalars'},
         });
         if ($opts->{'builtinPackage'}) {
             $be->setBuiltinPackage($opts->{'builtinPackage'});
