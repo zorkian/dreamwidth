@@ -19,10 +19,11 @@ use lib "$FindBin::Bin/../../..";
 use JSON::PP;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Digest::SHA qw(sha256_hex);
-use Encode qw(decode FB_CROAK);
 use Storable qw(dclone);
 use S2::Compiler;
 use S2::Checker;
+use Config;
+use Unicode::UCD;
 
 binmode STDIN, ':raw';
 binmode STDOUT, ':raw';
@@ -33,7 +34,28 @@ eval {
     my $bytes = <STDIN>;
     die "input" if !defined($bytes) || length($bytes) > 134217728;
     my $request = $json->decode($bytes);
-    die "input" unless ref($request) eq 'HASH' && ref($request->{layers}) eq 'ARRAY';
+    die "input" unless ref($request) eq 'HASH';
+    if ($request->{profileOnly}) {
+        my %profile = map { $_ => $Config{$_} } qw(version archname ivsize uvsize nvsize nvtype nv_preserves_uv_bits);
+        $profile{unicodeVersion} = Unicode::UCD::UnicodeVersion();
+        for my $spec (['lower','Lowercase_Mapping'], ['upper','Uppercase_Mapping'], ['title','Titlecase_Mapping']) {
+            my ($ranges, $values, $format, $default) = Unicode::UCD::prop_invmap($spec->[1]);
+            die "profile" unless $format eq 'al' && $default == 0;
+            $profile{$spec->[0]} = {ranges => $ranges, values => [map { ref($_) eq 'ARRAY' ? [map {0 + $_} @$_] : 0 + $_ } @$values]};
+        }
+        my @sources;
+        for my $name (sort keys %INC) {
+            next unless $name =~ m{^(?:Unicode/|unicore/|Config)};
+            my $file = $INC{$name};
+            open my $source, '<:raw', $file or die "profile";
+            local $/;
+            my $data = <$source>;
+            close $source;
+            push @sources, {file => $file, digest => sha256_hex($data)};
+        }
+        $result = {kind => 'profile', profile => \%profile, sources => \@sources};
+    } else {
+    die "input" unless ref($request->{layers}) eq 'ARRAY';
     die "input" unless $request->{systemUserId} =~ /^\d+$/ && $request->{systemUserId} > 0;
     my %checkers;
     my @compiled;
@@ -66,20 +88,20 @@ eval {
                 candidateSha256 => sha256_hex($native), activeSha256 => sha256_hex($active)};
             last;
         }
-        # Native compilation uses source bytes. JS JSON output uses decoded text;
-        # the frontend decisions are otherwise independently checked against the
-        # same proven parent checker. Neither compiled Perl nor DB checker is eval'd.
-        my $text = decode('UTF-8', $source, FB_CROAK);
+        # Both checkers see the same raw bytes. General scalar literals serialize
+        # octets as hex, never a Unicode decode/reencode of stored source.
+        my $text = $source;
         my $js = '';
         my $compiler = S2::Compiler->new({checker => dclone($parent)});
         my $variable = 'layer_' . scalar(@compiled);
         $compiler->compile_source({type => $type, source => \$text, output => \$js,
             layerid => $variable, untrusted => $untrusted,
-            builtinPackage => 'S2::Builtin', format => 'javascript', generalHashes => 1});
+            builtinPackage => 'S2::Builtin', format => 'javascript', generalHashes => 1, generalScalars => 1});
         $checkers{$id} = $native_compiler->{checker};
         push @compiled, {id => 0 + $id, variable => $variable, code => $js};
     }
     $result ||= {kind => 'compiled', layers => \@compiled};
+    }
 };
 # Compiler diagnostics contain paths and original input. Keep them out of the
 # parent-facing response/log; separate offline native tooling supplies diagnostics.
