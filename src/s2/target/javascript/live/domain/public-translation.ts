@@ -21,7 +21,7 @@
 // The inherited notice above applies to adapted LiveJournal portions.
 //
 
-import {NativeString,concatStrings,splitString} from "../../runtime/native-string";
+import {NativeString,concatStrings,splitString,startsWith} from "../../runtime/native-string";
 import {scalarNumber,scalarTruthy,NativeNumber} from "../../runtime/native-scalar";
 import {runtime} from "../../runtime/s2runtime";
 
@@ -36,8 +36,9 @@ export interface PublicTranslationFile {
     readonly value: NativeString | undefined;
 }
 export interface PublicTranslationInputs {
-    readonly language: string;
-    readonly defaultLanguage: string;
+    readonly language: string|NativeString;
+    readonly defaultLanguage: string|NativeString;
+    readonly mlDebug?:boolean;
     readonly isDevServer: boolean;
     readonly changedSeconds: number;
     readonly files: Iterable<PublicTranslationFile>;
@@ -46,6 +47,33 @@ export interface PublicTranslationInputs {
     readonly fromDatabase: () => NativeString | Promise<NativeString>;
 }
 const bytes = (text: string): NativeString => NativeString.hostUtf8Bytes(text);
+export type GeneralMlLookup = {readonly kind:"debug";readonly value:NativeString|undefined} |
+    {readonly kind:"lookup";readonly language:NativeString|undefined;readonly defaultLanguage:NativeString|undefined;readonly code:NativeString|undefined};
+/** RequestWrapper establishes a context before s2_context; S2 later merges it. */
+export class GeneralMlRequestContext {
+    private language:NativeString|undefined;
+    private merged=false;
+    private readonly defaultLanguage:NativeString|undefined;
+    private readonly scope:NativeString|undefined;
+    constructor(defaultLanguage:NativeString|undefined,firstLanguage:NativeString|undefined,
+        scope:NativeString|undefined,noteScope?:NativeString) {
+        this.defaultLanguage=defaultLanguage?.clone();
+        this.language=(scalarTruthy(defaultLanguage)?defaultLanguage:firstLanguage)?.clone();
+        this.scope=(scope===undefined?noteScope:scope)?.clone();
+    }
+    /** LJ/S2.pm87-90 replaces lang but preserves the existing scope. */
+    afterContextInitialization():void {
+        if(this.merged)throw Error("Language context already merged");
+        this.merged=true;this.language=this.defaultLanguage;
+    }
+    resolve(input:NativeString|undefined):GeneralMlLookup {
+        if(runtime.scalarCompare("string","==",scalarTruthy(this.language)?this.language:bytes(""),bytes("debug")))
+            return {kind:"debug",value:input?.clone()};
+        const code=input&&startsWith(input,bytes("."))&&scalarTruthy(this.scope)?concatStrings(this.scope!,input):input?.clone();
+        return {kind:"lookup",language:(scalarTruthy(this.language)?this.language:this.defaultLanguage)?.clone(),
+            defaultLanguage:this.defaultLanguage?.clone(),code};
+    }
+}
 export const isMissingPublicTranslation = (value: NativeString): boolean => {
     const raw=value.bytes();
     return !raw.length || raw.subarray(0,15).equals(Buffer.from("[missing string")) ||
@@ -53,22 +81,26 @@ export const isMissingPublicTranslation = (value: NativeString): boolean => {
 };
 
 /** Lang.pm598-684, with the user-authorized SELECT-only/cache-free boundary. */
-export async function selectPublicTranslation(input: PublicTranslationInputs, code: string): Promise<NativeString> {
-    if(input.language==="debug")return bytes(code);
+export async function selectPublicTranslation(input: PublicTranslationInputs, code: string|NativeString): Promise<NativeString> {
+    const nativeCode=typeof code==="string"?bytes(code):code;
+    const message=(prefix:string)=>concatStrings(concatStrings(bytes(prefix),nativeCode),bytes("]"));
+    const pv=(value:string|NativeString)=>typeof value==="string"?bytes(value):value;
+    const same=(left:string|NativeString,right:string|NativeString)=>runtime.scalarCompare("string","==",pv(left),pv(right));
+    if(input.mlDebug??same(input.language,"debug"))return nativeCode;
     const fromFiles=async():Promise<NativeString>=>{
         for(const file of input.files) {
             if(!file.modifiedSeconds || input.changedSeconds>file.modifiedSeconds)return input.fromDatabase();
             if(file.value && scalarTruthy(file.value))return file.value;
         }
-        return bytes(`[missing string ${code}]`);
+        return message("[missing string ");
     };
-    const fileFirst=input.isDevServer && (input.language==="en" || input.language===input.defaultLanguage);
+    const fileFirst=input.isDevServer && (same(input.language,"en") || same(input.language,input.defaultLanguage));
     let value=await (fileFirst?fromFiles():input.fromDatabase());
     if(!input.isDevServer && isMissingPublicTranslation(value)) {
         const fallback=await fromFiles();
         if(!isMissingPublicTranslation(fallback))value=fallback;
     }
-    return scalarTruthy(value)?value:bytes(input.isDevServer?`[uhhh: ${code}]`:"");
+    return scalarTruthy(value)?value:input.isDevServer?message("[uhhh: "):bytes("");
 }
 
 function pluralIndex(language:string,count:unknown):number {

@@ -29,15 +29,19 @@ import {decodeLegacyBytes} from "./legacy-text";
 import type {ConfiguredDatabase} from "../startup-types";
 import type {PlaceholderResolutionSpec} from "../contracts";
 import {placeholderFileValue} from "../domain/placeholder";
-import {SUBJECT_TRANSLATION_KEYS,selectPublicTranslation,type SubjectTranslationName,type PublicTranslationFile} from "../domain/public-translation";
-import {NativeString} from "../../runtime/native-string";
-import {nativeProgramError} from "../../runtime/native-scalar";
+import {SUBJECT_TRANSLATION_KEYS,selectPublicTranslation,type SubjectTranslationName,type PublicTranslationFile,type GeneralMlLookup} from "../domain/public-translation";
+import {NativeString,hashKeyBytes,caseString} from "../../runtime/native-string";
+import type {NativeProfile} from "../../runtime/native-profile";
+import {nativeProgramError,isNativeProgramError,legacyText} from "../../runtime/native-scalar";
 
 type TranslationConfiguration=Pick<PlaceholderResolutionSpec,"defaultLang"|"isDevServer"|"languageFiles">;
 export interface PublicTranslationSnapshot {
-    readonly name:SubjectTranslationName;
+    readonly name:SubjectTranslationName|"standard-image";
+    readonly code?:NativeString;
+    readonly context?:GeneralMlLookup;
+    readonly error?:Error;
     readonly language:string;
-    readonly value:NativeString;
+    readonly value:NativeString|undefined;
     readonly fingerprint:string;
 }
 const sha=(value:Uint8Array|string)=>createHash("sha256").update(value).digest("hex");
@@ -84,7 +88,8 @@ function languageFile(filename:string,code:string,changed:number):{value:PublicT
             BigInt(bytes.length)!==after.size)throw new SnapshotError("unavailable");
         // LangDatFile opens raw bytes. Latin1 is solely a reversible parser
         // view here; output is reconstructed as octets, never UTF8 reencoded.
-        const raw=placeholderFileValue(bytes.toString("latin1"),code);
+        const raw=placeholderFileValue(bytes.toString("latin1"),code,value=>
+            caseString(NativeString.bytes(Buffer.from(value,"latin1")),"lower").bytes().toString("latin1"));
         return {value:{modifiedSeconds,value:raw===null?undefined:NativeString.bytes(Buffer.from(raw,"latin1"))},
             witness:{...identity,sha256:sha(bytes)}};
     }finally{closeSync(fd);}
@@ -95,64 +100,101 @@ export class MysqlPublicTranslations {
     private readonly issued = new WeakSet<object>();
     private readonly databases:PrimaryDatabases;
     private readonly configuration:TranslationConfiguration;
-    constructor(database:ConfiguredDatabase,configuration:TranslationConfiguration) {
+    private readonly profile:NativeProfile|undefined;
+    private readonly profileIdentity:string|undefined;
+    constructor(database:ConfiguredDatabase,configuration:TranslationConfiguration,profile?:NativeProfile) {
         this.databases=PrimaryDatabases.create(database);
         this.configuration=structuredClone(configuration);
+        this.profile=profile===undefined?undefined:structuredClone(profile);
+        this.profileIdentity=this.profile===undefined?undefined:sha(JSON.stringify(this.profile));
     }
     async close():Promise<void> {await this.databases.close();}
-    async snapshot(name:SubjectTranslationName):Promise<PublicTranslationSnapshot> {
+    async snapshot(name:SubjectTranslationName):Promise<PublicTranslationSnapshot & {readonly value:NativeString}> {
         if(!Object.hasOwn(SUBJECT_TRANSLATION_KEYS,name))throw new SnapshotError("unavailable");
-        const code=SUBJECT_TRANSLATION_KEYS[name],spec=this.configuration;
-        if(spec.defaultLang==="debug") {
-            const value=Object.freeze({name,language:spec.defaultLang,value:NativeString.hostUtf8Bytes(code),
-                fingerprint:sha(JSON.stringify({spec,name}))});this.issued.add(value);return value;
+        const result=await this.snapshotCode(NativeString.hostUtf8Bytes(SUBJECT_TRANSLATION_KEYS[name]),name);
+        if(result.error)throw result.error;
+        return result as PublicTranslationSnapshot & {readonly value:NativeString};
+    }
+    /** Parent-selected installed descriptor key, never a child-selected ML code. */
+    async snapshotContext(context:GeneralMlLookup):Promise<PublicTranslationSnapshot> {
+        return this.snapshotCode(context.kind==="debug"?context.value:context.code,"standard-image",context);
+    }
+    async snapshotCode(input:NativeString|undefined,name:SubjectTranslationName|"standard-image"="standard-image",
+        request?:GeneralMlLookup):Promise<PublicTranslationSnapshot> {
+        const code=input===undefined?NativeString.bytes(Buffer.alloc(0)):NativeString.fromFrame(input.frame());
+        const originalCode=input===undefined?undefined:code;
+        if(code.bytes().length>16384)throw new SnapshotError("unavailable");
+        const context=request===undefined?undefined:Object.freeze(request.kind==="debug"?
+            {kind:"debug" as const,value:request.value?.clone()}:
+            {kind:"lookup" as const,language:request.language?.clone(),defaultLanguage:request.defaultLanguage?.clone(),code:request.code?.clone()});
+        const spec=this.configuration,queryCode=code.bytes();
+        const language=context?.kind==="lookup"?context.language??NativeString.bytes(Buffer.alloc(0)):NativeString.hostUtf8Bytes(spec.defaultLang);
+        const defaultLanguage=context?.kind==="lookup"?context.defaultLanguage??NativeString.bytes(Buffer.alloc(0)):NativeString.hostUtf8Bytes(spec.defaultLang);
+        const contextIdentity=context?.kind==="lookup"?{kind:context.kind,language:context.language?.frame()??null,
+            defaultLanguage:context.defaultLanguage?.frame()??null}:context?.kind;
+        const debug=context===undefined?spec.defaultLang==="debug":context.kind==="debug";
+        if(debug) {
+            const value=Object.freeze({name,code:originalCode,context,language:legacyText(language),value:originalCode,
+                fingerprint:sha(JSON.stringify({spec,name,context:contextIdentity,code:originalCode?.frame()??null}))});this.issued.add(value);return value;
         }
+        const lowerCode=caseString(code,"lower",this.profile),fileKey=hashKeyBytes(lowerCode);
+        // LangDatFile loads raw-byte hash keys. A wide flagged lookup cannot
+        // equal those keys; Latin1 here is only the reversible byte parser view.
+        const fileCode=fileKey.utf8?undefined:fileKey.bytes.toString("latin1");
         // MyISAM is native for ml_* public data. This is session READ ONLY;
         // no authorization/identity/content table exemption or writes occur.
         const data=await this.databases.snapshot(undefined,[],async connection=>{
-            const languages=(await sql<SqlRow>`SELECT lnid,lncode FROM ml_langs
-                WHERE BINARY lncode=BINARY ${spec.defaultLang} LIMIT 2`.execute(connection)).rows;
+            const languageKey=hashKeyBytes(language);
+            const languages=languageKey.utf8?[]:(await sql<SqlRow>`SELECT lnid,lncode FROM ml_langs
+                WHERE BINARY lncode=BINARY ${languageKey.bytes} LIMIT 2`.execute(connection)).rows;
             if(languages.length>1)throw new SnapshotError("unavailable");
             const lnid=languages[0]?.lnid;
             if(lnid!==undefined && (typeof lnid!=="number" || !Number.isSafeInteger(lnid) || lnid<1))throw new SnapshotError("unavailable");
             const rows=lnid===undefined?[]:(await sql<SqlRow>`SELECT i.itid,i.itcode,i.visible,l.txtid,
                 CAST(l.chgtime AS CHAR) AS chgtime
                 FROM ml_items i LEFT JOIN ml_latest l ON l.dmid=1 AND l.itid=i.itid AND l.lnid=${lnid}
-                WHERE i.dmid=1 AND i.itcode=${code} LIMIT 2`.execute(connection)).rows;
+                WHERE i.dmid=1 AND i.itcode=${queryCode} LIMIT 2`.execute(connection)).rows;
             if(rows.length>1)throw new SnapshotError("unavailable");
             const fileWitnesses:unknown[]=[];
             function* files():Generator<PublicTranslationFile> {
                 for(const filename of spec.languageFiles) {
-                    const file=languageFile(filename,code,changedSeconds(rows[0]?.chgtime));
+                    const file=languageFile(filename,fileCode??"",changedSeconds(rows[0]?.chgtime));
                     fileWitnesses.push(file?.witness??{filename,absent:true});
-                    if(file)yield file.value;
+                    if(file)yield fileCode===undefined?{...file.value,value:undefined}:file.value;
                 }
             }
             let databaseRows:readonly SqlRow[]|undefined;
             const fromDatabase=async():Promise<NativeString>=>{
-                if(lnid===undefined)throw nativeProgramError("Unable to load language code: "+spec.defaultLang);
+                if(lnid===undefined)throw nativeProgramError("Unable to load language code: "+legacyText(language));
                 databaseRows=(await sql<SqlRow>`SELECT i.itid,l.txtid,
                     HEX(t.text) AS stored_hex,HEX(CONVERT(t.text USING latin1)) AS recovered_hex,
                     HEX(CONVERT(CONVERT(t.text USING latin1) USING utf8mb4)) AS roundtrip_hex
                     FROM ml_items i LEFT JOIN ml_latest l ON l.dmid=1 AND l.itid=i.itid AND l.lnid=${lnid}
                     LEFT JOIN ml_text t ON t.dmid=1 AND t.txtid=l.txtid
-                    WHERE i.dmid=1 AND i.itcode=${code} LIMIT 2`.execute(connection)).rows;
+                    WHERE i.dmid=1 AND i.itcode=${lowerCode.bytes()} LIMIT 2`.execute(connection)).rows;
                 if(databaseRows.length>1)throw new SnapshotError("unavailable");
                 const row=databaseRows[0];
                 return row?.stored_hex===null || row?.stored_hex===undefined?NativeString.bytes(Buffer.alloc(0)):
                     NativeString.bytes(decodeLegacyBytes(row.stored_hex,row.recovered_hex,row.roundtrip_hex,262144,65536).originalBytes);
             };
-            const value=await selectPublicTranslation({language:spec.defaultLang,defaultLanguage:spec.defaultLang,
-                isDevServer:spec.isDevServer,changedSeconds:changedSeconds(rows[0]?.chgtime),files:files(),fromDatabase},code);
-            return {value,languages,rows,databaseRows,fileWitnesses};
+            try {
+                const value=await selectPublicTranslation({language,defaultLanguage,mlDebug:false,
+                    isDevServer:spec.isDevServer,changedSeconds:changedSeconds(rows[0]?.chgtime),files:files(),fromDatabase},code);
+                return {value,error:undefined,languages,rows,databaseRows,fileWitnesses};
+            }catch(error) {
+                if(!isNativeProgramError(error))throw error;
+                // A source semantic failure still depends on the observed
+                // public language absence. Retain it for the final reread.
+                return {value:undefined,error,languages,rows,databaseRows,fileWitnesses};
+            }
         });
-        const result=Object.freeze({name,language:spec.defaultLang,value:data.value,
-            fingerprint:sha(JSON.stringify({spec,name,languages:data.languages,rows:data.rows,
-                databaseRows:data.databaseRows,files:data.fileWitnesses}))});
+        const result=Object.freeze({name,code:originalCode,context,language:legacyText(language),value:data.value,error:data.error,
+            fingerprint:sha(JSON.stringify({spec,name,context:contextIdentity,profile:this.profileIdentity,code:originalCode?.frame()??null,languages:data.languages,rows:data.rows,
+                databaseRows:data.databaseRows,files:data.fileWitnesses,error:data.error?.message}))});
         this.issued.add(result);return result;
     }
     async revalidate(snapshot:PublicTranslationSnapshot):Promise<boolean> {
         if(!this.issued.has(snapshot))return false;
-        return (await this.snapshot(snapshot.name)).fingerprint===snapshot.fingerprint;
+        return (await this.snapshotCode(snapshot.code,snapshot.name,snapshot.context)).fingerprint===snapshot.fingerprint;
     }
 }

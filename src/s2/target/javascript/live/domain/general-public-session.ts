@@ -23,10 +23,11 @@
 import type {PublicUserSnapshot} from "../data/public-users";
 import type {PublicEncodingSnapshot} from "../data/public-encodings";
 import type {PublicTranslationSnapshot} from "../data/public-translations";
-import type {SubjectTranslationName} from "./public-translation";
+import type {SubjectTranslationName,GeneralMlLookup,GeneralMlRequestContext} from "./public-translation";
 import {NativeString} from "../../runtime/native-string";
 import {caseString} from "../../runtime/native-string";
 import {nativeCharacterClass, type NativeProfile} from "../../runtime/native-profile";
+import {isNativeProgramError} from "../../runtime/native-scalar";
 
 interface PublicUsers {
     snapshot(name: string): Promise<PublicUserSnapshot>;
@@ -38,6 +39,8 @@ interface PublicEncodings {
 }
 interface PublicTranslations {
     snapshot(name: SubjectTranslationName): Promise<PublicTranslationSnapshot>;
+    snapshotCode?(code:NativeString|undefined):Promise<PublicTranslationSnapshot>;
+    snapshotContext?(context:GeneralMlLookup):Promise<PublicTranslationSnapshot>;
     revalidate(snapshot: PublicTranslationSnapshot): Promise<boolean>;
 }
 
@@ -72,7 +75,15 @@ export class GeneralPublicSession {
     private pending = 0;
     constructor(private readonly userStore: PublicUsers, private readonly translationStore: PublicTranslations,
         private readonly profile: NativeProfile, private readonly usernameMaximum: number,
-        private readonly encodingStore?: PublicEncodings) {}
+        private readonly encodingStore?: PublicEncodings,
+        private readonly languageContext?:GeneralMlRequestContext) {}
+    /** The child initialization result precedes native S2's language merge. */
+    afterContextInitialization():void {
+        this.assertOpen();
+        if(this.pending)throw Error("Public helper operation is pending");
+        if(!this.languageContext)throw Error("Request language context is not installed");
+        this.languageContext.afterContextInitialization();
+    }
     private assertOpen(): void {
         if (this.state !== "open") throw new Error("Public helper session is closed");
     }
@@ -94,6 +105,20 @@ export class GeneralPublicSession {
             this.assertOpen(); this.translations.push(witness); return witness;
         } catch (error) {this.state = "failed"; throw error;}
         finally {this.pending--;}
+    }
+    /** Keys originate in validated parent image descriptors, not author IPC. */
+    async imageTranslation(code:NativeString|undefined):Promise<PublicTranslationSnapshot> {
+        this.assertOpen();
+        if(!this.translationStore.snapshotContext||!this.languageContext)
+            throw new Error("Installed request language context is unavailable; re-export configuration");
+        this.pending++;
+        try {
+            const witness=await this.translationStore.snapshotContext(this.languageContext.resolve(code));
+            this.assertOpen();this.translations.push(witness);
+            if(witness.error)throw witness.error;
+            return witness;
+        }catch(error){if(!isNativeProgramError(error))this.state="failed";throw error;}
+        finally{this.pending--;}
     }
     /** Source text_convert reaches the public mapping only after non-ASCII detection. */
     async encoding(): Promise<PublicEncodingSnapshot> {
