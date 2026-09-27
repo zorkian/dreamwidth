@@ -81,6 +81,8 @@ export interface StandaloneStartupConfig {
     readonly schema: 1;
     readonly sourceFeatureFlagsIdentity?:string;
     readonly sourceFeatureFlags?:{readonly memories:boolean;readonly tellafriend:boolean;readonly esn:boolean};
+    /** Native Image_userpic interpolation source; parent resolves approved Image URLs. */
+    readonly nativeUserpicRoot?:{readonly base64:string;readonly utf8:boolean};
     readonly nativePublicUrls?: {
         readonly siteDomain: {readonly base64:string;readonly utf8:boolean};
         readonly knownHttpsSites: readonly {readonly base64:string;readonly utf8:boolean}[];
