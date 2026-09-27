@@ -69,6 +69,11 @@ test("official posts require current community/poster/maintainer source authorit
             const projected=selected.entrySource(entry,{permalinkUrl:NativeString.hostUtf8Bytes("/257.html"),
                 adultContentLevel:NativeString.hostUtf8Bytes("none"),content:{suspendMessage:0,noEntryBody:0,noHtml:0,
                     cutUrl:NativeString.hostUtf8Bytes("/257.html"),cutDisable:0}});
+            const direct=selected.entryPageSource(entry,{permalinkUrl:NativeString.hostUtf8Bytes("/257.html"),
+                adultContentLevel:NativeString.hostUtf8Bytes("none"),mode:0,suspendMessage:0,noHtml:0});
+            assert.equal(scalarTruthy(direct.adminPost),scalarTruthy(projected.adminPost));
+            assert.equal(Object.hasOwn(direct,"forceMoodtheme"),false);
+            assert.equal(Object.hasOwn(direct.content,"noEntryBody"),false);
             assert.equal(Object.hasOwn(projected,"relationships"),false);
             assert.equal(Object.hasOwn(projected,"canManage"),false);
             assert.equal(Object.hasOwn(projected,"props"),false);
