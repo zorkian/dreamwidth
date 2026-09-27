@@ -17,9 +17,9 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false):Promise<void> {
+export async function stylesBrowser(html:string,port:number, layout?:"easyread", modules=false, typography=false):Promise<void> {
     const baseOutput=process.env.S2_STYLES_BROWSER_OUTPUT;
-    const output=baseOutput&&layout?path.join(baseOutput,layout+(modules?"-modules":"")):baseOutput;
+    const output=baseOutput&&layout?path.join(baseOutput,layout+(typography?"-typography":modules?"-modules":"")):baseOutput;
     if(!output) return;
     const appOrigin="http://localhost:8080";
     const pageUrl=`http://localhost:${port}/users/ordinary6/76801.html`;
@@ -73,6 +73,9 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             tags:document.querySelector('.module-tags_list, .module-tags_cloud, .module-tags_multilevel')?.textContent,
             moduleOrder:[...document.querySelectorAll(".module")].map(node=>node.className),
             calendar:document.querySelector(".module-calendar")?.textContent,
+            typography:Object.fromEntries(['#header h1#title','.entry .entry-title','.comment-title','.module h2','.module-content'].map(selector=>{
+                const node=document.querySelector(selector);if(!node)return [selector,null];
+                const style=getComputedStyle(node);return [selector,{family:style.fontFamily,size:style.fontSize}];})),
             tagAfterCredit:!!(document.querySelector('.module-credit')!.compareDocumentPosition(document.querySelector('.module-tags_list, .module-tags_cloud, .module-tags_multilevel')!)&Node.DOCUMENT_POSITION_FOLLOWING),
             journalStyles:[...document.querySelectorAll('link[rel=stylesheet]')].map(node=>(node as HTMLLinkElement).href).filter(url=>/\/res\//.test(url))}));
         assert.equal(state.background,'rgb(18, 52, 86)');
@@ -86,6 +89,14 @@ export async function stylesBrowser(html:string,port:number, layout?:"easyread",
             const summary=state.moduleOrder.findIndex((name:string)=>name.includes('module-pagesummary'));
             assert.ok(calendar>=0&&summary>calendar);assert.ok(!state.moduleOrder.some((name:string)=>name.includes('module-userprofile')));
         }else assert.equal(state.tagAfterCredit,true);
+        if(typography) {
+            assert.ok(state.typography['#header h1#title'].family.startsWith('Verdana'));
+            assert.ok(state.typography['.entry .entry-title'].family.startsWith('"Courier New"'));
+            assert.ok(state.typography['.comment-title'].family.startsWith('"Times New Roman"'));
+            assert.equal(state.typography['#header h1#title'].size,'32px');
+            assert.equal(state.typography['.entry .entry-title'].size,'19.2px');
+            assert.equal(state.typography['.module h2'].size,'20px');
+        }
         mkdirSync(output,{recursive:true});
         await page.screenshot({path:path.join(output,"entry-styles.png"),fullPage:true});
 

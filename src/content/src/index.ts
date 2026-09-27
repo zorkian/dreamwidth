@@ -515,4 +515,4 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
     };
 }
 
-export {cleanStockStylesheet,validateStockFontFamily} from "./policy/stylesheet";
+export {cleanStockStylesheet,validateStockFontFamily,validateStockFontSize} from "./policy/stylesheet";

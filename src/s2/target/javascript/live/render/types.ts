@@ -130,6 +130,7 @@ export type RenderPage =
 export interface RenderContentPreparation {
     stylesheet?(source:string):string;
     fontFamily?(source:string):void;
+    fontSize?(source:string):void;
     customtext?(source:string):string;
     comment?(comment:ApprovedComment,entryUrl:string):string;
     subject(entry: ApprovedEntry, entryUrl: string, source?: string): SubjectPreparation;
