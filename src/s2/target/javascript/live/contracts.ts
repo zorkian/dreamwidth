@@ -302,6 +302,8 @@ export interface NativeSelectedSnapshot {
     readonly encoding: "dbi-byte-view";
     readonly oldEncoding: number; // source user.oldenc, parent-only conversion authority
     readonly facts: RawJournalSnapshot;
+    /** Leading displayed sticky entries; the original pagination window is unchanged. */
+    readonly stickyEntryCount?:number;
     readonly undefinedEntryEvents: readonly number[];
     // Parent-only reached DB text cells, before unknown8bit/cleaner transforms.
     // Child projection must select approved public fields; never send this bag.

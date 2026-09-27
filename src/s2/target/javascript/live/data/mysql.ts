@@ -33,10 +33,13 @@ import type {
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
     PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags, RawComments, RawCommentHeader, RawCommentAuthor, RawCommentText,
 } from "../contracts";
-import {selectComments,commentCapability,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
+import {selectComments,commentCapability,commentCapabilityValue,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
 import { decodeLegacyText, decodeLegacyBytes, decodeLegacyPayload } from "./legacy-text";
+
+import {NativeString,scalarNumber} from "../../runtime/native-scalar";
+import {arrayIndex} from "../../runtime/native-number";
 
 type Connection = ReadConnection;
 type Row = SqlRow;
@@ -213,6 +216,7 @@ function header(row: Row, journalid: number): RawEntryHeader {
 
 interface NativeSnapshotEvidence {
     readonly oldEncoding: number;
+    readonly stickyEntryCount: number;
     readonly undefinedEvents: readonly number[];
     readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
 }
@@ -335,7 +339,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
     }
     private user(row: Row, settings: PublicSettings, raw: RawField[]): UserRecord {
         const id = number(row.userid, 1);
-        return new UserRecord({userid: id, user: requiredString(row.user), clusterid: number(row.clusterid, 1),
+        return new UserRecord({userid: id, user: requiredString(row.user), clusterid: number(row.clusterid,
+                raw instanceof RawFields && raw.byteView ? 0 : 1),
             status: requiredString(row.status), statusvis: requiredString(row.statusvis), journaltype: requiredString(row.journaltype),
             name: decodedColumn(row, "name", "user:" + id + ":name", raw, 1024, false)!,
             optShowTalkLinks: requiredString(row.opt_showtalklinks), optWhocanReply: requiredString(row.opt_whocanreply),
@@ -387,7 +392,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         if (!facts) return null;
         const evidence = this.nativeSnapshots.get(facts)!;
         const snapshot: NativeSelectedSnapshot = Object.freeze({encoding: "dbi-byte-view", facts,
-            oldEncoding: evidence.oldEncoding,
+            oldEncoding: evidence.oldEncoding, stickyEntryCount:evidence.stickyEntryCount,
             undefinedEntryEvents: evidence.undefinedEvents, sources: evidence.sources});
         // Preserve the issued request independently of mutable parent projection
         // work. Neither a copied wrapper nor a different store can issue authority.
@@ -439,14 +444,43 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             return {facts, style, raw, themeAuthors:await this.loadThemeAuthors(connection,style)};
         });
+        // Native RecentPage skips suspended entries/posters AFTER selecting its
+        // window but BEFORE Entry_from_entryobj loads text. Direct Entry applies
+        // visible_to before text or comments. Keep the complete window as a
+        // pagination/freshness witness while withholding hidden body reads.
+        const visibility = byteView ? await this.databases.snapshot(clusterId, clusterTables,
+            connection => this.nativeEntryVisibility(connection, ownerId, frozenRequest,
+                before.facts.logNames,this.settings(before.facts,plan,[]).sticky_entry,unsigned(before.facts.owner.caps,16))) : undefined;
+        if (byteView && !visibility) return null;
+        const authorFacts = visibility ? await this.databases.snapshot(undefined, globalTables,
+            connection => this.nativeEntryAuthors(connection, before.facts,
+                visibility.rows.map(row => number(row.posterid,1)))) : undefined;
+        const visible = (row:Row) => row.security==="public" && visibility && authorFacts &&
+            !visibility.suspended.includes(number(row.jitemid,1)) &&
+            authorFacts.find(facts=>number(facts.owner.userid,1)===number(row.posterid,1))!.owner.statusvis!=="S";
+        const stickyRows = visibility ? visibility.sticky.filter((row):row is Row=>row!==null && !!visible(row)) : [];
+        const visibleRows = visibility && authorFacts ? [...stickyRows,...visibility.window.rows.filter(row =>
+            visible(row) && !visibility.activeIds.includes(String(number(row.jitemid,1)*256+number(row.anum,0,255))))] : undefined;
+        if (byteView && frozenRequest.page.kind==="entry" && !visibleRows?.length) return null;
         const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
             if (!window) return null;
+            if (visibility) {
+                const fresh = await this.nativeEntryVisibility(connection, ownerId, frozenRequest,
+                    before.facts.logNames,this.settings(before.facts,plan,[]).sticky_entry,unsigned(before.facts.owner.caps,16));
+                if (!fresh || digest(fresh)!==digest(visibility)) throw new SnapshotError("unavailable");
+            }
             const raw = new RawFields(byteView);
-            const loaded = await this.loadEntries(connection, ownerId, window.rows,
-                window.rows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            const bodyRows = visibleRows ?? window.rows;
+            const uniqueRows=[...new Map(bodyRows.map(row=>[number(row.jitemid,1),row])).values()];
+            const loaded = await this.loadEntries(connection, ownerId, uniqueRows,
+                uniqueRows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            if(byteView) {
+                const byId=new Map(loaded.entries.map(entry=>[entry.jitemid,entry]));
+                loaded.entries=bodyRows.map(row=>byId.get(number(row.jitemid,1))!);
+            }
             const statusId = before.facts.logNames.find(row => row.name === "statusvis")?.propid;
             const calendar = await this.loadCalendar(connection, ownerId, frozenRequest,
                 statusId === undefined ? 0 : number(statusId, 1), raw,
@@ -497,6 +531,11 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const raw = new RawFields(byteView), owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
             const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
+            if (visibility && authorFacts) {
+                const freshAuthors = await this.nativeEntryAuthors(connection, facts,
+                    visibility.rows.map(row => number(row.posterid,1)));
+                if (digest(freshAuthors)!==digest(authorFacts)) throw new SnapshotError("unavailable");
+            }
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
             const themeAuthors=await this.loadThemeAuthors(connection,style);
@@ -509,14 +548,14 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors,
-            ...(byteView ? [number(before.facts.owner.oldenc)] : [])];
+            ...(byteView ? [number(before.facts.owner.oldenc),visibility,authorFacts] : [])];
         const result: RawJournalSnapshot = {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
         if (byteView) {
             const sources = [...after.raw.sources, ...selected.raw.sources, ...(comments?.sources ?? [])];
-            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
+            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), stickyEntryCount:stickyRows.length, undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
                 sources: Object.freeze(sources.map(([key,value]) => Object.freeze({key,
                     value: value === undefined ? null : Object.freeze({base64: Buffer.from(value).toString("base64"), utf8: false as const})})))});
         }
@@ -631,6 +670,56 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                         nativeType:requiredString(definition.native_type)} : {}),
                     sourceHash: requiredString(definition.source_hash).toLowerCase()};
             })};
+    }
+    private async nativeEntryVisibility(connection: Connection, ownerId: number,
+        request: RawPageRequest, definitions: readonly Row[], stickyValue:string|null,caps:string) {
+        const window = await this.loadWindow(connection,ownerId,request);
+        if (!window) return null;
+        const activeIds:string[]=[];
+        const sticky:(Row|null)[]=[];
+        if(request.page.kind==="recent" && request.page.skip===0 && stickyValue!==null) {
+            const ids=stickyValue.split(",");
+            while(ids.at(-1)==="")ids.pop();
+            if(ids.length) {
+                const max=commentCapabilityValue(this.config.capabilities.maxStickies,caps)??0;
+                activeIds.push(...(ids.length>max?ids.slice(0,Math.max(0,Math.trunc(max-1)+1)):ids));
+                for(const text of activeIds) {
+                    const id=arrayIndex(scalarNumber(NativeString.bytes(Buffer.from(text,"latin1"))));
+                    const item=id>>8n;
+                    if(item<=0n || item>BigInt(Number.MAX_SAFE_INTEGER)) {sticky.push(null);continue;}
+                    const rows=(await sql<Row>`SELECT journalid,jitemid,anum,posterid,eventtime,logtime,rlogtime,revttime,
+                        year,month,day,security,CAST(allowmask AS CHAR) AS allowmask,replycount,compressed
+                        FROM log2 WHERE journalid=${ownerId} AND jitemid=${Number(item)} LIMIT 2`.execute(connection)).rows;
+                    if(rows.length>1)unsupported();
+                    const row=rows[0];
+                    sticky.push(row??null);
+                }
+            }
+        }
+        const rows=[...window.rows,...sticky.filter((row):row is Row=>row!==null)];
+        const status = definitions.find(row => row.name==="statusvis")?.propid;
+        const ids = [...new Set(rows.map(row => number(row.jitemid,1)))];
+        const statuses = status===undefined || !ids.length ? [] : (await sql<Row>`
+            SELECT jitemid,HEX(value) AS value FROM logprop2
+            WHERE journalid=${ownerId} AND propid=${number(status,1)}
+                AND jitemid IN (${sql.join(ids)}) ORDER BY jitemid LIMIT ${ids.length+1}`.execute(connection)).rows;
+        if (statuses.length>ids.length || new Set(statuses.map(row=>number(row.jitemid,1))).size!==statuses.length)
+            unsupported();
+        // Entry::statusvis recognizes only the original one-byte S value.
+        return {window,rows,sticky,activeIds,statuses,suspended:statuses.filter(row=>row.value==="53").map(row=>number(row.jitemid,1))};
+    }
+    private async nativeEntryAuthors(connection: Connection, owner: GlobalFacts,
+        ids: readonly number[]): Promise<GlobalFacts[]> {
+        const result:GlobalFacts[]=[];
+        for (const id of [...new Set(ids)].sort((a,b)=>a-b)) {
+            if (id===number(owner.owner.userid,1)) {result.push(owner);continue;}
+            const rows=(await sql<Row>`SELECT user FROM user WHERE userid=${id} LIMIT 2`.execute(connection)).rows;
+            if (rows.length!==1) unsupported();
+            const facts=await this.globalFacts(connection,requiredString(rows[0]!.user));
+            if (!facts || number(facts.owner.userid,1)!==id) unsupported();
+            result.push(facts);
+        }
+        return result;
     }
     private async loadPosters(connection: Connection, owner: RawUser, entries: readonly RawEntry[],
         raw: RawField[]): Promise<RawUser[]> {
