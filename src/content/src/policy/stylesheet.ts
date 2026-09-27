@@ -32,6 +32,19 @@ export function validateStockFontFamily(source:string):void {
     });
 }
 
+// Prove one original emitted size+unit value, never a declaration fragment.
+// The maintained grammar decides accepted numbers/units; no normalization.
+export function validateStockFontSize(source:string):void {
+    if(Buffer.byteLength(source)>1024||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source))throw new UnsupportedContent();
+    safeText(source);
+    const ast=tree.parse(source,{context:"value",onParseError(){throw new UnsupportedContent();}});
+    if(tree.lexer.matchProperty("font-size",ast).error)throw new UnsupportedContent();
+    tree.walk(ast,node=>{
+        if(!["Value","Identifier","Dimension","Percentage","Number"].includes(node.type))throw new UnsupportedContent();
+        if(node.type==="Identifier")safeText(tree.ident.decode(node.name));
+    });
+}
+
 // Only the qualified EasyRead+Aqua stock generator has this native-invalid
 // output. Browser CSSOM discards these complete declarations/rule. Account for
 // every error/Raw by maintained source locations before omitting anything.

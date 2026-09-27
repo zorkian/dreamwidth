@@ -28,7 +28,7 @@ import type {RenderInput,RenderContentPreparation} from "../render/types";
 import {cssMultiplyLength} from "../render/builtins";
 import {builtin} from "../../runtime/s2runtime";
 import {validateArtifact} from "../render/artifact";
-import {cleanStockStylesheet,validateStockFontFamily} from "@dreamwidth/content";
+import {cleanStockStylesheet,validateStockFontFamily,validateStockFontSize} from "@dreamwidth/content";
 
 test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
  const run=spawnSync("perl",[resolve("tools/styles-native.pl")],{encoding:"utf8",timeout:20000});
@@ -58,6 +58,22 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    else assert.equal(row.error,'');
    if(row.case==='credit-slot')assert.ok(Object.values(row.sections).some((section:any)=>section.some((item:any)=>item?.[0]==='credit')));
  }
+ const helperExpected:Record<string,string>={specific:'font-family: Specific, Base, serif; font-size: 1.25em;',
+   inherit:'font-family: Base, serif; ',fallback:'font-family: serif; ',empty:'',
+   'not-emitted':'font-family: Base; ','emitted-injection':'font-family: Base; font-size: 1px;color:redpx;'};
+ for(const row of rows.filter((row:any)=>row.name==='typography-helper'))assert.equal(row.output,helperExpected[row.case]);
+ for(const row of rows.filter((row:any)=>row.name==='typography')) {
+   assert.deepEqual({...readPropertyLayer(row.compiled,990006)},row.values);assert.equal(Object.keys(row.values).length,18);
+   for(const bad of [row.compiled.replace('"font_entry_title_size","120"','"font_entry_title_size",120'),
+     row.compiled.replace('"font_entry_title_size"','"font_base_units"'),row.compiled+'print "BAD";'])
+       assert.throws(()=>readPropertyLayer(bad,990006));
+ }
+ for(const row of rows.filter((row:any)=>row.name==='typography-css')) {
+   const css=cleanStockStylesheet(row.css,row.layout==='easyread'?'easyread-aqua':undefined);
+   assert.ok(css.includes('font-size:1.25em'));assert.ok(css.includes('font-size:120%'));
+   assert.ok(css.includes('font-family:Verdana'));assert.ok(css.includes('font-family:Courier New'));
+   if(row.layout==='easyread'){assert.equal((row.css.match(/font-family: font-family:/g)||[]).length,2);assert.ok(row.css.includes('; font-size: 1em;'));}
+ }
  const user=rows.find((row:any)=>row.name==='user-after-theme');
  assert.deepEqual({...readPropertyLayer(user.compiled,980005)}, {color_page_background:'#123456',font_base:'Georgia',module_tags_show:0,module_tags_order:-1});
  for(const row of rows.filter((row:any)=>row.name==='color')) {
@@ -66,7 +82,7 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    else {assert.equal(value?.['.type'],'Color');assert.equal(value?._as_string,row.value.as_string);
      for(const channel of ['r','g','b'])assert.equal(value?.['_'+channel],row.value[channel]);}
  }
- for(const row of rows.filter((row:any)=>row.css&&row.name!=='easyread')) {
+ for(const row of rows.filter((row:any)=>['dazzle','kelis'].includes(row.name))) {
    const name=row.name;assert.equal(row.title,name==='dazzle'?'Dazzle':'Kelis');
    const css=cleanStockStylesheet(row.css);assert.ok(css.includes('.entry .inner,.module{padding:.5em}'));
    assert.ok(css.includes(name==='dazzle'?'#00eeff':'#f8f1e0'));
@@ -104,8 +120,12 @@ test("theme credit freezes complete prepared emission and refuses later altered 
  const input:RenderInput={page:{kind:'recent',pageSkip:0,itemshow:20,maxScrollback:100,hasPrevious:false},journal,config:cfg,skip:0,skipPresent:false,
    nowSeconds:now,formChallenge:'public-challenge',uniq:'AAAAAAAAAAAAAAA',resourceTimes:loadResourceTimes()};
  const content:RenderContentPreparation={body:()=>'<p>Body</p>',subject:entry=>({html:entry.subject,recentHtml:entry.subject,all:entry.subject}) as import('@dreamwidth/content/contracts').SubjectPreparation,metadata:()=>{throw new Error('Unexpected metadata');},
-   stylesheet:cleanStockStylesheet,fontFamily:validateStockFontFamily};
+   stylesheet:cleanStockStylesheet,fontFamily:validateStockFontFamily,fontSize:validateStockFontSize};
  assert.ok(renderStock(artifact,input,2097152,content).includes("lj:user='zvi'"));
+ const typed={...input,journal:{...journal,customtextProperties:{font_entry_title:'Verdana'}}};
+ assert.throws(()=>renderStock(artifact,typed,2097152,{...content,fontSize:undefined}));
+ assert.ok(renderStock(artifact,typed,2097152,content).includes('font-family:Verdana'));
+
  assert.ok(renderStock(artifact,{...input,journal:{...journal,themeAuthors:[{name:'zvi',author:null}]}},2097152,content).includes("class='style-author'>zvi</span>"));
  for(const hook of [undefined,'unsupported'] as const)assert.throws(()=>renderStock(artifact,{...input,config:{...cfg,cssCleanerHookKind:hook}},2097152,content),/Missing qualified stylesheet/);
  const original=Context.prototype.runMethod;

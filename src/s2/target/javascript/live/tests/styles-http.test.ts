@@ -239,6 +239,32 @@ test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and ident
    await set(placement.replace('"module_links_order",2','"module_links_order",15'));
    const collision=await get();assert.equal(collision.statusCode,200,collision.body);
    assert.ok(collision.body.includes('module-credit'));assert.ok(!collision.body.includes('Placement link'));
+   const nativeTypography=rows.find((row:any)=>row.name==='typography'&&row.layout==='easyread');
+   const typography=placement.replace('1;\n# end.\n',nativeTypography.compiled.split('\n')
+     .filter((line:string)=>line.startsWith('register_set(')).map((line:string)=>line.replace('990006','980005')).join('\n')+'\n1;\n# end.\n');
+   await set(typography);
+   for(const url of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+     const response=await get(url);assert.equal(response.statusCode,200,response.body);
+     assert.ok(response.body.includes('font-family:Verdana,Georgia,sans-serif;font-size:2em'));
+     assert.ok(response.body.includes('font-family:Courier New,Georgia,sans-serif;font-size:120%'));
+     assert.ok(response.body.includes('font-family:Times New Roman,Georgia,sans-serif'));
+     assert.ok(!response.body.includes('HIDDEN_EASYREAD_COMMENT'));
+   }
+   if(process.env.S2_STYLES_BROWSER_OUTPUT)await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread',true,true);
+   for(const value of [typography.replace('"font_entry_title_size","120"','"font_entry_title_size","1px;color:red"'),
+     typography.replace('"font_entry_title_units","%"','"font_entry_title_units","%;color:red"'),
+     typography.replace('"font_module_heading","Georgia"','"font_module_heading"," "')]) {
+     await set(value);assert.equal((await get()).statusCode,422);
+   }
+   await set(typography.replace('"font_entry_title_size","120"','"font_entry_title_size","1px;color:red"').replace('"font_entry_title_units","%"','"font_entry_title_units",""'));
+   const notEmitted=await get();assert.equal(notEmitted.statusCode,200,notEmitted.body);assert.ok(!notEmitted.body.includes('color:red'));
+   await set(typography);
+   const originalTypographyRender=Renderer.prototype.render;
+   const typographyMutation=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>) {
+     const html=await originalTypographyRender.apply(this,args);await set(typography.replace('"font_entry_title_size","120"','"font_entry_title_size","125"'));return html;
+   });
+   try{assert.equal((await get()).statusCode,409);}finally{typographyMutation.mock.restore();}
+   await set(typography);assert.equal((await get()).statusCode,200);
    await set(user);
    for(const [id,name] of [[900003,'rb'],[900004,'krja']] as const) {
      await admin.query(`INSERT INTO ${table(g,'user')} (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,dversion,caps) VALUES(?,?,0,'N','V','P','Credit','Y','all','N',1,10,2)`,[id,name]);

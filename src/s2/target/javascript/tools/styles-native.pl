@@ -105,4 +105,28 @@ for my$value("15em", "1.5em", "junk15em", "0", "bad", "15bogus", "-5px", "0em") 
   }
  }
 }
+{
+ my @names=qw(module_heading module_text journal_title journal_subtitle entry_title comment_title);
+ my @families=('Georgia','', 'Verdana','', 'Courier New','Times New Roman');
+ my @sizes=('1.25','','2','1.5','120','');my @units=('em','px','em','','%','pt');
+ my $source='layerinfo type = "user";';
+ for my $i(0..$#names){my $key='font_'.$names[$i];$source.=" set $key = \"$families[$i]\"; set ${key}_size = \"$sizes[$i]\"; set ${key}_units = \"$units[$i]\";";}
+ my $output='';$compiler->compile_source({source=>\$source,type=>'user',layerid=>990006,output=>\$output,format=>'perl',builtinPackage=>'S2::Builtin::LJ'});
+ S2::load_layer(990006,$output,123);
+ for my $layout(qw(tabula easyread)) {
+  my @layers=$layout eq 'tabula'?(980001,980002,980003,990006):(990001,990002,990003,990006);
+  my $ctx=S2::make_context(@layers);
+  push @rows,{name=>'typography',layout=>$layout,compiled=>$output,values=>{map {my $key='font_'.$_;map {my $k=$key.$_;($k=>$ctx->[S2::PROPS]->{$k})} ('','_size','_units')} @names}};
+  for my $view(qw(recent entry)) {
+   my $ctx=S2::make_context(@layers);S2::run_code($ctx,'prop_init()');LJ::S2::escape_all_props($ctx,\@layers);
+   my $css='';S2::set_output(sub{$css.=$_[0]});S2::set_output_safe(sub{$css.=$_[0]});
+   for my $fn(qw(Page::print_contextual_stylesheet() Page::print_default_stylesheet() print_stylesheet() Page::print_theme_stylesheet())){S2::run_code($ctx,$fn,{_type=>$view eq 'entry'?'EntryPage':'RecentPage',view=>$view});}
+   push @rows,{name=>'typography-css',layout=>$layout,view=>$view,css=>$css};
+  }
+ }
+ my $ctx=S2::make_context(980001,980002,980003);
+ for my $case(['specific','Specific','Base','serif','1.25','em'],['inherit','','Base','serif','','em'],['fallback','','','serif','2',''],['empty','','','','',''],['not-emitted','Base','','','1px;color:red',''],['emitted-injection','Base','','','1px;color:red','px']) {
+  my($name,@args)=@$case;push @rows,{name=>'typography-helper',case=>$name,args=>\@args,output=>S2::run_function($ctx,'generate_font_css(string,string,string,string,string)',@args)};
+ }
+}
 print JSON::PP->new->canonical->utf8->encode(\@rows);
