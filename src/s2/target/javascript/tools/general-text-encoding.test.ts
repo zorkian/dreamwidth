@@ -73,6 +73,13 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
             const [definitions]=await admin.query<any[]>(`SELECT propid FROM ${table(g,"logproplist")} WHERE name='unknown8bit'`);
             assert.equal(definitions.length,1);
             await admin.query(`INSERT INTO ${table(c,"logprop2")} (journalid,jitemid,propid,value) VALUES (900001,1,?,'1')`,[definitions[0].propid]);
+            const [formatDefinitions]=await admin.query<any[]>(`SELECT propid,name FROM ${table(g,"logproplist")}
+                WHERE name IN ('editor','opt_preformatted','import_source')`);
+            assert.equal(formatDefinitions.length,3);
+            for(const definition of formatDefinitions)await admin.query(`INSERT INTO ${table(c,"logprop2")}
+                (journalid,jitemid,propid,value) VALUES (900001,1,?,?)
+                ON DUPLICATE KEY UPDATE value=VALUES(value)`,
+                [definition.propid,definition.name==='editor'?'rte0':'0']);
             await admin.query(`UPDATE ${table(c,"logtext2")} SET event=CONVERT(? USING latin1) WHERE journalid=900001 AND jitemid=1`,[Buffer.from([255,0,97])]);
             await admin.query(`INSERT INTO ${table(c,"links")} (journalid,ordernum,parentnum,title,url,hover)
                 VALUES (900001,2,0,'-',CONVERT(? USING latin1),'<hover>')`,[Buffer.from([47,255,38,97])]);
@@ -96,6 +103,12 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
                 assert.equal(links[1]!.url!.flagged(),false);
                 assert.equal(links[1]!.hover!.bytes().toString(),"<hover>");
                 const entry=snapshot.facts.entries[0]!;
+                const formatting=text.entryFormatting(entry);
+                assert.deepEqual(Object.keys(formatting).sort(),["editor","event","importSourceDefined","logtimeMysql","preformatted","subject"].sort());
+                assert.equal(formatting.editor!.bytes().toString(),"rte0");
+                assert.equal((formatting.preformatted as NativeString).bytes().toString(),"0");
+                assert.equal(formatting.importSourceDefined,true);
+                assert.equal(formatting.logtimeMysql.bytes().toString(),entry.logtime);
                 const oracle=JSON.parse(execFileSync("perl",["tools/general-selected-encoding-native.pl",g,c],{encoding:"utf8",timeout:10000}));
                 const frames=(value:NativeString|undefined)=>value===undefined?null:{base64:value.bytes().toString("base64"),utf8:value.flagged()?1:0};
                 assert.deepEqual({subject:frames(text.entry(entry).subject),text:frames(text.entry(entry).text)},oracle);

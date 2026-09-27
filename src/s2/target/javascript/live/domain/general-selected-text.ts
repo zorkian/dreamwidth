@@ -24,6 +24,7 @@
 import type {NativeSelectedSnapshot,RawEntry,RawCommentText} from "../contracts";
 import {NativeString} from "../../runtime/native-string";
 import {scalarTruthy} from "../../runtime/native-scalar";
+import type {GeneralEntryContentInput} from "./general-entry-content";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
 
 /** This source bag remains parent-only; only named approved values may be projected. */
@@ -97,6 +98,17 @@ export class GeneralSelectedText {
             journalTitle:prop("journaltitle"),journalSubtitle:prop("journalsubtitle"),
             website:Object.freeze({url:prop("url"),name:prop("urlname")}),
             customtext:Object.freeze({title:prop("customtext_title"),url:prop("customtext_url"),content:prop("customtext_content")})});
+    }
+    /** Only fields reached by Entry event_html, not its parent-only property bag. */
+    entryFormatting(entry:RawEntry):Pick<GeneralEntryContentInput,
+        "subject"|"event"|"editor"|"preformatted"|"importSourceDefined"|"logtimeMysql"> {
+        const converted=this.entry(entry);
+        return Object.freeze({subject:converted.subject?.clone(),event:converted.text?.clone(),
+            editor:converted.props.editor?.clone(),preformatted:converted.props.opt_preformatted?.clone(),
+            importSourceDefined:converted.props.import_source!==undefined,
+            // This civil timestamp was validated from the authoritative header;
+            // DBI and this projection both produce unflagged ASCII payloads.
+            logtimeMysql:NativeString.bytes(Buffer.from(entry.logtime,"ascii"))});
     }
     entry(entry:RawEntry):ConvertedNativeItem {
         const value=this.entries.get(entry);if(!value)throw Error("Unselected entry text reference");return value;
