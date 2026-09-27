@@ -147,6 +147,33 @@ my @cases = (
     ],
     [ 'false_body', { editor => 'html_casual1' }, undef, '0' ],
 );
+if ( @ARGV && $ARGV[0] eq '--markdown' ) {
+    @cases = (
+        [ 'explicit', { editor => 'markdown0' }, undef, "**bold**\nnext" ],
+        [ 'latest', { editor => 'markdown_latest' }, undef, '**bold**' ],
+        [ 'magic', {}, undef, "!markdown\n**bold**\nnext" ],
+        [ 'raw_magic', { editor => 'html_raw0' }, undef, "!markdown\n**bold**\nnext" ],
+        [ 'list', { editor => 'markdown0' }, undef, '3. item' ],
+        [ 'ordinary_list', { editor => 'markdown0' }, undef, '1. item' ],
+        [ 'nested_classic', { editor => 'markdown0' }, undef, "3. outer\n    7. inner" ],
+        [ 'nested_list', { editor => 'markdown0' }, undef, "3. outer\n\n    7. inner" ],
+        [ 'multiline_paragraph', { editor => 'markdown0' }, undef, "ordinary paragraph\nwith `code`" ],
+        [ 'multiline_code', { editor => 'markdown0' }, undef, "`line\ncode`" ],
+        [ 'edge_code', { editor => 'markdown0' }, undef, "`\nedge\n`" ],
+        [ 'mention', { editor => 'markdown0' }, undef, 'x @name' ],
+        [ 'code_mention', { editor => 'markdown0' }, undef, '`@name`' ],
+        [ 'escaped_mention', { editor => 'markdown0' }, undef, 'x\@name' ],
+        [ 'email', { editor => 'markdown0' }, undef, '<mail@example.invalid>' ],
+        [ 'unsafe_link', { editor => 'markdown0' }, undef, '[label](javascript:alert(1))' ],
+        [ 'block_cut', { editor => 'markdown0' }, undef, '<div class="ljcut">hidden **raw**</div>' ],
+        [ 'inline_cut', { editor => 'markdown0' }, undef, 'a <lj-cut>hidden</lj-cut> after' ],
+        [ 'recursive', { editor => 'markdown0' }, undef, '<div markdown="1">**inside**</div>' ],
+        [ 'literal_attribute', { editor => 'markdown0' }, undef, '`<div markdown="1">`' ],
+        [ 'false', { editor => 'markdown0' }, undef, '0' ],
+        [ 'auth', { editor => 'markdown0' }, undef, '[help](https://example.invalid/see_request?id=1&auth=TOKEN&x=2)' ],
+        [ 'preview_email', {}, undef, '!markdown' . "\n" . ('x' x 270) . ' <mail@example.invalid>' ],
+    );
+}
 my $base     = "a\nhttp://example.invalid/?a=1&b=2\nmail\@example.invalid\n";
 my $original = \&LJ::CleanHTML::formatting_args;
 my @rows;

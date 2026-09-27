@@ -45,16 +45,17 @@ const perlTrue = (value: string | null | undefined): boolean =>
 
 // clean_event returns before format inference for Perl-false body text.
 export function entryBodyFormat(body: string, props: Readonly<Record<string,string|null|undefined>>,
-    logtime: string): "html_raw0" | "html_casual0" | "html_casual1" {
+    logtime: string): "html_raw0" | "html_casual0" | "html_casual1" | "markdown0" | "markdown0-magic" {
     if (!perlTrue(body)) return "html_raw0";
     if (perlTrue(props.editor)) {
         if (props.editor === "rte0") return "html_casual1";
+        if (["markdown0", "markdown", "markdown_latest"].includes(props.editor!)) return "markdown0";
         if (["html_raw0", "html_casual0", "html_casual1"].includes(props.editor!))
             return props.editor as "html_raw0" | "html_casual0" | "html_casual1";
         throw new Unsupported();
     }
     // Native input is a byte string: its source marker uses ASCII whitespace.
-    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test(body)) throw new Unsupported();
+    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test(body)) return "markdown0-magic";
     if (perlTrue(props.opt_preformatted)) return "html_raw0";
     if (props.import_source !== undefined && props.import_source !== null) return "html_casual0";
     return logtime && logtime < "2019-05" ? "html_casual0" : "html_casual1";

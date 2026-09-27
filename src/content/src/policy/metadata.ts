@@ -34,11 +34,24 @@ function escape(value: string): string {
 // Source clean_event's html_casual1 text-token operation, not a parser and not
 // body HTML. No generated link string here may be reinserted into a DOM. The
 // caller escapes the complete helper string at the OG attribute boundary.
-function text(value: string, ancestors: readonly Element[]): string {
+export function casualMentions(value:string):string {
+    if(/^@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value))throw new UnsupportedContent();
+    return value.replace(/(\\.)|(?<=[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/gm,(match,escape)=>{
+        if(escape)return escape==='\\@'?'@':escape;
+        throw new UnsupportedContent();
+    });
+}
+
+function text(value: string, ancestors: readonly Element[], markdown = false): string {
     const tags = ancestors.map(element => element.localName);
     const raw = tags.some(tag => ["pre", "textarea", "lj-raw"].includes(tag));
     const auto = !raw && tags.filter(tag => tag === "table").length <=
         tags.filter(tag => tag === "td" || tag === "th").length;
+    if (markdown) {
+        const eligible = !raw && !tags.includes("code") && !ancestors.some(element =>
+            element.localName === "blockquote" && element.getAttribute("class") === "twitter-tweet");
+        return (eligible ? casualMentions(value) : value).replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    }
     const links: string[] = [];
     if (auto && !tags.includes("a")) {
         value = value.replace(/https?:\/\/[^\t\n\v\f\r '\"<>]+[a-zA-Z0-9_/&=\-]/g, match => {
@@ -95,7 +108,7 @@ function image(value: string, input: EntryContentInput): string {
 // an independently parsed/audited/repaired raw document; it never consumes the
 // displayed sanitized fragment. Original text slices preserve entity spellings.
 export function metadataText(root: Element, input: EntryContentInput,
-    limits: CleanerLimits, locate: LocateNode): string {
+    limits: CleanerLimits, locate: LocateNode, markdown = false): string {
     const cssBudget = {bytes: 0, nodes: 0};
     const context = {...input.context, reader: {removeColors: false, removeSizes: false,
         removeFonts: false, maxImageWidth: null, maxImageHeight: null,
@@ -160,7 +173,7 @@ export function metadataText(root: Element, input: EntryContentInput,
         const location = locate(node);
         if (node.nodeType === 3) {
             if (!location) throw new UnsupportedContent();
-            emit(text(sourceText(node, location), ancestors));
+            emit(text(sourceText(node, location), ancestors, markdown));
             return;
         }
         if (node.nodeType !== 1) throw new UnsupportedContent();
@@ -249,7 +262,7 @@ export function metadataText(root: Element, input: EntryContentInput,
         children();
         if (!voids.has(tag)) emit(`</${tag}>`);
     }
-    emit(text(prefix, []));
+    emit(text(prefix, [], markdown));
     // HTML-direct whitespace is outside BODY but source-visible to clean_event.
     // There is no whole-gap scan or transparent explicit HEAD exception.
     for (const node of document.documentElement.childNodes) {
