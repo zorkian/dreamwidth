@@ -16,12 +16,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createHash} from "node:crypto";
 import {execFileSync,spawnSync} from "node:child_process";
-import {mkdtempSync,rmSync,writeFileSync,readFileSync,readdirSync,cpSync,mkdirSync,openSync,closeSync} from "node:fs";
+import {mkdtempSync,rmSync,writeFileSync,readFileSync,readdirSync,cpSync,mkdirSync,openSync,closeSync,renameSync,utimesSync,statSync} from "node:fs";
 import path from "node:path";
 import {tmpdir} from "node:os";
 import {ArtifactCompiler,CompilerFailure,type ActiveStyleSnapshot} from "../live/render/layer-artifact";
 import {ProgramCoordinator,type PreparedProgram} from "../live/render/program-coordinator";
 import {admitProgram,instantiateAdmittedProgram} from "../live/render/program";
+import {pinInstalled,checkInstalled} from "../live/render/installed-files";
 import {CompilerQueue,CompilerCancelled} from "../live/render/compiler-queue";
 import {Context} from "../runtime/s2runtime";
 import {NativeOutput} from "../runtime/native-string";
@@ -148,7 +149,7 @@ const socket=require("node:net").connect(9,"127.0.0.1");socket.on("error",error=
 }));
 
 test("actual installed recovery and scalar-profile producer changes invalidate authenticated caches",()=>fixture(async(directory,compiler,sandbox)=>{
-    const {snapshot}=native();
+    const {snapshot,oracle}=native();
     // Copy only the coordinator's relative JS graph. No old artifacts/cache,
     // node_modules, secrets or repository tree enter this test installation.
     const installation=path.join(directory,"installation"),original=path.resolve("dist");
@@ -169,11 +170,33 @@ test("actual installed recovery and scalar-profile producer changes invalidate a
     const Installed=require(path.join(installation,"dist/live/render/program-coordinator.js")).ProgramCoordinator as typeof ProgramCoordinator;
     const first=new Installed(compiler,path.join(directory,"cache"),{sandbox});
     const key=first.key(snapshot);await first.prepare(snapshot);
+    const malformed={...snapshot,styleId:66601,layers:snapshot.layers.map((row,index)=>({...row,sourceBytes:null,
+        activeCompiledBytes:index?row.activeCompiledBytes:Buffer.from("not a generated registration")}))};
+    const negativeKey=first.key(malformed);
+    const processes=require("node:child_process"),originalSpawn=processes.spawn;let launches=0;
+    processes.spawn=function(...args:unknown[]){launches++;return originalSpawn(...args);};
+    try{
+        await assert.rejects(first.prepare(malformed),error=>{
+            const gap=error as {layerId:number;reason:string};assert.equal(gap.layerId,101);assert.equal(typeof gap.reason,"string");return true;
+        });
+        assert.equal(launches,1);
+        await assert.rejects(first.prepare(malformed),/Active program recovery unfinished/);
+        assert.equal(launches,1); // authenticated negative: no producer child
+        const negative=path.join(directory,"cache",first.key(malformed)+".json");
+        const forged=JSON.parse(readFileSync(negative,"utf8"));
+        const payload=JSON.parse(forged.payload);payload.reason="forged reason";forged.payload=JSON.stringify(payload);
+        writeFileSync(negative,JSON.stringify(forged));
+        await assert.rejects(first.prepare(malformed),/Active program recovery unfinished/);assert.equal(launches,2);
+    }finally{processes.spawn=originalSpawn;}
     const adapter=path.join(installation,"dist/live/render/recovery/execute.js");
     writeFileSync(adapter,readFileSync(adapter,"utf8")+"\n// Harmless installed adapter revision.\n");
     assert.throws(()=>first.key(snapshot),/S2 compiler unavailable/);
     const revised=new Installed(compiler,path.join(directory,"cache"),{sandbox});
     assert.notEqual(revised.key(snapshot),key);await revised.prepare(snapshot);
+    assert.notEqual(revised.key(malformed),negativeKey); // new adapter has a new complete key
+    launches=0;processes.spawn=function(...args:unknown[]){launches++;return originalSpawn(...args);};
+    try{await assert.rejects(revised.prepare(malformed),/Active program recovery unfinished/);assert.equal(launches,1);}
+    finally{processes.spawn=originalSpawn;}
     // A genuinely re-extracted producer profile binds a different compiler key.
     const s2Root=path.join(directory,"s2"),js=path.join(s2Root,"target/javascript");
     mkdirSync(path.join(js,"tools"),{recursive:true});mkdirSync(path.join(js,"runtime"));mkdirSync(path.join(js,"dist/runtime"),{recursive:true});
@@ -182,6 +205,13 @@ test("actual installed recovery and scalar-profile producer changes invalidate a
     for(const name of ["s2runtime","native-string","native-number","native-scalar","native-profile"]){
         cpSync(path.resolve("runtime",name+".ts"),path.join(js,"runtime",name+".ts"));
         cpSync(path.resolve("dist/runtime",name+".js"),path.join(js,"dist/runtime",name+".js"));
+    }
+    for(const name of ["layer-artifact","installed-files","compiler-queue"]){
+        for(const [source,destination] of [["live/render","live/render"],["dist/live/render","dist/live/render"]]){
+            const extension=source!.startsWith("dist")?".js":".ts";
+            const output=path.join(js,destination!,name+extension);mkdirSync(path.dirname(output),{recursive:true});
+            cpSync(path.resolve(source!,name+extension),output);
+        }
     }
     const extraction=path.join(js,"tools/compile-active.pl");
     const before=new ArtifactCompiler({s2Root,perl:"/usr/bin/perl",isolationExecutable:path.join(directory,"compiler-isolation")});
@@ -193,8 +223,37 @@ test("actual installed recovery and scalar-profile producer changes invalidate a
     const after=new ArtifactCompiler({s2Root,perl:"/usr/bin/perl",isolationExecutable:path.join(directory,"compiler-isolation")});
     assert.notEqual(before.scalarProfile.unicodeVersion,after.scalarProfile.unicodeVersion);
     assert.notEqual(before.digest,after.digest);assert.throws(()=>before.key(snapshot),CompilerFailure);
+    // A genuinely slow optional source producer keeps its native60s budget;
+    // the coordinator's smaller proof slice expires while its outer budget lives.
+    writeFileSync(extraction,readFileSync(extraction,"utf8").replace("} else {","} else { select undef, undef, undef, 4;"));
+    const slow=new ArtifactCompiler({s2Root,perl:"/usr/bin/perl",isolationExecutable:path.join(directory,"compiler-isolation")});
+    const fallback=new Installed(slow,path.join(directory,"slow-source-cache"),{sandbox});
+    const pids:number[]=[];processes.spawn=function(...args:unknown[]){const child=originalSpawn(...args);pids.push(child.pid);return child;};
+    try{
+        const deadline=Date.now()+3000;
+        const result=await fallback.prepare(snapshot,{deadline});
+        assert.equal(result.program.route,"recovery");assert.ok(Date.now()<deadline);assert.equal(pids.length,2);
+        assert.equal(execute(fallback,result).base64,oracle.outputs[1].base64);
+        for(const pid of pids)assert.throws(()=>process.kill(pid,0));
+    }finally{processes.spawn=originalSpawn;}
     // Trusted test-only installed job consumes CPU without executing input code.
-    const job=path.join(installation,"dist/live/render/recover-job.js");
+    const job=path.join(installation,"dist/live/render/recover-job.js"),jobBytes=readFileSync(job,"utf8");
+    // Actual reviewed catch distinguishes a real RangeError from RecoveryGap.
+    writeFileSync(job,"const {Parser}=require('./recovery/parser');Parser.prototype.parse=()=>{throw new RangeError('test resource failure')};\n"+jobBytes);
+    const transient=new Installed(compiler,path.join(directory,"transient-cache"),{sandbox});
+    launches=0;processes.spawn=function(...args:unknown[]){launches++;return originalSpawn(...args);};
+    try{for(let index=0;index<2;index++)await assert.rejects(transient.prepare(malformed),/S2 compiler unavailable/);assert.equal(launches,2);}
+    finally{processes.spawn=originalSpawn;}
+    assert.equal(readdirSync(path.join(directory,"transient-cache")).filter(name=>name.endsWith(".json")).length,0);
+    for(const [name,replacement] of [
+        ["absent-origin","output.map(row=>{delete row.deterministic;return row;})"],
+        ["mixed-origin","output.map((row,index)=>index===1?{kind:'gap',id:row.id,reason:'test transient',deterministic:false}:row)"]
+    ]) {
+        writeFileSync(job,jobBytes.replace("JSON.stringify(output)","JSON.stringify("+replacement+")"));
+        const unknown=new Installed(compiler,path.join(directory,name!+"-cache"),{sandbox});
+        await assert.rejects(unknown.prepare(malformed),/S2 compiler unavailable/);
+        assert.equal(readdirSync(path.join(directory,name!+"-cache")).filter(file=>file.endsWith(".json")).length,0);
+    }
     writeFileSync(job,"require('node:fs').readFileSync(0);while(true){}\n");
     const busy=new Installed(compiler,path.join(directory,"busy-cache"),{sandbox});
     const missing={...snapshot,layers:snapshot.layers.map(row=>({...row,sourceBytes:null}))};
@@ -265,4 +324,47 @@ test("pure private admission closure cannot import compiler, filesystem, process
         assert.doesNotMatch(code,/process\.env|child_process|node:fs|\.spawn\(/);
     }
     inspect(path.resolve("dist/live/render/program.js"));assert.ok(seen.size>=6);
+});
+
+
+test("warm cache checks installed bigint identity without rereading large executables",async t=>fixture(async(directory,compiler,sandbox)=>{
+    const {snapshot}=native(),coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    await coordinator.prepare(snapshot);
+    const fs=require("node:fs"),originalRead=fs.readFileSync;
+    let installedReads=0;
+    fs.readFileSync=function(file:unknown,...args:unknown[]){
+        if(typeof file==="string")installedReads++;
+        return originalRead(file,...args);
+    };
+    const start=performance.now();
+    try{for(let index=0;index<10;index++)await coordinator.prepare(snapshot);}
+    finally{fs.readFileSync=originalRead;}
+    assert.equal(installedReads,0);
+    t.diagnostic(`Ten authenticated warm preparations: ${(performance.now()-start).toFixed(1)}ms; zero installed-file reads`);
+}));
+
+test("source proof service failure falls back to actual active recovery, cancellation does not",()=>fixture(async(directory,_compiler,sandbox)=>{
+    const {snapshot,oracle}=native();
+    const compiler=new ArtifactCompiler({s2Root:root,perl:"/usr/bin/perl",isolationExecutable:path.join(directory,"compiler-isolation"),maxOutputBytes:1});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const recovered=await coordinator.prepare(snapshot);
+    assert.equal(recovered.program.route,"recovery");assert.equal(execute(coordinator,recovered).base64,oracle.outputs[1].base64);
+    const control=new AbortController();control.abort();
+    await assert.rejects(coordinator.prepare({...snapshot,styleId:12345},{signal:control.signal}),CompilerCancelled);
+    assert.equal(readdirSync(path.join(directory,"cache")).filter(name=>name.endsWith(".json")).length,1);
+}));
+
+
+test("installed identity detects same-size edits, restored mtime and same-content inode replacement",()=>{
+    const directory=mkdtempSync(path.join(tmpdir(),"s2-installed-")),file=path.join(directory,"producer");
+    try{
+        writeFileSync(file,"original");const pin=pinInstalled(file),before=statSync(file);
+        checkInstalled([pin]);checkInstalled([pin],true);
+        writeFileSync(file,"mutated!");utimesSync(file,before.atime,before.mtime);
+        assert.throws(()=>checkInstalled([pin]),/changed/);
+        writeFileSync(file,"original");const same=pinInstalled(file),replacement=path.join(directory,"replacement");
+        writeFileSync(replacement,"original");renameSync(replacement,file);
+        assert.throws(()=>checkInstalled([same]),/changed/);
+        checkInstalled([pinInstalled(file)],true);
+    }finally{rmSync(directory,{recursive:true,force:true});}
 });
