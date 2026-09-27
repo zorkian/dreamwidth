@@ -24,6 +24,8 @@ class Image { var string url; var int width; var int height; var string alttext;
 class Link { var string url; var string caption; var Image icon; }
 class UserLite { var string user; var string username; var string name; function builtin equals(UserLite other):bool; }
 function builtin UserLite(string name):UserLite;
+function builtin start_css();
+function builtin end_css();
 class RecentPage { var string title; var Image image; var Link link; var Date date; var Date other; var UserLite user; function print(); }
 class EntryPage { var string title; var Image image; var Link link; var Date date; var Date other; var UserLite user; function print(); }
 function prop_init() {
@@ -40,8 +42,10 @@ function RecentPage::print() {
     $alias.user = "mutated-public";
     var UserLite loaded = UserLite("public_name");
     print ":"; if ($alias->equals($loaded)) { print "1"; } else { print "0"; }
+    start_css(); print "p { color: red; }"; end_css();
 }
 function EntryPage::print() {
     print "entry:" + $.title + ":" + $*init_count + ":" + $*init_name + ":" + $.user.user;
     print ":" + $.date->compare($.other) + ":" + $.image.width + "x" + $.image.height + ":" + $.link.icon.url;
+    start_css(); print "p { color: red; }"; end_css();
 }

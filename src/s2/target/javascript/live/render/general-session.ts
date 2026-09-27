@@ -55,7 +55,18 @@ export class GeneralProgramSession {
         this.output = createNativeOutput({...output, initialization: true,
             checkDepth: () => this.context.recoveryCheckpoint()});
         this.context = new Context([...this.layers], () => {throw new Error("Legacy output bridge forbidden");},
-            undefined, callbacks, undefined, config.maxRecursion ?? 500, this.output.sink);
+            undefined, {...callbacks,
+                // These hosts must use the SAME native output session during
+                // initialization and printing, including saved printer pairs.
+                _start_css: ctx => {
+                    if (ctx !== this.context) throw new Error("Invalid output Context");
+                    this.startCss();
+                },
+                _end_css: ctx => {
+                    if (ctx !== this.context) throw new Error("Invalid output Context");
+                    this.endCss();
+                },
+            }, undefined, config.maxRecursion ?? 500, this.output.sink);
     }
     initialize(cleaner: GeneralPropertyCleaner): InitializedProgram {
         if (this.phase !== "new") throw new Error("Active program already initialized");

@@ -62,6 +62,7 @@ function fixture(initError=false) {
         },
     },config,{
         helpers(){return {host:async()=>{throw Error("Unexpected host");},session:{
+            afterContextInitialization(){order.push("context-language");},
             async finish(operation:()=>Promise<boolean>){order.push("check-public");return operation();},
         } as GeneralPublicSession};},
         async project(){order.push("project");return {".type":"RecentPage",_title:NativeString.bytes(Buffer.from([255]))};},
@@ -74,7 +75,7 @@ test("general parent init precedes selected data, approved wire and final reread
     const control=fixture();
     const result=await control.pipeline.render(control.request,control.programRequest);
     assert.ok(result.ok);assert.deepEqual(result.html,Buffer.from([255,0,97]));
-    assert.deepEqual(control.order,["journal","active","compile","init","selected","project","print",
+    assert.deepEqual(control.order,["journal","active","compile","init","context-language","selected","project","print",
         "check-public","check-journal","check-active","check-selected"]);
     const changed=fixture();changed.setChanged();
     assert.deepEqual(await changed.pipeline.render(changed.request,changed.programRequest),{ok:false,reason:"changed"});
