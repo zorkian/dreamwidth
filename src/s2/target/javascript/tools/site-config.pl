@@ -363,6 +363,7 @@ sub export_config {
         },
         styles => {
             defaultStyle => scalar_map( $LJ::DEFAULT_STYLE, 0 ),
+            defaultFeedStyle => scalar_map( $LJ::DEFAULT_FEED_STYLE // {}, 0 ),
             layerRemap   => scalar_map( \%LJ::S2LID_REMAP,  1 ),
             siteSchemeInheritance => \@site_scheme
         },

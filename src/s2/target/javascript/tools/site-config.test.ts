@@ -49,7 +49,8 @@ $DEFAULT_LANG='en'; @CLUSTERS=(7,9); %CLUSTER_PAIR_ACTIVE=(7=>'B');
 %DBINFO=(master=>{host=>'db.example.test',dbname=>'custom_global',user=>'fixture',pass=>'${secret}'},
   fallback=>{host=>'fallback.example.test',user=>'fixture',pass=>'${secret}',role=>{cluster9=>0}},
   other=>{sock=>'/tmp/example-mysql.sock',dbname=>'custom_cluster',user=>'fixture',pass=>'${secret}',role=>{cluster7b=>3,cluster9=>1}});
-$DEFAULT_STYLE={core=>'core2',layout=>'core2base/layout'}; %S2LID_REMAP=(4=>12);
+$DEFAULT_STYLE={core=>'core2',layout=>'core2base/layout'};
+$DEFAULT_FEED_STYLE={core=>'core2',layout=>'sitefeeds/layout',theme=>'sitefeeds/default'}; %S2LID_REMAP=(4=>12);
 $CAP_DEF{maxcomments}=0;
 %CAP=(1=>{s2viewentry=>0,maxcomments=>123},5=>{_name=>'_moveinprogress',readonly=>1,s2viewentry=>1});
 %KNOWN_HTTPS_SITES=('UPPER.example'=>1,'lower.example'=>1,'false.example'=>0);
@@ -121,6 +122,8 @@ LJ::Hooks::register_hook('modify_scheme_list', sub {
 `);
         const output = path.join(dir, "schemes.json");
         const result = exportSite(home, output);
+        if (!dbAttempt) assert.deepEqual(readStartupConfig(output).styles.defaultFeedStyle,
+            {core: "core2", layout: "sitefeeds/layout", theme: "sitefeeds/default"});
         assert.ok(!result.stdout.includes(secret) && !result.stderr.includes(secret));
         if (dbAttempt) {
             assert.equal(result.status, 1);

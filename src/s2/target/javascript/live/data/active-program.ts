@@ -199,7 +199,7 @@ export class MysqlActivePrograms {
     async load(requestInput: ActiveProgramRequest): Promise<ActiveProgramSnapshot | null> {
         const request = Object.freeze(structuredClone(requestInput));
         if (!/^[a-z0-9_]{1,25}$/.test(request.username) || !['recent', 'entry'].includes(request.view) ||
-            !['journal', 'default', 'siteviews'].includes(request.selection)) invalid();
+            !['journal', 'default', 'siteviews', 'sitefeeds'].includes(request.selection)) invalid();
         // Legacy configuration can serve its existing journal/default path,
         // but cannot authorize a guessed default SiteScheme inheritance.
         if (request.selection === 'siteviews' && this.config.styles.siteSchemeInheritance === undefined) {
@@ -207,9 +207,15 @@ export class MysqlActivePrograms {
         }
         const global = await this.global(request);
         if (!global) return null;
-        const cluster = await this.cluster(global, request.selection === 'default' ? 0 : undefined);
+        if ((request.selection === 'sitefeeds' || (request.selection === 'journal' && global.journal.journaltype === 'Y')) &&
+            this.config.styles.defaultFeedStyle === undefined) throw new SnapshotError('unavailable');
+        const sitefeeds = request.selection === 'sitefeeds' || (request.selection === 'journal' &&
+            global.journal.journaltype === 'Y' && Object.keys(this.config.styles.defaultFeedStyle ?? {}).length > 0);
+        const selectedRequest: ActiveProgramRequest = sitefeeds ? {...request, selection: 'sitefeeds'} : request;
+        const mapStyle = sitefeeds || request.selection === 'default' ? 0 : undefined;
+        const cluster = await this.cluster(global, mapStyle);
         const aliases = publicLayerAliases(global.publicLayers, this.config.styles);
-        let selection = selectActiveStyle(activeStyleId(cluster.settings), cluster.map, aliases, this.config.styles, request);
+        let selection = selectActiveStyle(activeStyleId(cluster.settings), cluster.map, aliases, this.config.styles, selectedRequest);
         const reads: unknown[] = [global.rows, cluster.rows];
         const dependencies: ActiveLayerDependency[] = [];
         const load = async (): Promise<ActiveLayerInput[]> => {
@@ -249,9 +255,15 @@ export class MysqlActivePrograms {
                     stored = hex(compiled.stored_bytes); decoded = stored;
                     const cid = ownerId === global.system.userid ? 0 : owner?.clusterId;
                     if (cid && stored[0] === 31 && stored[1] === 139) {
-                        try {decoded = gunzipSync(stored, {maxOutputLength: 16777216});} catch {invalid();}
+                        try {decoded = gunzipSync(stored, {maxOutputLength: 16777216});}
+                        catch (error) {
+                            // A native corrupt-stream miss is different from our
+                            // explicit decoded-byte resource ceiling.
+                            if ((error as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') invalid();
+                            decoded = null;
+                        }
                     }
-                    if (decoded.length > 16777215) invalid();
+                    if (decoded && decoded.length > 16777215) invalid();
                 }
                 const source = definition?.source === null || definition?.source === undefined ? null : hex(definition.source);
                 dependencies.push({id: layerId, role, ownerId, ownerCluster: owner?.clusterId ?? null,
@@ -274,7 +286,7 @@ export class MysqlActivePrograms {
         if (criticalMissing()) throw new SnapshotError('unavailable');
         const afterGlobal = await this.global(request);
         if (!afterGlobal || jsonDigest(afterGlobal.rows) !== jsonDigest(global.rows)) throw new SnapshotError('unavailable');
-        const afterCluster = await this.cluster(afterGlobal, request.selection === 'default' ? 0 : undefined);
+        const afterCluster = await this.cluster(afterGlobal, mapStyle);
         if (jsonDigest(afterCluster.rows) !== jsonDigest(cluster.rows)) throw new SnapshotError('unavailable');
         const fingerprint = jsonDigest([request, this.config.styles, this.config.capabilities, selection, reads]);
         return Object.freeze({request, journal: global.journal, selection,
