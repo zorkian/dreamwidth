@@ -40,7 +40,8 @@ our @trace;my @rows;
 no warnings 'redefine';
 local *LJ::Talk::treat_as_anon=sub{push @trace,'anonymous';!$_[0]};
 local *LJ::S2::DateTime_unix=sub{push @trace,'date:'.$_[0];{_type=>'DateTime',value=>$_[0]}};
-local *LJ::S2::DateTime_tz=sub{push @trace,'poster-time:'.$_[0];undef};
+local *LJ::S2::DateTime_tz=sub{push @trace,'poster-time:'.$_[0];
+    $_[1]?{_type=>'DateTime',value=>$_[0],zone=>$_[1]{suspended}?'S':'V'}:undef};
 local *LJ::S2::UserLite=sub{push @trace,'poster';{_type=>'UserLite',user=>'registered'}};
 local *LJ::Comment::new=sub{bless {},'CommentEdit'};
 local *LJ::S2::Image_userpic=sub{my($u,$id,$keyword,$w,$h)=@_;LJ::S2::Image('/picture',$w,$h,'ALT')};
@@ -51,10 +52,12 @@ local *LJ::is_enabled=sub{push @trace,'feature:'.$_[0] if $_[0] eq 'esn'||$_[0] 
 my $loaded=0;
 local *S2::get_property_value=sub{$_[1] eq 'userpics_position'?($loaded?'left':'none'):'small'};
 local *LJ::Talk::talkargs=sub{my($url,@args)=@_;$url.'?'.join('&',grep{defined&&length}@args)};
-for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1],['A',1,0]) {
+for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],
+    ['D',2,1,1],['S',2,1,1],['S',2,1,0]) {
     @trace=();my($state,$poster,$suspended)=@$spec;
     $loaded=$poster==1;
-    my %user=$poster==2||$poster==1?($poster=>bless({suspended=>$suspended},'CommentAuthor')):();
+    my $poster_loaded=$spec->[3]//0;
+    my %user=$poster_loaded?($poster=>bless({suspended=>$suspended},'CommentAuthor')):();
     my %userpic=(7=>{width=>13,height=>15});my $com={posterid=>$poster,talkid=>1,body=>'one<b>two</b>',subject=>'Q<"&',
         datepost=>'2026-09-27 00:00:00',datepost_unix=>1015,parenttalkid=>$loaded?2:0,_loaded=>$loaded,
         state=>$state,_show=>0,children=>[],props=>$loaded?{subjecticon=>3,imported_from=>'Source &<'}:{},showable_children=>2,hide_children=>0,
@@ -71,31 +74,34 @@ for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1],['A',1,0]) {
     $projection{poster}=$result->{poster};$projection{links}=$result->{link_keyseq};
     $projection{editreason}=$result->{editreason};$projection{admin_post}=$result->{admin_post};
     $projection{picture}=$result->{userpic};$projection{metadata}=$result->{metadata};
+    $projection{timePoster}=$result->{time_poster};
     $projection{timeAlias}=refaddr($result->{time})==refaddr($result->{system_time})?1:0;
-    push @rows,{state=>$state,poster=>$poster,suspended=>$suspended,result=>\%projection,
+    push @rows,{state=>$state,poster=>$poster,suspended=>$suspended,posterLoaded=>$poster_loaded,
+        result=>\%projection,
         featureCalls=>[grep{/^feature:/}@trace]};
 }
 print JSON::PP->new->canonical->encode(\@rows);`;
     const rows=JSON.parse(execFileSync("perl",["-e",oracle],{encoding:"utf8",timeout:10000,maxBuffer:131072})) as any[];
-    assert.equal(rows.length,6);
+    assert.equal(rows.length,9);
     const approved:GeneralCommentSourceInput[]=[];
     const journal={".type":"UserLite",_user:pv("journal")};
     for(const row of rows) {
-        const hidden=row.state==="S"||row.state==="D"||row.suspended;
+        const hidden=row.state==="S"||row.state==="D"||row.suspended&&row.posterLoaded;
         const loaded=row.poster===1;
-        const common={talkid:261,ditemid:261,depth:1,journal,
+        const common={state:row.state,show:row.state!=="S"&&row.state!=="D",
+            posterId:row.poster,posterLoaded:!!row.posterLoaded,posterSuspended:!!row.suspended,
+            talkid:261,ditemid:261,depth:1,journal,
             datepostUnix:1015,entryLogtimeUnix:1000,permalinkUrl:pv("/261.html?thread=261#cmt261"),
             replyUrl:pv("/261.html?replyto=261"),parentUrl:loaded?pv("/261.html?thread=517#cmt517"):undefined,threadrootUrl:undefined,
             expandUrl:pv("/261.html?thread=261#cmt261"),jsExpandUrl:pv("/261.html?thread=261&destination_thread=0#cmt261"),
             hasChildren:false,showableChildren:2,hideChildren:0,hiddenChild:0,echi:pv("E"),lastTalkid:261,lastJournalId:0};
-        const input:GeneralCommentSourceInput=hidden?{...common,visibility:row.state==="D"?"deleted":
-            row.state==="S"?"screened":"suspended",frozen:false}:{...common,visibility:"public",frozen:row.state==="F",
-            screened:false,loaded,posterId:row.poster,posterExists:loaded,body:pv('one<b>two</b>'),subject:pv('Q<"&'),
+        const input:GeneralCommentSourceInput=hidden?{...common,kind:"stub"}:{...common,kind:"shown",
+            loaded,body:pv('one<b>two</b>'),subject:pv('Q<"&'),
             noHtml:0,anonymous:true,preformatted:undefined,editor:undefined,datepost:pv("2026-09-27 00:00:00"),
             importSourceDefined:false,importedFrom:loaded?pv('Source &<'):undefined,pictureKeyword:undefined,
             subjectIcon:loaded?3:undefined,hasPicture:loaded,adminPost:loaded?1:0};
         approved.push(input);
-        let cleans=0,posters=0;
+        let cleans=0,posters=0,posterTimes=0;
         const featureCalls:string[]=[];
         const posterModel={".type":"UserLite",_user:pv("registered")};
         const model=generalCommentFromSource({prop:{_userpics_position:pv(loaded?"left":"none"),
@@ -104,7 +110,9 @@ print JSON::PP->new->canonical->encode(\@rows);`;
                 assert.equal(options.anonymous,true);assert.equal(options.noCss,true);
                 // Declared original-native cleaner result, not a JS cleaner implementation.
                 return pv(row.result.text);},
-            dateTimeUnix:value=>({".type":"DateTime",_value:value}),posterTime:()=>undefined,
+            dateTimeUnix:value=>({".type":"DateTime",_value:value}),
+            posterTime:value=>{posterTimes++;return {".type":"DateTime",_value:value,
+                _zone:row.suspended?'S':'V'};},
             poster(){posters++;assert.ok(loaded);return posterModel;},
             edit(){assert.ok(loaded);return {edited:1,url:pv('/edit?'),reason:pv('edited <&'),time:1020,threadrootUrl:pv('/root')};},
             subjectImage(){assert.ok(loaded);return generalImage(pv('/icon.gif'),3,4,undefined);},
@@ -121,6 +129,8 @@ print JSON::PP->new->canonical->encode(\@rows);`;
         assert.deepEqual((model._link_keyseq as unknown[]).map(text),row.result.links);
         assert.equal(model._time,model._system_time);assert.equal(row.result.timeAlias,1);
         assert.equal(cleans,hidden?0:1);assert.equal(posters,loaded?1:0);
+        assert.equal(posterTimes,(row.posterLoaded?1:0)+(loaded?1:0));
+        assert.equal((model._time_poster as any)?._zone,row.result.timePoster?.zone);
         assert.deepEqual(featureCalls,row.featureCalls);
         if(loaded) {
             assert.equal(model._poster,posterModel);

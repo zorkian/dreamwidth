@@ -169,7 +169,16 @@ without raw talk properties or account rows. Only the public variant carries bod
 author, picture keyword, imported attribution, or original cleaning inputs. Deleted,
 screened-hidden and suspended stubs invoke no body, author, picture, icon or edit
 provider. Their public structural/header facts still form the native blank Comment
-model. Parent selection, privacy approval and final reread remain mandatory; this
+model. State, `_show`, page-loaded poster and poster suspension remain separate facts:
+the native suspension, deletion and hidden-screen blocks stack in that order, so
+`fromsuspended` can coexist with `deleted` or `screened_noshow`. A hidden comment's
+poster enters the page-wide author map only if that poster also has a shown comment;
+hidden-only authors trigger no account reads. `time_poster` is computed when that
+page-wide author exists, including for a blank stub. Parent assembly must supply its
+approved timezone witness without loading hidden body or picture fields. Invalid
+author rows need witnessed absence and a final reread; this parent SQL follow-through
+is separate from the pure model component. Parent selection,
+privacy approval and final reread remain mandatory; this
 converter does not authorize a record or expose manager-only `poster_ip`.
 
 The required `cleanComment` operation receives quote_html output and the source
@@ -184,9 +193,10 @@ records when comments are disabled. Post-comment cmtinfo/head resources remain a
 separate unconditional operation, including on the disabled path.
 
 Focused proof executes the retained EntryPage conversion block read from installed
-source with declared native providers and a sticky DB-connect tripwire. Its six rows
+source with declared native providers and a sticky DB-connect tripwire. Its nine rows
 cover anonymous, missing registered author, each blank-stub reason, and a combined
-registered edit/image branch. The JS projection receives the actual native cleaner
+registered edit/image branch, plus overlapping suspended/deleted and suspended/screened
+states with the same author loaded or absent from another page comment. The JS projection receives the actual native cleaner
 result through an explicitly declared provider; this proves model sequencing and
 no-read behavior, not a JS cleaner implementation. Tree order/alias/cycle controls use
 approved synthetic records. Original cleaning, installed calendar, source URL/image
