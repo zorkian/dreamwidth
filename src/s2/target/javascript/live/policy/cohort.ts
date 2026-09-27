@@ -276,7 +276,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         customtextProperties=readPropertyLayer(userLayer.propertyCompiled,userLayer.s2lid);
     }
     const inlineStylesheet=!!theme||!!customtextProperties&&["color_page_background","font_base","module_tags_show","module_tags_order"].some(key=>Object.hasOwn(customtextProperties!,key));
-    if(inlineStylesheet&&config.cssCleanerHookConfigured!==false)throw new Unsupported();
+    if(inlineStylesheet&&!["none","proxy-css-links-only"].includes(config.cssCleanerHookKind??""))throw new Unsupported();
     const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
     for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {
         if(value && value!=='0') {

@@ -75,13 +75,13 @@ export function validateConfig(config: PublicAppConfig): void {
         "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback", "imgPrefix",
         "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
         "facebookPreviewIcon", ...(config.commentSettings === undefined ? [] : ["commentSettings"]),
-        ...(config.cssCleanerHookConfigured===undefined?[]:["cssCleanerHookConfigured"]),
+        ...(config.cssCleanerHookKind===undefined?[]:["cssCleanerHookKind"]),
         ...(config.headIconHookConfigured===undefined?[]:["headIconHookConfigured"])]);
     if(config.commentSettings!==undefined) {
         const c=exactRecord(config.commentSettings,["pageSize","threadPoint","maxSubjects"]);
         if(Object.values(c).some(n=>typeof n!=="number"||!Number.isSafeInteger(n)||n<1||n>10000))throw new Unsupported();
     }
-    if(config.cssCleanerHookConfigured!==undefined&&typeof config.cssCleanerHookConfigured!=="boolean")throw new Unsupported();
+    if(config.cssCleanerHookKind!==undefined&&!["none","proxy-css-links-only","unsupported"].includes(config.cssCleanerHookKind))throw new Unsupported();
     if(config.headIconHookConfigured!==undefined&&typeof config.headIconHookConfigured!=="boolean")throw new Unsupported();
     if ([config.userpicUrlHookConfigured,config.tagsEnabled,config.tagListHookConfigured].some(value=>typeof value !== "boolean")) throw new Unsupported();
     for (const value of [config.listenOrigin, config.canonicalAppOrigin]) {

@@ -59,7 +59,7 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         const value=originalContent.customtext!(source);cleaned.add(value);return value;
     }}:{})};
     const layers = instantiate(artifact,input.journal.theme);
-    if(input.journal.inlineStylesheet&&(!content.stylesheet||!content.fontFamily||input.config.cssCleanerHookConfigured!==false))
+    if(input.journal.inlineStylesheet&&(!content.stylesheet||!content.fontFamily||!["none","proxy-css-links-only"].includes(input.config.cssCleanerHookKind??"")))
         throw new Error("Missing qualified stylesheet cleaner/config");
     if(input.journal.customtextProperties) {
         const data=new StockLayer();
