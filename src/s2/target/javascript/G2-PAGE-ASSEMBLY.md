@@ -163,3 +163,32 @@ The source/model fixture has explicitly empty content and declared public helper
 does not establish installed original cleaning, the general calendar provider, OG image
 URL handling, complete ordinary factory startup, or HTTP/browser acceptance. Those
 remain required work. The held original subject component has not been consumed.
+
+Approved Comment conversion now uses named public-record and blank-stub variants,
+without raw talk properties or account rows. Only the public variant carries body,
+author, picture keyword, imported attribution, or original cleaning inputs. Deleted,
+screened-hidden and suspended stubs invoke no body, author, picture, icon or edit
+provider. Their public structural/header facts still form the native blank Comment
+model. Parent selection, privacy approval and final reread remain mandatory; this
+converter does not authorize a record or expose manager-only `poster_ip`.
+
+The required `cleanComment` operation receives quote_html output and the source
+preformatted, anonymous/no-CSS, editor, date and import-definedness options. It must
+run the actual original-source comment cleaner and apply its native exception effects;
+there is no identity or scalar fallback. Date/time providers likewise retain their
+source exception effects. The converter preserves native escaped comment subjects,
+logtime-based seconds, loaded edit metadata, invalid-poster UserLite fallback, source
+link ordering, separate feature calls, object aliases and mutable replies arrays.
+The iterative tree wrapper preserves native pre-order/root depth one and accesses no
+records when comments are disabled. Post-comment cmtinfo/head resources remain a
+separate unconditional operation, including on the disabled path.
+
+Focused proof executes the retained EntryPage conversion block read from installed
+source with declared native providers and a sticky DB-connect tripwire. Its six rows
+cover anonymous, missing registered author, each blank-stub reason, and a combined
+registered edit/image branch. The JS projection receives the actual native cleaner
+result through an explicitly declared provider; this proves model sequencing and
+no-read behavior, not a JS cleaner implementation. Tree order/alias/cycle controls use
+approved synthetic records. Original cleaning, installed calendar, source URL/image
+providers, public SQL/identity witnesses, factory binding, cmtinfo and ordinary
+HTTP/browser acceptance remain required. Held subject code is not imported.
