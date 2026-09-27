@@ -16,6 +16,17 @@ import type {GeneralUserAuthority} from "../domain/general-user-authority";
 import {decodeGeneralString} from "./general-site-url-client";
 import {encodeGeneralModel} from "./general-model-wire";
 import {PrivateTransportError} from "./private-transport";
+import {generalNativeHostResult} from "./general-native-host-result";
+import {encodeScalar} from "../../runtime/native-scalar";
+
+export async function parentUserUrl(parameters:unknown,authority:GeneralUserAuthority):Promise<unknown> {
+    if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||
+        Object.keys(parameters).length!==2||!Object.hasOwn(parameters,"name")||
+        !Object.hasOwn(parameters,"view"))throw new PrivateTransportError();
+    const row=parameters as Record<string,unknown>;
+    const name=decodeGeneralString(row.name),view=decodeGeneralString(row.view);
+    return generalNativeHostResult(async()=>encodeScalar(await authority.url(name,view)));
+}
 
 export async function parentLoadUser(parameters:unknown,authority:GeneralUserAuthority):Promise<unknown> {
     if(parameters && typeof parameters==="object" && !Array.isArray(parameters) &&

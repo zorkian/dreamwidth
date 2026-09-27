@@ -17,6 +17,13 @@ import {decodeGeneralModel} from "./general-model-wire";
 import type {GeneralWorkerChannel} from "./general-worker-channel";
 import {GeneralUserBindings} from "./general-user-bindings";
 import {PrivateTransportError} from "./private-transport";
+import {decodeGeneralString} from "./general-site-url-client";
+import {generalNativeHostValue} from "./general-native-host-result";
+
+export function workerUserUrl(channel:GeneralWorkerChannel,name:NativeString,view:NativeString):NativeString {
+    return channel.host("user-url",{name:encodeScalar(name),view:encodeScalar(view)},
+        value=>generalNativeHostValue(value,decodeGeneralString));
+}
 
 export function decodePreparedUser(input:unknown,bindings:GeneralUserBindings):unknown {
     if(input===null)return undefined;
