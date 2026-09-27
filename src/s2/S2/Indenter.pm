@@ -35,6 +35,8 @@ sub tabwriteln {
     $this->{'o'}->writeln(" "x($this->{'tabsize'}*$this->{'depth'}) . $s);
 }
 
+sub lineNumber { shift->{o}->lineNumber(); }
+
 sub newline { shift->{'o'}->newline(); }
 
 sub tabIn { shift->{'depth'}++; }
