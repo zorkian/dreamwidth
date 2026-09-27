@@ -75,6 +75,9 @@ export class GeneralRequestPipeline {
                 host:helpers.host,
                 select:async count=>{
                     if (!Number.isSafeInteger(count) || count < 1 || count > 50) throw new PrivateTransportError();
+                    // LJ/S2.pm merges language only after s2_context returns,
+                    // before Page preparation or selected-entry helper reads.
+                    helpers.session.afterContextInitialization();
                     const selectedRequest: RawPageRequest = request.page.kind === "recent" ?
                         {...request,page:{...request.page,itemshow:count}} : request;
                     const snapshot = await this.store.loadNativeSelectedSnapshot(selectedRequest);
