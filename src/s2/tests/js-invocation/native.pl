@@ -53,4 +53,8 @@ $ctx->[S2::VTABLE]->{$plural} = sub { S2::get_object_func_num('Thing', undef, 'm
 $ctx->[S2::VTABLE]->{$outer} = sub { S2::run_function($ctx, 'plural()') };
 eval { S2::run_function($ctx, 'outer()') };
 my $nested_error = $@;
-print JSON::PP->new->canonical->encode({nestedError=>$nested_error,id=>801,source=>encode_base64($source,''),code=>encode_base64(octets($code),''),instrumentationUnchanged=>1,marks=>\@marks,output=>encode_base64(octets($output),'')});
+my $outer_divide = S2::get_func_num('outerdivide()');
+$ctx->[S2::VTABLE]->{$outer_divide} = sub { S2::run_function($ctx, 'faildivide()') };
+eval { S2::run_function($ctx, 'outerdivide()') };
+my $divide_error = $@;
+print JSON::PP->new->canonical->encode({divideError=>$divide_error,nestedError=>$nested_error,id=>801,source=>encode_base64($source,''),code=>encode_base64(octets($code),''),instrumentationUnchanged=>1,marks=>\@marks,output=>encode_base64(octets($output),'')});

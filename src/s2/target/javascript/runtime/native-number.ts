@@ -19,6 +19,9 @@
 //
 
 import {NativeString} from './native-string';
+// Scalar and number modules are mutually dependent; this factory is invoked only
+// by arithmetic after module initialization, never during numeric class setup.
+import {nativeProgramError} from './native-scalar';
 
 export const NUMERIC_PROFILE = 'perl-5.34-ivuv64-nv64-preserve-ivuv-nvbits53-digits15-v1';
 const IV_MIN = -(1n << 63n), IV_MAX = (1n << 63n) - 1n, UV_MAX = (1n << 64n) - 1n;
@@ -189,7 +192,7 @@ export function intCast(value: NativeNumber): NativeNumber {
 }
 export function divide(left: NativeNumber, right: NativeNumber): NativeNumber {
     const a = numeric(left), b = numeric(right), ai = integerEligible(a), bi = integerEligible(b);
-    if (nv(b) === 0) throw new Error('Illegal division by zero');
+    if (nv(b) === 0) throw nativeProgramError('Illegal division by zero');
     if (ai !== undefined && bi !== undefined) {
         const absA = ai < 0 ? -ai : ai, absB = bi < 0 ? -bi : bi;
         if (absA >= absB && absA > (1n << 53n) && ai % bi === 0n) {
@@ -288,12 +291,12 @@ export function modulo(left: NativeNumber, right: NativeNumber): NativeNumber {
         }
     }
     if(useDouble) {
-        if(rightNV===0)throw new Error('Illegal modulus zero');
+        if(rightNV===0)throw nativeProgramError('Illegal modulus zero');
         let result=leftNV%rightNV;
         if(leftNegative!==rightNegative&&result!==0)result=rightNV-result;
         return NativeNumber.nv(rightNegative?-result:result);
     }
-    if(rightInteger===0n)throw new Error('Illegal modulus zero');
+    if(rightInteger===0n)throw nativeProgramError('Illegal modulus zero');
     let result=leftInteger%rightInteger;
     if(leftNegative!==rightNegative&&result!==0n)result=rightInteger-result;
     return NativeNumber.integer(rightNegative?-result:result);
