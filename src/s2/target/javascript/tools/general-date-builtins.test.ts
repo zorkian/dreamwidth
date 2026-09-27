@@ -117,8 +117,11 @@ test('actual constructor cache PV and zero use existing model field', () => {
 test('ordinal failure retains compiled formatter and native retry count', () => {
     let fail = true;
     const layer = new Layer();
-    layer.registerFunction(['lang_ordinal(int)'], () => (_ctx, n) => { if (fail)
-        throw nativeProgramError('trusted ordinal failure'); return scalarConcat(n, bytes('th')); });
+    layer.registerFunction(['lang_ordinal(int)'], () => (_ctx, n) => {
+        if (fail)
+            throw nativeProgramError('trusted ordinal failure');
+        return scalarConcat(n, bytes('th'));
+    });
     const ctx = new Context([layer], () => { }), cb = generalDateCallbacks({ dayOfWeek() { return 3; } }), model: GeneralModel = { _day: bytes('27') };
     ctx.prop._lang_fmt_date_retry = bytes('%%dayord%%');
     let failed = 0;
@@ -127,3 +130,43 @@ test('ordinal failure retains compiled formatter and native retry count', () => 
     ctx.prop._lang_fmt_date_retry = bytes('replacement');
     assert.deepEqual({ failed, value: frame(cb._Date__date_format!(ctx, model, bytes('retry'), false)), count: 1 }, oracle.retry);
 });
+const aliasCases = [
+    { fmt: '%%m%%/%%dayord%%' }, { fmt: '%%yyyy%%-%%dayord%%' },
+    { fmt: '%%mon%%/%%dayord%%' }, { fmt: '%%mm%%/%%dayord%%' },
+    { fmt: '%%m%%/%%dayord%%', link: true }, { fmt: '%%yyyy%%-%%dayord%%', link: true },
+    { fmt: '%%H%%/%%dayord%%', field: 'missing' }, { fmt: '%%H%%/%%dayord%%', field: 'undef' },
+    { fmt: '%%mon%%/%%dayord%%', element: 'missing' }, { fmt: '%%mon%%/%%dayord%%', element: 'undef' },
+];
+const aliasNative = JSON.parse(execFileSync('perl', ['-e', String.raw `
+use strict;use warnings;no warnings 'once';use JSON::PP;
+use lib '/workspaces/dreamwidth/cgi-bin','/workspaces/dreamwidth/src/s2';
+our$db;BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{$db=1;die'DB forbidden'};*DBI::connect_cached=sub{$db=1;die'DB forbidden'};}
+require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require S2;require LJ::S2;
+our$model;{no warnings 'redefine';*S2::run_function=sub{my($ctx,$name,$arg)=@_;$model->{month}=1;$model->{year}=1999;$model->{hour}=99;$ctx->[S2::PROPS()]->{lang_monthname_short}->[9]='MUT';return$arg.'th'};}
+my$cases=JSON::PP->new->decode(do{local$/;<STDIN>});my@out;
+for my$s(@$cases){my$c=[];my$a=$s->{element}&&$s->{element}eq'missing'?[]:[map{'Sep'}0..9];$a->[9]=undef if$s->{element}&&$s->{element}eq'undef';
+$c->[S2::PROPS()]={lang_monthname_short=>$a};$c->[S2::SCRATCH()]={};$model={year=>2026,month=>9,day=>27};$model->{hour}=undef if$s->{field}&&$s->{field}eq'undef';
+my$r=S2::Builtin::LJ::Date__date_format($c,$model,$s->{fmt},$s->{link}?1:0);my$h;{use bytes;$h=unpack('H*',$r)}push@out,{hex=>$h,utf8=>utf8::is_utf8($r)?1:0};}
+die'DB attempted'if$db;print JSON::PP->new->canonical->encode([@out]);
+`], { input: JSON.stringify(aliasCases), timeout: 10000, maxBuffer: 1048576 }).toString());
+for (const [index, spec] of aliasCases.entries())
+    test('native join aliases after ordinal ' + index, () => {
+        const model: GeneralModel = { _year: bytes('2026'), _month: bytes('9'), _day: bytes('27') };
+        if ('field' in spec && spec.field === 'undef')
+            model._hour = undefined;
+        const names: unknown[] = 'element' in spec && spec.element === 'missing' ? [] : Array.from({ length: 10 }, () => bytes('Sep'));
+        if ('element' in spec && spec.element === 'undef')
+            names[9] = undefined;
+        const layer = new Layer();
+        layer.registerFunction(['lang_ordinal(int)'], () => (ctx, n) => {
+            model._month = 1;
+            model._year = 1999;
+            model._hour = 99;
+            (ctx.prop._lang_monthname_short as unknown[])[9] = bytes('MUT');
+            return scalarConcat(n, bytes('th'));
+        });
+        const ctx = new Context([layer], () => { });
+        ctx.prop._lang_monthname_short = names;
+        const cb = generalDateCallbacks({ dayOfWeek() { return 3; } });
+        assert.deepEqual(frame(cb._Date__date_format!(ctx, model, bytes(spec.fmt), 'link' in spec && spec.link)), aliasNative[index]);
+    });
