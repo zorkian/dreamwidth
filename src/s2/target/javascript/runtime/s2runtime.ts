@@ -12,6 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {raiseNativeExecutionStop} from './native-scalar';
 import {NativeSink, scalarPV, scalarNumber, scalarConcat, scalarTruthy, scalarNotags, scalarCopy, incrementScalar, legacyText, NativeString, NativeNumber} from "./native-scalar";
 
 import {arithmetic, divide, modulo, intCast, numericCompare, arrayIndex} from "./native-number";
@@ -687,11 +688,11 @@ export class Context {
         // MAX_RECURSION to500, overriding check_depth's standalone fallback50.
         // Recovered loops call this same seam;
         // the outer worker deadline remains an independent fail-stop boundary.
-        if (this.deadline && performance.now() > this.deadline) throw new Error("S2 execution timed out");
+        if (this.deadline && performance.now() > this.deadline) raiseNativeExecutionStop("deadline");
         const counts = new Map<string, number>();
         for (const frame of this.callFrames) {
             const count = (counts.get(frame) ?? 0) + 1;
-            if (count >= this.maxRecursion) throw new Error("Excessive S2 recursion");
+            if (count >= this.maxRecursion) raiseNativeExecutionStop("recursion");
             counts.set(frame, count);
         }
     }
@@ -706,7 +707,12 @@ export class Context {
         try {
             if (++this.functionCalls % 16 === 0) this.recoveryCheckpoint();
             return scalarCopy(implementation(context, ...args.map(scalarCopy)));
-        } finally { this.callFrames.pop(); }
+        } finally {
+            this.callFrames.pop();
+            // S2::run_function cancels its alarm before s2_run prints diagnostics.
+            // The enclosing worker/page deadline remains independently active.
+            if (!this.callFrames.length) this.deadline = 0;
+        }
     }
 
     getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false,

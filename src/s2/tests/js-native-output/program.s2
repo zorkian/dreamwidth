@@ -15,3 +15,10 @@
 layerinfo type = core;
 function trusted() { print "RAW"; }
 function main() { trusted(); }
+function deep(int n) {
+    print "x";
+    print "x";
+    print "x";
+    if ($n > 0) { deep($n - 1); }
+}
+function recursive() { deep(200); }
