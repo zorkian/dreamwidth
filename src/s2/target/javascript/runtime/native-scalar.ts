@@ -138,16 +138,20 @@ export function decodeScalar(wire: NativeScalarWire): NativeScalar {
     return value;
 }
 
-const stops = new WeakSet<Error>();
+const stops = new WeakMap<Error, 'recursion' | 'deadline'>();
 
 /** Runtime-only authority; neither messages nor public properties authenticate a stop. */
 export function raiseNativeExecutionStop(kind: 'recursion' | 'deadline'): never {
     const error = new Error(kind === 'recursion' ? 'Excessive S2 recursion' : 'S2 execution timed out');
-    stops.add(error);
+    stops.set(error, kind);
     throw error;
 }
 export function isNativeExecutionStop(value: unknown): value is Error {
     return typeof value === 'object' && value !== null && stops.has(value as Error);
+}
+/** Trusted coordinator lookup; no author-visible property or message inference. */
+export function nativeExecutionStopKind(value: unknown): 'recursion' | 'deadline' | undefined {
+    return typeof value === 'object' && value !== null ? stops.get(value as Error) : undefined;
 }
 
 const programErrors = new WeakSet<Error>();

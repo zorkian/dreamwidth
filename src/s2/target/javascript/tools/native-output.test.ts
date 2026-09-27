@@ -21,7 +21,7 @@ import {tmpdir} from 'node:os';
 import {runInNewContext} from 'node:vm';
 import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
 import {recoverActiveLayer} from '../live/render/recovery';
-import {isNativeExecutionStop} from '../runtime/native-scalar';
+import {isNativeExecutionStop, raiseNativeExecutionStop, nativeExecutionStopKind} from '../runtime/native-scalar';
 import {createNativeOutput, type NativeOutputOptions} from '../live/render/native-output';
 import {Context,Layer,s2} from '../runtime/s2runtime';
 import {NativeString} from '../runtime/native-string';
@@ -172,9 +172,24 @@ test('legacy/default sink cadence remains Context-owned; declaration captured on
 });
 
 test('private execution-stop authority cannot be forged by author-like error data',()=>{
+    const raised:Error[]=[];
+    for(const kind of ['recursion','deadline'] as const) {
+        try {raiseNativeExecutionStop(kind);} catch(error) {
+            assert.ok(isNativeExecutionStop(error));
+            assert.equal(nativeExecutionStopKind(error),kind);
+            raised.push(error);
+            assert.equal(nativeExecutionStopKind(new Proxy(error,{})),undefined);
+            assert.equal(isNativeExecutionStop(new Proxy(error,{})),false);
+        }
+    }
+    assert.equal(raised.length,2);
+    assert.notEqual(raised[0],raised[1]);
+    for(const error of raised)assert.ok(isNativeExecutionStop(error));
+    assert.equal('nativeExecutionStopKind' in s2.runtime,false);
     for(const error of [new Error('Excessive S2 recursion'),new Error('S2 execution timed out'),
-        Object.assign(new Error('stop'),{nativeExecutionStop:true}),Object.create(Error.prototype)]) {
+        Object.assign(new Error('stop'),{nativeExecutionStop:true,kind:'deadline'}),Object.create(Error.prototype)]) {
         assert.equal(isNativeExecutionStop(error),false);
+        assert.equal(nativeExecutionStopKind(error),undefined);
         const page=createNativeOutput(options(()=>{throw error;}));
         for(let n=0;n<7;n++)page.sink.raw(bytes('x'));
         assert.throws(()=>page.sink.raw(bytes('x')));
