@@ -130,17 +130,26 @@ test('source-proven and recovered actual program preserves defining-layer safe/r
             assert.equal(oracle.recursive.ok,0);
             const partial=Buffer.from(recursivePage.runtimeError(diagnostic).bytes);
             const nativePartial=Buffer.from(oracle.recursive.base64,'base64');
-            // Existing Context function-name recursion differs from native caller-location
-            // counting. Preserve the exact independent discrepancy, not normalized parity.
-            assert.equal(nativePartial.length,277);
-            console.log(JSON.stringify({proof:'actual-recursion-count-gap',route:route===0?'source':'recovered',configuredRecursion:50,actualBase64:partial.toString('base64'),nativeBase64:nativePartial.toString('base64'),actualBytes:partial.length,nativeBytes:nativePartial.length}));
-            assert.deepEqual(partial.subarray(partial.indexOf(60)),nativePartial.subarray(nativePartial.indexOf(60)));
+            assert.deepEqual(partial,nativePartial);
             assert.equal(partial.subarray(0,partial.indexOf(60)).every(byte=>byte===120),true);
             const capture=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
             capture.startCss();
             recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,capture.sink);
             assert.throws(()=>recursiveContext.runFunction('recursive()'),isNativeExecutionStop);
             assert.deepEqual(Buffer.from(capture.runtimeError(diagnostic).bytes),Buffer.alloc(0));
+        }
+        // Cross-route dispatch must share Context entry cadence exactly once.
+        const proven=instantiateProgram(compiled.program);
+        for(const mixed of [[proven[0]!,recovered[1]!],[recovered[0]!,proven[1]!]]) {
+            let checks=0;const context=new Context(mixed,()=>{});
+            context.recoveryCheckpoint=()=>{checks++;};
+            const fn=context.getFunction('main()');
+            // Each main calls trusted twice: exactly three entries, no check.
+            fn(context);assert.equal(checks,0);
+            const runner=new Layer();let active:Context;
+            runner.functions.set('outer()',()=>{for(let n=0;n<5;n++)active.getFunction('main()')(active);});
+            active=new Context([...mixed,runner],()=>{},undefined,undefined,undefined,500,{ownsPrintCheckpoints:true,raw:()=>{},safe:()=>{}});active.recoveryCheckpoint=()=>{checks++;};
+            active.runFunction('outer()');assert.equal(checks,1);
         }
     } finally {rmSync(directory,{recursive:true,force:true});}
 });
