@@ -28,12 +28,14 @@ import type {GeneralEntryContentInput} from "./general-entry-content";
 import type {GeneralEntrySourceInput} from "./general-entry-from-source";
 import {generalMysqlDateParts} from "./general-model-date";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
+import type {GeneralPublicSession} from "./general-public-session";
 
 /** This source bag remains parent-only; only named approved values may be projected. */
 export class GeneralSelectedText {
     private readonly sources=new Map<string,NativeString|undefined>();
     private readonly entries=new WeakMap<RawEntry,ConvertedNativeItem>();
     private readonly comments=new WeakMap<RawCommentText,ConvertedNativeItem>();
+    private readonly official=new WeakMap<RawEntry,boolean>();
     private constructor(private readonly snapshot:NativeSelectedSnapshot) {
         if(snapshot.encoding!=="dbi-byte-view")throw Error("Invalid selected source encoding");
         for(const cell of snapshot.sources) {
@@ -52,7 +54,8 @@ export class GeneralSelectedText {
         if(!this.sources.has(key))throw Error("Missing selected source witness");
         return this.sources.get(key);
     }
-    static async prepare(snapshot:NativeSelectedSnapshot,encoding:GeneralTextEncoding):Promise<GeneralSelectedText> {
+    static async prepare(snapshot:NativeSelectedSnapshot,encoding:GeneralTextEncoding,
+        authority?:GeneralPublicSession):Promise<GeneralSelectedText> {
         const prepared=new GeneralSelectedText(snapshot);
         for(const entry of snapshot.facts.entries) {
             const prefix="entry:"+entry.jitemid;
@@ -62,6 +65,13 @@ export class GeneralSelectedText {
             const converted=scalarTruthy(props.unknown8bit)?await encoding.item(subject,text,props):
                 Object.freeze({subject,text,props:Object.freeze(props)});
             prepared.entries.set(entry,converted);
+            let official=false;
+            if(snapshot.facts.owner.journaltype==="C") {
+                if(!authority)throw Error("Community maintainer authority is not installed");
+                const manages=await authority.entryMaintainer(entry.journalid,entry.posterid);
+                official=manages&&scalarTruthy(converted.props.admin_post);
+            }
+            prepared.official.set(entry,official);
         }
         for(const comment of snapshot.facts.comments?.texts??[]) {
             const prefix="comment:"+comment.jtalkid;
@@ -124,7 +134,7 @@ export class GeneralSelectedText {
             permalinkUrl:options.permalinkUrl.clone(),adultContentLevel:options.adultContentLevel.clone(),
             dateparts:generalMysqlDateParts(entry.eventtime),systemDateparts:generalMysqlDateParts(entry.logtime),
             security:bytes(entry.security),allowmask:bytes(entry.allowmask),
-            adminPost:NativeNumber.integer(scalarTruthy(converted.props.admin_post)?1n:0n),
+            adminPost:NativeNumber.integer(this.official.get(entry)?1n:0n),
             forceMoodtheme:bytes(owner.optForceMoodtheme),
             content:Object.freeze({...this.entryFormatting(entry),
                 suspendMessage:options.content.suspendMessage,noEntryBody:options.content.noEntryBody,

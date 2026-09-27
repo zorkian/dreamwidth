@@ -43,13 +43,14 @@ const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","s2compil
 const publicLanguageTables = ["ml_langs","ml_items","ml_latest","ml_text"];
 
 export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>,
-    publicLanguage = false, publicUsers = false, publicEncodings = false): Promise<void> {
+    publicLanguage = false, publicUsers = false, publicEncodings = false, publicMaintainers = false): Promise<void> {
     assert.equal(process.env.LJHOME,"/workspaces/dreamwidth");
     const prefix = "s6_selected_" + randomBytes(8).toString("hex");
     const schemas = [prefix+"_g",prefix+"_seven",prefix+"_nineteen"];
     const created: string[] = [];
     const selectedGlobalTables = [...globalTables, ...(publicLanguage ? publicLanguageTables : []),
-        ...(publicUsers ? ["identitymap"] : []), ...(publicEncodings ? ["codes"] : [])];
+        ...(publicUsers ? ["identitymap"] : []), ...(publicEncodings ? ["codes"] : []),
+        ...(publicMaintainers ? ["reluser"] : [])];
     const admin = await mysql.createConnection({socketPath:"/var/run/mysqld/mysqld.sock",user:"root"});
     let store: MysqlLiveStore | undefined;
     const table = (schema: string,name: string) => {
@@ -103,7 +104,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
                 VALUES (900001,44,?,?)`,[row.type,row.s2lid]);
         }
         const [logDefinitions] = await admin.query<mysql.RowDataPacket[]>(`SELECT propid,name FROM ${table(g,"logproplist")}
-            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location','xpost','xpostdetail','opt_nocomments','opt_nocomments_maintainer')`);
+            WHERE name IN ('editor','statusvis','picture_mapid','picture_keyword','current_mood','current_moodid','current_coords','current_location','xpost','xpostdetail','opt_nocomments','opt_nocomments_maintainer','admin_post')`);
         const logProp = (name:string) => Number(logDefinitions.find(row => row.name===name)!.propid);
         const insertEntry = async (schema:string,journal:number,id:number,security:string,eventTime:string,
             event:string|Buffer) => {
