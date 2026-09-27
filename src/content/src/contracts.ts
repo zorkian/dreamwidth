@@ -63,7 +63,7 @@ export interface EntryContentContext {
 // explicit refusal or a documented security removal, never implicit admission.
 export interface EntryContentInput {
     readonly body: string; // RAW, untrusted UTF8 text; explicitly not safe HTML
-    readonly format: "html_raw0" | "html_casual0" | "html_casual1";
+    readonly format: "html_raw0" | "html_casual0" | "html_casual1" | "markdown0" | "markdown0-magic";
     readonly context: EntryContentContext;
 }
 // A comment is original source with independently selected native trust/format.
@@ -117,6 +117,13 @@ export interface ContentProvenance {
     readonly inputSha256: string;
     readonly outputSha256: string;
     readonly cutsOmitted: number;
+    readonly markdown?: {
+        readonly converter: "markdown-it@15.0.2";
+        readonly optionsSha256: string;
+        readonly sourceSha256: string;
+        readonly htmlSha256: string;
+        readonly tokenCount: number;
+    };
 }
 export type EntryContentResult =
     | { readonly kind: "ok"; readonly fragment: BodyFragment; readonly provenance: ContentProvenance }

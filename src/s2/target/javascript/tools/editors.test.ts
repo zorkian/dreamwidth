@@ -35,25 +35,25 @@ test('31 native entry-format and independent OG records retain original context'
     // Fixed browser-equivalent HTML5 BR/entity spelling, not normalized outputs.
     const raw='a\nhttp://example.invalid/?a=1&amp;b=2\nmail@example.invalid\n';
     const casual='a<br><a href="http://example.invalid/?a=1&amp;b=2">http://example.invalid/?a=1&amp;b=2</a><br>mail@example.invalid<br>';
-    const display:Record<string,string>={magic_raw:'!markdown\n**bold**\nnext',crlf:'a<br>b\rc<br>',
+    const display:Record<string,string>={magic_missing:'<p><strong>bold</strong>\nnext</p>\n',markdown_alias:'<p><strong>bold</strong>\nnext</p>\n',magic_raw:'!markdown\n**bold**\nnext',crlf:'a<br>b\rc<br>',
         pre:'<pre>\nhttp://example.invalid/\\@x\n</pre>',code:'<code>a<br>\\@x</code>',
         textarea:'<textarea>\n\\@x\n</textarea>',mentions0:'x @name',escaped:'x@name',
         email:'mail@example.invalid',cut:'a<br><a name="cutid1"></a>hidden<br><b>x</b><br>after',false_body:'0'};
     const cleaner=createEntryCleaner(limits);
     try {
         for(const row of rows){
-            const refused=['invalid_truthy','magic_missing','markdown_alias'].includes(row.id);
+            const refused=['invalid_truthy'].includes(row.id);
             if(refused){assert.throws(()=>entryBodyFormat(row.source,row.props,row.logtime),row.id);continue;}
             const format=entryBodyFormat(row.source,row.props,row.logtime);
             const expected=row.entry.format_calls[0];
-            assert.equal(format,expected==='rte0'?'html_casual1':expected??'html_raw0',row.id);
+            assert.equal(format,row.id==='magic_missing'?'markdown0-magic':expected==='markdown'?'markdown0':expected==='rte0'?'html_casual1':expected??'html_raw0',row.id);
             const input={body:row.source,format,context};
             const displayed=cleaner.clean(input);
             if(row.entry.mentions.length){assert.deepEqual(displayed,{kind:'failure',reason:'unsupported'},row.id);continue;}
             assert.equal(displayed.kind,'ok',row.id+': '+JSON.stringify(displayed));
             if(displayed.kind==='ok')assert.equal(displayed.fragment.html,display[row.id]??(format==='html_raw0'?raw:casual),row.id);
             const metadata=cleaner.metadata({subject:'Title',entry:input});
-            if(row.metadata.mentions.length||['magic_raw','escaped'].includes(row.id)){
+            if(row.metadata.mentions.length||['escaped'].includes(row.id)){
                 assert.deepEqual(metadata,{kind:'failure',reason:'unsupported'},row.id+' metadata');
             }else{
                 assert.equal(metadata.kind,'ok',row.id+' metadata');
@@ -136,4 +136,62 @@ test('native support-auth scalar removal binds original hashes and stripped pars
             assert.notEqual(imageInput.body.slice(request.sourceStart,request.sourceEnd),request.sourceText);
         }
     } finally {cleaner.close();}
+});
+
+test('23 independent Markdown contexts preserve exact fields and name CommonMark boundaries',()=>{
+    const root=resolve(__dirname,'../../../../../..');
+    const oracle=spawnSync('perl',[resolve(root,'src/s2/target/javascript/tools/editors-native.pl'),'--markdown'],
+        {cwd:root,env:{...process.env,LJHOME:root},encoding:'utf8',timeout:10000,maxBuffer:262144});
+    assert.equal(oracle.status,0,oracle.stderr);assert.equal(oracle.stderr,'');
+    const rows=JSON.parse(oracle.stdout);assert.equal(rows.length,23);
+    const cleaner=createEntryCleaner(limits);
+    const refused=new Set(['multiline_code','edge_code','mention','inline_cut','recursive']);
+    const exact=new Set(['explicit','latest','magic','raw_magic','list','ordinary_list','multiline_paragraph','code_mention','escaped_mention','false','auth']);
+    try {
+        for(const row of rows){
+            const format=entryBodyFormat(row.source,row.props,row.logtime);
+            const input={body:row.source,format,context};
+            const result=cleaner.clean(input);
+            if(refused.has(row.id)){
+                assert.deepEqual(result,{kind:'failure',reason:'unsupported'},row.id);continue;
+            }
+            assert.equal(result.kind,'ok',row.id+': '+JSON.stringify(result));
+            if(result.kind!=='ok')continue;
+            if(exact.has(row.id))assert.equal(result.fragment.html,row.entry.output,row.id);
+            if(row.id==='nested_classic'){
+                assert.equal(result.fragment.html,'<ol>\n<li>outer\n7. inner</li>\n</ol>\n');
+                assert.equal((row.entry.output.match(/<ol>/g)??[]).length,2);
+            }
+            if(row.id==='nested_list'){
+                assert.equal((result.fragment.html.match(/<ol>/g)??[]).length,2);
+                assert.equal((row.entry.output.match(/<ol>/g)??[]).length,2);
+                assert.ok(!result.fragment.html.includes('start='));
+                assert.ok(!row.entry.output.includes('start='));
+                assert.ok(result.fragment.html.includes('outer'));assert.ok(result.fragment.html.includes('inner'));
+            }
+            if(row.id==='email'){
+                assert.equal(result.fragment.html,'<p><a href="mailto:mail@example.invalid">mail@example.invalid</a></p>\n');
+                assert.match(row.entry.output,/&#(?:x[0-9A-Fa-f]+|[0-9]+);/);
+            }
+            if(row.id==='unsafe_link'){
+                assert.equal(result.fragment.html,'<p>[label](javascript:alert(1))</p>\n');
+                assert.equal(row.entry.output,'<p><a>label</a></p>\n');
+            }
+            if(row.id==='block_cut')assert.ok(result.fragment.html.includes('<a name="cutid1"></a>'));
+            if(row.id==='literal_attribute')assert.equal(result.fragment.html,'<p><code>&lt;div markdown="1"&gt;</code></p>\n');
+            const helper=cleaner.metadata({subject:'Title',entry:input});
+            if(row.metadata.mentions.length || ['escaped_mention','email'].includes(row.id)){
+                assert.deepEqual(helper,{kind:'failure',reason:'unsupported'},row.id+' helper');continue;
+            }
+            assert.equal(helper.kind,'ok',row.id+' helper: '+JSON.stringify(helper));
+            if(helper.kind!=='ok')continue;
+            if(row.id==='preview_email'){
+                const expected='<p>'+'x'.repeat(270)+' <a href="mailto:mail@example.invalid">mail@example.invalid</a></p>\n';
+                assert.equal(helper.metadata.eventText,expected);
+                assert.match(row.metadata.output,/&#(?:x[0-9A-Fa-f]+|[0-9]+);/);
+                const og=helper.metadata.eventText.replace(/[\t\n\v\f\r ]+/g,' ').trim().slice(0,300).trim();
+                assert.equal(og,'<p>'+'x'.repeat(270)+' <a href="mailto:mail@examp');
+            }else assert.equal(helper.metadata.eventText,row.metadata.output,row.id+' independent helper');
+        }
+    }finally{cleaner.close();}
 });

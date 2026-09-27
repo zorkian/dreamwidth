@@ -17,8 +17,9 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function editorsBrowser(port:number, html:string):Promise<void> {
-    const output=process.env.S2_EDITORS_BROWSER_OUTPUT;
+export async function editorsBrowser(port:number, html:string, mode:"editor"|"markdown"="editor"):Promise<void> {
+    const output=mode==="markdown"?process.env.S2_MARKDOWN_BROWSER_OUTPUT:process.env.S2_EDITORS_BROWSER_OUTPUT;
+    const destination=mode==="markdown"?"https://markdown.slice17.invalid/?x=1&y=2":"https://editor.slice16.invalid/?x=1&y=2";
     if(!output) return;
     const appOrigin="http://localhost:8080";
     const pageUrl=`http://localhost:${port}/users/ordinary6/76801.html`;
@@ -64,7 +65,7 @@ export async function editorsBrowser(port:number, html:string):Promise<void> {
         await context.route("**/*",async(route:any)=>{
             const url=route.request().url();
             if(url===pageUrl && route.request().isNavigationRequest())return route.continue();
-            if(url==="https://editor.slice16.invalid/?x=1&y=2" && route.request().isNavigationRequest())
+            if(url===destination && route.request().isNavigationRequest())
                 return route.fulfill({status:200,contentType:"text/plain",body:"Intercepted declared editor destination"});
             const asset=assets.get(url);
             if(!asset){failures.push(url);return route.abort();}
@@ -73,26 +74,29 @@ export async function editorsBrowser(port:number, html:string):Promise<void> {
         const page=await context.newPage();page.on("pageerror",(error:Error)=>failures.push(error.message));
         assert.equal((await page.goto(pageUrl,{waitUntil:"networkidle"})).status(),200);
         const body=page.locator('.entry-content').first();
-        assert.ok((await body.innerText()).includes('First\nStyled editor'));
-        const state=await body.locator('b').filter({hasText:'Styled editor'}).evaluate((node:HTMLElement)=>{
+        if(mode==="markdown"){
+            assert.equal(await body.locator('h1').innerText(),'Markdown heading');
+            assert.equal(await body.locator('ol').evaluate((node:HTMLOListElement)=>node.start),1);
+        }else assert.ok((await body.innerText()).includes('First\nStyled editor'));
+        const state=await body.locator('b').filter({hasText:mode==="markdown"?'Styled Markdown':'Styled editor'}).evaluate((node:HTMLElement)=>{
             const style=getComputedStyle(node);return {color:style.color,weight:style.fontWeight};});
         assert.deepEqual(state,{color:'rgb(255, 0, 0)',weight:'700'});
-        assert.ok((await body.innerText()).includes('Cut editor body'));
+        assert.ok((await body.innerText()).includes(mode==="markdown"?'Markdown cut body':'Cut editor body'));
         assert.equal(await body.locator('a[name="cutid1"]').count(),1);
-        const link=body.locator('a[href="https://editor.slice16.invalid/?x=1&y=2"]');
+        const link=body.locator(`a[href="${destination}"]`);
         assert.equal(await link.count(),1);
         const og=await page.locator('meta[property="og:description"]').getAttribute('content');
-        assert.ok(og.includes('<br />'));assert.ok(!og.includes('cutid1'));
+        assert.ok(og.includes(mode==="markdown"?'<h1>Markdown heading</h1>':'<br />'));assert.ok(!og.includes('cutid1'));
         mkdirSync(output,{recursive:true});
         await page.screenshot({path:path.join(output,'entry-editors.png'),fullPage:true});
-        await link.click();await page.waitForURL('https://editor.slice16.invalid/?x=1&y=2');
+        await link.click();await page.waitForURL(destination);
         assert.deepEqual(failures,[]);
         mkdirSync(output,{recursive:true});
         writeFileSync(path.join(output,"browser.json"),JSON.stringify({pageUrl,fixtureStyle:44,
             htmlSha256:createHash("sha256").update(html).digest("hex"),
             retainedPageSha256:createHash("sha256").update(prior).digest("hex"),
             stylesheetMapping:{emitted:expectedStyle[0],retained:retainedStyle[0]},computedBody:state,
-            bodyDestination:"https://editor.slice16.invalid/?x=1&y=2",
+            mode,bodyDestination:destination,
             resources:[...requested].map(url=>({url,source:assets.get(url)!.source,
                 sha256:createHash("sha256").update(assets.get(url)!.body).digest("hex")})),failures},null,2)+"\n");
     }finally{await context.close();await browser.close();}
