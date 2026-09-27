@@ -123,6 +123,14 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
                 assert.equal(Object.hasOwn(projected,"props"),false);
                 assert.equal(Object.hasOwn(projected.content,"props"),false);
                 assert.equal(Object.hasOwn(projected.content,"xpostOpaque"),false);
+                const direct=text.entryPageSource(entry,{permalinkUrl:projected.permalinkUrl,
+                    adultContentLevel:projected.adultContentLevel,mode:NativeString.hostUtf8Bytes("reply"),
+                    suspendMessage:0,noHtml:0});
+                assert.equal((direct.mode as NativeString).bytes().toString(),"reply");
+                assert.deepEqual(direct.content.event!.bytes(),projected.content.event!.bytes());
+                for(const key of ["noEntryBody","cutUrl","cutDisable","props"])
+                    assert.equal(Object.hasOwn(direct.content,key),false);
+                assert.equal(Object.hasOwn(direct,"forceMoodtheme"),false);
                 assert.throws(()=>text.entrySource({...entry},{permalinkUrl:projected.permalinkUrl,
                     adultContentLevel:projected.adultContentLevel,content:projected.content}));
                 const oracle=JSON.parse(execFileSync("perl",["tools/general-selected-encoding-native.pl",g,c],{encoding:"utf8",timeout:10000}));
