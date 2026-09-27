@@ -87,6 +87,24 @@ push @cases,['proxy_link',['safe','<link rel="stylesheet" href="http://other.tes
 push @cases,['flagged_raw',['raw',decode('UTF-8',"\xc3\xa9")]];
 push @cases,['mixed_raw',['raw',"\xe9"],['raw',decode('UTF-8',"\xc3\xa9")]];
 push @cases,['flagged_css',['raw',"\xe9"],['start'],['raw',decode('UTF-8',"p{content:\"\xc3\xa9\"}")],['end']];
+for my $tag(qw(style title textarea script xmp)) {
+ for my $tail ('','</'.$tag.' foo>') {
+  push @cases,["eof_${tag}_$tail",['safe',"<$tag>p{color:red}$tail"],['raw','<div>CHROME</div>'],['safe','after']];
+ }
+}
+for my $value ('<input disabled checked><p a=1 b>','<scr<script>ipt>',
+ '<![CDATA[<b>x</b>]]>','<x:meta http-equiv="refresh">','<me-ta http-equiv="refresh">',
+ '<x:link rel="stylesheet" href="http://evil.test/a.css">','<a href="java'.chr(0xa0).'script:x">x</a>') {
+ push @cases,["token_$value",['safe',$value]];
+}
+for my $value ('<![CDATA[x]]>','<![CDATA[<b>x</b>]]>tail','<![IGNORE[<b>x</b>]]>',
+ '<a title="'.chr(0xc3).chr(0xa9).'">x</a>', '<a title="'.chr(0xc3).chr(0xa9).chr(0xa0).'">x</a>', '<title>t<b>x</b>',
+ '<title>t<!-- hidden -->after', '<style>a<!-- hidden -->b', '<script>bad<b>visible</b>') {
+ push @cases,["recovery_$value",['safe',$value]];
+}
+push @cases,['cdata_raw',['safe','<![CDATA[<b>x'],['raw','RAW'],['safe','</b>]]>tail']];
+push @cases,['cdata_attribute',['safe','<p a="<![CDATA[<b>x]]>">text</p>']];
+push @cases,['cdata_comment',['safe','<!-- <![CDATA[<b>x]]> --><p>text</p>']];
 my @rows;
 for my $case (@cases) {
  my ($id,@trace)=@$case;my $out='';local $LJ::S2::ret_ref=\$out;

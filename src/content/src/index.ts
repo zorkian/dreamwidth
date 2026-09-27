@@ -516,6 +516,3 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
 }
 
 export {cleanStockStylesheet,validateStockFontFamily,validateStockFontSize} from "./policy/stylesheet";
-
-export {createPageOutput} from "./page-output";
-export type {PageChunk,PageOutput,PageOutputOptions,PageOutputLimits,StylesheetPolicy} from "./page-output-types";

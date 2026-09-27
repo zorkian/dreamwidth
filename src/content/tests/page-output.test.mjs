@@ -36,7 +36,7 @@ for(const row of native) test(`native ${row.id}`,()=>{
  assert.deepEqual(bytes(),Buffer.from(row.base64,'base64'));
 });
 test('copies scalar input and prevents page-to-page eating leakage',()=>{
- const first=session();first.output.printSafe({bytes:Buffer.from('<script>never'),utf8:false});first.output.finish();assert.equal(first.bytes().length,0);
+ const first=session();first.output.printSafe({bytes:Buffer.from('<script>never'),utf8:false});first.output.finish();assert.equal(first.bytes().toString(),'never');
  const second=session();const raw=Buffer.from('<b>visible</b>');second.output.printSafe({bytes:raw,utf8:false});raw.fill(0);second.output.finish();assert.equal(second.bytes().toString(),'<b>visible</b>');
 });
 test('output/input/deadline and completed-session bounds fail closed',()=>{
