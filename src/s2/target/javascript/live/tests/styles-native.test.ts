@@ -94,6 +94,18 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
        'easyread-aqua',{...expectation,pageFont:'font-family:  serif ; '}));
    }
  }
+ const presentation=rows.find((row:any)=>row.name==='presentation');
+ assert.deepEqual({...readPropertyLayer(presentation.compiled,990008)}, {entry_userpic_style:'small',comment_userpic_style:'smaller',userpics_position:'right',entry_metadata_position:'top'});
+ for(const row of rows.filter((row:any)=>row.name==='presentation-size')) {
+   const expected:Record<string,number[]>={'':[101,99],small:[75.75,74.25],smaller:[50.5,49.5],unknown:[101,99]};
+   assert.deepEqual([row.width,row.height],expected[row.style]);
+   assert.ok(row.image.includes(`height="${row.height}" width="${row.width}"`));
+ }
+ for(const row of rows.filter((row:any)=>row.name==='presentation-css')) {
+   const css=cleanStockStylesheet(row.css,row.layout==='easyread'?'easyread-aqua':undefined);
+   assert.ok(css.includes('text-align:right'));
+   if(row.layout==='easyread')assert.ok(css.includes('margin-right:85px'));
+ }
  const user=rows.find((row:any)=>row.name==='user-after-theme');
  assert.deepEqual({...readPropertyLayer(user.compiled,980005)}, {color_page_background:'#123456',font_base:'Georgia',module_tags_show:0,module_tags_order:-1});
  for(const row of rows.filter((row:any)=>row.name==='color')) {

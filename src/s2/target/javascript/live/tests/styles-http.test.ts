@@ -300,6 +300,56 @@ test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and ident
    });
    try{assert.equal((await get()).statusCode,409);}finally{baseMutation.mock.restore();}
    await set(baseWrapper('serif','1.25'));assert.equal((await get()).statusCode,200);
+   // Public odd-sized default picture also remains independently available
+   // to the journal profile and Entry OG when entry/comment display is none.
+   await admin.query(`UPDATE ${table(g,'user')} SET defaultpicid=11 WHERE userid=900001`);
+   await admin.query(`INSERT INTO ${table(c,'userpic2')} (userid,picid,width,height,state,description) VALUES(900001,11,101,99,'N','Odd')`);
+   await admin.query(`UPDATE ${table(c,'talk2')} SET posterid=900001 WHERE journalid=900001 AND jtalkid=1`);
+   const [musicDefs]=await admin.query<any[]>(`SELECT propid FROM ${table(g,'logproplist')} WHERE name='current_music'`);
+   await admin.query(`INSERT INTO ${table(c,'logprop2')} (journalid,jitemid,propid,value) VALUES(900001,300,?,'PRESENTATION_MUSIC')`,[musicDefs[0].propid]);
+   const nativePresentation=rows.find((row:any)=>row.name==='presentation').compiled;
+   const presentation=(entry='small',comment='smaller',position='right',metadata='top')=>placement.replace('"module_userprofile_show",0','"module_userprofile_show",1').replace('"module_userprofile_section","none"','"module_userprofile_section","two"').replace('"module_userprofile_order",1','"module_userprofile_order",3').replace('1;\n# end.\n',
+     nativePresentation.split('\n').filter((line:string)=>line.startsWith('register_set('))
+       .map((line:string)=>line.replace('990008','980005')).join('\n')+'\n1;\n# end.\n')
+     .replace('"entry_userpic_style","small"',`"entry_userpic_style",${JSON.stringify(entry)}`)
+     .replace('"comment_userpic_style","smaller"',`"comment_userpic_style",${JSON.stringify(comment)}`)
+     .replace('"userpics_position","right"',`"userpics_position",${JSON.stringify(position)}`)
+     .replace('"entry_metadata_position","top"',`"entry_metadata_position",${JSON.stringify(metadata)}`);
+   await set(presentation());
+   for(const url of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+     const response=await get(url);assert.equal(response.statusCode,200,response.body);
+     assert.ok(response.body.includes('height="74.25" width="75.75"'));assert.ok(!response.body.includes('HIDDEN_EASYREAD_COMMENT'));
+     const entryStart=response.body.indexOf('id="entry-');assert.ok(entryStart>=0);
+     const metadataIndex=response.body.indexOf('PRESENTATION_MUSIC',entryStart);
+     const bodyIndex=response.body.indexOf('Public body 300',entryStart);
+     assert.ok(metadataIndex>=0&&bodyIndex>metadataIndex);
+     if(url.endsWith('.html'))assert.ok(response.body.includes('height="49.5" width="50.5"'));
+   }
+   if(process.env.S2_STYLES_BROWSER_OUTPUT)await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread',true,false,undefined,
+     {imageUrls:[new URL(cfg.userpicRoot+'/11/900001',cfg.listenOrigin).href]});
+   await set(presentation('','', 'left','bottom'));
+   const full=await get('/users/ordinary6/76801.html');assert.equal(full.statusCode,200,full.body);
+   assert.ok(full.body.includes('height="99" width="101"'));
+   const fullEntry=full.body.indexOf('id="entry-');assert.ok(fullEntry>=0);
+   assert.ok(full.body.indexOf('PRESENTATION_MUSIC',fullEntry)>full.body.indexOf('Public body 300',fullEntry));
+   await set(presentation('smaller','small','left','top'));
+   const reversed=await get('/users/ordinary6/76801.html');assert.equal(reversed.statusCode,200,reversed.body);
+   assert.ok(reversed.body.includes('height="49.5" width="50.5"'));assert.ok(reversed.body.includes('height="74.25" width="75.75"'));
+   await set(presentation('small','smaller','none','top'));
+   const none=await get('/users/ordinary6/76801.html');assert.equal(none.statusCode,200,none.body);
+   assert.ok(!none.body.includes('height="74.25" width="75.75"'));assert.ok(!none.body.includes('height="49.5" width="50.5"'));
+   assert.ok(none.body.includes(`property="og:image" content="${cfg.userpicRoot}/11/900001"`));
+   assert.ok(none.body.includes('height="99" width="101"'),'Independent default profile picture remains');
+   for(const value of [presentation('unknown'),presentation('small','unknown'),presentation('small','smaller','unknown'),presentation('small','smaller','right','unknown')]) {
+     await set(value);assert.equal((await get()).statusCode,422);
+   }
+   await set(presentation());assert.equal((await get()).statusCode,200);
+   const originalPresentation=Renderer.prototype.render;
+   const presentationMutation=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>) {
+     const html=await originalPresentation.apply(this,args);await set(presentation('small','smaller','left'));return html;
+   });
+   try{assert.equal((await get()).statusCode,409);}finally{presentationMutation.mock.restore();}
+   await set(presentation());assert.equal((await get()).statusCode,200);
    await set(user);
    for(const [id,name] of [[900003,'rb'],[900004,'krja']] as const) {
      await admin.query(`INSERT INTO ${table(g,'user')} (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,dversion,caps) VALUES(?,?,0,'N','V','P','Credit','Y','all','N',1,10,2)`,[id,name]);

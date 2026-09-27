@@ -145,4 +145,26 @@ for my$value("15em", "1.5em", "junk15em", "0", "bad", "15bogus", "-5px", "0em") 
    pageFont=>S2::run_function($ctx,'generate_font_css(string,string,string,string)',map{$p->{$_}}qw(font_base font_fallback font_base_size font_base_units))};
  }
 }
+{
+ my $source='layerinfo type = "user"; set entry_userpic_style = "small"; set comment_userpic_style = "smaller"; set userpics_position = "right"; set entry_metadata_position = "top";';
+ my $output='';$compiler->compile_source({source=>\$source,type=>'user',layerid=>990008,output=>\$output,format=>'perl',builtinPackage=>'S2::Builtin::LJ'});
+ S2::load_layer(990008,$output,123);push @rows,{name=>'presentation',compiled=>$output};
+ for my $layout(qw(tabula easyread)) {
+  my @layers=$layout eq 'tabula'?(980001,980002,980003,990008):(990001,990002,990003,990008);
+  my $ctx=S2::make_context(@layers);S2::run_code($ctx,'prop_init()');LJ::S2::escape_all_props($ctx,\@layers);
+  my $css='';S2::set_output(sub{$css.=$_[0]});S2::set_output_safe(sub{$css.=$_[0]});
+  for my $fn(qw(Page::print_contextual_stylesheet() Page::print_default_stylesheet() print_stylesheet() Page::print_theme_stylesheet())){S2::run_code($ctx,$fn,{_type=>'EntryPage',view=>'entry'});}
+  push @rows,{name=>'presentation-css',layout=>$layout,css=>$css};
+ }
+ local *LJ::get_remote=sub{undef};local *LJ::is_enabled=sub{0};local *LJ::currents=sub{()};
+ my $ctx=S2::make_context(980001,980002,980003);
+ for my $style('','small','smaller','unknown') {
+  my $entry=LJ::S2::Entry({}, {subject=>'Subject',text=>'Body',poster=>{_u=>{}},journal=>{_u=>{}},
+   userpic=>{_type=>'Image',url=>'https://pictures.invalid/odd',width=>101,height=>99,alttext=>'Odd',extra=>{title=>'Odd'}},
+   userpic_style=>$style,security=>'public',adult_content_level=>'',moodthemeid=>0,props=>{},group_names=>'Groups',
+   dateparts=>'2026 9 27 1 2 3',system_dateparts=>'2026 9 27 1 2 3'});
+  push @rows,{name=>'presentation-size',style=>$style,width=>$entry->{userpic}{width},height=>$entry->{userpic}{height},
+   image=>S2::run_function($ctx,'Image::as_string()',$entry->{userpic})};
+ }
+}
 print JSON::PP->new->canonical->utf8->encode(\@rows);
