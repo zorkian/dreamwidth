@@ -20,7 +20,7 @@ import {tmpdir} from "node:os";
 import {ArtifactCompiler,CompilerFailure,instantiateProgram,type ActiveStyleSnapshot,type ProgramArtifact} from "../live/render/layer-artifact";
 import {ArtifactCache} from "../live/render/artifact-cache";
 import {NativeOutput,NativeString,caseString} from "../runtime/native-string";
-import {Context} from "../runtime/s2runtime";
+import {Context, Layer, s2} from "../runtime/s2runtime";
 import {scalarPV,scalarNumber,legacyText} from "../runtime/native-scalar";
 import {exactHostInteger} from "../runtime/native-number";
 
@@ -83,6 +83,71 @@ test("arbitrary custom stack: native function/alias/inheritance/composites/trust
         assert.notEqual(failure.status,0);
         assert.match(failure.stderr,/Delete statement argument is not a hash/);
     }
+}));
+
+test("general scalars instantiate core2 and all 58 stock layouts, execute stock push and 2000-term concat",
+    {timeout:180000},()=>fixture(async(_directory,launcher)=> {
+    const oracle=JSON.parse(execFileSync("/usr/bin/prlimit",["--as=1073741824","--cpu=120","--",
+        "/usr/bin/perl",path.join(tools,"scalar-stock.pl")],{
+        env:{...env,LJHOME:path.resolve(root,"../.."),PERL5LIB:"/opt/dreamwidth-extlib/lib/perl5"},
+        encoding:"utf8",timeout:150000,maxBuffer:128*1024*1024}));
+    assert.equal(oracle.layers.length,59);
+    assert.ok(oracle.layers.some((layer:any)=>layer.name==="venture/layout.s2"));
+    for(const layer of oracle.layers) {
+        const value=new Function("s2",`"use strict";\n${layer.code}\nreturn ${layer.variable};`)(s2);
+        assert.ok(value instanceof Layer,layer.name);
+    }
+    const adapt=(snapshot:any)=>({...snapshot,layers:snapshot.layers.map((layer:any)=> {
+        const {sourceBase64,activeBase64,...identity}=layer;
+        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64"),
+            activeCompiledBytes:Buffer.from(activeBase64,"base64")};
+    })});
+    const producer=compiler(launcher);
+    const stock=await producer.compile(adapt(oracle.snapshot));
+    assert.equal(stock.kind,"compiled");if(stock.kind!=="compiled")throw Error("Stock compilation required");
+    const ctx=new Context(instantiateProgram(stock.program),()=>{throw Error("Unexpected stock output");});
+    const comment={".type":"Comment",_replies:[
+        {".type":"Comment",_replies:[{".type":"Comment",_replies:[]}]},
+        {".type":"Comment",_replies:[]}]};
+    assert.equal(exactHostInteger(scalarNumber(ctx.getFunction(
+        "print_module_pagesummary_comment_count(Comment)")(ctx,comment)),0,100),oracle.count);
+    assert.equal(legacyText(scalarPV(ctx.getFunction(
+        "generate_font_css(string,string,string,string,string)")(ctx,"Georgia","Arial","serif","12","px"))),oracle.font);
+    const bytes=NativeString.bytes(Buffer.from('e78cabc3a9','hex'));
+    const pv=(value:string)=>NativeString.hostUtf8Bytes(value);
+    const color=s2.builtin.construct_Color(pv('#0ef')); assert.ok(color);
+    assert.deepEqual([color._as_string,color._r,color._g,color._b],
+        [oracle.color.as_string,oracle.color.r,oracle.color.g,oracle.color.b]);
+    assert.equal(s2.builtin.construct_Color(pv('#123456\n'))??null,oracle.invalidColor);
+    const calls:Record<string,()=>unknown>={
+        length:()=>ctx.builtin._string__length!(ctx,bytes),
+        index:()=>ctx.builtin._string__index!(ctx,bytes,pv('é')),
+        substr:()=>ctx.builtin._string__substr!(ctx,bytes,0,1),
+        substr_invalid:()=>ctx.builtin._string__substr!(ctx,NativeString.bytes(Buffer.from('ff41','hex')),0,1),
+        lower:()=>ctx.builtin._string__lower!(ctx,scalarPV('AZ猫é')),
+        upper:()=>ctx.builtin._string__upper!(ctx,scalarPV('az猫é')),
+        upperfirst:()=>ctx.builtin._string__upperfirst!(ctx,scalarPV('az猫é')),
+        ends_lf:()=>ctx.builtin._string__ends_with!(ctx,pv('x\n'),pv('x')),
+        replace:()=>ctx.builtin._string__replace!(ctx,pv('a.a'),pv('.'),pv('!')),
+        split:()=>ctx.builtin._string__split!(ctx,pv('a::'),pv(':')),
+        compare:()=>ctx.builtin._string__compare!(ctx,pv('a'),pv('b')),
+        repeat:()=>ctx.builtin._string__repeat!(ctx,pv('ab'),2),
+    };
+    assert.deepEqual(oracle.builtinRows.map((row:any)=>row.id),Object.keys(calls));
+    for(const row of oracle.builtinRows) {
+        const call=calls[row.id]; assert.ok(call);
+        const value=call();
+        if(row.hex!==undefined)assert.equal(scalarPV(value).bytes().toString('hex'),row.hex,row.id);
+        else if(row.parts)assert.deepEqual((value as unknown[]).map(part=>legacyText(scalarPV(part))),row.parts,row.id);
+        else assert.equal(exactHostInteger(scalarNumber(value),-100,100),row.value,row.id);
+    }
+    const long=await producer.compile(adapt(oracle.longSnapshot));
+    assert.equal(long.kind,"compiled");if(long.kind!=="compiled")throw Error("Long compilation required");
+    const output=new NativeOutput();
+    const longContext=new Context(instantiateProgram(long.program),()=>{throw Error("Legacy sink used");},
+        undefined,undefined,undefined,500,{raw:value=>output.append(value),safe:()=>{throw Error("Unexpected safe output");}});
+    longContext.runFunction("main()");
+    assert.equal(output.bytes().toString("base64"),oracle.longOutputBase64);
 }));
 
 test("source/active mismatch and ownership never execute wrong version",()=>fixture(async(_directory,launcher)=> {
@@ -174,30 +239,6 @@ test("source and shared sink preserve independent native raw octets and wide ope
     const output=new NativeOutput();
     const context=new Context(instantiateProgram(result.program),()=>{throw Error("Legacy sink used");},
         undefined,undefined,undefined,500,{raw:value=>output.append(value),safe:()=>{throw Error("Unexpected safe output");}});
-    const bytes=NativeString.bytes(Buffer.from('e78cabc3a9','hex'));
-    const pv=(value:string)=>NativeString.hostUtf8Bytes(value);
-    const calls:Record<string,()=>unknown>={
-        length:()=>context.builtin._string__length!(context,bytes),
-        index:()=>context.builtin._string__index!(context,bytes,pv('é')),
-        substr:()=>context.builtin._string__substr!(context,bytes,0,1),
-        substr_invalid:()=>context.builtin._string__substr!(context,NativeString.bytes(Buffer.from('ff41','hex')),0,1),
-        lower:()=>context.builtin._string__lower!(context,scalarPV('AZ猫é')),
-        upper:()=>context.builtin._string__upper!(context,scalarPV('az猫é')),
-        upperfirst:()=>context.builtin._string__upperfirst!(context,scalarPV('az猫é')),
-        ends_lf:()=>context.builtin._string__ends_with!(context,pv('x\n'),pv('x')),
-        replace:()=>context.builtin._string__replace!(context,pv('a.a'),pv('.'),pv('!')),
-        split:()=>context.builtin._string__split!(context,pv('a::'),pv(':')),
-        compare:()=>context.builtin._string__compare!(context,pv('a'),pv('b')),
-        repeat:()=>context.builtin._string__repeat!(context,pv('ab'),2),
-    };
-    assert.deepEqual(oracle.builtinRows.map((row:any)=>row.id),Object.keys(calls));
-    for(const row of oracle.builtinRows) {
-        const call=calls[row.id]; assert.ok(call);
-        const value=call();
-        if(row.hex!==undefined)assert.equal(scalarPV(value).bytes().toString('hex'),row.hex,row.id);
-        else if(row.parts)assert.deepEqual((value as unknown[]).map(part=>legacyText(scalarPV(part))),row.parts,row.id);
-        else assert.equal(exactHostInteger(scalarNumber(value),-100,100),row.value,row.id);
-    }
     context.runFunction("main()");
     assert.equal(output.bytes().toString("base64"),oracle.outputBase64);
 }));

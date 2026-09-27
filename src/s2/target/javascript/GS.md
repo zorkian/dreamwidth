@@ -19,6 +19,10 @@ Source lowering carries scalar/list/void evaluation context. In particular,
 direct native print of one `reverse` argument leaves that argument unchanged,
 while assignment reverses its bytes. Array foreach aliases elements; string and
 hash-key foreach use temporary scalar cells. Assignment copies scalar state.
+String concat chains use flat scalar-context operand callbacks and complete each
+left-associated coercion before evaluating the next right operand. Array push
+uses a statement-safe cell helper, evaluates its target and value once, and
+retains native scalar/list contexts without V8 spread-argument limits.
 
 Native language operations and string builtins have different boundaries.
 `substr` deliberately performs native lax UTF8 decoding, character slicing and
@@ -80,3 +84,9 @@ The independent fixed-source Perl oracle compares raw bytes and supplies distinc
 builtin/flagged-case expectations. The numeric oracle executes 49 fixed native
 branches, including coercion, overflow, formatting and safe wide-index reads.
 Neither oracle executes stored database code or regenerates candidate expectations.
+The stock regression compiles and instantiates core2 plus all 58 current layouts
+under general scalar lowering, including Venture. It also executes native and JS
+core2/Venture stack helpers (the nested-comment push/count and font generator)
+through the actual source-correspondence producer, and a 2,000-term concat source.
+This is compiler/runtime coverage, not general page/host serving completion.
+The compact builtin oracle calls the actual retained `S2::Builtin::LJ` functions.

@@ -42,23 +42,7 @@ for my $hex ('c39f', 'c4b0', 'ce9fcea3', 'c7b3') {
     push @cases, {input => $hex, lower => unpack('H*', encode_utf8(lc($pv))),
         upper => unpack('H*', encode_utf8(uc($pv))), title => unpack('H*', encode_utf8(ucfirst($pv)))};
 }
-my $byte_pv = pack('H*', 'e78cabc3a9');
-my $invalid_pv = pack('H*', 'ff41');
-my @builtin_cases = (
-    {id => 'length', value => length($byte_pv)},
-    {id => 'index', value => index($byte_pv, pack('H*', 'c3a9'))},
-    {id => 'substr', hex => unpack('H*', encode_utf8(substr(decode_utf8($byte_pv), 0, 1)))},
-    {id => 'substr_invalid', hex => unpack('H*', encode_utf8(substr(decode_utf8($invalid_pv), 0, 1)))},
-    {id => 'lower', hex => unpack('H*', lc('AZ' . $byte_pv))},
-    {id => 'upper', hex => unpack('H*', uc('az' . $byte_pv))},
-    {id => 'upperfirst', hex => unpack('H*', ucfirst('az' . $byte_pv))},
-    {id => 'ends_lf', value => ("x\n" =~ /\Qx\E$/) ? 1 : 0},
-    {id => 'replace', hex => do {my $v = 'a.a'; $v =~ s/\Q.\E/!/g; unpack('H*', $v)}},
-    {id => 'split', parts => [split(/\Q:\E/, 'a::')]},
-    {id => 'compare', value => 'b' cmp 'a'},
-    {id => 'repeat', hex => unpack('H*', 'ab' x 2)},
-);
-print JSON::PP->new->canonical->encode({caseRows => \@cases, builtinRows => \@builtin_cases,
+print JSON::PP->new->canonical->encode({caseRows => \@cases,
     outputBase64 => encode_base64($output, ''),
     outputUtf8 => utf8::is_utf8($output) ? JSON::PP::true : JSON::PP::false,
     profile => {version => "$^V", ivsize => $Config{ivsize}, uvsize => $Config{uvsize},

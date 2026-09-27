@@ -158,6 +158,20 @@ export const runtime = {
         if (!slot.delete) throw new Error("Native delete requires a hash element");
         return slot.delete();
     },
+    pushSlot(slot: {get(): unknown; set(value: unknown): unknown}, operation: () => unknown,
+        spread: boolean): void {
+        let target = slot.get();
+        if (target === undefined || target === null) { target = []; slot.set(target); }
+        if (!Array.isArray(target)) throw new Error("Native push requires an array");
+        const value = evaluateAs(spread ? "scalar" : "list", operation);
+        if (spread) {
+            const values = runtime.asArray(value);
+            // Do not use spread-call arguments: native lists can exceed V8's
+            // call-argument limit. Capture the list before mutating its target.
+            const copy = values.map(item => scalarCopy(item));
+            for (const item of copy) target.push(item);
+        } else target.push(scalarCopy(value));
+    },
     assignSlot(slot: {set(value: unknown): unknown}, value: unknown, notags: boolean): unknown {
         return slot.set(notags ? scalarNotags(value) : scalarCopy(value));
     },
@@ -198,6 +212,15 @@ export const runtime = {
         if (op === "%") return modulo(a, b);
         if (op === "+" || op === "-" || op === "*") return arithmetic(op, a, b);
         throw new Error("Unknown native scalar operator");
+    },
+    scalarConcatChain(operands: readonly (() => unknown)[]): NativeString {
+        if (!operands.length) return NativeString.bytes(new Uint8Array());
+        let value: unknown = evaluateAs("scalar", operands[0]!);
+        for (let index = 1; index < operands.length; index++) {
+            const right = evaluateAs("scalar", operands[index]!);
+            value = scalarConcat(value, right);
+        }
+        return scalarPV(value);
     },
     isContext(value: unknown): value is Context {
         return typeof value === "object" && value !== null && contextBrands.has(value);
@@ -473,11 +496,15 @@ export type BuiltinFunction = (context: Context, ...args: any[]) => unknown;
 export type FixtureBuiltins = Record<string, BuiltinFunction>;
 
 export const builtin = {
-    construct_Color(value: string): S2Object | undefined {
-        let hex = value.replace(/^#/, "");
+    construct_Color(value: string | NativeString | NativeNumber): S2Object | undefined {
+        // This host constructor recognizes ASCII color syntax. Inspect scalar
+        // octets without coercing a private scalar object through JS String().
+        const text = typeof value === "string" ? value : scalarPV(value).bytes().toString("latin1");
+        let hex = text.replace(/^#/, "");
         if (hex === "") return {".type": "Color", _as_string: ""};
         if (/^[0-9a-fA-F]{3}$/.test(hex)) hex = [...hex].map(char => char + char).join("");
-        if (!/^[0-9a-fA-F]{6}$/.test(hex)) return undefined;
+        if (typeof value === "string" ? !/^[0-9a-fA-F]{6}$/.test(hex) :
+            hex.length !== 6 || /[^0-9a-fA-F]/.test(hex)) return undefined;
         return {
             ".type": "Color",
             _as_string: "#" + hex.toLowerCase(),
