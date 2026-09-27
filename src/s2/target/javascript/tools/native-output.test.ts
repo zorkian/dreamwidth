@@ -116,6 +116,15 @@ test('source-proven and recovered actual program preserves defining-layer safe/r
             layer.scalarProfile=compiler.scalarProfile;return layer;
         });
         for(const [route,layers] of [instantiateProgram(compiled.program),recovered].entries()) {
+            let initContext:Context;
+            const lifecycle=createNativeOutput({...options(()=>initContext.recoveryCheckpoint()),initialization:true});
+            initContext=new Context(layers,()=>{throw Error('legacy init printer');},undefined,
+                undefined,undefined,500,lifecycle.sink);
+            initContext.runFunction('main()'); // Fixed actual compiled program, both routes; suppressed.
+            lifecycle.startCss();initContext.print(bytes('p{color:red}'));
+            lifecycle.beginRendering();initContext.runFunction('main()');
+            lifecycle.endCss();initContext.print(bytes('HIDDEN'));
+            assert.deepEqual(Buffer.from(lifecycle.finish().bytes),Buffer.from(oracle.base64,'base64'));
             let ctx:Context;const page=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
             ctx=new Context(layers,()=>{throw Error('legacy output used');},undefined,undefined,undefined,500,page.sink);
             ctx.runFunction('main()');const output=page.finish();
@@ -208,4 +217,36 @@ test('actual Context deadline cancels before diagnostic eighth-print checkpoint'
     assert.throws(()=>ctx.runFunction('main()'),isNativeExecutionStop);
     // This raw diagnostic is print eight and must not revive the cancelled alarm.
     assert.deepEqual(Buffer.from(page.runtimeError(bytes('diagnostic')).bytes),Buffer.from('xxxxxxxdiagnostic'));
+});
+
+test('initialization scratch survives actual Context sink rebinding with native bytes', () => {
+    const initRows = rows as unknown as {id:string;ctype:string;base64:string;flag:number;
+        init:[string,string?][];render:[string,string?][];checks:number;transforms:number}[];
+    for (const row of initRows.filter(row => row.id.startsWith('init_'))) {
+        let checks=0, transforms=0;
+        const page=createNativeOutput({...options(()=>{checks++;}),initialization:true,
+            contentType:row.ctype,transformCss:chunk=>{transforms++;return chunk;}});
+        const sink=page.sink;
+        const ctx=new Context([],()=>{throw new Error('legacy init sink');},undefined,
+            undefined,undefined,500,sink);
+        const perform=(trace:[string,string?][])=>{for(const [op,value] of trace) {
+            if(op==='raw')ctx.print(bytes(value??''));
+            else if(op==='safe')ctx.safePrint(bytes(value??''));
+            else if(op==='start')page.startCss(); else page.endCss();
+        }};
+        perform(row.init);page.beginRendering();assert.equal(page.sink,sink);
+        perform(row.render);const frame=page.finish();
+        assert.equal(Buffer.from(frame.bytes).toString('base64'),row.base64,row.id);
+        assert.equal(frame.utf8,!!row.flag,row.id);
+        assert.equal(checks,row.checks,row.id);assert.equal(transforms,row.transforms,row.id);
+    }
+});
+test('initialization failure stays suppressed and never binds or ends CSS implicitly',()=>{
+    let transforms=0;
+    const page=createNativeOutput({...options(),contentType:'text/css',initialization:true,
+        transformCss:chunk=>{transforms++;return chunk;}});
+    page.startCss();page.sink.raw(bytes('p{color:red}'));
+    const frame=page.runtimeError(bytes('diagnostic'));
+    assert.equal(frame.bytes.length,0);assert.equal(transforms,0);
+    assert.throws(()=>page.beginRendering(),/terminal/);
 });

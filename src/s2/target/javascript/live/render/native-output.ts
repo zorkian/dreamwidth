@@ -22,6 +22,7 @@ export type NativeOutputOptions = Omit<Parameters<typeof createPageOutput>[0], '
 /** Only the trusted coordinator receives this object, never stored S2 code. */
 export interface NativePageOutput {
     readonly sink: NativeSink;
+    beginRendering(): void;
     startCss(): void;
     endCss(): void;
     finish(): NativePVFrame;
@@ -32,6 +33,7 @@ export interface NativePageOutput {
 
 export function createNativeOutput(options: NativeOutputOptions): NativePageOutput {
     const output = new NativeOutput();
+    let rendering=!options.initialization;
     let state: 'open' | 'complete' | 'failed' = 'open';
     const page = createPageOutput({...options, output: chunk => output.append(NativeString.fromFrame(chunk))});
     function operate<T>(operation: () => T): T {
@@ -57,12 +59,13 @@ export function createNativeOutput(options: NativeOutputOptions): NativePageOutp
     }
     return Object.freeze({
         sink,
+        beginRendering: () => operate(() => {page.beginRendering();rendering=true;}),
         startCss: () => operate(() => page.startCss()),
         endCss: () => operate(() => page.endCss()),
         finish: () => complete(() => page.finish()),
         // LJ/S2.pm333-354: error completion deliberately omits cleaner eof.
         runtimeError: (diagnostic: NativeString) => complete(() => {
-            if (options.contentType === 'text/css') page.endCss();
+            if (rendering && options.contentType === 'text/css') page.endCss();
             page.printRaw(diagnostic.frame());
         }),
         abort: () => { state = 'failed'; },
