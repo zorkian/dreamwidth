@@ -105,6 +105,7 @@ for my $value ('<![CDATA[x]]>','<![CDATA[<b>x</b>]]>tail','<![IGNORE[<b>x</b>]]>
 push @cases,['cdata_raw',['safe','<![CDATA[<b>x'],['raw','RAW'],['safe','</b>]]>tail']];
 push @cases,['cdata_attribute',['safe','<p a="<![CDATA[<b>x]]>">text</p>']];
 push @cases,['cdata_comment',['safe','<!-- <![CDATA[<b>x]]> --><p>text</p>']];
+push @cases,['bare_original_case',['safe','<INPUT DISABLED Checked><TD NOWRAP>text</TD>']];
 my @rows;
 for my $case (@cases) {
  my ($id,@trace)=@$case;my $out='';local $LJ::S2::ret_ref=\$out;
