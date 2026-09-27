@@ -1,0 +1,201 @@
+// invocation.test.ts
+//
+// Actual native caller COP, run-boundary and liveness-window qualification.
+//
+// Authors:
+//      Dreamwidth contributors
+//
+// Copyright (c) 2026 by Dreamwidth Studios, LLC.
+//
+// This program is free software; you may redistribute it and/or modify it under
+// the same terms as Perl itself. For a copy of the license, please reference
+// 'perldoc perlartistic' or 'perldoc perlgpl'.
+//
+
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {resolve,join} from 'node:path';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {runInNewContext} from 'node:vm';
+import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
+import {Context,Layer,s2} from '../runtime/s2runtime';
+import {scalarPV,legacyText,isNativeExecutionStop,isNativeProgramError,raiseNativeExecutionStop} from '../runtime/native-scalar';
+import {recoverActiveLayer} from '../live/render/recovery';
+import {createNativeOutput} from '../live/render/native-output';
+const native=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-invocation/native.pl')],
+    {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {id:number;code:string;source:string;marks:{label:string;line:number}[];output:string;instrumentationUnchanged:number;nestedError:string;divideError:string};
+
+test('actual emitter COP phases through source-proven and original-byte recovery',async()=>{
+    assert.equal(native.instrumentationUnchanged,1);
+    const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:[{id:native.id,ownerId:1,parentId:0,type:'core',compiledTime:1,
+        sourceBytes:Buffer.from(native.source,'base64'),activeCompiledBytes:Buffer.from(native.code,'base64')}]};
+    const directory=mkdtempSync(join(tmpdir(),'gn-phases-'));
+    try {
+        const launcher=join(directory,'compiler-isolation');execFileSync('cc',['-std=c11','-Wall','-Wextra','-Werror','-O2',resolve('tools/compiler-isolation.c'),'-o',launcher]);
+        const compiler=new ArtifactCompiler({s2Root:resolve('../..'),perl:'/usr/bin/perl',isolationExecutable:launcher});
+        const compiled=await compiler.compile(snapshot);assert.equal(compiled.kind,'compiled');if(compiled.kind!=='compiled')throw Error('source correspondence');
+        const recovery=recoverActiveLayer({id:native.id,ownerId:1,systemUserId:1,parentId:0,type:'core',activeBytes:Buffer.from(native.code,'base64')},1);
+        assert.equal(recovery.kind,'recovered');if(recovery.kind!=='recovered')throw Error('recovery');
+        const recovered=runInNewContext(recovery.code+';recovered_layer;',{s2},{timeout:5000}) as Layer;recovered.scalarProfile=compiler.scalarProfile;
+        for(const [route,layers] of [['source',instantiateProgram(compiled.program)],['recovered',[recovered]]] as const) {
+            const marks:{label:string;line:number}[]=[];const sites=new WeakMap<object,number>();
+            const original=s2.runtime.nativeCOP;
+            // Trusted test observation of the ACTUAL private frame register; never an
+            // alternate location/brand adapter or a production JS-stack inspection.
+            const top=(context:Context,depth=1)=>(context as unknown as {callFrames:{cop:object}[]}).callFrames.at(-depth)!.cop;
+            s2.runtime.nativeCOP=(context,layer,line)=>{original(context,layer,line);sites.set(top(context),line);};
+            try {
+                let output='';const context=new Context([...layers],value=>output+=value,undefined,{_mark:(ctx,label)=>{
+                    const text=legacyText(scalarPV(label));const line=sites.get(top(ctx,text.startsWith('up-')?2:1));assert.ok(line,route+': missing COP '+text);
+                    marks.push({label:text,line});return s2.runtime.numericLiteral(text.startsWith('false')?'0':'1');
+                }},undefined,500,undefined,{nowMilliseconds:()=>0});
+                context.runFunction('main()');
+                assert.deepEqual(marks,native.marks,route);
+                assert.deepEqual(Buffer.from(output),Buffer.from(native.output,'base64'));
+            } finally {s2.runtime.nativeCOP=original;}
+        }
+    } finally {rmSync(directory,{recursive:true,force:true});}
+});
+
+test('explicit runs reset entries and window while retaining host frames and outer deadline',()=>{
+    let now=0;const layer=new Layer();
+        type RunState={functionCalls:number;nativeHostFrames:object[];lastDepthCheck:number};
+    layer.registerFunction(['leaf()'],()=>()=>undefined,10);
+    // Context builds its function table at construction; use a fresh instance.
+    const ctx=new Context([layer],()=>{},undefined,undefined,undefined,8,undefined,{nowMilliseconds:()=>now});
+    const actual=ctx as unknown as RunState;
+    ctx.runBoundary(()=>{
+        assert.equal(actual.nativeHostFrames.length,3);
+        for(let n=0;n<7;n++)ctx.getFunction('leaf()')(ctx);
+        assert.equal(actual.functionCalls,7);
+        now=200;ctx.recoveryCheckpoint();assert.equal(actual.lastDepthCheck,0);
+        ctx.runBoundary(()=>{
+            assert.equal(actual.nativeHostFrames.length,6);
+            assert.equal(actual.functionCalls,0);assert.equal(actual.lastDepthCheck,200);
+            ctx.getFunction('leaf()')(ctx);assert.equal(actual.functionCalls,1);
+        },'plural');
+        assert.equal(actual.nativeHostFrames.length,3);
+        now=4001;
+        assert.throws(()=>ctx.runBoundary(()=>ctx.checkExecutionDeadline(),'ordinal'),isNativeExecutionStop);
+    });
+    assert.equal(actual.nativeHostFrames.length,0);
+    ctx.checkExecutionDeadline(); // outer unwind cancels only the program deadline
+});
+
+test('nested unknown failures remain infrastructure and COP rejects unloaded layers',()=>{
+    const layer=new Layer();const failure=new RangeError('bounded host failure');
+    layer.registerFunction(['fail()'],()=>()=>{throw failure;},12);
+    layer.registerFunction(['probe()'],()=>ctx=>{
+        assert.throws(()=>ctx.setNativeCOP(new Layer(),12),/active loaded/);
+        assert.throws(()=>ctx.setNativeCOP(layer,0),/Invalid native COP/);
+    },11);
+    const ctx=new Context([layer],()=>{},undefined,undefined,undefined,500,undefined,{nowMilliseconds:()=>0});
+    assert.throws(()=>ctx.runBoundary(()=>ctx.runNativeFunction('fail()',[],'plural')),error=>error===failure);
+    ctx.runFunction('probe()');
+});
+
+test('native recursive physical-line families agree across both actual routes',async()=>{
+    const rows=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-invocation/recursion.pl')],
+        {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {case:string;sources:string[];compiled:string[];ids:number[];output:string;samples:{counter?:number;beforeHost?:number;afterHost?:number}[]}[];
+    const directory=mkdtempSync(join(tmpdir(),'gn-recursion-'));
+    try {
+        const launcher=join(directory,'isolation');execFileSync('cc',['-std=c11','-Wall','-Wextra','-Werror','-O2',resolve('tools/compiler-isolation.c'),'-o',launcher]);
+        const compiler=new ArtifactCompiler({s2Root:resolve('../..'),perl:'/usr/bin/perl',isolationExecutable:launcher});
+        for(const row of rows){
+            const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:row.ids.map((id,index)=>({id,ownerId:1,parentId:index?row.ids[0]!:0,type:index?'layout':'core',compiledTime:1,
+                sourceBytes:Buffer.from(row.sources[index]!,'base64'),activeCompiledBytes:Buffer.from(row.compiled[index]!,'base64')}))};
+            const result=await compiler.compile(snapshot);assert.equal(result.kind,'compiled',row.case);if(result.kind!=='compiled')throw Error(row.case);
+            const recovered=snapshot.layers.map(layer=>{
+                const result=recoverActiveLayer({id:layer.id,ownerId:1,systemUserId:1,parentId:layer.parentId,type:layer.type,activeBytes:layer.activeCompiledBytes},1);
+                assert.equal(result.kind,'recovered',row.case);if(result.kind!=='recovered')throw Error(row.case);
+                const value=runInNewContext(result.code+';recovered_layer;',{s2},{timeout:5000}) as Layer;value.scalarProfile=compiler.scalarProfile;return value;
+            });
+            const sourceLayers=instantiateProgram(result.program);
+            const routes:[string,readonly Layer[]][]=[['source',sourceLayers],['recovered',recovered]];
+            if(sourceLayers.length>1)routes.push(['mixed',[sourceLayers[0]!,recovered[1]!]]);
+            for(const [route,layers] of routes){
+                let output='';const checkpoints:number[]=[];
+                const hostSamples:{beforeHost?:number;afterHost?:number}[]=[];
+                const ctx=new Context([...layers],value=>output+=value,undefined,{_host:(context,value)=>{
+                    hostSamples.push({beforeHost:(context as unknown as {functionCalls:number}).functionCalls});
+                    const result=context.runNativeFunction('helper(int)',[value],'plural');
+                    hostSamples.push({afterHost:(context as unknown as {functionCalls:number}).functionCalls});return result;
+                }},undefined,8,undefined,{nowMilliseconds:()=>0});
+                const original=ctx.recoveryCheckpoint.bind(ctx);ctx.recoveryCheckpoint=()=>{
+                    checkpoints.push((ctx as unknown as {functionCalls:number}).functionCalls);original();
+                };
+                if(row.case==='reentry'){ctx.runFunction('main()');assert.deepEqual(hostSamples,row.samples,row.case+route);}
+                else assert.throws(()=>ctx.runFunction('main()'),isNativeExecutionStop,row.case+route);
+                assert.equal(output,row.output,row.case+route);
+                assert.deepEqual(checkpoints,row.samples.filter(sample=>sample.counter!==undefined).map(sample=>sample.counter),row.case+route);
+            }
+        }
+    } finally {rmSync(directory,{recursive:true,force:true});}
+});
+
+test('lapsed depth window does not translate nested host stack exhaustion into program output',()=>{
+    let now=0;const ctx=new Context([],()=>{throw Error('unexpected output');},undefined,undefined,undefined,2,undefined,{nowMilliseconds:()=>now});
+    const recurse=():unknown=>{ctx.recoveryCheckpoint();return recurse();};
+    assert.throws(()=>ctx.runBoundary(()=>ctx.runBoundary(()=>{now=151;return recurse();},'plural')),
+        error=>error instanceof RangeError && !isNativeExecutionStop(error));
+    // Stack restoration must still permit an unrelated later run.
+    ctx.runBoundary(()=>ctx.checkExecutionDeadline());
+});
+
+test('passing depth check refreshes window; lapse persists until explicit reentry',()=>{
+    let now=0;const ctx=new Context([],()=>{},undefined,undefined,undefined,500,undefined,{nowMilliseconds:()=>now});
+    const state=ctx as unknown as {lastDepthCheck:number};
+    ctx.runBoundary(()=>{
+        now=150;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,150);
+        now=301;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,150);
+        now=302;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,150);
+        ctx.runBoundary(()=>{assert.equal(state.lastDepthCheck,302);now=303;ctx.recoveryCheckpoint();assert.equal(state.lastDepthCheck,303);},'ordinal');
+    });
+});
+
+
+test('nested program errors alone gain native run signature wrapping',()=>{
+    const prefix='Died in S2::run_code running outer(): Died in S2::run_code running plural(): ';
+    assert.ok(native.nestedError.startsWith(prefix+'Method called on null Thing object'),native.nestedError);
+    const layer=new Layer();
+    layer.registerFunction(['plural()'],()=>ctx=>ctx.getMethod(null,'missing()',layer,7)(ctx),20);
+    layer.registerFunction(['outer()'],()=>ctx=>ctx.runNativeFunction('plural()',[],'plural'),21);
+    let stop:unknown;try {raiseNativeExecutionStop('recursion');} catch(error) {stop=error;}
+    layer.registerFunction(['stop()'],()=>()=>{throw stop;},22);
+    const ctx=new Context([layer],()=>{},undefined,undefined,undefined,500,undefined,{nowMilliseconds:()=>0});
+    assert.throws(()=>ctx.runNativeFunction('outer()'),error=>isNativeProgramError(error) &&
+        error.message==='Died in S2::run_code running outer(): Died in S2::run_code running plural(): <unknown S2 layer>:7: method missing() called on null object');
+    assert.throws(()=>ctx.runNativeFunction('stop()'),error=>error===stop && isNativeExecutionStop(error) && !isNativeProgramError(error));
+    for(const error of [new Error('Died in S2::run_code running plural(): fake'),Object.assign(new Error('fake'),{programError:true}),new RangeError('fake')]) {
+        assert.equal(isNativeProgramError(error),false);
+        layer.functions.set('hostile()',()=>{throw error;});
+        // A newly assembled real Context uses the actual registered function.
+        const actual=new Context([layer],()=>{});
+        assert.throws(()=>actual.runNativeFunction('hostile()'),caught=>caught===error);
+    }
+});
+
+
+test('native arithmetic and array semantic dies share the private program-error authority',()=>{
+    const prefix='Died in S2::run_code running outerdivide(): Died in S2::run_code running faildivide(): ';
+    assert.ok(native.divideError.startsWith(prefix+'Illegal division by zero'),native.divideError);
+    const layer=new Layer();
+    layer.registerFunction(['faildivide()'],()=>()=>s2.runtime.scalarBinary('/',s2.runtime.numericLiteral('1'),s2.runtime.numericLiteral('0')),30);
+    layer.registerFunction(['outerdivide()'],()=>ctx=>ctx.runNativeFunction('faildivide()',[],'plural'),31);
+    const ctx=new Context([layer],()=>{});
+    assert.throws(()=>ctx.runNativeFunction('outerdivide()'),error=>isNativeProgramError(error) && error.message===prefix+'Illegal division by zero');
+    assert.throws(()=>s2.runtime.scalarBinary('%',s2.runtime.numericLiteral('1'),s2.runtime.numericLiteral('0')),isNativeProgramError);
+    assert.throws(()=>s2.runtime.memberSlot([],s2.runtime.numericLiteral('-1'),'array').set!(s2.runtime.numericLiteral('1')),isNativeProgramError);
+});
+
+
+test('shared program-error authority initializes in either scalar/number module import order',()=>{
+    const number=resolve('dist/runtime/native-number.js');
+    const scalar=resolve('dist/runtime/native-scalar.js');
+    for(const first of [number,scalar]){
+        const script=`require(${JSON.stringify(first)});const n=require(${JSON.stringify(number)});const s=require(${JSON.stringify(scalar)});try{n.divide(n.NativeNumber.literal('1'),n.NativeNumber.literal('0'));process.exit(2);}catch(e){if(!s.isNativeProgramError(e))throw e;}`;
+        execFileSync(process.execPath,['-e',script],{timeout:5000,maxBuffer:65536});
+    }
+});

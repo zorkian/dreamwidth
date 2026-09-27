@@ -49,7 +49,48 @@ export class Parser {
                 if (value.kind !== "number" || constants[name] !== value.value) throw new RecoveryGap("Invalid historical constant");
             } else statements.push(this.statement());
         }
+        this.propagateEffectiveCOP(statements);
         return statements;
+    }
+    private propagateEffectiveCOP(statements: Stmt[]): void {
+        // Complete original-byte positions precede ordered effective sharing.
+        const voidCall=(statement:Stmt)=>statement.kind==='expr' &&
+            ((statement.expr.kind==='call' && statement.expr.name.startsWith('S2::Builtin::')) ||
+             (statement.expr.kind==='invoke' && !(statement.expr.callee.kind==='variable' &&
+                ['$S2::pout','$S2::pout_s'].includes(statement.expr.callee.name))));
+        const block=(body:Stmt[],share?:number,force?:number,directSub=false):number|undefined=>{
+            let last:number|undefined;
+            for(const child of body){
+                const single=body.length===1;
+                const override=single && (force!==undefined || (share!==undefined && voidCall(child)))
+                    ? force ?? share : undefined;
+                last=statement(child,override,single && child.kind==='if' ? share : undefined,
+                    directSub && child===body.at(-1) && child.kind==='if');
+            }
+            return last;
+        };
+        const statement=(node:Stmt,override?:number,inheritedShare?:number,terminal=false):number|undefined=>{
+            const effective=override ?? node.copLine;
+            node.copLine=effective;
+            if(node.kind==='if'){
+                const then=node.branches[0]!.body;
+                // Static direct-sub-final native rule; never propagate into nested blocks.
+                const elsifShare=terminal && then.length===1 ? then[0]!.copLine : effective;
+                block(then,inheritedShare ?? effective);
+                for(const branch of node.branches.slice(1))block(branch.body,elsifShare);
+                if(node.otherwise.length)block(node.otherwise);
+                return effective;
+            }
+            if(node.kind==='for')block(node.body,undefined,effective);
+            else if(node.kind==='while' || node.kind==='foreach' || node.kind==='block')block(node.body);
+            return effective;
+        };
+        const scan=(value:unknown):void=>{
+            if(!value || typeof value!=='object')return;
+            if('kind' in value && value.kind==='sub')block((value as Extract<Expr,{kind:'sub'}>).body,undefined,undefined,true);
+            for(const child of Object.values(value))scan(child);
+        };
+        scan(statements);
     }
     private block(): Stmt[] {
         this.need("{"); const body: Stmt[] = [];
@@ -61,6 +102,23 @@ export class Parser {
     }
     private parenthesis(): Expr { this.need("("); const x = this.expr(); this.need(")"); return x; }
     private statement(): Stmt {
+        const start=this.at;
+        const statement=this.statementShape();
+        const initial=this.tokens[start]!;
+        // The ordinary emitter keeps a statement on one line except literal
+        // arrays/hashes. Those retain the statement-start COP, not element lines.
+        const end=this.tokens[this.at-1]!;
+        const before=end.value===';' ? this.tokens[this.at-2]! : end;
+        statement.copLine ??= initial.line;
+        if(statement.kind==='expr' || statement.kind==='return') {
+            const span=this.tokens.slice(start,this.at);
+            const literal=span.some((token,i)=>['[','{'].includes(token.value) &&
+                span.slice(i+1).some(next=>next.line>token.line));
+            if(!literal)statement.copLine=before.endLine;
+        }
+        return statement;
+    }
+    private statementShape(): Stmt {
         if (this.is("{")) return {kind:"block", body:this.block()};
         if (this.eat("if")) {
             const branches = [{test:this.parenthesis(), body:this.block()}];
@@ -75,7 +133,14 @@ export class Parser {
         }
         if (this.eat("foreach")) {
             const variable = this.eat("my") ? this.declaration(false) : this.prefix();
-            const list = this.parenthesis(); return {kind:"foreach",variable,list,body:this.block()};
+            this.need("(");
+            const from=this.at;const list=this.expr();const to=this.at;this.need(")");
+            const statement:Stmt={kind:"foreach",variable,list,body:this.block()};
+            const tokens=this.tokens.slice(from,to);
+            const literal=tokens.findIndex((token,i)=>['[','{'].includes(token.value) && tokens[i+1] && tokens[i+1]!.line>token.line);
+            if(literal>=0 && tokens[literal+1] && tokens[literal+1]!.line>tokens[literal]!.line)
+                statement.copLine=tokens[literal+1]!.line;
+            return statement;
         }
         if (this.eat("return")) {
             const value = this.is(";") ? undefined : this.expr(); this.need(";");
