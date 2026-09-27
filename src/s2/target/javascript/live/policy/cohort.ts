@@ -287,7 +287,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         if(/^module_(?:userprofile|links|pagesummary|calendar|tags)_section$/.test(key)&&!["none","one","two"].includes(String(value)))throw new Unsupported();
     }
     const inlineStylesheet=!!theme||!!customtextProperties&&Object.keys(customtextProperties).some(key=>
-        key==="color_page_background"||key==="font_base"||/^font_(?:module_heading|module_text|journal_title|journal_subtitle|entry_title|comment_title)(?:_size|_units)?$/.test(key)||/^module_(?:userprofile|links|pagesummary|calendar|tags)_/.test(key));
+        key==="color_page_background"||["font_base","font_fallback","font_base_size","font_base_units"].includes(key)||/^font_(?:module_heading|module_text|journal_title|journal_subtitle|entry_title|comment_title)(?:_size|_units)?$/.test(key)||/^module_(?:userprofile|links|pagesummary|calendar|tags)_/.test(key));
     if(inlineStylesheet&&!["none","proxy-css-links-only"].includes(config.cssCleanerHookKind??""))throw new Unsupported();
     const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
     for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {

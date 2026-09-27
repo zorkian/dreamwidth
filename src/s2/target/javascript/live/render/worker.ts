@@ -92,7 +92,7 @@ process.stdin.on("end", () => {
             allowedComments.add(node);addComments(node.replies);}};
         addComments(request.journal.comments?.roots??[]);
         const content: RenderContentPreparation = {
-            stylesheet(source) {try{return cleanStockStylesheet(source,request.journal.layout==='easyread'?"easyread-aqua":undefined);}catch{throw new Unsupported();}},
+            stylesheet(source,expectation) {try{return cleanStockStylesheet(source,request.journal.layout==='easyread'?"easyread-aqua":undefined,expectation);}catch{throw new Unsupported();}},
             fontFamily(source) {try{validateStockFontFamily(source);}catch{throw new Unsupported();}},
             fontSize(source) {try{validateStockFontSize(source);}catch{throw new Unsupported();}},
             comment(comment,entryUrl) {
