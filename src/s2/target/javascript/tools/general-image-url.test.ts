@@ -12,6 +12,10 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {parentNormalizeImageUrl} from "../live/render/general-image-url-host";
+import {encodeScalar,scalarNumber} from "../runtime/native-scalar";
+import {decodeGeneralString} from "../live/render/general-site-url-client";
+import {PrivateTransportError} from "../live/render/private-transport";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {execFileSync} from "node:child_process";
@@ -52,4 +56,8 @@ test("image helper uses actual native domain capture/case/word class without pro
     const native=JSON.parse(execFileSync("perl",["-e",oracle],{input:JSON.stringify({domain:wire(domain),sites:sites.map(wire),values:values.map(wire)}),
         encoding:"utf8",timeout:10000}));
     assert.deepEqual(values.map(value=>wire(normalizeGeneralImageUrl(value,prepared,profile))),native);
+    assert.deepEqual(values.map(value=>wire(decodeGeneralString(
+        parentNormalizeImageUrl({url:encodeScalar(value)},prepared,profile)))),native);
+    assert.throws(()=>parentNormalizeImageUrl({url:encodeScalar(values[0]!),journal:"untrusted"},prepared,profile),PrivateTransportError);
+    assert.throws(()=>parentNormalizeImageUrl({url:encodeScalar(scalarNumber(1))},prepared,profile),PrivateTransportError);
 });
