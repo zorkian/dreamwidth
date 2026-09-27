@@ -587,6 +587,7 @@ export class Context {
     private deadline = 0;
     private functionCalls = 0;
     private printCalls = 0;
+    private readonly sinkOwnsPrintCheckpoints: boolean;
     evaluationContext(): EvaluationMode { return evaluationMode; }
     evaluateAs<T>(mode: EvaluationMode, operation: () => T): T { return evaluateAs(mode, operation); }
 
@@ -598,6 +599,7 @@ export class Context {
         private readonly nativeSink?: NativeSink,
     ) {
         if (!Number.isSafeInteger(maxRecursion) || maxRecursion < 1) throw new Error("Invalid S2 recursion bound");
+        this.sinkOwnsPrintCheckpoints = nativeSink?.ownsPrintCheckpoints === true;
         this.scalarProfile=layers.find(layer=>layer.scalarProfile)?.scalarProfile;
         contextBrands.add(this);
         for (const layer of layers) {
@@ -640,7 +642,7 @@ export class Context {
     }
 
     print(value: unknown): void {
-        if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
+        if (!this.sinkOwnsPrintCheckpoints && ++this.printCalls % 8 === 0) this.recoveryCheckpoint();
         if (this.nativeSink) this.nativeSink.raw(scalarPV(value));
         else this.write(NativeString.is(value) || NativeNumber.is(value) ? legacyText(scalarPV(value)) : String(value));
     }
@@ -669,7 +671,7 @@ export class Context {
     }
 
     safePrint(value: unknown): void {
-        if (++this.printCalls % 8 === 0) this.recoveryCheckpoint();
+        if (!this.sinkOwnsPrintCheckpoints && ++this.printCalls % 8 === 0) this.recoveryCheckpoint();
         if (this.nativeSink) this.nativeSink.safe(scalarPV(value));
         else this.write(this.safeOutput(NativeString.is(value) || NativeNumber.is(value) ? legacyText(scalarPV(value)) : String(value)));
     }
