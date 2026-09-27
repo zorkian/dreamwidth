@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {execFileSync} from "node:child_process";
 import {NativeString,NativeNumber,scalarPV} from "../runtime/native-scalar";
-import type {Context} from "../runtime/s2runtime";
+import {runtime,type Context} from "../runtime/s2runtime";
 import {generalCommentFromSource,generalCommentTreeFromSource,type GeneralCommentSourceInput,
     type GeneralApprovedCommentNode,type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
 import {generalImage} from "../live/domain/general-model-primitives";
@@ -52,7 +52,7 @@ local *LJ::is_enabled=sub{push @trace,'feature:'.$_[0] if $_[0] eq 'esn'||$_[0] 
 my $loaded=0;
 local *S2::get_property_value=sub{$_[1] eq 'userpics_position'?($loaded?'left':'none'):'small'};
 local *LJ::Talk::talkargs=sub{my($url,@args)=@_;$url.'?'.join('&',grep{defined&&length}@args)};
-for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],
+for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],['A',1,1,1],
     ['D',2,1,1],['S',2,1,1],['S',2,1,0]) {
     @trace=();my($state,$poster,$suspended)=@$spec;
     $loaded=$poster==1;
@@ -61,7 +61,7 @@ for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],
     my %userpic=(7=>{width=>13,height=>15});my $com={posterid=>$poster,talkid=>1,body=>'one<b>two</b>',subject=>'Q<"&',
         datepost=>'2026-09-27 00:00:00',datepost_unix=>1015,parenttalkid=>$loaded?2:0,_loaded=>$loaded,
         state=>$state,_show=>0,children=>[],props=>$loaded?{subjecticon=>3,imported_from=>'Source &<'}:{},showable_children=>2,hide_children=>0,
-        hidden_child=>0,echi=>'E',pickw=>undef};
+        hidden_child=>0,echi=>'E',pickw=>$suspended&&$loaded?'kw':undef};
     $com->{picid}=7 if $loaded;
     my $entry=bless {},'CommentEntry';my $u=bless {},'CommentAuthor';my $remote;
     my $get={};my $opts={ctx=>[]};my $depth=1;my $flat_mode=0;my $viewsome=0;my $viewall=0;
@@ -73,6 +73,7 @@ for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],
         seconds_since_entry anchor dom_id comment_posted edited permalink_url reply_url expand_url js_expand_url);
     $projection{poster}=$result->{poster};$projection{links}=$result->{link_keyseq};
     $projection{editreason}=$result->{editreason};$projection{admin_post}=$result->{admin_post};
+    $projection{editUrl}=$result->{edit_url};$projection{threadroot}=$result->{threadroot_url};
     $projection{picture}=$result->{userpic};$projection{metadata}=$result->{metadata};
     $projection{timePoster}=$result->{time_poster};
     $projection{timeAlias}=refaddr($result->{time})==refaddr($result->{system_time})?1:0;
@@ -82,7 +83,7 @@ for my $spec(['A',0,0],['F',999,0],['S',0,0],['D',0,0],['A',2,1,1],['A',1,0,1],
 }
 print JSON::PP->new->canonical->encode(\@rows);`;
     const rows=JSON.parse(execFileSync("perl",["-e",oracle],{encoding:"utf8",timeout:10000,maxBuffer:131072})) as any[];
-    assert.equal(rows.length,9);
+    assert.equal(rows.length,10);
     const approved:GeneralCommentSourceInput[]=[];
     const journal={".type":"UserLite",_user:pv("journal")};
     for(const row of rows) {
@@ -95,7 +96,11 @@ print JSON::PP->new->canonical->encode(\@rows);`;
             replyUrl:pv("/261.html?replyto=261"),parentUrl:loaded?pv("/261.html?thread=517#cmt517"):undefined,threadrootUrl:undefined,
             expandUrl:pv("/261.html?thread=261#cmt261"),jsExpandUrl:pv("/261.html?thread=261&destination_thread=0#cmt261"),
             hasChildren:false,showableChildren:2,hideChildren:0,hiddenChild:0,echi:pv("E"),lastTalkid:261,lastJournalId:0};
-        const input:GeneralCommentSourceInput=hidden?{...common,kind:"stub"}:{...common,kind:"shown",
+        const suspendedOnly=row.suspended&&row.posterLoaded&&row.state!=="D"&&row.state!=="S";
+        const input:GeneralCommentSourceInput=suspendedOnly?{...common,kind:"suspended-loaded",loaded,
+            pictureKeyword:loaded?pv('kw'):undefined,importedFrom:loaded?pv('Source &<'):undefined,
+            adminPost:loaded?1:0}:
+            hidden?{...common,kind:"stub"}:{...common,kind:"shown",
             loaded,body:pv('one<b>two</b>'),subject:pv('Q<"&'),
             noHtml:0,anonymous:true,preformatted:undefined,editor:undefined,datepost:pv("2026-09-27 00:00:00"),
             importSourceDefined:false,importedFrom:loaded?pv('Source &<'):undefined,pictureKeyword:undefined,
@@ -128,16 +133,26 @@ print JSON::PP->new->canonical->encode(\@rows);`;
                 text(model['_'+key]),row.result[key]===null?null:String(row.result[key]),key);
         assert.deepEqual((model._link_keyseq as unknown[]).map(text),row.result.links);
         assert.equal(model._time,model._system_time);assert.equal(row.result.timeAlias,1);
-        assert.equal(cleans,hidden?0:1);assert.equal(posters,loaded?1:0);
+        assert.equal(cleans,hidden?0:1);assert.equal(posters,loaded&&!suspendedOnly?1:0);
         assert.equal(posterTimes,(row.posterLoaded?1:0)+(loaded?1:0));
         assert.equal((model._time_poster as any)?._zone,row.result.timePoster?.zone);
         assert.deepEqual(featureCalls,row.featureCalls);
         if(loaded) {
-            assert.equal(model._poster,posterModel);
+            assert.equal(model._poster,suspendedOnly?undefined:posterModel);
             assert.equal(text(model._editreason),row.result.editreason);
-            assert.equal(text((model._userpic as any)._width),String(row.result.picture.width));
-            assert.equal(text((model._userpic as any)._height),String(row.result.picture.height));
+            assert.equal(text(model._edit_url),row.result.editUrl);
+            assert.equal(text(model._threadroot_url),row.result.threadroot);
+            if(!suspendedOnly){
+                assert.equal(text((model._userpic as any)._width),String(row.result.picture.width));
+                assert.equal(text((model._userpic as any)._height),String(row.result.picture.height));
+            }
             assert.equal(model._admin_post,row.result.admin_post);
+        }
+        if(suspendedOnly){
+            assert.equal(text(runtime.memberSlot(model._metadata,pv('picture_keyword'),'hash').get()),
+                row.result.metadata.picture_keyword??null);
+            assert.equal(text(runtime.memberSlot(model._metadata,pv('imported_from'),'hash').get()),
+                row.result.metadata.imported_from??null);
         }
         if(row.poster===999&&!hidden)assert.equal((model._poster as any)._journal_type.bytes().toString(),'P');
         if(hidden)assert.equal(model._poster,undefined);

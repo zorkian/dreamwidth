@@ -164,22 +164,25 @@ does not establish installed original cleaning, the general calendar provider, O
 URL handling, complete ordinary factory startup, or HTTP/browser acceptance. Those
 remain required work. The held original subject component has not been consumed.
 
-Approved Comment conversion now uses named public-record and blank-stub variants,
-without raw talk properties or account rows. Only the public variant carries body,
-author, picture keyword, imported attribution, or original cleaning inputs. Deleted,
-screened-hidden and suspended stubs invoke no body, author, picture, icon or edit
-provider. Their public structural/header facts still form the native blank Comment
-model. State, `_show`, page-loaded poster and poster suspension remain separate facts:
+Approved Comment conversion now uses named public, suspended-loaded and blank-stub
+variants, without raw talk properties or account rows. A loaded comment by a
+page-loaded suspended poster retains its approved picture keyword, imported
+attribution, edit/admin fields and poster time, while the exact native suspension
+block blanks subject, text, poster, userpic, icon and full/screened fields. Body
+cleaning and image/poster results are discarded by that block, so this model
+does not invoke those providers for the suspended-only variant. Deleted and
+screened-hidden stubs invoke no body, author, picture, icon or edit provider.
+State, `_show`, page-loaded poster and poster suspension remain separate facts:
 the native suspension, deletion and hidden-screen blocks stack in that order, so
 `fromsuspended` can coexist with `deleted` or `screened_noshow`. A hidden comment's
 poster enters the page-wide author map only if that poster also has a shown comment;
 hidden-only authors trigger no account reads. `time_poster` is computed when that
-page-wide author exists, including for a blank stub. Parent assembly must supply its
-approved timezone witness without loading hidden body or picture fields. Invalid
-author rows need witnessed absence and a final reread; this parent SQL follow-through
-is separate from the pure model component. Parent selection,
-privacy approval and final reread remain mandatory; this
-converter does not authorize a record or expose manager-only `poster_ip`.
+page-wide author exists, including for a blank stub. Parent selection reads the
+suspended-loaded comment's named metadata/edit properties and owner-scoped map and
+keyword rows, while leaving its talktext2 subject/body and userpic2 image rows unread.
+Hidden-only authors and D/screened-hidden properties remain unread. Missing author,
+status, map and timezone changes participate in the source bracket and final reread.
+This converter does not authorize a record or expose manager-only `poster_ip`.
 
 The required `cleanComment` operation receives quote_html output and the source
 preformatted, anonymous/no-CSS, editor, date and import-definedness options. It must
@@ -193,10 +196,11 @@ records when comments are disabled. Post-comment cmtinfo/head resources remain a
 separate unconditional operation, including on the disabled path.
 
 Focused proof executes the retained EntryPage conversion block read from installed
-source with declared native providers and a sticky DB-connect tripwire. Its nine rows
+source with declared native providers and a sticky DB-connect tripwire. Its ten rows
 cover anonymous, missing registered author, each blank-stub reason, and a combined
-registered edit/image branch, plus overlapping suspended/deleted and suspended/screened
-states with the same author loaded or absent from another page comment. The JS projection receives the actual native cleaner
+registered edit/image branch, suspended-only loaded metadata/edit preservation, plus
+overlapping suspended/deleted and suspended/screened states with the same author
+loaded or absent from another page comment. The JS projection receives the actual native cleaner
 result through an explicitly declared provider; this proves model sequencing and
 no-read behavior, not a JS cleaner implementation. Tree order/alias/cycle controls use
 approved synthetic records. Original cleaning, installed calendar, source URL/image
