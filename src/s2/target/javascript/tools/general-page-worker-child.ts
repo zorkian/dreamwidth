@@ -28,11 +28,14 @@ const pv=NativeString.hostUtf8Bytes,channel=new GeneralWorkerChannel(process.env
 let username:NativeString;
 const noContent=()=>{throw Error("Declared empty-content fixture reached an original cleaner");};
 function page(value:unknown,bindings:GeneralWorkerPublicBindings):GeneralPageInput {
-    if(!value||typeof value!=="object"||Object.keys(value).length!==2||
+    if(!value||typeof value!=="object"||Object.keys(value).length!==3||
         !NativeString.is((value as Record<string,unknown>).username)||
-        !NativeString.is((value as Record<string,unknown>).title))throw Error("Invalid fixed source descriptor");
-    const row=value as {username:NativeString;title:NativeString};username=row.username;
-    const journal=bindings.prepareUser(bindings.loadUser(username) as GeneralModel,generalNull("Image"),undefined,undefined);
+        !NativeString.is((value as Record<string,unknown>).title)||
+        !(value as Record<string,unknown>).defaultPicture||
+        ((value as Record<string,unknown>).defaultPicture as GeneralModel)[".type"]!=="Image")
+        throw Error("Invalid fixed source descriptor");
+    const row=value as {username:NativeString;title:NativeString;defaultPicture:GeneralModel};username=row.username;
+    const journal=bindings.prepareUser(bindings.loadUser(username) as GeneralModel,row.defaultPicture,undefined,undefined);
     return {styleId:0,styleModtime:0,baseUrl:pv("/journal"),journal,journalType:pv("P"),
         ownerName:row.title,journalTitle:undefined,journalSubtitle:undefined,layoutName:undefined,
         themeName:undefined,layoutUrl:pv(""),getargs:[],viewingStyleOptions:undefined,viewUrls:[],links:[],
@@ -52,7 +55,7 @@ function entry():GeneralEntrySourceInput {
 function entryOperations(bindings:GeneralWorkerPublicBindings) {
     return {features:{memories:false,tellafriend:false,esn:false},
         user:()=>bindings.loadUser(username) as GeneralModel,
-        picture:()=>undefined,moodtheme:()=>undefined,tagList:()=>({html:undefined,tags:[]}),
+        picture:()=>generalNull("Image"),moodtheme:()=>undefined,tagList:()=>({html:undefined,tags:[]}),
         commentInfo:()=>generalCommentInfo({_count:0,_enabled:0}),standardImage:noContent,
         currents:()=>({values:[]}),groupNames:()=>pv(""),cleanSubject:noContent,
         cleanEvent:noContent,expandEmbedded:(value:NativeString|undefined)=>value,
@@ -64,6 +67,14 @@ function escapeProperty(value:unknown,mode:"plain"|"html"):unknown {
 }
 executeGeneralWorker(channel,generalWorkerFactory(channel,{
     propertyCleaner(){return {clean:noContent};},seesControlStrip:()=>false,
+    dates:{dayOfWeek(_ctx,date){
+        // Exact declared fixture civil day; the native oracle independently
+        // runs LJ::day_of_week. This is not the installed calendar provider.
+        if(scalarPV(date._year).bytes().toString()!=="2026"||
+            scalarPV(date._month).bytes().toString()!=="9"||
+            scalarPV(date._day).bytes().toString()!=="27")throw Error("Unplanned fixture civil day");
+        return 0;
+    }},
     output(){return {contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
         stylesheet:{domain:"example.org",webDomain:"www.example.org",statPrefix:"https://static.example.org",
             trustedHosts:{},cssCleanerEnabled:true,cssProxy:null},transformCss:noContent,expandEmbed:noContent};},

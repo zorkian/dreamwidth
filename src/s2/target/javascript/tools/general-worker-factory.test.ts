@@ -33,9 +33,11 @@ test("installed factory retains one private navigation authority and requires so
     let inputBindings:GeneralWorkerPublicBindings|undefined;
     let inputSession:GeneralProgramSession|undefined;
     let inputStart:GeneralWorkerStart|undefined;
+    let weekdayCalls=0;
     const factory=generalWorkerFactory(new GeneralWorkerChannel("a".repeat(64)),{
         propertyCleaner(){throw Error("No cleaner substitution");},
         output(){throw Error("No output substitution");},seesControlStrip:()=>false,
+        dates:{dayOfWeek(){weekdayCalls++;return 1;}},
         recentInput(){throw boundary;},entryInput(_value,value,session,start){
             inputBindings=value;inputSession=session;inputStart=start;return {page:{}} as never;},
         recentOperations(){throw Error("Invalid descriptor must not prepare operations");},
@@ -64,6 +66,10 @@ test("installed factory retains one private navigation authority and requires so
     const result=registry._ItemRange__url_of!(undefined!,range,2);
     assert.equal(scalarPV(result).bytes().toString(),"page=2");
     assert.equal(scalarPV(registry._ItemRange__url_of!(undefined!,{...range},2)).bytes().length,0);
+    const date={".type":"Date",_year:2026,_month:9,_day:27};
+    assert.equal(scalarPV(registry._Date__day_of_week!(undefined!,date)).bytes().toString(),"2");
+    assert.equal(scalarPV(registry._Date__day_of_week!(undefined!,date)).bytes().toString(),"2");
+    assert.equal(weekdayCalls,1);
     assert.equal(Object.isFrozen(bindings),true);
 });
 
@@ -84,6 +90,7 @@ test("actual installed factory has a closed pure-model dependency graph",()=>{
     const paths=manifest.files.map((file:{path:string})=>file.path) as string[];
     assert.ok(paths.includes("app/dist/live/domain/general-page-assembly.js"));
     assert.ok(paths.includes("app/dist/live/domain/general-comment-navigation.js"));
+    assert.ok(paths.includes("app/dist/live/render/general-date-builtins.js"));
     assert.equal(paths.some(file=>/\/live\/data\/|general-selected-text|general-recent-selection|layer-artifact/.test(file)),false);
     console.log("Factory admission-only closed-stage evidence: "+directory);
 });

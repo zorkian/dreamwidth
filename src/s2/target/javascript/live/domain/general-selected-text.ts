@@ -169,6 +169,12 @@ export class GeneralSelectedText {
         }
         return names.get(current)?.clone();
     }
+    /** User construction and the Recent shared-picture branch use defaultpicid directly. */
+    defaultPicture(userid:number,root:NativeString):GeneralModel {
+        // Do not route through keyword resolution: the direct default can name
+        // a row excluded from the usable keyword list (Userpic::get/load_row).
+        return this.resolvedPictureImage(userid,this.pictureId(userid),root);
+    }
     /** Entry::userpic_kw then new_from_keyword/default; no uploaded URL is involved. */
     entryPicture(entry:RawEntry,root:NativeString):{readonly image:GeneralModel;readonly keyword:NativeString|undefined} {
         const converted=this.entry(entry);

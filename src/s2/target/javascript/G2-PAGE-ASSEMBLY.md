@@ -139,3 +139,27 @@ oracle uses an explicitly declared selected-row info provider; direct Userpic fa
 and Image construction use the actual retained methods and isolated read-only SQL.
 Ordinary worker descriptor/provider binding, independent OG URL behavior, and original
 content cleaning remain required integration work; this is not full HTTP acceptance.
+
+The installed factory registers the reviewed Date callbacks once per request. Its
+required calendar operation returns the native `LJ::day_of_week` value before the
+wrapper adds one and caches `_dayofweek`. The focused worker declares only its tested
+civil day; an installed Time::Local/timezone provider remains mandatory, with no guessed
+UTC or JavaScript Date replacement.
+
+Recent's picture caller maps an approved picid-zero Null Image to an absent userpic,
+after the native poster/shared-picture branch chooses its source. Direct Entry retains
+the separate Null Image. The shared reviewed autovivification implementation allows
+custom code to assign a missing picture's width without inventing a typed Image: the
+native, source-JS and recovered-JS controls retain the native `isnull` result. Earlier
+failed worker evidence is preserved. User's default picture and the community shared
+picture use direct `defaultpicid`, independently of keyword-list eligibility.
+
+Setup exports `USERPIC_ROOT` as an additive public native byte/flag frame alongside the
+legacy text projection. Parent preparation validates the frame and binds both bytes and
+flag in its source digest. This binding transfers the approved Image model, not the
+native root frame or raw account/picture rows. A closed source/recovered worker control
+reads its bound User's default-image width and exact URL against native Image_userpic.
+The source/model fixture has explicitly empty content and declared public helpers; it
+does not establish installed original cleaning, the general calendar provider, OG image
+URL handling, complete ordinary factory startup, or HTTP/browser acceptance. Those
+remain required work. The held original subject component has not been consumed.

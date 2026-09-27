@@ -368,6 +368,7 @@ sub export_config {
         schema       => 1,
         sourceFeatureFlags => \%source_features,
         sourceFeatureFlagsIdentity => $feature_identity,
+        nativeUserpicRoot => public_scalar_frame( $LJ::USERPIC_ROOT // '' ),
         nativePublicUrls => {
             siteDomain => public_scalar_frame( $LJ::DOMAIN // '' ),
             knownHttpsSites => [ map { public_scalar_frame($_) }

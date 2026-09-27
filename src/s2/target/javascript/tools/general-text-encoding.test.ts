@@ -235,6 +235,7 @@ test("selected poster pictures retain source bytes, final witnesses and hidden-t
         assert.equal(picture.description!.bytes().toString("hex"),"ff3c26");assert.equal(picture.description!.flagged(),false);
         assert.equal(picture.width,103);assert.equal(picture.height,97);
         const root=NativeString.bytes(Buffer.from("https://pics.invalid"));
+        const defaultImage=source.defaultPicture(900002,root);
         const image=source.resolvedPictureImage(900002,9101,root,NativeString.bytes(Buffer.from("0")),0,50);
         assert.equal((image._url as NativeString).bytes().toString(),"https://pics.invalid/9101/900002");
         assert.equal(image._width,103);assert.equal(image._height,50);
@@ -276,12 +277,16 @@ my @chosen=map {$u->get_picid_from_keyword($_)} (undef,$keyword,'pic#9101','pic#
 my @chosen_flags=map {utf8::is_utf8($_)?1:0} @chosen;
 my $pic=LJ::Userpic->new($u,9101);my $description=$pic->description;
 local $LJ::USERPIC_ROOT='https://pics.invalid';my $image=LJ::S2::Image_userpic($u,9101,'0',0,50);
+my $default=LJ::S2::Image_userpic($u,$u->{defaultpicid});
 print encode_json({width=>$pic->width,height=>$pic->height,description=>encode_base64($description,''),
+ defaultImage=>{url=>$default->{url},width=>$default->{width},height=>$default->{height},alt=>encode_base64($default->{alttext},'')},
  utf8=>utf8::is_utf8($description)?1:0,chosen=>\@chosen,chosenFlags=>\@chosen_flags,mapped=>\@mapped,image=>{url=>$image->{url},width=>$image->{width},height=>$image->{height},
  alt=>encode_base64($image->{alttext},''),altUtf8=>utf8::is_utf8($image->{alttext})?1:0}});
 $db->do('ROLLBACK');$db->disconnect;`;
         assert.deepEqual({width:picture.width,height:picture.height,
             description:picture.description!.bytes().toString("base64"),utf8:picture.description!.flagged()?1:0,
+            defaultImage:{url:(defaultImage._url as NativeString).bytes().toString(),width:defaultImage._width??null,
+                height:defaultImage._height??null,alt:(defaultImage._alttext as NativeString).bytes().toString("base64")},
             chosen,chosenFlags,mapped,image:{url:(image._url as NativeString).bytes().toString(),width:image._width,height:image._height,
                 alt:(image._alttext as NativeString).bytes().toString("base64"),
                 altUtf8:(image._alttext as NativeString).flagged()?1:0}},

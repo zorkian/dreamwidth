@@ -35,19 +35,26 @@ export interface GeneralImageUrlFrames {
     readonly siteDomain:{readonly base64:string;readonly utf8:boolean};
     readonly knownHttpsSites:readonly {readonly base64:string;readonly utf8:boolean}[];
 }
+function decodeNativeUrlFrame(frame:GeneralImageUrlFrames["siteDomain"]):NativeString {
+    if(typeof frame.base64!=="string"||typeof frame.utf8!=="boolean")throw Error("Invalid native URL frame");
+    const bytes=Buffer.from(frame.base64,"base64");
+    if(bytes.length>16384||bytes.toString("base64")!==frame.base64)throw Error("Invalid native URL frame");
+    return NativeString.fromFrame({bytes,utf8:frame.utf8});
+}
+/** Trusted setup value used by parent selected-Image approval, not a child URL claim. */
+export function prepareGeneralUserpicRoot(frame:GeneralImageUrlFrames["siteDomain"]):
+    {readonly value:NativeString;readonly sourceDigest:string} {
+    const value=decodeNativeUrlFrame(frame);
+    const sourceDigest=createHash("sha256").update(JSON.stringify(["USERPIC_ROOT",frame.base64,frame.utf8])).digest("hex");
+    return Object.freeze({value,sourceDigest});
+}
 /** Parent setup binds these validated source frames into the request config identity. */
 export function prepareGeneralImageUrlFacts(frames:GeneralImageUrlFrames):GeneralImageUrlFacts {
-    const decode=(frame:GeneralImageUrlFrames["siteDomain"])=>{
-        if(typeof frame.base64!=="string"||typeof frame.utf8!=="boolean")throw Error("Invalid native URL frame");
-        const bytes=Buffer.from(frame.base64,"base64");
-        if(bytes.length>16384||bytes.toString("base64")!==frame.base64)throw Error("Invalid native URL frame");
-        return NativeString.fromFrame({bytes,utf8:frame.utf8});
-    };
     if(!Array.isArray(frames.knownHttpsSites)||frames.knownHttpsSites.length>4096)
         throw Error("Invalid native URL facts");
     const sourceDigest=createHash("sha256").update(JSON.stringify([frames.siteDomain,frames.knownHttpsSites])).digest("hex");
-    return Object.freeze({sourceDigest,siteDomain:decode(frames.siteDomain),
-        knownHttpsSites:Object.freeze(frames.knownHttpsSites.map(decode))});
+    return Object.freeze({sourceDigest,siteDomain:decodeNativeUrlFrame(frames.siteDomain),
+        knownHttpsSites:Object.freeze(frames.knownHttpsSites.map(decodeNativeUrlFrame))});
 }
 const patterns=new WeakMap<object,{byte:RegExp;unicode:RegExp}>();
 function domainPattern(profile:NativeProfile,utf8:boolean):RegExp {

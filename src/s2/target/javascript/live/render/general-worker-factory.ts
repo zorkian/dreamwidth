@@ -25,6 +25,7 @@ import {generalUserConstructor} from "./general-user-builtins";
 import {GeneralStandardImageClient} from "./general-standard-images-client";
 import {generalImageCallbacks,type GeneralImageCallbacks} from "./general-image-builtins";
 import {generalScalarCallbacks} from "./general-builtins";
+import {generalDateCallbacks,type GeneralDateOperations} from "./general-date-builtins";
 import {generalModelCallbacks} from "./general-model-builtins";
 import {generalCommentNavigation,type GeneralCommentNavigation} from "../domain/general-comment-navigation";
 import {generalEscapeUrl} from "../domain/general-navigation-url";
@@ -44,6 +45,8 @@ export interface GeneralWorkerPublicBindings {
 export interface GeneralWorkerFactoryServices {
     readonly propertyCleaner:GeneralInstalledOperations["propertyCleaner"];
     readonly output:GeneralInstalledOperations["output"];
+    /** Native LJ::day_of_week result before wrapper +1; no guessed JS calendar. */
+    readonly dates:GeneralDateOperations;
     seesControlStrip(start:GeneralWorkerStart):unknown;
     /** Validate named authorized source descriptors, never cast an arbitrary resume graph. */
     recentInput(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
@@ -63,6 +66,7 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
     const images=generalImageCallbacks({sourceFacts:()=>source.sourceFacts(),
         translate:key=>source.translate(key),escapeUrl:generalEscapeUrl});
     const navigation=generalCommentNavigation();
+    const dates=generalDateCallbacks(services.dates);
     const bindings:GeneralWorkerPublicBindings=Object.freeze({users,images,navigation,
         loadUser:(name:NativeString)=>workerLoadUser(channel,users,name),
         prepareUser(lite:GeneralModel,picture:GeneralModel,url:unknown,name:unknown){
@@ -76,7 +80,7 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
         builtins(start,page){return {...generalScalarCallbacks({page,
             seesControlStrip:()=>services.seesControlStrip(start)}),
             ...generalUserConstructor(channel,users),...generalModelCallbacks(),
-            ...images.callbacks,...navigation.callbacks};},
+            ...images.callbacks,...navigation.callbacks,...dates};},
         propertyCleaner:services.propertyCleaner,output:services.output,
         preparePage(session,start,approved){
             // Native Page fallback reads the properties AFTER initialization and
@@ -86,8 +90,19 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
                 content:session.context.prop._text_module_customtext_content};
             if(start.kind==="recent") {
                 const input=services.recentInput(approved,bindings,session,start);
+                const operations=services.recentOperations(session,start,bindings);
                 return generalRecentPageFromSource(session.context,
-                    {...input,page:{...input.page,customtextDefaults}},services.recentOperations(session,start,bindings));
+                    {...input,page:{...input.page,customtextDefaults}},{...operations,
+                        entry(source){
+                            const entry=operations.entry(source);
+                            return {...entry,picture(kind){
+                                const picture=entry.picture(kind);
+                                // Recent only assigns Image_userpic if native
+                                // entry/default userpic exists. Direct Entry
+                                // retains its separate picid-zero Null fallback.
+                                return picture?.[".isnull"]===true?undefined:picture;
+                            }};
+                        }});
             }
             const input=services.entryInput(approved,bindings,session,start);
             return generalEntryPageFromSource(session.context,{...input,page:{...input.page,customtextDefaults}},{
