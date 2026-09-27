@@ -18,9 +18,14 @@ import {GeneralWorkerChannel} from "../live/render/general-worker-channel";
 
 const channel = new GeneralWorkerChannel(process.env.S2_PRIVATE_JOB!);
 const start = channel.start(value => {
-    if (value !== "fixed-channel-test" && value !== "fixed-preparation-error-test" && value !== "fixed-site-helper-test") throw new Error("Unexpected test start");
+    if (value !== "fixed-channel-test" && value !== "fixed-preparation-error-test" && value !== "fixed-site-helper-test" && value !== "fixed-flagged-latin1-test" && value !== "fixed-flagged-wide-test") throw new Error("Unexpected test start");
     return value;
 });
+if (start === "fixed-flagged-latin1-test" || start === "fixed-flagged-wide-test") {
+    channel.resume({kind:"number",number:{mode:"iv",value:"3"}},value=>value);
+    channel.result(NativeString.hostUnicode(start === "fixed-flagged-latin1-test" ? "café" : "☺").frame());
+    process.exit(0);
+}
 if (start === "fixed-preparation-error-test") {
     channel.preparationResult({bytes: Buffer.from("<b>Error preparing to run:</b> &lt;author&gt;"), utf8: false});
     process.exit(0);

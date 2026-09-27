@@ -58,7 +58,7 @@ function fixture(initError=false) {
                 const model=decodeGeneralModel(resume.page) as Record<string,unknown>;
                 assert.deepEqual(Object.keys(model),[".type","_title"]);
                 assert.deepEqual((model._title as NativeString).bytes(),Buffer.from([255]));}
-            order.push("print");return Buffer.from([255,0,97]);
+            order.push("print");return {bytes:Buffer.from([255,0,97]),utf8:false};
         },
     },config,{
         helpers(){return {host:async()=>{throw Error("Unexpected host");},session:{
