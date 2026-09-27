@@ -79,10 +79,13 @@ export class Parser {
             if(body.length!==1)return;
             const only=body[0]!;
             if(only.kind==='if')only.branches.forEach(branch=>share(branch.body,line));
-            else if(!['while','for','foreach'].includes(only.kind))only.copLine=line;
+            else if(only.kind==='expr' &&
+                ((only.expr.kind==='call' && only.expr.name.startsWith('S2::Builtin::')) ||
+                 (only.expr.kind==='invoke' && !(only.expr.callee.kind==='variable' &&
+                    ['$S2::pout','$S2::pout_s'].includes(only.expr.callee.name)))))only.copLine=line;
         };
         if(statement.kind==='if')statement.branches.forEach(branch=>share(branch.body,statement.copLine!));
-        if(statement.kind==='for')share(statement.body,statement.copLine!);
+        if(statement.kind==='for' && statement.body.length===1)statement.body[0]!.copLine=statement.copLine;
         return statement;
     }
     private statementShape(): Stmt {
