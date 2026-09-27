@@ -335,7 +335,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
     }
     private user(row: Row, settings: PublicSettings, raw: RawField[]): UserRecord {
         const id = number(row.userid, 1);
-        return new UserRecord({userid: id, user: requiredString(row.user), clusterid: number(row.clusterid, 1),
+        return new UserRecord({userid: id, user: requiredString(row.user), clusterid: number(row.clusterid,
+                raw instanceof RawFields && raw.byteView ? 0 : 1),
             status: requiredString(row.status), statusvis: requiredString(row.statusvis), journaltype: requiredString(row.journaltype),
             name: decodedColumn(row, "name", "user:" + id + ":name", raw, 1024, false)!,
             optShowTalkLinks: requiredString(row.opt_showtalklinks), optWhocanReply: requiredString(row.opt_whocanreply),
@@ -439,14 +440,35 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             return {facts, style, raw, themeAuthors:await this.loadThemeAuthors(connection,style)};
         });
+        // Native RecentPage skips suspended entries/posters AFTER selecting its
+        // window but BEFORE Entry_from_entryobj loads text. Direct Entry applies
+        // visible_to before text or comments. Keep the complete window as a
+        // pagination/freshness witness while withholding hidden body reads.
+        const visibility = byteView ? await this.databases.snapshot(clusterId, clusterTables,
+            connection => this.nativeEntryVisibility(connection, ownerId, frozenRequest,
+                before.facts.logNames)) : undefined;
+        if (byteView && !visibility) return null;
+        const authorFacts = visibility ? await this.databases.snapshot(undefined, globalTables,
+            connection => this.nativeEntryAuthors(connection, before.facts,
+                visibility.window.rows.map(row => number(row.posterid,1)))) : undefined;
+        const visibleRows = visibility && authorFacts ? visibility.window.rows.filter(row =>
+            !visibility.suspended.includes(number(row.jitemid,1)) &&
+            authorFacts.find(facts => number(facts.owner.userid,1)===number(row.posterid,1))!.owner.statusvis!=="S") : undefined;
+        if (byteView && frozenRequest.page.kind==="entry" && !visibleRows?.length) return null;
         const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
             if (!window) return null;
+            if (visibility) {
+                const fresh = await this.nativeEntryVisibility(connection, ownerId, frozenRequest,
+                    before.facts.logNames);
+                if (!fresh || digest(fresh)!==digest(visibility)) throw new SnapshotError("unavailable");
+            }
             const raw = new RawFields(byteView);
-            const loaded = await this.loadEntries(connection, ownerId, window.rows,
-                window.rows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            const bodyRows = visibleRows ?? window.rows;
+            const loaded = await this.loadEntries(connection, ownerId, bodyRows,
+                bodyRows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
             const statusId = before.facts.logNames.find(row => row.name === "statusvis")?.propid;
             const calendar = await this.loadCalendar(connection, ownerId, frozenRequest,
                 statusId === undefined ? 0 : number(statusId, 1), raw,
@@ -497,6 +519,11 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const raw = new RawFields(byteView), owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
             const style = includeStyle ? await this.loadStyle(connection, owner, plan, raw) : null;
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
+            if (visibility && authorFacts) {
+                const freshAuthors = await this.nativeEntryAuthors(connection, facts,
+                    visibility.window.rows.map(row => number(row.posterid,1)));
+                if (digest(freshAuthors)!==digest(authorFacts)) throw new SnapshotError("unavailable");
+            }
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
             const themeAuthors=await this.loadThemeAuthors(connection,style);
@@ -509,7 +536,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
             plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors,
-            ...(byteView ? [number(before.facts.owner.oldenc)] : [])];
+            ...(byteView ? [number(before.facts.owner.oldenc),visibility,authorFacts] : [])];
         const result: RawJournalSnapshot = {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
@@ -631,6 +658,34 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                         nativeType:requiredString(definition.native_type)} : {}),
                     sourceHash: requiredString(definition.source_hash).toLowerCase()};
             })};
+    }
+    private async nativeEntryVisibility(connection: Connection, ownerId: number,
+        request: RawPageRequest, definitions: readonly Row[]) {
+        const window = await this.loadWindow(connection,ownerId,request);
+        if (!window) return null;
+        const status = definitions.find(row => row.name==="statusvis")?.propid;
+        const ids = window.rows.map(row => number(row.jitemid,1));
+        const statuses = status===undefined || !ids.length ? [] : (await sql<Row>`
+            SELECT jitemid,HEX(value) AS value FROM logprop2
+            WHERE journalid=${ownerId} AND propid=${number(status,1)}
+                AND jitemid IN (${sql.join(ids)}) ORDER BY jitemid LIMIT 201`.execute(connection)).rows;
+        if (statuses.length>ids.length || new Set(statuses.map(row=>number(row.jitemid,1))).size!==statuses.length)
+            unsupported();
+        // Entry::statusvis recognizes only the original one-byte S value.
+        return {window,statuses,suspended:statuses.filter(row=>row.value==="53").map(row=>number(row.jitemid,1))};
+    }
+    private async nativeEntryAuthors(connection: Connection, owner: GlobalFacts,
+        ids: readonly number[]): Promise<GlobalFacts[]> {
+        const result:GlobalFacts[]=[];
+        for (const id of [...new Set(ids)].sort((a,b)=>a-b)) {
+            if (id===number(owner.owner.userid,1)) {result.push(owner);continue;}
+            const rows=(await sql<Row>`SELECT user FROM user WHERE userid=${id} LIMIT 2`.execute(connection)).rows;
+            if (rows.length!==1) unsupported();
+            const facts=await this.globalFacts(connection,requiredString(rows[0]!.user));
+            if (!facts || number(facts.owner.userid,1)!==id) unsupported();
+            result.push(facts);
+        }
+        return result;
     }
     private async loadPosters(connection: Connection, owner: RawUser, entries: readonly RawEntry[],
         raw: RawField[]): Promise<RawUser[]> {
