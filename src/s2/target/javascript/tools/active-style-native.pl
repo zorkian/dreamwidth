@@ -70,10 +70,27 @@ my %native;
     local *DW::SiteScheme::default = sub {'fixture_child'};
     local *DW::SiteScheme::inheritance = sub {qw(fixture_child fixture_parent global)};
     $native{siteviews} = {LJ::S2::siteviews_style()};
+    local $LJ::DEFAULT_FEED_STYLE = {core => 'core2', layout => 'fixture/layout', theme => 'missing/theme'};
+    $native{sitefeeds} = {LJ::S2::sitefeeds_style()};
+    # Exercise the installed lexical get_styleinfo closure, not a copied branch.
+    # This is trusted offline source qualification; no stored program is used.
+    open my $styles_file, '<', "$FindBin::Bin/../../../../../cgi-bin/LJ/User/Styles.pm" or die $!;
+    my $styles_source = do {local $/; <$styles_file>};
+    close $styles_file;
+    my ($closure) = $styles_source =~ /my \$get_styleinfo = (sub \{.*?\n        \});/s;
+    die 'Native style closure missing' unless $closure;
+    my ($geta, $opts, $remote, $view, $stylearg) = ({}, {}, undef, 'lastn', 'original');
+    my $u = bless {userid => 900001, journaltype => 'Y', stylesys => 2, s2_style => 44}, 'LJ::User';
+    my $get_styleinfo = eval $closure;
+    die $@ unless $get_styleinfo;
+    $native{feedInfo} = [$get_styleinfo->()];
     %map = ();
     $native{default} = {LJ::S2::get_style(44, {u => $user})};
     local $LJ::DEFAULT_STYLE = {core => 'missing/core', layout => 'missing/layout'};
     $native{incomplete} = {LJ::S2::get_style(44, {u => $user})};
 }
+my $corrupt_gzip = "\037\213broken";
+LJ::text_uncompress(\$corrupt_gzip);
+$native{corruptGzipAbsent} = defined $corrupt_gzip ? JSON::PP::false : JSON::PP::true;
 print JSON::PP->new->canonical->encode({layers => \@layers, outputBase64 => encode_base64($output, ''),
     selection => \%native, syntheticWrites => \@writes});

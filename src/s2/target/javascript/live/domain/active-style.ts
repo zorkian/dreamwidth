@@ -35,11 +35,11 @@ export interface ActiveProgramRequest {
     readonly username: string;
     readonly view: 'recent' | 'entry';
     // Parent-controlled selection. Entry may require another context after init.
-    readonly selection: 'journal' | 'default' | 'siteviews';
+    readonly selection: 'journal' | 'default' | 'siteviews' | 'sitefeeds';
 }
 export interface ActiveStyleSelection {
     readonly styleId: number;
-    readonly origin: 'persisted' | 'default' | 'siteviews';
+    readonly origin: 'persisted' | 'default' | 'siteviews' | 'sitefeeds';
     readonly original: ActiveLayerMap;
     readonly effective: ActiveLayerMap;
     readonly unresolvedRoles: readonly string[];
@@ -76,7 +76,23 @@ export function selectActiveStyle(styleId: number, map: ActiveLayerMap,
     let original: Record<string, number> = {...map};
     let origin: ActiveStyleSelection['origin'] = 'persisted';
     const unresolvedRoles: string[] = [];
-    if (request.selection === 'siteviews') {
+    if (request.selection === 'sitefeeds') {
+        origin = 'sitefeeds'; original = {};
+        for (const [role, alias] of Object.entries(config.defaultFeedStyle ?? {})) {
+            const layer = publicLayers.get(alias);
+            if (layer) original[role] = layer.id;
+        }
+        // sitefeeds_style skips unresolved aliases; an empty result reaches
+        // s2_context's ordinary get_style(0) default branch.
+        if (!Object.keys(original).length) {
+            origin = 'default';
+            for (const [role, alias] of Object.entries(config.defaultStyle)) {
+                const layer = alias ? publicLayers.get(alias) : undefined;
+                if (layer) original[role] = layer.id;
+                else unresolvedRoles.push(role);
+            }
+        }
+    } else if (request.selection === 'siteviews') {
         origin = 'siteviews';
         let theme = 'siteviews/default';
         for (const scheme of config.siteSchemeInheritance ?? []) {
