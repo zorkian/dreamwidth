@@ -74,6 +74,11 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
             assert.equal(definitions.length,1);
             await admin.query(`INSERT INTO ${table(c,"logprop2")} (journalid,jitemid,propid,value) VALUES (900001,1,?,'1')`,[definitions[0].propid]);
             await admin.query(`UPDATE ${table(c,"logtext2")} SET event=CONVERT(? USING latin1) WHERE journalid=900001 AND jitemid=1`,[Buffer.from([255,0,97])]);
+            await admin.query(`INSERT INTO ${table(c,"links")} (journalid,ordernum,parentnum,title,url,hover)
+                VALUES (900001,2,0,'-',CONVERT(? USING latin1),'<hover>')`,[Buffer.from([47,255,38,97])]);
+            await admin.query(`INSERT INTO ${table(c,"links")} (journalid,ordernum,parentnum,title,url,hover)
+                VALUES (900001,1,0,'first','/first','')`);
+            await admin.query(`UPDATE ${table(g,"user")} SET name=CONVERT(? USING latin1) WHERE userid=900001`,[Buffer.from([255,60,110,62])]);
             const snapshot=await store.loadNativeSelectedSnapshot(request("ordinary6",{kind:"entry",ditemid:257}));
             assert.ok(snapshot);
             const codes=new MysqlPublicEncodings(startup.database);
@@ -82,6 +87,14 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
                 const session=new GeneralPublicSession(unused,unused,scalar,25,codes);
                 const converter=new GeneralTextEncoding(session,profile,snapshot.oldEncoding,{maxInputBytes:1048576,maxOutputBytes:1048576});
                 const text=await GeneralSelectedText.prepare(snapshot,converter);
+                const pageText=text.pageText();assert.equal(pageText.ownerName!.bytes().toString("hex"),"ff3c6e3e");
+                assert.equal(pageText.customtext.content,undefined);
+                const links=text.publicLinks();assert.equal(links.length,2);
+                assert.equal(links[0]!.title!.bytes().toString(),"first");
+                assert.equal(links[1]!.title!.bytes().toString("hex"),"2d");
+                assert.equal(links[1]!.url!.bytes().toString("hex"),"2fff2661");
+                assert.equal(links[1]!.url!.flagged(),false);
+                assert.equal(links[1]!.hover!.bytes().toString(),"<hover>");
                 const entry=snapshot.facts.entries[0]!;
                 const oracle=JSON.parse(execFileSync("perl",["tools/general-selected-encoding-native.pl",g,c],{encoding:"utf8",timeout:10000}));
                 const frames=(value:NativeString|undefined)=>value===undefined?null:{base64:value.bytes().toString("base64"),utf8:value.flagged()?1:0};

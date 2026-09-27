@@ -73,6 +73,31 @@ export class GeneralSelectedText {
         }
         return prepared;
     }
+    /** Native load_linkobj stably sorts numeric ordernum after SQL receipt. */
+    publicLinks():readonly {readonly title:NativeString|undefined;readonly url:NativeString|undefined;
+        readonly hover:NativeString|undefined}[] {
+        const owner=this.snapshot.facts.owner.userid;
+        return Object.freeze(this.snapshot.facts.links.map((link,index)=>({link,index}))
+            .sort((left,right)=>left.link.ordernum-right.link.ordernum)
+            .map(({index})=>Object.freeze({
+            title:this.source(`link:${owner}:${index}:title`),
+            url:this.source(`link:${owner}:${index}:url`),
+            hover:this.source(`link:${owner}:${index}:hover`)})));
+    }
+    /** Raw user props have no charset transform in Account.pm preload_props. */
+    pageText():{readonly ownerName:NativeString|undefined;readonly journalTitle:NativeString|undefined;
+        readonly journalSubtitle:NativeString|undefined;
+        readonly website:{readonly url:NativeString|undefined;readonly name:NativeString|undefined};
+        readonly customtext:{readonly title:NativeString|undefined;readonly url:NativeString|undefined;
+            readonly content:NativeString|undefined}} {
+        const owner=this.snapshot.facts.owner;
+        const prop=(name:"url"|"urlname"|"journaltitle"|"journalsubtitle"|"customtext_title"|"customtext_url"|"customtext_content")=>
+            owner.publicSettings[name]===null?undefined:this.source(`user:${owner.userid}:prop:${name}`);
+        return Object.freeze({ownerName:this.source(`user:${owner.userid}:name`),
+            journalTitle:prop("journaltitle"),journalSubtitle:prop("journalsubtitle"),
+            website:Object.freeze({url:prop("url"),name:prop("urlname")}),
+            customtext:Object.freeze({title:prop("customtext_title"),url:prop("customtext_url"),content:prop("customtext_content")})});
+    }
     entry(entry:RawEntry):ConvertedNativeItem {
         const value=this.entries.get(entry);if(!value)throw Error("Unselected entry text reference");return value;
     }

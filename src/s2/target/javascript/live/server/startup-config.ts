@@ -61,8 +61,20 @@ function origin(value: unknown): void {
 // This validates the private document's shape. Public renderer policy and primary
 // role/topology decisions remain in their owning policy/data boundaries.
 export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
-    const root = record(value, ["schema", "listener", "artifactPath", "app", "placeholder",
-        "database", "capabilities", "styles"]);
+    const root = record(value);
+    record(root, ["schema", "listener", "artifactPath", "app", "placeholder",
+        "database", "capabilities", "styles",
+        ...(Object.hasOwn(root,"nativePublicUrls")?["nativePublicUrls"]:[])]);
+    if(root.nativePublicUrls!==undefined) {
+        const facts=record(root.nativePublicUrls,["siteDomain","knownHttpsSites"]);
+        const frame=(input:unknown)=>{
+            const value=record(input,["base64","utf8"]);
+            const encoded=text(value.base64,21848);boolean(value.utf8);
+            const bytes=Buffer.from(encoded,"base64");
+            if(bytes.length>16384||bytes.toString("base64")!==encoded)invalid();
+        };
+        frame(facts.siteDomain);list(facts.knownHttpsSites,frame);
+    }
     if (root.schema !== 1) invalid();
     const listener = record(root.listener, ["host", "port"]);
     const host = text(listener.host, 253);

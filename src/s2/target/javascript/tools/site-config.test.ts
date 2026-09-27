@@ -21,6 +21,8 @@ import test from "node:test";
 import { parseStartupArgs, readStartupConfig, StartupConfigError, validateStartupConfig }
     from "../live/server/startup-config";
 
+import {prepareGeneralImageUrlFacts} from "../live/domain/general-image-url";
+
 const repo = path.resolve(process.cwd(), "../../../..");
 const exporter = path.join(process.cwd(), "tools/site-config.pl");
 const secret = "synthetic-credential-never-log";
@@ -100,6 +102,28 @@ test("source configuration export preserves arbitrary endpoints, URL facts and p
     const linked = path.join(dir, "linked.json"); symlinkSync(output, linked);
     assert.equal(exportSite(home, linked).status, 1);
     assert.deepEqual(readFileSync(output), before);
+}));
+
+test("native public URL facts retain installed byte flags and exact hash key case",()=>temporary(dir=>{
+    const home=fixture(dir, `$DOMAIN=pack('C*',0xc3,0xa9);
+%KNOWN_HTTPS_SITES=(pack('U*',0x78,0x2e,0xe9,0xe9)=>1,'UPPER.example'=>1,'dead.example'=>0);`);
+    const output=path.join(dir,"native-urls.json");
+    const result=exportSite(home,output);assert.equal(result.status,0,result.stderr);
+    const facts=readStartupConfig(output).nativePublicUrls!;
+    assert.deepEqual(facts.siteDomain,{base64:Buffer.from([0xc3,0xa9]).toString("base64"),utf8:false});
+    assert.deepEqual(facts.knownHttpsSites,[
+        {base64:Buffer.from("UPPER.example").toString("base64"),utf8:false},
+        {base64:Buffer.from("x.éé").toString("base64"),utf8:true}]);
+    const assembled=prepareGeneralImageUrlFacts(facts);
+    assert.match(assembled.sourceDigest,/^[a-f0-9]{64}$/);
+    assert.notEqual(assembled.sourceDigest,prepareGeneralImageUrlFacts({...facts,
+        siteDomain:{...facts.siteDomain,utf8:true}}).sourceDigest);
+    assert.equal(assembled.siteDomain.bytes().toString("hex"),"c3a9");
+    assert.equal(assembled.siteDomain.flagged(),false);
+    assert.equal(assembled.knownHttpsSites[1]!.bytes().toString("hex"),"782ec3a9c3a9");
+    assert.equal(assembled.knownHttpsSites[1]!.flagged(),true);
+    const bad=JSON.parse(readFileSync(output,"utf8"));bad.nativePublicUrls.siteDomain.base64="not-base64";
+    assert.throws(()=>validateStartupConfig(bad),StartupConfigError);
 }));
 
 test("effective source recursion override exports and validates without DB access",()=>temporary(dir=>{
