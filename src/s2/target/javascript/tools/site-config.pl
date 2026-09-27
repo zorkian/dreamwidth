@@ -39,6 +39,7 @@ use File::Spec;
 use File::Temp qw(tempfile);
 use Getopt::Long qw(GetOptions);
 use JSON::PP;
+use MIME::Base64 qw(encode_base64);
 use Scalar::Util qw(looks_like_number);
 use URI;
 
@@ -74,6 +75,16 @@ sub css_hook_kind {
         return 'unsupported' unless $qualified;
     }
     return 'proxy-css-links-only';
+}
+
+sub public_scalar_frame {
+    my ($value) = @_;
+    fail('Invalid public scalar configuration') if !defined $value || ref $value;
+    my $flag = utf8::is_utf8($value);
+    my $bytes = "$value";
+    utf8::encode($bytes) if $flag;
+    fail('Public scalar configuration too large') if length($bytes) > 16384;
+    return { base64 => encode_base64($bytes, ''), utf8 => truth($flag) };
 }
 
 sub string {
@@ -286,6 +297,11 @@ sub export_config {
     fail('Too many author readonly clusters') if @readonly_clusters > 4096;
     my $config = {
         schema       => 1,
+        nativePublicUrls => {
+            siteDomain => public_scalar_frame( $LJ::DOMAIN // '' ),
+            knownHttpsSites => [ map { public_scalar_frame($_) }
+                sort grep { $LJ::KNOWN_HTTPS_SITES{$_} } keys %LJ::KNOWN_HTTPS_SITES ],
+        },
         listener     => { host => $host, port => 0 + $port },
         artifactPath => File::Spec->rel2abs(
             $opts{artifact} // "$ENV{LJHOME}/src/s2/target/javascript/artifacts/live/stock.json"
