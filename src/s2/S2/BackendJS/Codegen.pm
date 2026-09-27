@@ -345,6 +345,14 @@ package S2::NodePushStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    if ($bp->{opts}{generalScalars}) {
+        $o->tabwrite("s2.runtime.pushSlot(");
+        $this->{lhs}{var}->asJS_slot($bp, $o);
+        $o->write(",()=> (");
+        $this->{expr}->asJS($bp, $o);
+        $o->writeln(")," . ($this->{expr}{_is_array} ? "true" : "false") . ");");
+        return;
+    }
     $o->tabwrite("");
     $this->{lhs}->asJS($bp, $o);
     $o->write($this->{expr}{_is_array} ? ".push(..." : ".push(");
@@ -769,6 +777,27 @@ sub asJS {
     if ($bp->{opts}{generalScalars}) {
         my $op = $this->{myType}->equals($S2::Type::STRING) ? "concat" :
             $this->{op} == $S2::TokenPunct::PLUS ? "+" : "-";
+        if ($op eq "concat") {
+            # Flatten only the left-associated string chain. Each operation is
+            # still completed before evaluating the next right operand.
+            my @right;
+            my $left = $this;
+            while ($left->isa("S2::NodeSum") && $left->{myType}->equals($S2::Type::STRING)) {
+                push @right, $left->{rhs};
+                $left = $left->{lhs};
+            }
+            $o->write("s2.runtime.scalarConcatChain([");
+            my $first = 1;
+            for my $operand ($left, reverse @right) {
+                $o->write(",") unless $first;
+                $first = 0;
+                $o->write("()=> (");
+                $operand->asJS($bp, $o);
+                $o->write(")");
+            }
+            $o->write("])");
+            return;
+        }
         $o->write("s2.runtime.scalarBinary(" . $bp->quoteString($op) . ",");
         $this->{lhs}->asJS_context($bp, $o, "scalar");
         $o->write(",");
@@ -1071,7 +1100,7 @@ sub asJS_slot {
             $o->write($slot);
             return;
         }
-        $o->write("{get:()=>" . $base . ",set:(value)=>" . $base . "=value}");
+        $o->write("({get:()=>" . $base . ",set:(value)=>" . $base . "=value})");
         return;
     }
     $base = $bp->{iteration_slots}{$base} . ".get()" if $bp->{iteration_slots}{$base};
