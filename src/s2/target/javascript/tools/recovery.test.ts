@@ -262,3 +262,18 @@ test("only exact first generated entry prologue transfers counter ownership",()=
     const {layer}=recovered(envelope(`register_function(101,["main()"],sub{return sub{${prefix}my ($_ctx)=@_;$S2::pout->("kept");};});`));
     let output='';new Context([layer],value=>output+=value).runFunction('main()');assert.equal(output,'kept');
 });
+
+
+test("negative-cache authority follows actual recovery failure origin only",()=>{
+    const malformed=recoverActiveLayer(input('not a generated program'),1);
+    assert.equal(malformed.kind,'gap');
+    if(malformed.kind!=='gap')throw Error('gap expected');
+    assert.equal(malformed.deterministic,true);
+    for(const error of [new RangeError('Unknown generated constant'),new Error('Unbound generated lexical')]) {
+        const hostile=input('');Object.defineProperty(hostile,'activeBytes',{get(){throw error;}});
+        const result=recoverActiveLayer(hostile,1);
+        assert.equal(result.kind,'gap');if(result.kind!=='gap')throw Error('gap expected');
+        assert.equal(result.deterministic,false);
+        assert.equal(result.reason,'Generated program could not be parsed');
+    }
+});
