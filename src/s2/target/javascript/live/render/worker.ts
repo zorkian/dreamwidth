@@ -12,7 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import {createEntryCleaner,cleanStockStylesheet,validateStockFontFamily} from "@dreamwidth/content";
+import {createEntryCleaner,cleanStockStylesheet,validateStockFontFamily,validateStockFontSize} from "@dreamwidth/content";
 import type {EntryContentInput} from "@dreamwidth/content/contracts";
 import {renderStock} from "./engine";
 import {validateArtifact} from "./artifact";
@@ -94,6 +94,7 @@ process.stdin.on("end", () => {
         const content: RenderContentPreparation = {
             stylesheet(source) {try{return cleanStockStylesheet(source,request.journal.layout==='easyread'?"easyread-aqua":undefined);}catch{throw new Unsupported();}},
             fontFamily(source) {try{validateStockFontFamily(source);}catch{throw new Unsupported();}},
+            fontSize(source) {try{validateStockFontSize(source);}catch{throw new Unsupported();}},
             comment(comment,entryUrl) {
                 if(!entryPage||!allowedComments.has(comment)||!comment.full||comment.rawBody===null||
                     entryUrl!==documentUrl)throw new Unsupported();

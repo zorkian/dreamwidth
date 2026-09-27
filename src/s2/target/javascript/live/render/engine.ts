@@ -110,7 +110,21 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         SITENAMESHORT: c.siteNameShort, SITENAMEABBREV: c.siteNameAbbrev,
         IMGDIR: c.imgPrefix, STYLES_IMGDIR: c.imgPrefix + "/styles", STATDIR: c.statPrefix,
     }, {...callbacks(page, host),
-        _start_css:()=>{if(!input.journal.inlineStylesheet||++cssDepth>16)throw new Error("CSS capture limit");},
+        _start_css:()=>{
+            if(!input.journal.inlineStylesheet||++cssDepth>16)throw new Error("CSS capture limit");
+            const typography=["module_heading","module_text","journal_title","journal_subtitle","entry_title","comment_title"];
+            if(typography.some(name=>["","_size","_units"].some(suffix=>
+                Object.hasOwn(input.journal.customtextProperties??{},"font_"+name+suffix)))) {
+                if(!content.fontFamily||!content.fontSize)throw new Unsupported();
+                for(const name of typography) {
+                    const family=String(ctx.prop["_font_"+name]??"");
+                    const size=String(ctx.prop["_font_"+name+"_size"]??"");
+                    const units=String(ctx.prop["_font_"+name+"_units"]??"");
+                    if(family!=="")content.fontFamily(family);
+                    if(size!==""&&units!=="")content.fontSize(size+units);
+                }
+            }
+        },
         _end_css:()=>{
             if(!cssDepth)throw new Error("Unbalanced CSS capture");
             if(--cssDepth)return;

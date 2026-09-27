@@ -22,9 +22,22 @@ export type CustomtextProperties = Partial<Record<
     "module_links_show" | "module_links_order" | "module_links_section" |
     "module_pagesummary_show" | "module_pagesummary_order" | "module_pagesummary_section" |
     "module_calendar_show" | "module_calendar_order" | "module_calendar_section" |
-    "module_tags_section", string | number>>;
+    "module_tags_section", string | number>> & Partial<Record<
+    "font_module_heading" | "font_module_heading_size" | "font_module_heading_units" |
+    "font_module_text" | "font_module_text_size" | "font_module_text_units" |
+    "font_journal_title" | "font_journal_title_size" | "font_journal_title_units" |
+    "font_journal_subtitle" | "font_journal_subtitle_size" | "font_journal_subtitle_units" |
+    "font_entry_title" | "font_entry_title_size" | "font_entry_title_units" |
+    "font_comment_title" | "font_comment_title_size" | "font_comment_title_units", string>>;
 
 const types: Record<string,string> = {
+    font_module_heading:"string", font_module_heading_size:"string", font_module_heading_units:"string",
+    font_module_text:"string", font_module_text_size:"string", font_module_text_units:"string",
+    font_journal_title:"string", font_journal_title_size:"string", font_journal_title_units:"string",
+    font_journal_subtitle:"string", font_journal_subtitle_size:"string", font_journal_subtitle_units:"string",
+    font_entry_title:"string", font_entry_title_size:"string", font_entry_title_units:"string",
+    font_comment_title:"string", font_comment_title_size:"string", font_comment_title_units:"string",
+
     module_userprofile_show:"bool", module_userprofile_order:"int", module_userprofile_section:"string",
     module_links_show:"bool", module_links_order:"int", module_links_section:"string",
     module_pagesummary_show:"bool", module_pagesummary_order:"int", module_pagesummary_section:"string",
@@ -91,7 +104,7 @@ export function readPropertyLayer(source:string,id:number):CustomtextProperties 
                 if(!Number.isSafeInteger(value)||(type==='bool'&&value!==0&&value!==1)||
                     (type==='int'&&Math.abs(value)>10000))throw new Unsupported();
             }
-            take(");\n");values[key as keyof CustomtextProperties]=value;
+            take(");\n");(values as Record<string,string|number>)[key]=value;
         }
     }
     take("1;\n# end.\n");
