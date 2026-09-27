@@ -109,6 +109,22 @@ test("trusted setup and native item_toutf8 preserve source lookup/error/binary o
                 assert.equal((formatting.preformatted as NativeString).bytes().toString(),"0");
                 assert.equal(formatting.importSourceDefined,true);
                 assert.equal(formatting.logtimeMysql.bytes().toString(),entry.logtime);
+                const contentOptions={suspendMessage:0,noEntryBody:0,noHtml:0,
+                    cutUrl:NativeString.hostUtf8Bytes("/257.html"),cutDisable:0,
+                    props:{useragent:"must remain parent-only"},xpostOpaque:"must remain parent-only"};
+                const projected=text.entrySource(entry,{
+                    permalinkUrl:NativeString.hostUtf8Bytes("/257.html"),adultContentLevel:NativeString.hostUtf8Bytes("none"),
+                    content:contentOptions});
+                assert.equal(projected.content.ditemid,257);
+                assert.equal(projected.content.jitemid,1);
+                assert.equal(projected.posterId,entry.posterid);
+                assert.equal(projected.content.journalName.bytes().toString(),"ordinary6");
+                assert.deepEqual(projected.content.event!.bytes(),formatting.event!.bytes());
+                assert.equal(Object.hasOwn(projected,"props"),false);
+                assert.equal(Object.hasOwn(projected.content,"props"),false);
+                assert.equal(Object.hasOwn(projected.content,"xpostOpaque"),false);
+                assert.throws(()=>text.entrySource({...entry},{permalinkUrl:projected.permalinkUrl,
+                    adultContentLevel:projected.adultContentLevel,content:projected.content}));
                 const oracle=JSON.parse(execFileSync("perl",["tools/general-selected-encoding-native.pl",g,c],{encoding:"utf8",timeout:10000}));
                 const frames=(value:NativeString|undefined)=>value===undefined?null:{base64:value.bytes().toString("base64"),utf8:value.flagged()?1:0};
                 assert.deepEqual({subject:frames(text.entry(entry).subject),text:frames(text.entry(entry).text)},oracle);
