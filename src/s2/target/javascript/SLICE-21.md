@@ -35,7 +35,12 @@ At actual inline CSS emission, the credential-free child requires family and
 size proof callbacks for the new typography path. CSS Tree parses the emitted
 size+unit as one value and matches its maintained `font-size` grammar. Functions,
 URLs, Raw data, controls/style-end and values above1024UTF8bytes refuse. The AST
-is proof only; original bytes go to unchanged stock generation. Empty size or
+is proof only; original bytes go to unchanged stock generation. Each original
+family/size scalar must also be token-closed under the maintained tokenizer:
+closed and unterminated comment tokens, bad/unterminated strings and trailing
+escape/EOF repair refuse. Quoted comment-looking text in a properly closed
+string remains a string. This stricter fragment boundary also covers existing
+`font_base` and the family proof used by EasyRead's exact omission reader. Empty size or
 units do not undergo size-value proof, because native emits no size declaration.
 
 Malformed/unprovable families and emitted sizes can refuse the whole page where

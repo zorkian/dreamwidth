@@ -23,6 +23,7 @@ import {withSelectedFixture} from '../../tools/selected-fixture';
 import {createAnonymousRecentService} from '../policy/service';
 import {createLiveApp} from '../server/app';
 import {Renderer} from '../render/child';
+import {readPropertyLayer} from '../domain/property-layer';
 import {config,capabilities,limits} from './fixtures';
 import {stylesBrowser} from './styles-browser.test';
 
@@ -258,6 +259,14 @@ test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and ident
    }
    await set(typography.replace('"font_entry_title_size","120"','"font_entry_title_size","1px;color:red"').replace('"font_entry_title_units","%"','"font_entry_title_units",""'));
    const notEmitted=await get();assert.equal(notEmitted.statusCode,200,notEmitted.body);assert.ok(!notEmitted.body.includes('color:red'));
+   // Individually EOF-repaired pieces must not concatenate into extra CSS.
+   const twoPart=typography.replace('"font_entry_title","Courier New"','"font_entry_title","Georgia /*"')
+     .replace('"font_base","Georgia"','"font_base","'+String.raw`\"*/ } .pwn{color:#123457} /*\"`+'"');
+   const decodedTwoPart=readPropertyLayer(twoPart,980005);
+   assert.equal(decodedTwoPart.font_entry_title,'Georgia /*');
+   assert.equal(decodedTwoPart.font_base,'"*/ } .pwn{color:#123457} /*"');
+   await set(twoPart);assert.equal((await get()).statusCode,422,'Token-closed scalar proof prevents two-part CSS injection');
+   await set(typography);assert.equal((await get()).statusCode,200,'Valid recovery after two-part payload');
    await set(typography);
    const originalTypographyRender=Renderer.prototype.render;
    const typographyMutation=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>) {

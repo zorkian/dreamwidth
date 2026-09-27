@@ -19,10 +19,31 @@ const pseudos=new Set(["visited","hover","active","first-child","before","last-c
 function safeText(value:string):void {
     if(/[<\x00-\x08\x0b\x0e-\x1f\x7f]/.test(value))throw new UnsupportedContent();
 }
+// CSS parsers repair EOF and discard comments. Prove each original scalar is
+// token-closed before stock concatenates it with other independently proved
+// pieces. The maintained tokenizer alone decides string/escape boundaries.
+function proveScalarPiece(source:string):void {
+    const tokens:{type:number;start:number;end:number}[]=[];
+    tree.tokenize(source,(type,start,end)=>{
+        if([tree.tokenTypes.Comment,tree.tokenTypes.BadString,tree.tokenTypes.BadUrl].includes(type))throw new UnsupportedContent();
+        tokens.push({type,start,end});
+    });
+    let index=0;
+    // A stock delimiter must be a separate token. Unterminated strings and
+    // trailing escapes instead consume it or change their original token span.
+    tree.tokenize(source+";",(type,start,end)=>{
+        if(start>=source.length)return;
+        const original=tokens[index++];
+        if(!original||type!==original.type||start!==original.start||end!==original.end)throw new UnsupportedContent();
+    });
+    if(index!==tokens.length)throw new UnsupportedContent();
+}
+
 export function validateStockFontFamily(source:string):void {
     if(Buffer.byteLength(source)>1024)throw new UnsupportedContent();
     if(source==="")return;
     safeText(source);
+    proveScalarPiece(source);
     const ast=tree.parse(source,{context:"value",onParseError(){throw new UnsupportedContent();}});
     if(tree.lexer.matchProperty("font-family",ast).error)throw new UnsupportedContent();
     tree.walk(ast,node=>{
@@ -37,6 +58,7 @@ export function validateStockFontFamily(source:string):void {
 export function validateStockFontSize(source:string):void {
     if(Buffer.byteLength(source)>1024||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source))throw new UnsupportedContent();
     safeText(source);
+    proveScalarPiece(source);
     const ast=tree.parse(source,{context:"value",onParseError(){throw new UnsupportedContent();}});
     if(tree.lexer.matchProperty("font-size",ast).error)throw new UnsupportedContent();
     tree.walk(ast,node=>{

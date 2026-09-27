@@ -28,3 +28,10 @@ test('font size proof is one maintained CSS value and preserves caller bytes',()
  for(const value of ['1.25em','120%','16px','0','medium'])assert.equal(validateStockFontSize(value),undefined);
  for(const value of ['', ' ', '1px;color:red', '1px}', 'calc(1px + 2px)', 'url(x)', 'var(--size)', '1px!important', '</style>', '\uD800'])assert.throws(()=>validateStockFontSize(value),value);
 });
+
+test('original font pieces are token closed before stock concatenation',()=>{
+ for(const value of ['Georgia /*','Georgia /**/', '"x', '"x\\"', 'Georgia\\'])assert.throws(()=>validateStockFontFamily(value),value);
+ for(const value of ['0/*em','1em/**/','1em\\'])assert.throws(()=>validateStockFontSize(value),value);
+ for(const value of ['Georgia','"Open Sans", serif','"comment /* inside closed string"','G\\65 orgia'])validateStockFontFamily(value);
+ validateStockFontSize('1em');
+});
