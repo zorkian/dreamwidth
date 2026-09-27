@@ -65,6 +65,10 @@ export interface SourceStyleConfiguration {
 
 export interface StandaloneStartupConfig {
     readonly schema: 1;
+    readonly nativePublicUrls?: {
+        readonly siteDomain: {readonly base64:string;readonly utf8:boolean};
+        readonly knownHttpsSites: readonly {readonly base64:string;readonly utf8:boolean}[];
+    };
     readonly listener: {readonly host: string; readonly port: number};
     readonly artifactPath: string;
     // Public config is completed with resolved placeholder attribute text before
