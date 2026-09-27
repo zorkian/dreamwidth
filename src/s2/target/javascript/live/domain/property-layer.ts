@@ -17,9 +17,19 @@ import {Unsupported} from "../policy/content";
 export type CustomtextProperties = Partial<Record<
     "module_customtext_show" | "module_customtext_order" | "module_customtext_section" |
     "text_module_customtext" | "text_module_customtext_url" | "text_module_customtext_content",
-    string | number>> & Partial<Record<"color_page_background" | "font_base" | "module_tags_show" | "module_tags_order", string | number>>;
+    string | number>> & Partial<Record<"color_page_background" | "font_base" | "module_tags_show" | "module_tags_order" |
+    "module_userprofile_show" | "module_userprofile_order" | "module_userprofile_section" |
+    "module_links_show" | "module_links_order" | "module_links_section" |
+    "module_pagesummary_show" | "module_pagesummary_order" | "module_pagesummary_section" |
+    "module_calendar_show" | "module_calendar_order" | "module_calendar_section" |
+    "module_tags_section", string | number>>;
 
 const types: Record<string,string> = {
+    module_userprofile_show:"bool", module_userprofile_order:"int", module_userprofile_section:"string",
+    module_links_show:"bool", module_links_order:"int", module_links_section:"string",
+    module_pagesummary_show:"bool", module_pagesummary_order:"int", module_pagesummary_section:"string",
+    module_calendar_show:"bool", module_calendar_order:"int", module_calendar_section:"string",
+    module_tags_section:"string",
     color_page_background:"Color", font_base:"string", module_tags_show:"bool", module_tags_order:"int",
     module_customtext_show:"bool", module_customtext_order:"int", module_customtext_section:"string",
     text_module_customtext:"string", text_module_customtext_url:"string", text_module_customtext_content:"string",

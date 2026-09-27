@@ -41,6 +41,23 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    if(row.state==='missing')assert.equal(row.rendered,'zvi');
    else assert.ok(row.rendered.includes("lj:user='zvi'"));
  }
+ for(const row of rows.filter((row:any)=>row.name==='module-properties')) {
+   assert.deepEqual({...readPropertyLayer(row.compiled,990004)},row.values);
+   assert.equal(Object.keys(row.values).length,13);assert.equal(row.values.module_links_order,9);
+   for(const bad of [row.compiled.replace('"module_links_order",9','"module_links_order",1+8'),
+     row.compiled.replace('"module_links_show",1','"module_links_show",2'),
+     row.compiled.replace('"module_links_section","two"','"module_links_section",1'),
+     row.compiled.replace('"module_links_order"','"unknown_order"'),row.compiled+'# trailing'])
+       assert.throws(()=>readPropertyLayer(bad,990004));
+ }
+ for(const row of rows.filter((row:any)=>row.name==='module-placement')) {
+   if(row.case==='collision')assert.deepEqual(row.sections.one[2],['links']);
+   if(row.case==='none')assert.deepEqual(row.sections.none[2],['userprofile']);
+   if(row.case==='seeded-negative')assert.deepEqual(row.sections.one[1],['userprofile']);
+   if(row.case.endsWith('negative')&&row.case!=='seeded-negative')assert.match(row.error,/non-creatable array/);
+   else assert.equal(row.error,'');
+   if(row.case==='credit-slot')assert.ok(Object.values(row.sections).some((section:any)=>section.some((item:any)=>item?.[0]==='credit')));
+ }
  const user=rows.find((row:any)=>row.name==='user-after-theme');
  assert.deepEqual({...readPropertyLayer(user.compiled,980005)}, {color_page_background:'#123456',font_base:'Georgia',module_tags_show:0,module_tags_order:-1});
  for(const row of rows.filter((row:any)=>row.name==='color')) {

@@ -183,6 +183,63 @@ test('EasyRead+Aqua actual selected SQL, comments, native fallback CSS and ident
      assert.equal(await store.revalidateFingerprint(baseline),true);
    }
    if(process.env.S2_STYLES_BROWSER_OUTPUT)await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread');
+   await admin.query(`INSERT INTO ${table(c,'links')} (journalid,ordernum,parentnum,url,title,hover) VALUES(900001,1,0,'/about','Placement link','')`);
+   // Exactly the new placement literals, independent of literal-set ordering.
+   const placement=user.replace('1;\n# end.\n',[
+     'register_set(980005,"module_userprofile_show",0);',
+     'register_set(980005,"module_userprofile_order",1);',
+     'register_set(980005,"module_userprofile_section","none");',
+     'register_set(980005,"module_links_show",1);',
+     'register_set(980005,"module_links_order",2);',
+     'register_set(980005,"module_links_section","two");',
+     'register_set(980005,"module_pagesummary_show",1);',
+     'register_set(980005,"module_pagesummary_order",4);',
+     'register_set(980005,"module_pagesummary_section","two");',
+     'register_set(980005,"module_calendar_show",1);',
+     'register_set(980005,"module_calendar_order",1);',
+     'register_set(980005,"module_calendar_section","two");',
+     'register_set(980005,"module_tags_section","two");','1;','# end.',''
+   ].join('\n'));
+   await set(placement);
+   for(const url of ['/users/ordinary6/','/users/ordinary6/76801.html']) {
+     const response=await get(url);assert.equal(response.statusCode,200,response.body);
+     assert.ok(!response.body.includes('module-userprofile'));
+     assert.ok(response.body.includes('Placement link'));assert.ok(response.body.includes('module-calendar'));assert.ok(response.body.includes('Monthly calendar'));assert.ok(response.body.includes('title="300 entries"'));
+     assert.ok(!response.body.includes('302 entries'));assert.ok(!response.body.includes('Foreign same ID'));
+     assert.ok(!response.body.includes('HIDDEN_EASYREAD_COMMENT'));
+     assert.ok(response.body.indexOf('module-calendar')<response.body.indexOf('module-pagesummary'));
+   }
+   if(process.env.S2_STYLES_BROWSER_OUTPUT)await stylesBrowser((await get('/users/ordinary6/76801.html')).body,8081,'easyread',true);
+   for(const bad of [placement.replace('"module_calendar_section","two"','"module_calendar_section","unknown"'),
+     placement.replace('"module_calendar_show",1','"module_calendar_show",2'),
+     placement.replace('"module_calendar_order",1','"module_calendar_order",1+1'),placement+'print "unsafe";']) {
+     await set(bad);assert.equal((await get()).statusCode,422);
+   }
+   const originalPlacementRender=Renderer.prototype.render;
+   const placementMutation=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,...args:Parameters<Renderer['render']>) {
+     const html=await originalPlacementRender.apply(this,args);
+     await set(placement.replace('"module_calendar_order",1','"module_calendar_order",3'));return html;
+   });
+   await set(placement);
+   try{assert.equal((await get()).statusCode,409);}finally{placementMutation.mock.restore();}
+   await set(placement);assert.equal((await get()).statusCode,200);
+   await set(placement.replace('"module_userprofile_show",0','"module_userprofile_show",1').replace('"module_userprofile_section","none"','"module_userprofile_section","two"').replace('"module_userprofile_order",1','"module_userprofile_order",3'));
+   const shown=await get();assert.equal(shown.statusCode,200,shown.body);assert.ok(shown.body.includes('module-userprofile'));
+   await set(placement.replace('"module_calendar_section","two"','"module_calendar_section","none"'));
+   const invisible=await get();assert.equal(invisible.statusCode,200);assert.ok(!invisible.body.includes('module-calendar'));
+   await set(placement.replace('"module_calendar_order",1','"module_calendar_order",-1').replace('"module_calendar_section","two"','"module_calendar_section","none"'));
+   assert.equal((await get()).statusCode,422,'Negative assignment to empty none fails rather than hiding it');
+   await set(placement);assert.equal((await get()).statusCode,200,'Valid page after index refusal');
+   await set(placement.replace('"module_links_order",2','"module_links_order",-1'));
+   const negative=await get();assert.equal(negative.statusCode,200,negative.body);
+   assert.ok(negative.body.includes('Placement link'));assert.ok(negative.body.includes('module-calendar'));
+   // Earlier native navlinks at index10 seed this section, so -1 targets10,
+   // not calendar at1. Preserve assignment-time length rather than sorting.
+   // Credit executes after links in modules_init and overwrites the shared slot.
+   await set(placement.replace('"module_links_order",2','"module_links_order",15'));
+   const collision=await get();assert.equal(collision.statusCode,200,collision.body);
+   assert.ok(collision.body.includes('module-credit'));assert.ok(!collision.body.includes('Placement link'));
+   await set(user);
    for(const [id,name] of [[900003,'rb'],[900004,'krja']] as const) {
      await admin.query(`INSERT INTO ${table(g,'user')} (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,opt_forcemoodtheme,moodthemeid,dversion,caps) VALUES(?,?,0,'N','V','P','Credit','Y','all','N',1,10,2)`,[id,name]);
      await admin.query(`INSERT INTO ${table(g,'useridmap')} (userid,user) VALUES(?,?)`,[id,name]);

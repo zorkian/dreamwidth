@@ -27,6 +27,7 @@
 import { Context, cleanTrustedSafeChunk, builtin } from "../../runtime/s2runtime";
 import { instantiate, StockLayer } from "./artifact";
 import { callbacks } from "./builtins";
+import { Unsupported } from "../policy/content";
 import { prepare } from "./prepare";
 import { head, hostData } from "./host";
 import type { Artifact, RenderContentPreparation, RenderInput } from "./types";
@@ -145,9 +146,9 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     const section=():unknown[]=>new Proxy([], {set(target,key,value) {
         if(typeof key==='string'&&/^-?[0-9]+$/.test(key)) {
             let index=Number(key);
-            if(!Number.isSafeInteger(index)||Math.abs(index)>10000)throw new Error('Module index limit');
+            if(!Number.isSafeInteger(index)||Math.abs(index)>10000)throw new Unsupported();
             if(index<0)index+=target.length;
-            if(index<0)throw new Error('Non-creatable module index');
+            if(index<0)throw new Unsupported();
             return Reflect.set(target,String(index),value);
         }
         return Reflect.set(target,key,value);
