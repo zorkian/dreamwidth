@@ -685,14 +685,14 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 activeIds.push(...(ids.length>max?ids.slice(0,Math.max(0,Math.trunc(max-1)+1)):ids));
                 for(const text of activeIds) {
                     const id=arrayIndex(scalarNumber(NativeString.bytes(Buffer.from(text,"latin1"))));
-                    const item=id>>8n,anum=Number(id&255n);
+                    const item=id>>8n;
                     if(item<=0n || item>BigInt(Number.MAX_SAFE_INTEGER)) {sticky.push(null);continue;}
                     const rows=(await sql<Row>`SELECT journalid,jitemid,anum,posterid,eventtime,logtime,rlogtime,revttime,
                         year,month,day,security,CAST(allowmask AS CHAR) AS allowmask,replycount,compressed
                         FROM log2 WHERE journalid=${ownerId} AND jitemid=${Number(item)} LIMIT 2`.execute(connection)).rows;
                     if(rows.length>1)unsupported();
                     const row=rows[0];
-                    sticky.push(row && number(row.anum,0,255)===anum?row:null);
+                    sticky.push(row??null);
                 }
             }
         }
