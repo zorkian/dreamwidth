@@ -54,6 +54,23 @@ function cloneData(value: unknown, seen = new Map<object, unknown>()): unknown {
     return copy;
 }
 
+export interface InvocationClock { nowMilliseconds(): number; }
+export type NativeRunOrigin = 'top-level' | 'plural' | 'ordinal';
+const nativeSites = new WeakMap<Layer, Map<number, object>>();
+const functionEntries = new WeakMap<S2Function, object>();
+const hostSites = Object.freeze({
+    'top-level': Object.freeze({}), plural: Object.freeze({}), ordinal: Object.freeze({}),
+    runEval: Object.freeze({}), runCall: Object.freeze({}),
+});
+function nativeSite(layer: Layer, line: number): object {
+    if (!Number.isSafeInteger(line) || line < 1) throw new Error('Invalid native COP');
+    let sites = nativeSites.get(layer);
+    if (!sites) { sites = new Map(); nativeSites.set(layer, sites); }
+    let site = sites.get(line);
+    if (!site) { site = Object.freeze({}); sites.set(line, site); }
+    return site;
+}
+
 export class Layer {
     scalarProfile?: NativeProfile;
     source = "<unknown S2 layer>";
@@ -86,8 +103,9 @@ export class Layer {
         this.globalFunctions.set(signature, {returntype, docstring, attrs});
     }
 
-    registerFunction(names: string[], factory: () => S2Function): void {
+    registerFunction(names: string[], factory: () => S2Function, nativeEntryLine?: number): void {
         const implementation = factory();
+        if (nativeEntryLine !== undefined) functionEntries.set(implementation, nativeSite(this, nativeEntryLine));
         for (const name of names) this.functions.set(name, implementation);
     }
 
@@ -262,6 +280,11 @@ export const runtime = {
         return runtime.reverseNative(value);
     },
     recoveryCheckpoint(context: Context): void { context.recoveryCheckpoint(); },
+    executionCheckpoint(context: Context): void { context.checkExecutionDeadline(); },
+    nativeCOP(context: Context, layer: Layer, line: number): void { context.setNativeCOP(layer, line); },
+    nativeFunctionEntry(fn: S2Function, layer: Layer, line: number): void {
+        functionEntries.set(fn, nativeSite(layer, line));
+    },
     makeHash(pairs: readonly (readonly [unknown, unknown])[]): Record<string, unknown> {
         const hash: Record<string, unknown> = Object.create(null);
         const identities = new Map<string, NativeString>();
@@ -584,7 +607,12 @@ export class Context {
     private readonly functions = new Map<string, S2Function>();
     private readonly classes = new Map<string, string | undefined>();
     private readonly methodFrames: string[] = [];
-    private readonly callFrames: string[] = [];
+    private readonly callFrames: {label: string; cop: object | string}[] = [];
+    private readonly nativeHostFrames: object[] = [];
+    private runDepth = 0;
+    private lastDepthCheck = 0;
+    private readonly now: () => number;
+    private readonly loadedLayers: Set<Layer>;
     private deadline = 0;
     private functionCalls = 0;
     private printCalls = 0;
@@ -598,8 +626,11 @@ export class Context {
         private readonly safeOutput: (text: string) => string = runtime.notags,
         private readonly maxRecursion = 500,
         private readonly nativeSink?: NativeSink,
+        clock?: InvocationClock,
     ) {
         if (!Number.isSafeInteger(maxRecursion) || maxRecursion < 1) throw new Error("Invalid S2 recursion bound");
+        this.now = clock ? clock.nowMilliseconds.bind(clock) : () => performance.now();
+        this.loadedLayers = new Set(layers);
         this.sinkOwnsPrintCheckpoints = nativeSink?.ownsPrintCheckpoints === true;
         this.scalarProfile=layers.find(layer=>layer.scalarProfile)?.scalarProfile;
         contextBrands.add(this);
@@ -683,27 +714,35 @@ export class Context {
         return (context, ...args) => this.invoke(name, implementation, context, args);
     }
 
+    checkExecutionDeadline(): void {
+        if (this.deadline && this.now() > this.deadline) raiseNativeExecutionStop("deadline");
+    }
+
     recoveryCheckpoint(): void {
         // Native run_function defaults to four seconds. DW configuration sets
         // MAX_RECURSION to500, overriding check_depth's standalone fallback50.
-        // Recovered loops call this same seam;
-        // the outer worker deadline remains an independent fail-stop boundary.
-        if (this.deadline && performance.now() > this.deadline) raiseNativeExecutionStop("deadline");
-        const counts = new Map<string, number>();
-        for (const frame of this.callFrames) {
-            const count = (counts.get(frame) ?? 0) + 1;
+        // Entry and print checkpoints use the native depth cadence; loop
+        // backedges check only the independent execution deadline.
+        const now = this.now();
+        this.checkExecutionDeadline();
+        // S2.pm513 is a liveness window, not a throttle: a lapse never refreshes it.
+        if (this.lastDepthCheck < now - 150) return;
+        this.lastDepthCheck = now;
+        const counts = new Map<object | string, number>();
+        for (const site of [...this.nativeHostFrames, ...this.callFrames.map(frame => frame.cop)]) {
+            const count = (counts.get(site) ?? 0) + 1;
             if (count >= this.maxRecursion) raiseNativeExecutionStop("recursion");
-            counts.set(frame, count);
+            counts.set(site, count);
         }
     }
 
     private invoke(name: string, implementation: S2Function, context: Context, args: unknown[]): unknown {
-        if (!this.callFrames.length) {
-            this.deadline = performance.now() + 4000;
+        if (!this.callFrames.length && !this.runDepth) {
+            this.deadline = this.now() + 4000;
             this.functionCalls = 0;
-            this.printCalls = 0;
+            this.lastDepthCheck = this.now();
         }
-        this.callFrames.push(name);
+        this.callFrames.push({label: name, cop: functionEntries.get(implementation) ?? name});
         try {
             if (++this.functionCalls % 16 === 0) this.recoveryCheckpoint();
             return scalarCopy(implementation(context, ...args.map(scalarCopy)));
@@ -711,7 +750,7 @@ export class Context {
             this.callFrames.pop();
             // S2::run_function cancels its alarm before s2_run prints diagnostics.
             // The enclosing worker/page deadline remains independently active.
-            if (!this.callFrames.length) this.deadline = 0;
+            if (!this.callFrames.length && !this.runDepth) this.deadline = 0;
         }
     }
 
@@ -748,13 +787,39 @@ export class Context {
         throw new Error(`${location}: undefined method ${type}::${name}`);
     }
 
-    runFunction(name: string): void {
-        this.getFunction(name)(this);
+    /** Installed compiler/recovery only; source text cannot nominate filenames. */
+    setNativeCOP(layer: Layer, line: number): void {
+        if (!contextBrands.has(this) || !this.loadedLayers.has(layer) || !this.callFrames.length)
+            throw new Error('Native COP requires active loaded Context frame');
+        this.callFrames[this.callFrames.length - 1]!.cop = nativeSite(layer, line);
     }
 
-    runMethod(value: unknown, name: string): void {
-        this.getMethod(value, name, { source: "<page>" } as Layer, 0)(this, value);
+    runBoundary<T>(operation: () => T, origin: NativeRunOrigin = 'top-level'): T {
+        if (!['top-level', 'plural', 'ordinal'].includes(origin)) throw new Error('Unknown native run origin');
+        const outer = this.runDepth === 0 && this.callFrames.length === 0;
+        if (outer) this.deadline = this.now() + 4000;
+        this.functionCalls = 0;
+        this.lastDepthCheck = this.now();
+        this.runDepth++;
+        // Native caller() retains host/run/eval frames across nested re-entry.
+        this.nativeHostFrames.push(hostSites[origin], hostSites.runEval, hostSites.runCall);
+        try { return operation(); }
+        finally {
+            this.nativeHostFrames.splice(-3);
+            this.runDepth--;
+            if (outer) this.deadline = 0;
+        }
     }
+
+    runNativeFunction(name: string, args: readonly unknown[] = [], origin: NativeRunOrigin = 'top-level'): unknown {
+        // Never string-wrap an unknown inner failure; private stop identity survives.
+        return this.runBoundary(() => this.getFunction(name)(this, ...args), origin);
+    }
+    runFunction(name: string): void { this.runNativeFunction(name); }
+    runMethod(value: unknown, name: string): void {
+        this.runBoundary(() => this.getMethod(value, name, {source: '<page>'} as Layer, 0)(this, value));
+    }
+
 }
 
 export const s2 = {
