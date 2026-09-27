@@ -118,7 +118,7 @@ export function commentCapability(cap:import('../startup-types').SourceCapabilit
 }
 
 /** Source badge presentation, independent of journal-owner admission. */
-export function authorBadge(author:import('../contracts').RawCommentAuthor,config:PublicAppConfig,
+export function authorBadge(author:Pick<import('../contracts').RawCommentAuthor,'statusvis'|'clusterid'|'caps'>,config:PublicAppConfig,
     caps:import('../startup-types').SourceCapabilities):{badgeKind:"personal"|"staff";badgeDeleted:boolean} {
     if(config.headIconHookConfigured!==false)throw new SnapshotError('unsupported');
     let readonly=false;

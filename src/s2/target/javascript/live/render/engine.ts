@@ -24,7 +24,7 @@
 //
 
 
-import { Context, cleanTrustedSafeChunk } from "../../runtime/s2runtime";
+import { Context, cleanTrustedSafeChunk, builtin } from "../../runtime/s2runtime";
 import { instantiate, StockLayer } from "./artifact";
 import { callbacks } from "./builtins";
 import { prepare } from "./prepare";
@@ -58,16 +58,25 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     content={...originalContent,...(originalContent.customtext?{customtext(source:string) {
         const value=originalContent.customtext!(source);cleaned.add(value);return value;
     }}:{})};
-    const layers = instantiate(artifact);
+    const layers = instantiate(artifact,input.journal.theme);
+    if(input.journal.inlineStylesheet&&(!content.stylesheet||!content.fontFamily||input.config.cssCleanerHookConfigured!==false))
+        throw new Error("Missing qualified stylesheet cleaner/config");
     if(input.journal.customtextProperties) {
         const data=new StockLayer();
         for(const [name,value] of Object.entries(input.journal.customtextProperties)) {
             const metadata=layers.map(layer=>layer.metadata.get('_'+name)).find(Boolean);
-            if(!metadata||typeof value!==(metadata.type==='string'?'string':'number'))throw new Error('Invalid property type');
-            data.setProperty('_'+name,value);
+            if(!metadata||typeof value!==(metadata.type==='string'||metadata.type==='Color'?'string':'number'))throw new Error('Invalid property type');
+            if(name==='font_base')content.fontFamily!(String(value));
+            const prepared=metadata.type==='Color'?builtin.construct_Color(String(value)):value;
+            if(prepared===undefined)throw new Error("Invalid Color");
+            data.setProperty('_'+name,prepared);
         }
         layers.push(data);
     }
+    let preparingCredit=false;
+    const creditChunks:string[]=[];
+    let cssDepth=0;
+    let cssBuffer="";
     let printing = false;
     let html = "";
     let bytes = 0;
@@ -84,6 +93,11 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         })():null;
     const ctx = new Context(layers, text => {
         if (!printing) return;
+        if(cssDepth) {
+            cssBuffer+=text;
+            if(Buffer.byteLength(cssBuffer)>65536)throw new Error("Stylesheet byte limit");
+            return;
+        }
         // Only the unchanged stock expand-all handler receives the named
         // transport-origin adaptation. The fallback href stays canonical.
         if(expansion)text=text.replaceAll(expansion.original,expansion.replacement);
@@ -94,16 +108,36 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         SITEROOT: c.siteRoot, PALIMGROOT: c.palImgRoot, SITENAME: c.siteName,
         SITENAMESHORT: c.siteNameShort, SITENAMEABBREV: c.siteNameAbbrev,
         IMGDIR: c.imgPrefix, STYLES_IMGDIR: c.imgPrefix + "/styles", STATDIR: c.statPrefix,
-    }, callbacks(page, host), text => finalized.has(text)?text:cleanTrustedSafeChunk(text, {
+    }, {...callbacks(page, host),
+        _start_css:()=>{if(!input.journal.inlineStylesheet||++cssDepth>16)throw new Error("CSS capture limit");},
+        _end_css:()=>{
+            if(!cssDepth)throw new Error("Unbalanced CSS capture");
+            if(--cssDepth)return;
+            const css=content.stylesheet!(cssBuffer);cssBuffer="";ctx.print(css);
+        }}, text => {
+        if(preparingCredit&&text.startsWith("<ul class='module-list'>")) {
+            if(creditChunks.length||Buffer.byteLength(text)>65536||!text.endsWith('</ul>'))
+                throw new Error("Unexpected theme credit safe emission");
+            creditChunks.push(text);return "";
+        }
+        if(cssDepth){cssBuffer+=text;if(Buffer.byteLength(cssBuffer)>65536)throw new Error("Stylesheet byte limit");return "";}
+        return finalized.has(text)?text:cleanTrustedSafeChunk(text, {
         href: String(page._stylesheet_url), decision: 1,
-    }));
+    });});
     // The pinned core2 stack has no core1 renamed properties. Group overrides
     // still come from compiled source defaults, never from a prepared fixture.
     for (const [key, value] of Object.entries(ctx.prop._grouped_property_override ?? {})) {
         if (typeof value !== "string") throw new Error("Invalid stock property override");
         if (ctx.prop["_" + value]) ctx.prop["_" + key] = ctx.prop["_" + value];
     }
+    // Native local argument autovivification leaves absent caller Colors null.
+    // The new stylesheet path needs readable fields while preserving isnull.
+    if(input.journal.inlineStylesheet)for(const layer of layers)for(const [name,metadata] of layer.metadata) {
+        if(metadata.type==='Color'&&ctx.prop[name]===undefined)
+            ctx.prop[name]={'.type':'Color','.isnull':true,_as_string:''};
+    }
     ctx.runFunction("prop_init()");
+    if(input.journal.inlineStylesheet)ctx.prop._external_stylesheet=0;
     // Perl autovivifies these nested array lvalues in modules_init. Provision
     // empty containers from live source defaults, then execute the unchanged
     // function which decides placement and order itself.
@@ -170,6 +204,15 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
         }
         finalized.add(`<li class="module-list-item"><span class="pagesummary-poster">${label}</span> - <span class="pagesummary-subject">${icon}<a href="#${comment.anchor}" ${display}</li>\n`);
     }
+    // Execute only the pinned credit helper against prepared immutable catalog
+    // and badge facts. Normal output is suppressed; later mutations cannot
+    // register new bytes. No other module-list or body chunk gains authority.
+    if(input.journal.theme) {
+        preparingCredit=true;
+        try {ctx.runFunction('print_module_credit()');}finally{preparingCredit=false;}
+        if(creditChunks.length!==1)throw new Error("Missing theme credit safe emission");
+        finalized.add(creditChunks[0]!);
+    }
     let metadata: ReturnType<RenderContentPreparation["metadata"]> | undefined;
     if (input.page.kind === "entry") {
         const ditemid = input.page.ditemid;
@@ -186,5 +229,6 @@ export function renderStock(artifact: Artifact, input: RenderInput, maxBytes: nu
     const footer = "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
     html = html.slice(0, ending) + footer + html.slice(ending);
     if (Buffer.byteLength(html) > maxBytes) throw new Error("Render output limit");
+    if(cssDepth||cssBuffer)throw new Error("Unbalanced CSS capture");
     return html;
 }
