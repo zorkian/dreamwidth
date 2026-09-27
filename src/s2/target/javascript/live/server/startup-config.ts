@@ -64,7 +64,16 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     const root = record(value);
     record(root, ["schema", "listener", "artifactPath", "app", "placeholder",
         "database", "capabilities", "styles",
-        ...(Object.hasOwn(root,"nativePublicUrls")?["nativePublicUrls"]:[])]);
+        ...(Object.hasOwn(root,"nativePublicUrls")?["nativePublicUrls"]:[]),
+        ...(Object.hasOwn(root,"sourceFeatureFlags")?["sourceFeatureFlags"]:[]),
+        ...(Object.hasOwn(root,"sourceFeatureFlagsIdentity")?["sourceFeatureFlagsIdentity"]:[])]);
+    if(root.sourceFeatureFlagsIdentity!==undefined) {
+        if(typeof root.sourceFeatureFlagsIdentity!=="string"||! /^[a-f0-9]{64}$/.test(root.sourceFeatureFlagsIdentity))invalid();
+    }
+    if(root.sourceFeatureFlags!==undefined) {
+        const flags=record(root.sourceFeatureFlags,["memories","tellafriend","esn"]);
+        for(const value of Object.values(flags))boolean(value);
+    }
     if(root.nativePublicUrls!==undefined) {
         const facts=record(root.nativePublicUrls,["siteDomain","knownHttpsSites"]);
         const frame=(input:unknown)=>{

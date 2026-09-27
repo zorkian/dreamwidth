@@ -44,9 +44,10 @@ function fixture(dir: string, tail = ""): string {
     mkdirSync(path.join(home, "bin/upgrading"), {recursive: true});
     writeFileSync(path.join(site, ".dir_scope"), "private\n");
     symlinkSync(path.join(repo, "cgi-bin"), path.join(home, "cgi-bin"));
+    symlinkSync(path.join(repo, "src"), path.join(home, "src"));
     writeFileSync(path.join(home, "bin/upgrading/en.dat"), "img.placeholder=Source fixture\n");
     writeFileSync(path.join(site, "etc/config-private.pl"), `package LJ;
-$IS_DEV_SERVER=0; $DOMAIN=''; $PROTOCOL='https'; $SITEROOT='https://app.example.test';
+$IS_DEV_SERVER=0; $_T_CONFIG=1; $DOMAIN=''; $PROTOCOL='https'; $SITEROOT='https://app.example.test';
 $DEFAULT_LANG='en'; @CLUSTERS=(7,9); %CLUSTER_PAIR_ACTIVE=(7=>'B');
 %DBINFO=(master=>{host=>'db.example.test',dbname=>'custom_global',user=>'fixture',pass=>'${secret}'},
   fallback=>{host=>'fallback.example.test',user=>'fixture',pass=>'${secret}',role=>{cluster9=>0}},
@@ -358,4 +359,18 @@ LJ::Hooks::register_hook('check_cap_readonly',sub{die 'must-not-execute'});`);
         (v:any)=>v.capabilities.authorReadonlyClusters[0].advisory='unknown']) {
         const changed=JSON.parse(JSON.stringify(value));mutate(changed);assert.throws(()=>validateStartupConfig(changed));
     }
+}));
+
+
+test("installed feature helper calls zero-argument CODE and blocks swallowed DB access",()=>temporary(dir=>{
+    const home=fixture(dir,`$DISABLED{memories}=sub{die 'unexpected arguments' if @_;return 0;};
+$DISABLED{tellafriend}=sub{die 'unexpected arguments' if @_;return 1;};$DISABLED{esn}='0';`);
+    const output=path.join(dir,"features.json");
+    const exported=exportSite(home,output);assert.equal(exported.status,0,exported.stderr);
+    assert.deepEqual(readStartupConfig(output).sourceFeatureFlags,{memories:true,tellafriend:false,esn:true});
+    assert.match(readStartupConfig(output).sourceFeatureFlagsIdentity!,/^[a-f0-9]{64}$/);
+    const unsafeHome=fixture(path.join(dir,"unsafe"),`$DISABLED{memories}=sub{eval{DBI->connect('ignored');};return 0;};`);
+    const rejected=exportSite(unsafeHome,path.join(dir,"unsafe.json"));
+    assert.notEqual(rejected.status,0);assert.equal(existsSync(path.join(dir,"unsafe.json")),false);
+    assert.match(rejected.stderr,/Feature setup attempted a database connection/);
 }));
