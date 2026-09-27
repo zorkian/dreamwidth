@@ -1162,7 +1162,12 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
                 CAST(caps AS CHAR) AS caps,defaultpicid,dversion
                 FROM user WHERE userid IN (${sql.join(ids)}) ORDER BY userid LIMIT 10001`.execute(connection)).rows;
-            if(rows.length!==ids.length)unsupported();
+            // Native load_userids_multiple can leave a referenced poster
+            // absent. EntryPage then creates a blank UserLite and treats the
+            // visible comment as anonymous. The general byte-view path keeps
+            // that witnessed absence; the reviewed legacy API retains its gate.
+            if(rows.length>ids.length||!byteView&&rows.length!==ids.length)unsupported();
+            if(!rows.length)return rows;
             const maps=(await sql<Row>`SELECT userid,user FROM useridmap WHERE userid IN (${sql.join(ids)})
                 OR user IN (${sql.join(rows.map(row=>requiredString(row.user)))}) ORDER BY userid,user LIMIT 20001`.execute(connection)).rows;
             if(maps.length!==rows.length||rows.some(row=>!maps.some(m=>m.userid===row.userid&&m.user===row.user)))unsupported();
@@ -1173,7 +1178,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             if(names.length>4096)unsupported();
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+            const timezoneIds=authors.filter(row=>(byteView||row.statusvis!=='S')&&
+                row.statusvis!=='X'&&number(row.clusterid,0)>0)
                 .map(row=>number(row.userid,1));
             const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
@@ -1228,9 +1234,11 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const id=number(row.userid,1),suspended=row.statusvis==='S';
             const cluster=number(row.clusterid,0),expunged=row.statusvis==='X'||cluster===0;
             let timezone:string|null=null,pictures:RawUserpics={pictures:[],mappings:[]};
-            if(!suspended&&cluster>0) {
+            if((!suspended||byteView)&&cluster>0) {
                 if(BigInt(unsigned(row.caps,16))&BigInt(this.config.capabilities.moveInProgressMask))unsupported();
-                const details=await this.databases.snapshot(cluster,['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'],async connection=>{
+                const tables=suspended?['userproplite2','userpropblob']:
+                    ['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'];
+                const details=await this.databases.snapshot(cluster,tables,async connection=>{
                     const prop=global.timezone[0]?.upropid;
                     if(!expunged&&prop!==undefined) {
                         const rows=(await sql<Row>`SELECT HEX(value) AS value_stored,HEX(CONVERT(value USING latin1)) AS value_original,
@@ -1242,7 +1250,9 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                         if(values.length>1)unsupported();
                         if(values[0])timezone=decodedColumn(values[0],'value','comment-author:'+id+':timezone',raw,1024,true,values[0].value_original===undefined);
                     }
-                    return this.loadUserpics(connection,id,number(row.dversion),raw);
+                    // A page-loaded suspended poster still supplies native
+                    // time_poster, but its picture rows remain unread.
+                    return suspended?{pictures:[],mappings:[]}:this.loadUserpics(connection,id,number(row.dversion),raw);
                 });pictures=details;
                 pictureRows+=pictures.pictures.length+pictures.mappings.length;if(pictureRows>10000)unsupported();
             }
@@ -1255,7 +1265,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const authors=await authorFacts(connection);
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+            const timezoneIds=authors.filter(row=>(byteView||row.statusvis!=='S')&&
+                row.statusvis!=='X'&&number(row.clusterid,0)>0)
                 .map(row=>number(row.userid,1));
             const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
