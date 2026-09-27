@@ -31,6 +31,8 @@ export interface NativeProfile {
     readonly unicodeVersion: string;
     readonly word: NativeCharacterClass;
     readonly space: NativeCharacterClass;
+    readonly digit: NativeCharacterClass;
+    readonly asciiLetterInsensitive: NativeCharacterClass;
     readonly lower: NativeCaseMap;
     readonly upper: NativeCaseMap;
     readonly title: NativeCaseMap;
@@ -51,7 +53,7 @@ export function mapNativeCase(codepoint: number, table: NativeCaseMap): readonly
 
 // Perl /d selects its native byte class until the scalar has the UTF-8 flag.
 // These inversion lists come from the same installed Perl as the compiled code.
-export function nativeCharacterClass(profile: NativeProfile, kind: 'word' | 'space',
+export function nativeCharacterClass(profile: NativeProfile, kind: 'word' | 'space' | 'digit' | 'asciiLetterInsensitive',
     codepoint: number, utf8: boolean): boolean {
     if (!Number.isInteger(codepoint) || codepoint < 0 || codepoint > 0x10ffff) return false;
     const ranges = profile[kind][utf8 ? 'unicode' : 'byte'];

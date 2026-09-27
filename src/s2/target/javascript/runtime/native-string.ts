@@ -120,6 +120,18 @@ export function byteCharacters(value: NativeString): NativeString[] {
     return Array.from(data.bytes, byte => NativeString.bytes(Uint8Array.of(byte)));
 }
 
+/** Installed character-class callers consume one branded native character. */
+export function characterCodepoint(value: NativeString): bigint {
+    const data = payload(value);
+    if (!data.utf8) {
+        if (data.bytes.length !== 1) throw new Error('Expected one native character');
+        return BigInt(data.bytes[0]!);
+    }
+    const spans = utf8Spans(data.bytes);
+    if (spans.length !== 1) throw new Error('Expected one native character');
+    return decodeCodepoint(spans[0]!);
+}
+
 export function reverseString(value: NativeString): NativeString {
     const data = payload(value);
     if (!data.utf8) return NativeString.bytes(Buffer.from(data.bytes).reverse());
