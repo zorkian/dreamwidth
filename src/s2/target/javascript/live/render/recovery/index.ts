@@ -20,7 +20,7 @@ import {instantiate} from "./execute";
 export type LayerType = "core"|"i18nc"|"layout"|"theme"|"i18n"|"user";
 export interface RecoveryInput {id:number;ownerId:number;systemUserId:number;parentId:number;type:LayerType;activeBytes:Uint8Array;}
 export type RecoveryResult = {kind:"recovered";id:number;activeSha256:string;abi:number;
-    variable:"recovered_layer";code:string;hostCalls:readonly string[]} | {kind:"gap";id:number;reason:string};
+    variable:"recovered_layer";code:string;hostCalls:readonly string[]} | {kind:"gap";id:number;reason:string;deterministic:boolean};
 
 const emittedExecutorNotice = "// execute.ts\n//\n// Declarative lowered-program execution over the S2 runtime ABI.\n//\n// Authors:\n//      Dreamwidth contributors\n//\n// Copyright (c) 2026 by Dreamwidth Studios, LLC.\n//\n// Inherited semantic ports: src/s2/S2.pm registration/context helpers and\n// src/s2/S2/Node*::asPerl generated-language operations.\n//\n// This code was forked from the LiveJournal project owned and operated\n// by Live Journal, Inc. The code has been modified and expanded by\n// Dreamwidth Studios, LLC. These files were originally licensed under\n// the terms of the license supplied by Live Journal, Inc, which can\n// currently be found at:\n//\n// http://code.livejournal.org/trac/livejournal/browser/trunk/LICENSE-LiveJournal.txt\n//\n// In accordance with the original license, this code and all its\n// modifications are provided under the GNU General Public License.\n// A copy of that license can be found in the LICENSE file included as\n// part of this distribution.\n//\n";
 
@@ -165,6 +165,6 @@ export function recoverActiveLayer(input: RecoveryInput, abi: number): RecoveryR
         return {kind:"recovered",id:input.id,abi,variable:"recovered_layer",code,hostCalls,
             activeSha256:createHash("sha256").update(bytes).digest("hex")};
     } catch(error) {
-        return {kind:"gap",id:input.id,reason:error instanceof RecoveryGap ? error.message : "Generated program could not be parsed"};
+        return {kind:"gap",id:input.id,deterministic:error instanceof RecoveryGap,reason:error instanceof RecoveryGap ? error.message : "Generated program could not be parsed"};
     }
 }
