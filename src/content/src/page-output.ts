@@ -60,7 +60,7 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
     };
     let parserBytes=0,titleFallback=false;
     let markupStart=0,markedSection=false;
-    let source="",pendingText="",tagName="",attrName="",attrValue="",tagStart=0;
+    let source="",pendingText="",tagName="",attrName="",attrRawName="",attrValue="",tagStart=0;
     let seq: string[]=[],attrs=new Map<string,string>();
     const eating: string[]=[];
     let style: string|null=null;
@@ -120,14 +120,14 @@ export function createPageOutput(options: PageOutputOptions): PageOutput {
             }
         }
         if(literal.has(name))literalTag=name;
-        seq=[];attrs=new Map();attrName='';attrValue='';
+        seq=[];attrs=new Map();attrName='';attrRawName='';attrValue='';
     };
     const callbacks: TokenizerCallbacks={
         onopentagname:(start,end)=>{tagName=source.slice(start,end);tagStart=start-1;seq=[];attrs=new Map();},
-        onattribname:(start,end)=>{attrName=source.slice(start,end).toLowerCase();attrValue='';},
+        onattribname:(start,end)=>{attrRawName=source.slice(start,end);attrName=attrRawName.toLowerCase();attrValue='';},
         onattribdata:(start,end)=>{attrValue+=source.slice(start,end);},
         onattribentity:()=>{throw new Error("Unexpected tokenizer entity decode");},
-        onattribend:quote=>{if(quote===0)attrValue=attrName;commitAttribute();},
+        onattribend:quote=>{if(quote===0)attrValue=attrRawName;commitAttribute();},
         onopentagend:end=>{startTag(end);markupStart=source.length;},onselfclosingtag:end=>{startTag(end,true);markupStart=source.length;},
         onclosetag:(start,end)=>{closeFallbackTitle();endTag(source.slice(start,end).toLowerCase());markupStart=source.length;},
         ontext:(start,end)=>{pendingText+=source.slice(start,end);markupStart=end;},
