@@ -27,3 +27,11 @@ This is model/session proof, not an ordinary installed-worker or HTTP milestone.
 Installed body/subject cleaners, public helper/resource/hook binding, Entry comments/OG,
 request context and final page postprocessing remain mandatory ongoing work. The held
 subject component is not consumed or replaced with an identity cleaner.
+
+Standard images use an explicit request Context during initialization. Native assigns
+CURR_CTX only after s2_context initialization (LJ/S2.pm139), so initialization-time
+get_image can observe a prior request or fail. Current-Context isolation is a
+deterministic protective difference, not cross-request global parity. At the actual
+s2_run boundary (line328), the render lookup cache resets; Image references already
+attached to prepared models remain aliases, and the next lookup rebuilds from the
+then-current properties. No cache or Context is shared between requests.

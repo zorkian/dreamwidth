@@ -24,7 +24,7 @@ import {initializedRecentCount} from "./general-selection";
 
 const hostNames = new Set<GeneralHostOperation>(["user-lite", "expand-user", "template-error",
     "video-error", "markup-error", "valid-stylesheet", "embed-transform", "expand-site-url",
-    "rewrite-blocked-href", "normalize-image-url"]);
+    "rewrite-blocked-href", "normalize-image-url", "standard-images"]);
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> {
     if (!value || typeof value !== "object" || Array.isArray(value) ||
         Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) {

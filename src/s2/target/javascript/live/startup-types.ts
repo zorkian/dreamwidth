@@ -63,7 +63,21 @@ export interface SourceStyleConfiguration {
     readonly layerRemap: Readonly<Record<string, number>>;
 }
 
+export interface StandardImageConfiguration {
+    readonly prefix:{readonly base64:string;readonly utf8:boolean};
+    readonly images:readonly {readonly name:string;
+        readonly src:{readonly base64:string;readonly utf8:boolean}|null;
+        readonly width:import("../runtime/native-scalar").NativeScalarWire|null;
+        readonly height:import("../runtime/native-scalar").NativeScalarWire|null;
+        readonly altKey:{readonly base64:string;readonly utf8:boolean}|null}[];
+}
+
 export interface StandaloneStartupConfig {
+    readonly nativeLanguageContext?: {
+        readonly defaultLang:{readonly base64:string;readonly utf8:boolean}|null;
+        readonly firstLang:{readonly base64:string;readonly utf8:boolean}|null;
+    };
+    readonly standardImages?:StandardImageConfiguration;
     readonly schema: 1;
     readonly sourceFeatureFlagsIdentity?:string;
     readonly sourceFeatureFlags?:{readonly memories:boolean;readonly tellafriend:boolean;readonly esn:boolean};

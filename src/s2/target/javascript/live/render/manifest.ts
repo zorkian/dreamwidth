@@ -93,7 +93,7 @@ function verifyRuntimeEntry(artifactPath: string, expectedEntry: string): Verifi
             !(file.path.startsWith("app/dist/live/render/") || file.path.startsWith("app/dist/live/policy/") ||
                 runtimeFiles.has(file.path) ||
                 (expectedEntry === "app/dist/live/render/general-worker.js" &&
-                    file.path === "app/dist/live/domain/general-model-primitives.js") ||
+                    ["app/dist/live/domain/general-model-primitives.js","app/dist/live/domain/general-navigation-url.js"].includes(file.path)) ||
                 file.path === "app/package.json" ||
                 file.path.startsWith("app/node_modules/")) ||
             /(?:^|\/)(?:playwright(?:-core)?|@playwright|canvas|typescript)(?:\/|$)/.test(file.path)) {

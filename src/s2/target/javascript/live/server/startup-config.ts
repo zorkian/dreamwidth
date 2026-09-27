@@ -14,6 +14,8 @@
 
 import { constants, closeSync, fstatSync, openSync, readSync } from "node:fs";
 import path from "node:path";
+import {isDeepStrictEqual} from "node:util";
+import {decodeScalar,encodeScalar,type NativeScalarWire} from "../../runtime/native-scalar";
 import type { StandaloneStartupConfig } from "../startup-types";
 
 export class StartupConfigError extends Error {
@@ -64,9 +66,41 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     const root = record(value);
     record(root, ["schema", "listener", "artifactPath", "app", "placeholder",
         "database", "capabilities", "styles",
+        ...(Object.hasOwn(root,"nativeLanguageContext")?["nativeLanguageContext"]:[]),
+        ...(Object.hasOwn(root,"standardImages")?["standardImages"]:[]),
         ...(Object.hasOwn(root,"nativePublicUrls")?["nativePublicUrls"]:[]),
         ...(Object.hasOwn(root,"sourceFeatureFlags")?["sourceFeatureFlags"]:[]),
         ...(Object.hasOwn(root,"sourceFeatureFlagsIdentity")?["sourceFeatureFlagsIdentity"]:[])]);
+    if(root.standardImages!==undefined) {
+        const facts=record(root.standardImages,["prefix","images"]);
+        const frame=(input:unknown)=>{
+            const value=record(input,["base64","utf8"]);
+            const encoded=text(value.base64,21848);boolean(value.utf8);
+            const bytes=Buffer.from(encoded,"base64");
+            if(bytes.length>16384||bytes.toString("base64")!==encoded)invalid();
+        };
+        const scalar=(input:unknown)=>{
+            try {
+                if(JSON.stringify(input).length>32768)invalid();
+                if(!isDeepStrictEqual(encodeScalar(decodeScalar(input as NativeScalarWire)),input))invalid();
+            }catch {invalid();}
+        };
+        frame(facts.prefix);const names=new Set<string>();
+        list(facts.images,value=>{
+            const image=record(value,["name","src","width","height","altKey"]);
+            const name=text(image.name,256);if(names.has(name))invalid();names.add(name);
+            nullable(image.src,frame);nullable(image.altKey,frame);nullable(image.width,scalar);nullable(image.height,scalar);
+        });
+    }
+    if(root.nativeLanguageContext!==undefined) {
+        const context=record(root.nativeLanguageContext,["defaultLang","firstLang"]);
+        for(const value of Object.values(context))nullable(value,input=>{
+            const frame=record(input,["base64","utf8"]);
+            const encoded=text(frame.base64,21848);boolean(frame.utf8);
+            const bytes=Buffer.from(encoded,"base64");
+            if(bytes.length>16384||bytes.toString("base64")!==encoded)invalid();
+        });
+    }
     if(root.sourceFeatureFlagsIdentity!==undefined) {
         if(typeof root.sourceFeatureFlagsIdentity!=="string"||! /^[a-f0-9]{64}$/.test(root.sourceFeatureFlagsIdentity))invalid();
     }
