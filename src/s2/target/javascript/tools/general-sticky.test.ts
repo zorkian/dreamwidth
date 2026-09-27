@@ -50,6 +50,34 @@ test("actual sticky selection prepends visible old/window entries without hidden
         assert.equal(await store.revalidateNativeSelectedFingerprint(first),true);
         const skip=await store.loadNativeSelectedSnapshot(request("ordinary6",{kind:"recent",skip:1,itemshow:3}));
         assert.ok(skip);assert.equal(skip.stickyEntryCount,0);assert.equal(skip.facts.entries.some(entry=>entry.jitemid===1),false);
+        // Native valid() loads by jitemid and replaces the untrusted low byte.
+        const [originalRows]=await admin.query(`SELECT revttime FROM ${table(c,"log2")} WHERE journalid=900001 AND jitemid=1`);
+        const originalReverse=(originalRows as {revttime:number}[])[0]!.revttime;
+        await admin.query(`UPDATE ${table(c,"log2")} SET anum=5,revttime=0 WHERE journalid=900001 AND jitemid=1`);
+        await set("256");
+        const mismatch=await store.loadNativeSelectedSnapshot(request("ordinary6",{kind:"recent",skip:0,itemshow:3}));
+        assert.ok(mismatch);assert.equal(mismatch.stickyEntryCount,1);
+        assert.equal(mismatch.facts.entries[0]?.jitemid,1);
+        assert.equal(mismatch.facts.entries[0]?.anum,5);
+        assert.equal(mismatch.facts.entries.filter(entry=>entry.jitemid===1).length,2);
+        const [nativeRows]=await admin.query(`SELECT * FROM ${table(c,"log2")} WHERE journalid=900001 AND jitemid=1`);
+        const loadingOracle=String.raw`use strict;use warnings;no warnings 'once';
+            use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
+            BEGIN {require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};*DBI::connect_cached=sub{die 'DB forbidden'};}
+            require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::Entry;
+            my $row=decode_json($ARGV[0]);my $u=bless {userid=>900001},'LJ::User';my @reads;
+            no warnings 'redefine';local *LJ::want_user=sub{$u};
+            local *LJ::get_log2_row=sub{push @reads,$_[1];die 'Unexpected row' unless $_[1]==1;return $row;};
+            my $entry=LJ::Entry->new($u,ditemid=>256);my $valid=$entry->valid;
+            print encode_json({valid=>$valid?1:0,jitemid=>$entry->jitemid,anum=>$entry->anum,
+                displayed=>($entry->jitemid<<8)+$entry->anum,reads=>\@reads});`;
+        const loaded=JSON.parse(execFileSync("perl",["-e",loadingOracle,JSON.stringify((nativeRows as unknown[])[0])],
+            {encoding:"utf8",timeout:10000}));
+        assert.deepEqual(loaded,{valid:1,jitemid:1,anum:5,displayed:261,reads:[1]});
+        assert.equal(await store.revalidateNativeSelectedFingerprint(mismatch),true);
+        await admin.query(`UPDATE ${table(c,"log2")} SET anum=1,revttime=? WHERE journalid=900001 AND jitemid=1`,[originalReverse]);
+        assert.equal(await store.revalidateNativeSelectedFingerprint(mismatch),false);
+        await set("257,76545");
         // Both candidates must fail native visible_to before a body read.
         await admin.query(`UPDATE ${table(c,"log2")} SET security='private' WHERE journalid=900001 AND jitemid=1`);
         await admin.query(`INSERT INTO ${table(c,"logprop2")} (journalid,jitemid,propid,value) VALUES (900001,299,?,'S')`,[logProp("statusvis")]);
