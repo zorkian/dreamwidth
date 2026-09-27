@@ -296,6 +296,7 @@ sub export_config {
             },
             usernameMaxLength => number($LJ::USERNAME_MAXLENGTH),
             maxScrollback     => number($LJ::MAX_SCROLLBACK_LASTN),
+            maxRecursion      => number( $S2::MAX_RECURSION || 500 ),
             commentSettings   => {
                 pageSize    => number( $LJ::TALK_PAGE_SIZE    || 25 ),
                 threadPoint => number( $LJ::TALK_THREAD_POINT || 50 ),

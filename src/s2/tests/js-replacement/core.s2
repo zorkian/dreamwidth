@@ -34,6 +34,10 @@ function Child::message() : string { return $super->message()+":child"; }
 function decorate(int value) : string { return "base"; }
 function marker() [notags] : string { return "base"; }
 function key() : string { $*calls++; return "computed"; }
+function depth(int n) : int {
+    if ($n == 0) { return 0; }
+    return 1 + depth($n - 1);
+}
 function main() {
     print decorate(6);
     var Child child=new Child;

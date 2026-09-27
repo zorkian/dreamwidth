@@ -24,7 +24,8 @@ import {Context} from "../runtime/s2runtime";
 const root=path.resolve(__dirname,"../../../..");
 const tools=path.join(root,"target/javascript/tools");
 const env={PATH:"/usr/bin:/bin",LANG:"C",LC_ALL:"C",TZ:"UTC",PERL_HASH_SEED:"0",PERL_PERTURB_KEYS:"0"};
-function native():{snapshot:ActiveStyleSnapshot;output:string;safe:string[];enumerations:any[]} {
+function native():{snapshot:ActiveStyleSnapshot;output:string;safe:string[];enumerations:any[];
+    recursion:{maxRecursion:number;value:number|null;refused:boolean}[]} {
     const result=JSON.parse(execFileSync("/usr/bin/perl",[path.join(tools,"active-native.pl")],{env,encoding:"utf8"}));
     result.snapshot.layers=result.snapshot.layers.map((layer:any)=> {
         const {sourceBase64,activeBase64,...identity}=layer;
@@ -53,6 +54,14 @@ test("arbitrary custom stack: native function/alias/inheritance/composites/trust
     const layers=instantiateProgram(result.program);let output="";const safe:string[]=[];
     const ctx=new Context(layers,value=>output+=value,undefined,undefined,value=>{safe.push(value);return value;});
     ctx.runFunction("main()");assert.equal(output,expected);assert.deepEqual(safe,oracle.safe);
+    assert.deepEqual(oracle.recursion,[{maxRecursion:500,value:120,refused:false},
+        {maxRecursion:50,value:null,refused:true}]);
+    for(const row of oracle.recursion) {
+        const bounded:Context=new Context(instantiateProgram(result.program),()=>{},undefined,undefined,undefined,row.maxRecursion);
+        if(row.refused)assert.throws(()=>bounded.getFunction("depth(int)")(bounded,120),/Excessive S2 recursion/);
+        else assert.equal(bounded.getFunction("depth(int)")(bounded,120),row.value);
+    }
+    assert.equal(ctx.getFunction("depth(int)")(ctx,120),120); // legacy config DW default500
     assert.equal(layers[0]!.declarations.get("_matrix")?.type,"int[][]");
     assert.equal(layers[0]!.declarations.get("_labels")?.type,"string{}");
     for(const row of oracle.enumerations) {
