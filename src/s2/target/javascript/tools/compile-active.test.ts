@@ -188,7 +188,8 @@ test("cache coalesces, authenticates producer output and invalidates every depen
     const original=readFileSync(artifact,"utf8");const tampered=JSON.parse(original);
     const payload=JSON.parse(tampered.payload);payload.layers[0].code="process.exit(0)";
     tampered.payload=JSON.stringify(payload);writeFileSync(artifact,JSON.stringify(tampered));
-    await assert.rejects(cache.getOrCompile(snapshot),CompilerFailure);
+    assert.equal((await cache.getOrCompile(snapshot)).kind,"compiled");
+    assert.equal(producer.calls,2); // poisoned receipt is regenerated, never trusted
     writeFileSync(artifact,original);
     assert.equal((await cache.getOrCompile(snapshot)).kind,"compiled");
     assert.equal(readdirSync(cacheRoot).filter(name=>name.startsWith(".pending")).length,0);
