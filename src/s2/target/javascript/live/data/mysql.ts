@@ -947,10 +947,10 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
     }
 
     private async loadUserpics(connection: Connection, ownerId: number, dversion: number,
-        raw: RawField[]): Promise<RawUserpics> {
+        raw: RawField[], mappingsOnly=false): Promise<RawUserpics> {
         // Include directly requested X/S rows: native default skeleton/get can
         // read them even though keyword selection excludes them.
-        const rows = (await sql<Row>`SELECT userid,picid,width,height,state,
+        const rows = mappingsOnly?[]:(await sql<Row>`SELECT userid,picid,width,height,state,
             HEX(description) AS description_stored,
             HEX(CONVERT(description USING latin1)) AS description_original,
             HEX(CONVERT(CONVERT(description USING latin1) USING utf8mb4)) AS description_roundtrip
@@ -959,7 +959,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         const pictures = rows.map(row => ({userid:number(row.userid,1),picid:number(row.picid,1),
             width:number(row.width),height:number(row.height),state:requiredString(row.state),
             description:decodedColumn(row,"description",`picture:${ownerId}:${row.picid}`,raw,4096,false)!}));
-        const mappings = dversion >= 9 ?
+        const mappings = mappingsOnly&&dversion<9?[]:dversion >= 9 ?
             (await sql<Row>`SELECT m.mapid,m.picid,m.redirect_mapid,
                 HEX(k.keyword) AS keyword_stored,
                 HEX(CONVERT(k.keyword USING latin1)) AS keyword_original,
@@ -1162,7 +1162,12 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 HEX(CONVERT(CONVERT(name USING latin1) USING utf8mb4)) AS name_roundtrip,
                 CAST(caps AS CHAR) AS caps,defaultpicid,dversion
                 FROM user WHERE userid IN (${sql.join(ids)}) ORDER BY userid LIMIT 10001`.execute(connection)).rows;
-            if(rows.length!==ids.length)unsupported();
+            // Native load_userids_multiple can leave a referenced poster
+            // absent. EntryPage then creates a blank UserLite and treats the
+            // visible comment as anonymous. The general byte-view path keeps
+            // that witnessed absence; the reviewed legacy API retains its gate.
+            if(rows.length>ids.length||!byteView&&rows.length!==ids.length)unsupported();
+            if(!rows.length)return rows;
             const maps=(await sql<Row>`SELECT userid,user FROM useridmap WHERE userid IN (${sql.join(ids)})
                 OR user IN (${sql.join(rows.map(row=>requiredString(row.user)))}) ORDER BY userid,user LIMIT 20001`.execute(connection)).rows;
             if(maps.length!==rows.length||rows.some(row=>!maps.some(m=>m.userid===row.userid&&m.user===row.user)))unsupported();
@@ -1173,7 +1178,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             if(names.length>4096)unsupported();
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+            const timezoneIds=authors.filter(row=>(byteView||row.statusvis!=='S')&&
+                row.statusvis!=='X'&&number(row.clusterid,0)>0)
                 .map(row=>number(row.userid,1));
             const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
@@ -1184,24 +1190,36 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             return {authors,names,timezone,timezoneValues};
         });
         const byAuthor=new Map(global.authors.map(row=>[number(row.userid,1),row]));
-        const authorized=(id:number):boolean=>{const h=headers.find(h=>h.jtalkid===id)!;return !h.posterid||byAuthor.get(h.posterid)?.statusvis!=='S';};
-        const full=selection.fullIds.filter(authorized),subjects=selection.subjectIds.filter(authorized);
-        const selectedIds=[...full,...subjects];const raw = new RawFields(byteView);
+        const suspended=(id:number):boolean=>{const h=headers.find(h=>h.jtalkid===id)!;
+            return !!h.posterid&&byAuthor.get(h.posterid)?.statusvis==='S';};
+        const full=selection.fullIds.filter(id=>!suspended(id));
+        const subjects=selection.subjectIds.filter(id=>!suspended(id));
+        // Native still exposes a loaded suspended comment's edit/metadata
+        // after redacting its subject and body. Read only those props; never
+        // select its talktext2 row or any hidden-only poster's record.
+        const metadataIds=byteView?selection.fullIds.filter(suspended):[];
+        const textIds=[...full,...subjects],selectedIds=[...textIds,...metadataIds];
+        const propIds=[...full,...metadataIds];
+        const suspendedProps=['picture_mapid','picture_keyword','imported_from',
+            'edit_time','edit_reason','admin_post'];
+        const raw = new RawFields(byteView);
         const texts=await this.databases.snapshot(clusterId,['talk2','talktext2','talkprop2'],async connection=>{
             if(digest(await readHeaders(connection))!==digest(headers))unsupported();
             if(!selectedIds.length)return [] as RawCommentText[];
+            const requestedText=textIds.length?textIds:[0];
             const rows=(await sql<Row>`SELECT jtalkid,
                 HEX(subject) AS subject_stored,HEX(CONVERT(subject USING latin1)) AS subject_original,
                 HEX(CONVERT(CONVERT(subject USING latin1) USING utf8mb4)) AS subject_roundtrip,
                 CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(body) ELSE NULL END AS body_stored,
                 CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(CONVERT(body USING latin1)) ELSE NULL END AS body_original,
                 CASE WHEN jtalkid IN (${sql.join(full.length?full:[0])}) THEN HEX(CONVERT(CONVERT(body USING latin1) USING utf8mb4)) ELSE NULL END AS body_roundtrip
-                FROM talktext2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(selectedIds)}) ORDER BY jtalkid`.execute(connection)).rows;
-            if(rows.length!==selectedIds.length)unsupported();
+                FROM talktext2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(requestedText)}) ORDER BY jtalkid`.execute(connection)).rows;
+            if(rows.length!==textIds.length)unsupported();
             const props=(await sql<Row>`SELECT jtalkid,tpropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,
                 HEX(CONVERT(CONVERT(value USING latin1) USING utf8mb4)) AS value_roundtrip
-                FROM talkprop2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(full.length?full:[0])}) ORDER BY jtalkid,tpropid LIMIT 20001`.execute(connection)).rows;
+                FROM talkprop2 WHERE journalid=${ownerId} AND jtalkid IN (${sql.join(propIds.length?
+                    propIds:[0])}) ORDER BY jtalkid,tpropid LIMIT 20001`.execute(connection)).rows;
             if(props.length>20000)unsupported();
             const names=this.names(global.names,'tpropid'),values=new Map<number,Record<string,string|null>>();
             for(const id of selectedIds)values.set(id,Object.create(null));
@@ -1211,10 +1229,12 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 if(!name||seen.has(id+':'+name)||!values.has(id))unsupported();seen.add(id+':'+name);
                 // Unknown/manager-only values stay solely in parent fingerprint.
                 raw.push(['comment:'+id+':prop:'+name,String(row.value_stored),String(row.value_original)]);
-                if((PUBLIC_COMMENT_PROPS as readonly string[]).includes(name))values.get(id)![name]=decodedColumn(row,'value','comment:'+id+':'+name,raw,8192,true);
+                if((PUBLIC_COMMENT_PROPS as readonly string[]).includes(name)&&
+                    (!metadataIds.includes(id)||suspendedProps.includes(name)))
+                    values.get(id)![name]=decodedColumn(row,'value','comment:'+id+':'+name,raw,8192,true);
             }
             let total=0;
-            return rows.map(row=>{
+            const visible=rows.map(row=>{
                 const id=number(row.jtalkid,1),props=values.get(id)!;
                 if(!byteView&&props.unknown8bit&&props.unknown8bit!=='0')unsupported();
                 const subject=decodedColumn(row,'subject','comment:'+id+':subject',raw,8192,true)??'';
@@ -1222,15 +1242,20 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 total+=Buffer.byteLength(subject)+Buffer.byteLength(body??'');if(total>2097152)unsupported();
                 return {jtalkid:id,subject,body,props:Object.freeze(props)};
             });
+            return [...visible,...metadataIds.map(id=>({jtalkid:id,subject:'',body:null,
+                props:Object.freeze(values.get(id)!)}))];
         });
         const authors:RawCommentAuthor[]=[];let pictureRows=0;
         for(const row of global.authors) {
             const id=number(row.userid,1),suspended=row.statusvis==='S';
             const cluster=number(row.clusterid,0),expunged=row.statusvis==='X'||cluster===0;
             let timezone:string|null=null,pictures:RawUserpics={pictures:[],mappings:[]};
-            if(!suspended&&cluster>0) {
+            if((!suspended||byteView)&&cluster>0) {
                 if(BigInt(unsigned(row.caps,16))&BigInt(this.config.capabilities.moveInProgressMask))unsupported();
-                const details=await this.databases.snapshot(cluster,['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'],async connection=>{
+                const tables=suspended?['userproplite2','userpropblob',
+                    ...(number(row.dversion)>=9?['userpicmap3','userkeywords']:[])]:
+                    ['userproplite2','userpropblob','userpic2','userpicmap2','userpicmap3','userkeywords'];
+                const details=await this.databases.snapshot(cluster,tables,async connection=>{
                     const prop=global.timezone[0]?.upropid;
                     if(!expunged&&prop!==undefined) {
                         const rows=(await sql<Row>`SELECT HEX(value) AS value_stored,HEX(CONVERT(value USING latin1)) AS value_original,
@@ -1242,7 +1267,10 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                         if(values.length>1)unsupported();
                         if(values[0])timezone=decodedColumn(values[0],'value','comment-author:'+id+':timezone',raw,1024,true,values[0].value_original===undefined);
                     }
-                    return this.loadUserpics(connection,id,number(row.dversion),raw);
+                    // A page-loaded suspended poster supplies time_poster and
+                    // surviving picture_keyword metadata through map redirects.
+                    // Its redacted image never needs userpic2 rows.
+                    return this.loadUserpics(connection,id,number(row.dversion),raw,suspended);
                 });pictures=details;
                 pictureRows+=pictures.pictures.length+pictures.mappings.length;if(pictureRows>10000)unsupported();
             }
@@ -1255,7 +1283,8 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const authors=await authorFacts(connection);
             const names=(await sql<Row>`SELECT tpropid,name FROM talkproplist ORDER BY tpropid LIMIT 4097`.execute(connection)).rows;
             const timezone=(await sql<Row>`SELECT upropid FROM userproplist WHERE name='timezone' LIMIT 2`.execute(connection)).rows;
-            const timezoneIds=authors.filter(row=>row.statusvis!=='S'&&row.statusvis!=='X'&&number(row.clusterid,0)>0)
+            const timezoneIds=authors.filter(row=>(byteView||row.statusvis!=='S')&&
+                row.statusvis!=='X'&&number(row.clusterid,0)>0)
                 .map(row=>number(row.userid,1));
             const timezoneValues=timezoneIds.length?(await sql<Row>`SELECT userid,upropid,HEX(value) AS value_stored,
                 HEX(CONVERT(value USING latin1)) AS value_original,

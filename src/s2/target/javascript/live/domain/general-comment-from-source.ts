@@ -56,7 +56,13 @@ export interface GeneralPublicCommentInput extends CommentCommon {
 export interface GeneralCommentStubInput extends CommentCommon {
     readonly kind:"stub";
 }
-export type GeneralCommentSourceInput=GeneralPublicCommentInput|GeneralCommentStubInput;
+/** Native suspended redaction leaves loaded edit and metadata fields intact. */
+export interface GeneralSuspendedCommentInput extends CommentCommon {
+    readonly kind:"suspended-loaded";readonly loaded:boolean;
+    readonly pictureKeyword:NativeString|undefined;
+    readonly importedFrom:NativeString|undefined;readonly adminPost:unknown;
+}
+export type GeneralCommentSourceInput=GeneralPublicCommentInput|GeneralSuspendedCommentInput|GeneralCommentStubInput;
 export interface GeneralCommentCleanOptions {
     readonly preformatted:unknown;readonly anonymous:boolean;readonly noCss:boolean;
     readonly editor:NativeString|undefined;readonly datepost:NativeString|undefined;
@@ -79,6 +85,7 @@ export interface GeneralCommentSourceOperations {
 }
 export interface GeneralApprovedCommentNode {
     readonly input:Omit<GeneralPublicCommentInput,"depth"|"hasChildren">|
+        Omit<GeneralSuspendedCommentInput,"depth"|"hasChildren">|
         Omit<GeneralCommentStubInput,"depth"|"hasChildren">;
     readonly children:readonly GeneralApprovedCommentNode[];
 }
@@ -116,8 +123,11 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     const fromSuspended=input.posterLoaded&&input.posterSuspended;
     const deleted=input.state==="D",screenedHidden=input.state==="S"&&!input.show;
     const visible=!fromSuspended&&!deleted&&!screenedHidden;
-    if(visible!==(input.kind==="shown"))throw Error("Invalid approved comment visibility");
+    const suspendedOnly=fromSuspended&&!deleted&&!screenedHidden;
+    if(visible!==(input.kind==="shown")||
+        suspendedOnly!==(input.kind==="suspended-loaded"))throw Error("Invalid approved comment visibility");
     const shown=input.kind==="shown"?input:undefined;
+    const loadedInput=input.kind==="shown"||input.kind==="suspended-loaded"?input:undefined;
     let text:NativeString|undefined=pv(""),subject:NativeString|undefined=pv(""),poster:GeneralModel|undefined,
         userpic:GeneralModel|undefined,subjectIcon:GeneralModel|undefined,posterTime:GeneralModel|undefined,
         edited:unknown,editUrl:NativeString|undefined,editReason:NativeString|undefined,
@@ -132,14 +142,16 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     // DateTime_tz(datepost,$pu) runs before all three redactions; hidden-only
     // posters never enter %user, while a page-shared loaded poster can.
     posterTime=input.posterLoaded?operations.posterTime(input.datepostUnix):undefined;
-    if(shown) {
-        if(shown.loaded) {
+    if(loadedInput) {
+        if(loadedInput.loaded) {
             const edit=operations.edit();edited=edit.edited;editUrl=edit.url;threadroot=edit.threadrootUrl;
             if(scalarTruthy(edited)) {
                 editReason=escapeNativeHtml(scalarPV(edit.reason));editTime=operations.dateTimeUnix(edit.time);
                 editTimePoster=operations.posterTime(edit.time);
             }
         }
+    }
+    if(shown) {
         if(scalarTruthy(shown.subjectIcon))subjectIcon=operations.subjectImage();
         if(!runtime.scalarCompare("string","==",context.prop._userpics_position,pv("none"))&&shown.hasPicture) {
             const style=context.prop._comment_userpic_style;
@@ -153,7 +165,7 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     const screened=screenedHidden?1:fromSuspended||deleted?undefined:input.state==="S"?1:0;
     const links=[pv("delete_comment"),pv(screened?"unscreen_comment":"screen_comment"),
         pv(input.state==="F"?"unfreeze_thread":"freeze_thread")];
-    const metadata=runtime.makeHash([[pv("picture_keyword"),shown?.pictureKeyword]]);
+    const metadata=runtime.makeHash([[pv("picture_keyword"),loadedInput?.pictureKeyword]]);
     const anchor=scalarTruthy(input.talkid)?concatStrings(pv("cmt"),scalarPV(input.talkid)):pv("");
     const model:GeneralModel={".type":"Comment",_journal:input.journal,_metadata:metadata,
         _permalink_url:input.permalinkUrl,_reply_url:input.replyUrl,_poster:poster,_replies:[],
@@ -173,7 +185,7 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
         _edittime_remote:undefined,_edittime_poster:editTimePoster,_edit_url:editUrl,_timeformat24:undefined,
         _showable_children:runtime.scalarCopy(input.showableChildren),_hide_children:runtime.scalarCopy(input.hideChildren),
         _hidden_child:runtime.scalarCopy(input.hiddenChild),_echi:runtime.scalarCopy(input.echi),
-        _admin_post:shown&&scalarTruthy(shown.adminPost)?1:0};
+        _admin_post:loadedInput&&scalarTruthy(loadedInput.adminPost)?1:0};
     // Native feature CODE may have effects: preserve all three calls and their
     // position after the model scalar copies, rather than snapshotting once.
     if(scalarTruthy(operations.esnEnabled()))links.push(pv("watch_thread"));
@@ -182,6 +194,7 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     if(scalarTruthy(operations.editCommentsEnabled()))links.unshift(pv("edit_comment"));
     model._expand_url=input.expandUrl;model._js_expand_url=input.jsExpandUrl;
     model._thread_url=input.hasChildren?input.expandUrl:undefined;
-    if(shown&&scalarTruthy(shown.importedFrom))runtime.memberSlot(metadata,pv("imported_from"),"hash").set(shown.importedFrom);
+    if(loadedInput&&scalarTruthy(loadedInput.importedFrom))
+        runtime.memberSlot(metadata,pv("imported_from"),"hash").set(loadedInput.importedFrom);
     return model;
 }
