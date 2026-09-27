@@ -13,6 +13,8 @@
 //
 
 import test from 'node:test';
+import {execFileSync} from 'node:child_process';
+import {nativeCharacterClass, type NativeProfile} from '../runtime/native-profile';
 import assert from 'node:assert/strict';
 import {NativeString, NativeOutput, byteCharacters, reverseString, concatStrings,
     builtinSubstr, caseString, endsWith, splitString} from '../runtime/native-string';
@@ -94,4 +96,38 @@ test('Context identity is installed-runtime brand, not prototype or duck typing'
     assert.equal(runtime.isContext(context), true);
     assert.equal(runtime.isContext(Object.create(Context.prototype)), false);
     assert.equal(runtime.isContext({getFunction: context.getFunction}), false);
+});
+
+test('installed Perl /d character classes preserve byte flags and Unicode version', () => {
+    const extracted = JSON.parse(execFileSync('perl', ['tools/compile-active.pl'], {
+        input: JSON.stringify({profileOnly: true}), encoding: 'utf8', timeout: 10000,
+        maxBuffer: 1048576,
+    }));
+    assert.equal(extracted.kind, 'profile');
+    const profile: NativeProfile = extracted.profile;
+    const points = [0, 9, 10, 32, 48, 65, 95, 127, 0x85, 0xa0, 0xe9,
+        0x301, 0x660, 0x200c, 0x203f, 0x1c89, 0x10400, 0x10ffff];
+    // Independent actual regex evaluation, not the inversion-list API under test.
+    const oracle = JSON.parse(execFileSync('perl', ['-MJSON::PP', '-e', `
+        my $points=JSON::PP->new->decode(do {local $/; <STDIN>}); my @rows;
+        for my $cp (@$points) { for my $flag (0,1) {
+            next if !$flag && $cp>255;
+            my $s=chr($cp); utf8::upgrade($s) if $flag;
+            push @rows, [$cp,$flag,($s =~ /\\w/ ? 1:0),($s =~ /\\s/ ? 1:0)];
+        }} print JSON::PP->new->encode(\\@rows);
+    `], {input: JSON.stringify(points), encoding: 'utf8', timeout: 5000, maxBuffer: 65536}));
+    for (const [point, flag, word, space] of oracle) {
+        assert.equal(nativeCharacterClass(profile, 'word', point, !!flag), !!word,
+            `word U+${point.toString(16)} flag=${flag}`);
+        assert.equal(nativeCharacterClass(profile, 'space', point, !!flag), !!space,
+            `space U+${point.toString(16)} flag=${flag}`);
+    }
+    assert.equal(nativeCharacterClass(profile, 'word', 0xe9, false), false);
+    assert.equal(nativeCharacterClass(profile, 'word', 0xe9, true), true);
+    assert.equal(nativeCharacterClass(profile, 'space', 0xa0, false), false);
+    assert.equal(nativeCharacterClass(profile, 'space', 0xa0, true), true);
+    assert.equal(profile.unicodeVersion, '13.0.0');
+    assert.equal(nativeCharacterClass(profile, 'word', 0x1c89, true), false);
+    assert.equal(nativeCharacterClass(profile, 'word', -1, true), false);
+    assert.equal(nativeCharacterClass(profile, 'space', 1.5, true), false);
 });
