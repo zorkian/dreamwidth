@@ -62,19 +62,25 @@ for my $spec (['program.s2','core',101,0],['override.s2','layout',102,1]) {
 }
 my $ctx=S2::make_context(101,102);my $output='';local $LJ::S2::ret_ref=\$output;
 my $ok=LJ::S2::s2_run(undef,$ctx,{contenttype=>'text/html'},'main()',{});
+my $recursive='';my $recursive_ok;
+{local $LJ::S2::ret_ref=\$recursive;local $S2::MAX_RECURSION=50;
+ $recursive_ok=LJ::S2::s2_run(undef,$ctx,{contenttype=>'text/html'},'recursive()',{});}
 my @errors;
 { no warnings 'redefine';
  *S2::run_code=sub {my ($ctx)=@_;for my $op (@{$ctx->[S2::SCRATCH]{trace}}) {
   if($op->[0] eq 'safe'){$S2::pout_s->($op->[1])}
+  elsif($op->[0] eq 'raw'){S2::pout($op->[1])}
   elsif($op->[0] eq 'start'){S2::Builtin::LJ::start_css($ctx)}
  }die "fixed failure\n";};
 }
 for my $spec (['pending','text/html',[['safe','<a href="tail']]],
  ['nested','text/html',[['start'],['start'],['safe','p{color:red}']]],
- ['css','text/css',[['safe','p{color:red}']]]) {
+ ['css','text/css',[['safe','p{color:red}']]],
+ ['checkpoint','text/html',[map {['raw','x']} 1..8]]) {
  my ($id,$ctype,$trace)=@$spec;my $out='';local $LJ::S2::ret_ref=\$out;
  my $context=[];$context->[S2::SCRATCH]={trace=>$trace};
+ local *S2::check_depth=sub {die "fixed failure\n"} if $id eq 'checkpoint';
  my $success=LJ::S2::s2_run(undef,$context,{contenttype=>$ctype},'error',{});
  push @errors,{id=>$id,ctype=>$ctype,ok=>$success,base64=>encode_base64(octets($out),''),flag=>utf8::is_utf8($out)?1:0};
 }
-print JSON::PP->new->canonical->encode({sources=>[map{encode_base64($_,'')}@sources],codes=>[map{encode_base64(octets($_),'')}@codes],ok=>$ok,base64=>encode_base64(octets($output),''),flag=>utf8::is_utf8($output)?1:0,errors=>\@errors});
+print JSON::PP->new->canonical->encode({sources=>[map{encode_base64($_,'')}@sources],codes=>[map{encode_base64(octets($_),'')}@codes],recursive=>{ok=>$recursive_ok,base64=>encode_base64(octets($recursive),'')},ok=>$ok,base64=>encode_base64(octets($output),''),flag=>utf8::is_utf8($output)?1:0,errors=>\@errors});
