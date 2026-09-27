@@ -17,8 +17,9 @@ import {createHash} from "node:crypto";
 import {readFileSync, mkdirSync, writeFileSync} from "node:fs";
 import path from "node:path";
 
-export async function stylesBrowser(html:string,port:number):Promise<void> {
-    const output=process.env.S2_STYLES_BROWSER_OUTPUT;
+export async function stylesBrowser(html:string,port:number, layout?:"easyread"):Promise<void> {
+    const baseOutput=process.env.S2_STYLES_BROWSER_OUTPUT;
+    const output=baseOutput&&layout?path.join(baseOutput,layout):baseOutput;
     if(!output) return;
     const appOrigin="http://localhost:8080";
     const pageUrl=`http://localhost:${port}/users/ordinary6/76801.html`;
@@ -66,13 +67,15 @@ export async function stylesBrowser(html:string,port:number):Promise<void> {
         assert.equal((await page.goto(pageUrl,{waitUntil:"networkidle"})).status(),200);
         const state=await page.evaluate(()=>({background:getComputedStyle(document.body).backgroundColor,
             font:getComputedStyle(document.body).fontFamily,
+            moduleFont:getComputedStyle(document.querySelector('.module-content')!).fontFamily,
+            sectionOrder:[...document.querySelectorAll('#secondary,#primary,#tertiary')].map(node=>node.id),
             padding:getComputedStyle(document.querySelector('.entry .inner')!).padding,
             tags:document.querySelector('.module-tags_list, .module-tags_cloud, .module-tags_multilevel')?.textContent,
             tagAfterCredit:!!(document.querySelector('.module-credit')!.compareDocumentPosition(document.querySelector('.module-tags_list, .module-tags_cloud, .module-tags_multilevel')!)&Node.DOCUMENT_POSITION_FOLLOWING),
             journalStyles:[...document.querySelectorAll('link[rel=stylesheet]')].map(node=>(node as HTMLLinkElement).href).filter(url=>/\/res\//.test(url))}));
         assert.equal(state.background,'rgb(18, 52, 86)');
-        assert.ok(state.font.includes('Georgia'));
-        assert.equal(state.padding,'8px');
+        if(layout==='easyread'){assert.equal(state.font,'"Times New Roman"');assert.ok(state.moduleFont.startsWith('Georgia'));assert.deepEqual(state.sectionOrder,['secondary','primary','tertiary']);}
+        else{assert.ok(state.font.includes('Georgia'));assert.equal(state.padding,'8px');}
         assert.deepEqual(state.journalStyles,[]);
         assert.ok(state.tags?.includes('Visible tag'));
         assert.equal(state.tagAfterCredit,true);

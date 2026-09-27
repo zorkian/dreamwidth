@@ -20,7 +20,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import {THEMES} from "../render/theme-catalog";
+import {THEMES,EASYREAD} from "../render/theme-catalog";
 import {gunzipSync} from "node:zlib";
 import { createHash } from "node:crypto";
 import { sql } from "kysely";
@@ -429,9 +429,10 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
     // No child-supplied name, profile, picture, timezone or email query exists.
     private async loadThemeAuthors(connection:Connection,style:RawStyle|null):Promise<NonNullable<RawJournalSnapshot['themeAuthors']>> {
         const selected=Object.values(THEMES).find(theme=>style?.layers.some(layer=>layer.type==='theme'&&layer.sourceHash===theme.sourceHash));
-        if(!selected)return [];
+        const easyread=style?.layers.some(layer=>layer.type==='layout'&&layer.sourceHash===EASYREAD.sourceHash);
+        if(!selected&&!easyread)return [];
         const authors: {name:string;author:import('../contracts').RawThemeAuthor|null}[]=[];
-        for(const name of selected.authors) {
+        for(const name of [...(easyread?EASYREAD.authors:[]),...(selected?.authors??[])]) {
             const rows=(await sql<Row>`SELECT userid,user,clusterid,status,statusvis,journaltype,CAST(caps AS CHAR) AS caps
                 FROM user WHERE BINARY user=BINARY ${name} LIMIT 2`.execute(connection)).rows;
             if(rows.length>1)unsupported();
@@ -508,7 +509,8 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 return {type: layer.type, s2lid: layer.s2lid, ownerid: number(definition.ownerid, 1),
                     ownerUsername: requiredString(definition.owner_username),
                     compiledTime: layer.type === "user" ? 0 : number(definition.compiled_time),
-                    ...(['user','theme'].includes(layer.type) ? {parentId:number(definition.parent_id),
+                    ...(['user','theme'].includes(layer.type)||(layer.type==='layout'&&
+                        requiredString(definition.source_hash).toLowerCase()===EASYREAD.sourceHash) ? {parentId:number(definition.parent_id),
                         nativeType:requiredString(definition.native_type)} : {}),
                     sourceHash: requiredString(definition.source_hash).toLowerCase()};
             })};

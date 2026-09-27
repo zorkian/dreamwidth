@@ -19,7 +19,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import {THEMES, type ThemeName} from "../render/theme-catalog";
+import {THEMES, EASYREAD, type ThemeName} from "../render/theme-catalog";
 import type { RawJournalSnapshot, RawEntryHeader, PublicAppConfig } from "../contracts";
 import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
@@ -237,9 +237,10 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             (style.origin !== "default" || style.styleid !== 0 || style.ownerid !== null))) {
         throw new Unsupported();
     }
+    const easyread=style.layers.find(layer=>layer.type==="layout")?.sourceHash===EASYREAD.sourceHash;
     for (const [index, type] of ["core", "layout"].entries()) {
         const layer = style.layers.find(layer => layer.type === type);
-        if (!layer || layer.ownerUsername !== "system" || layer.sourceHash !== SOURCE_HASHES[index] ||
+        if (!layer || layer.ownerUsername !== "system" || layer.sourceHash !== (index===1&&easyread?EASYREAD.sourceHash:SOURCE_HASHES[index]) ||
             !Number.isSafeInteger(layer.ownerid) || layer.ownerid <= 0 ||
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
@@ -254,7 +255,12 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             themeLayer.parentId!==style.layers.find(layer=>layer.type==='layout')!.s2lid||
             !integer(themeLayer.compiledTime))throw new Unsupported();
     }
-    const expectedAuthors=theme?THEMES[theme].authors:[];
+    if(easyread) {
+        const selected=style.layers.find(layer=>layer.type==='layout')!;
+        if(theme!=='aqua'||selected.nativeType!=='layout'||selected.parentId!==style.layers.find(layer=>layer.type==='core')!.s2lid)throw new Unsupported();
+    }
+    if(theme&&THEMES[theme].layout!==(easyread?'easyread':'tabula'))throw new Unsupported();
+    const expectedAuthors:string[]=[...(easyread?EASYREAD.authors:[]),...(theme?THEMES[theme].authors:[])];
     const rawAuthors=snapshot.themeAuthors??[];
     if(rawAuthors.length!==expectedAuthors.length||new Set(rawAuthors.map(row=>row.name)).size!==rawAuthors.length)throw new Unsupported();
     const themeAuthors=rawAuthors.map(row=>{
@@ -400,6 +406,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
         websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
-        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, themeAuthors, theme, themeLayoutId:theme?style.layers.find(layer=>layer.type==='layout')!.s2lid:undefined, inlineStylesheet, customtextProperties,customtextStored,
+        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, themeAuthors, ...(easyread?{layout:"easyread" as const}:{}), theme, themeLayoutId:theme?style.layers.find(layer=>layer.type==='layout')!.s2lid:undefined, inlineStylesheet, customtextProperties,customtextStored,
     };
 }

@@ -82,6 +82,7 @@ export interface ApprovedJournal {
     readonly comments?:ApprovedComments;
     readonly themeAuthors?: readonly {readonly name:string;readonly author:{readonly userid:number;readonly username:string;
         readonly badgeKind:"personal"|"staff";readonly badgeDeleted:boolean}|null}[];
+    readonly layout?: "easyread";
     readonly theme?: import("./theme-catalog").ThemeName;
     readonly themeLayoutId?: number;
     readonly inlineStylesheet?: boolean;
@@ -152,6 +153,7 @@ export interface RenderInput {
 export interface Artifact {
     readonly schema: 1;
     readonly abi: 1;
+    readonly layouts?: readonly {readonly name:"easyread";readonly sourceHash:string;readonly code:string}[];
     readonly themes?: readonly {readonly name: import("./theme-catalog").ThemeName; readonly sourceHash:string; readonly code:string;}[];
     readonly layers: readonly {
         readonly source: string;
