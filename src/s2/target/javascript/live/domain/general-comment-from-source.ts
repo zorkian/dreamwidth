@@ -31,6 +31,9 @@ import type {GeneralModel} from "./general-model-primitives";
 
 const pv=NativeString.hostUtf8Bytes;
 interface CommentCommon {
+    /** From the witnessed page-wide %user load, not the comment's hidden text. */
+    readonly state:"A"|"F"|"S"|"D";readonly show:boolean;
+    readonly posterId:unknown;readonly posterLoaded:boolean;readonly posterSuspended:boolean;
     readonly talkid:unknown;readonly ditemid:unknown;readonly depth:unknown;
     readonly journal:GeneralModel;readonly datepostUnix:unknown;readonly entryLogtimeUnix:unknown;
     readonly permalinkUrl:NativeString;readonly replyUrl:NativeString;
@@ -41,8 +44,7 @@ interface CommentCommon {
     readonly lastTalkid:unknown;readonly lastJournalId:unknown;
 }
 export interface GeneralPublicCommentInput extends CommentCommon {
-    readonly visibility:"public";readonly frozen:boolean;readonly screened:boolean;
-    readonly loaded:boolean;readonly posterId:unknown;readonly posterExists:boolean;
+    readonly kind:"shown";readonly loaded:boolean;
     readonly body:NativeString|undefined;readonly subject:NativeString|undefined;
     readonly noHtml:unknown;readonly anonymous:boolean;readonly preformatted:unknown;
     readonly editor:NativeString|undefined;readonly datepost:NativeString|undefined;
@@ -52,7 +54,7 @@ export interface GeneralPublicCommentInput extends CommentCommon {
     readonly adminPost:unknown;
 }
 export interface GeneralCommentStubInput extends CommentCommon {
-    readonly visibility:"deleted"|"suspended"|"screened";readonly frozen:boolean;
+    readonly kind:"stub";
 }
 export type GeneralCommentSourceInput=GeneralPublicCommentInput|GeneralCommentStubInput;
 export interface GeneralCommentCleanOptions {
@@ -109,51 +111,59 @@ export function generalCommentTreeFromSource(context:Context,enabled:unknown,
 /** Hidden variants carry no body/author fields and invoke no corresponding providers. */
 export function generalCommentFromSource(context:Context,input:GeneralCommentSourceInput,
     operations:GeneralCommentSourceOperations):GeneralModel {
-    const visible=input.visibility==="public";
+    // EntryPage applies all three redactions in source order. D/S can overlap
+    // a suspended poster loaded through a separate shown comment on this page.
+    const fromSuspended=input.posterLoaded&&input.posterSuspended;
+    const deleted=input.state==="D",screenedHidden=input.state==="S"&&!input.show;
+    const visible=!fromSuspended&&!deleted&&!screenedHidden;
+    if(visible!==(input.kind==="shown"))throw Error("Invalid approved comment visibility");
+    const shown=input.kind==="shown"?input:undefined;
     let text:NativeString|undefined=pv(""),subject:NativeString|undefined=pv(""),poster:GeneralModel|undefined,
         userpic:GeneralModel|undefined,subjectIcon:GeneralModel|undefined,posterTime:GeneralModel|undefined,
         edited:unknown,editUrl:NativeString|undefined,editReason:NativeString|undefined,
         editTime:GeneralModel|undefined,editTimePoster:GeneralModel|undefined,threadroot=input.threadrootUrl;
-    if(visible) {
-        text=operations.cleanComment(quoteGeneralEntryHtml(input.body,input.noHtml),{
-            preformatted:input.preformatted,anonymous:input.anonymous,noCss:input.anonymous,
-            editor:input.editor,datepost:input.datepost,isImported:input.importSourceDefined});
+    if(shown) {
+        text=operations.cleanComment(quoteGeneralEntryHtml(shown.body,shown.noHtml),{
+            preformatted:shown.preformatted,anonymous:shown.anonymous,noCss:shown.anonymous,
+            editor:shown.editor,datepost:shown.datepost,isImported:shown.importSourceDefined});
     }
     const time=operations.dateTimeUnix(input.datepostUnix);
     const seconds=arithmetic("-",scalarNumber(input.datepostUnix),scalarNumber(input.entryLogtimeUnix));
-    if(visible) {
-        posterTime=operations.posterTime(input.datepostUnix);
-        if(input.loaded) {
+    // DateTime_tz(datepost,$pu) runs before all three redactions; hidden-only
+    // posters never enter %user, while a page-shared loaded poster can.
+    posterTime=input.posterLoaded?operations.posterTime(input.datepostUnix):undefined;
+    if(shown) {
+        if(shown.loaded) {
             const edit=operations.edit();edited=edit.edited;editUrl=edit.url;threadroot=edit.threadrootUrl;
             if(scalarTruthy(edited)) {
                 editReason=escapeNativeHtml(scalarPV(edit.reason));editTime=operations.dateTimeUnix(edit.time);
                 editTimePoster=operations.posterTime(edit.time);
             }
         }
-        if(scalarTruthy(input.subjectIcon))subjectIcon=operations.subjectImage();
-        if(!runtime.scalarCompare("string","==",context.prop._userpics_position,pv("none"))&&input.hasPicture) {
+        if(scalarTruthy(shown.subjectIcon))subjectIcon=operations.subjectImage();
+        if(!runtime.scalarCompare("string","==",context.prop._userpics_position,pv("none"))&&shown.hasPicture) {
             const style=context.prop._comment_userpic_style;
             userpic=operations.picture(runtime.scalarCompare("string","==",style,pv("small"))?"small":
                 runtime.scalarCompare("string","==",style,pv("smaller"))?"smaller":"full");
         }
-        if(scalarTruthy(input.posterId))poster=input.posterExists?operations.poster():
+        if(scalarTruthy(input.posterId))poster=input.posterLoaded?operations.poster():
             {".type":"UserLite",_username:undefined,_user:undefined,_name:undefined,_journal_type:pv("P")};
     }
-    if(visible)subject=escapeNativeHtml(scalarPV(input.subject));
-    const screened=input.visibility==="screened"||(visible&&input.screened);
+    if(shown)subject=escapeNativeHtml(scalarPV(shown.subject));
+    const screened=screenedHidden?1:fromSuspended||deleted?undefined:input.state==="S"?1:0;
     const links=[pv("delete_comment"),pv(screened?"unscreen_comment":"screen_comment"),
-        pv(input.frozen?"unfreeze_thread":"freeze_thread")];
-    const metadata=runtime.makeHash([[pv("picture_keyword"),visible?input.pictureKeyword:undefined]]);
+        pv(input.state==="F"?"unfreeze_thread":"freeze_thread")];
+    const metadata=runtime.makeHash([[pv("picture_keyword"),shown?.pictureKeyword]]);
     const anchor=scalarTruthy(input.talkid)?concatStrings(pv("cmt"),scalarPV(input.talkid)):pv("");
     const model:GeneralModel={".type":"Comment",_journal:input.journal,_metadata:metadata,
         _permalink_url:input.permalinkUrl,_reply_url:input.replyUrl,_poster:poster,_replies:[],
         _subject:subject,_subject_icon:subjectIcon,_talkid:runtime.scalarCopy(input.talkid),
         _ditemid:runtime.scalarCopy(input.ditemid),_text:text,_userpic:userpic,_time:time,_system_time:time,
-        _edittime:editTime,_editreason:editReason,_tags:[],_full:visible&&input.loaded?1:0,
+        _edittime:editTime,_editreason:editReason,_tags:[],_full:shown?.loaded?1:0,
         _depth:runtime.scalarCopy(input.depth),_parent_url:input.parentUrl,_threadroot_url:threadroot,
-        _screened:input.visibility==="deleted"||input.visibility==="suspended"?undefined:screened?1:0,
-        _screened_noshow:input.visibility==="screened"?1:0,_frozen:input.frozen?1:0,
-        _deleted:input.visibility==="deleted"?1:0,_fromsuspended:input.visibility==="suspended"?1:0,
+        _screened:screened,
+        _screened_noshow:screenedHidden?1:0,_frozen:input.state==="F"?1:0,
+        _deleted:deleted?1:0,_fromsuspended:fromSuspended?1:0,
         _link_keyseq:links,_anchor:anchor,_dom_id:anchor,
         _comment_posted:runtime.scalarCompare("numeric","==",scalarTruthy(input.lastTalkid)?input.lastTalkid:0,
             scalarTruthy(input.talkid)?input.talkid:0)&&
@@ -163,7 +173,7 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
         _edittime_remote:undefined,_edittime_poster:editTimePoster,_edit_url:editUrl,_timeformat24:undefined,
         _showable_children:runtime.scalarCopy(input.showableChildren),_hide_children:runtime.scalarCopy(input.hideChildren),
         _hidden_child:runtime.scalarCopy(input.hiddenChild),_echi:runtime.scalarCopy(input.echi),
-        _admin_post:visible&&scalarTruthy(input.adminPost)?1:0};
+        _admin_post:shown&&scalarTruthy(shown.adminPost)?1:0};
     // Native feature CODE may have effects: preserve all three calls and their
     // position after the model scalar copies, rather than snapshotting once.
     if(scalarTruthy(operations.esnEnabled()))links.push(pv("watch_thread"));
@@ -172,6 +182,6 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     if(scalarTruthy(operations.editCommentsEnabled()))links.unshift(pv("edit_comment"));
     model._expand_url=input.expandUrl;model._js_expand_url=input.jsExpandUrl;
     model._thread_url=input.hasChildren?input.expandUrl:undefined;
-    if(visible&&scalarTruthy(input.importedFrom))runtime.memberSlot(metadata,pv("imported_from"),"hash").set(input.importedFrom);
+    if(shown&&scalarTruthy(shown.importedFrom))runtime.memberSlot(metadata,pv("imported_from"),"hash").set(shown.importedFrom);
     return model;
 }
