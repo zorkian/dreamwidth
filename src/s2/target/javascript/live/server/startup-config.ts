@@ -69,6 +69,7 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
         ...(Object.hasOwn(root,"nativeLanguageContext")?["nativeLanguageContext"]:[]),
         ...(Object.hasOwn(root,"standardImages")?["standardImages"]:[]),
         ...(Object.hasOwn(root,"nativePublicUrls")?["nativePublicUrls"]:[]),
+        ...(Object.hasOwn(root,"nativeUserpicRoot")?["nativeUserpicRoot"]:[]),
         ...(Object.hasOwn(root,"sourceFeatureFlags")?["sourceFeatureFlags"]:[]),
         ...(Object.hasOwn(root,"sourceFeatureFlagsIdentity")?["sourceFeatureFlagsIdentity"]:[])]);
     if(root.standardImages!==undefined) {
@@ -117,6 +118,12 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
             if(bytes.length>16384||bytes.toString("base64")!==encoded)invalid();
         };
         frame(facts.siteDomain);list(facts.knownHttpsSites,frame);
+    }
+    if(root.nativeUserpicRoot!==undefined) {
+        const frame=record(root.nativeUserpicRoot,["base64","utf8"]);
+        const encoded=text(frame.base64,21848);boolean(frame.utf8);
+        const bytes=Buffer.from(encoded,"base64");
+        if(bytes.length>16384||bytes.toString("base64")!==encoded)invalid();
     }
     if (root.schema !== 1) invalid();
     const listener = record(root.listener, ["host", "port"]);
