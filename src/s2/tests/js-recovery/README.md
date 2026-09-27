@@ -37,6 +37,9 @@ keys; the coordinator must validate `hostCalls` against its installed source
 capability registry before using the artifact. Arbitrary computed callables,
 module loading and non-S2 calls are rejected. Hash construction uses the agreed
 `runtime.makeHash` operation, including duplicate-last-wins and prototype keys.
+Context is usable only as a generated VTABLE/PROPS receiver or a passed
+argument. The executor separately refuses Context hash access and mutation and
+binds host calls to the executing branded Context, never a nominated lookalike.
 Source authority and output safety remain the serving coordinator's duties.
 
 Registration metadata, exact historical function aliases and call maps are
@@ -47,7 +50,8 @@ output channels. Notags calls remain distinct. A caller's ownership does not
 silently upgrade or alter those instructions.
 
 The shared runtime supplies `registerClassMetadata`, `registerGlobalFunction`,
-`runtime.makeHash` and `runtime.recoveryCheckpoint`. The checkpoint integrates
+`runtime.makeHash`, `runtime.recoveryCheckpoint` and authoritative
+`runtime.isContext(value)` branding. The checkpoint integrates
 with the native timeout/depth policy; process/parser bounds are separately
 supplied by the compilation coordinator. This component does not create an
 unbounded production compilation service or widen renderer permissions.

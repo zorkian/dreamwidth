@@ -32,6 +32,8 @@ import type {Expr, Stmt} from "./ast";
 export function instantiate(program: Stmt[], s2: any, layerId: number): any {
     type Cell = {get(): any; set(value: any): void; remove?(): void};
     type Env = {vars: Map<string, Cell>; parent?: Env; context?: any};
+    if(typeof s2.runtime.isContext !== "function")throw new Error("Missing authoritative Context brand ABI");
+    const isContext = (value: any): boolean => s2.runtime.isContext(value);
     const layer = s2.makeLayer();
     layer.source = "active compiled layer #" + layerId;
     const makeCell = (initial: any): Cell => {
@@ -94,6 +96,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             base=x.container === "array" ? [] : object([]);
             reference(x.base,env,true).set(base);
         }
+        if(isContext(base))throw new Error("Recovered Context mutation refused");
         const key=keyFor(base,evalExpr(x.key,env));
         if(!isObject(base))throw new Error("Invalid recovered dereference");
         return {get:()=>Object.hasOwn(base,key) ? base[key] : undefined,
@@ -114,8 +117,8 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             if(!Object.hasOwn(s2.builtin,"construct_"+ctor[1]) || typeof fn !== "function")throw new Error("Missing recovered constructor capability " + short);
             return fn(...args);
         }
-        const context=args[0] ?? env.context;
-        if(!context)throw new Error("Missing recovered host context");
+        const context=env.context;
+        if(!isContext(context) || args[0] !== context)throw new Error("Recovered builtin requires executing Context");
         const nameKey="_"+short;
         if(!Object.hasOwn(context.builtin,nameKey))throw new Error("Missing recovered host capability " + short);
         return context.builtin[nameKey](...args);
@@ -125,16 +128,21 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
         if(/^S2::Builtin(?:::LJ)?::/.test(name))return invokeBuiltin(name,args,env);
         switch(name) {
             case "get_func_num": return args[0];
-            case "get_object_func_num": return {[method]:true,classname:args[0],value:args[1],name:args[2],
-                layer:args[3],line:args[4],super:!!args[5],context:args[6] ?? context};
+            case "get_object_func_num":
+                if(args[6] !== context)throw new Error("Recovered method requires executing Context");
+                return {[method]:true,classname:args[0],value:args[1],name:args[2],
+                layer:args[3],line:args[4],super:!!args[5],context};
             case "S2::Object::new": return object([[".type",args[0]]]);
             case "S2::notags": return s2.runtime.notags(string(args[0]));
             case "S2::check_defined": return s2.runtime.isDefined(args[0]);
             case "S2::check_elements": return Array.isArray(args[0]) ? args[0].length !== 0 : isObject(args[0]) && Object.keys(args[0]).length !== 0;
             case "S2::get_characters": return Array.from(string(args[0]));
-            case "S2::object_isa": return args[0].objectIsa(args[1],args[2]);
-            case "S2::downcast_object": return args[0].downcastObject(args[1],args[2],layer,args[4]);
-            case "S2::interpolate_object": {
+            case "S2::object_isa":
+                if(args[0] !== context)throw new Error("Recovered helper requires executing Context"); return args[0].objectIsa(args[1],args[2]);
+            case "S2::downcast_object":
+                if(args[0] !== context)throw new Error("Recovered helper requires executing Context"); return args[0].downcastObject(args[1],args[2],layer,args[4]);
+            case "S2::interpolate_object":
+                if(args[0] !== context)throw new Error("Recovered helper requires executing Context"); {
                 if(!s2.runtime.isDefined(args[2]))return "";
                 try {return args[0].getFunction(string(args[2][".type"])+"::"+args[3])(args[0],args[2]);}
                 catch {return string(args[2]?.[".type"] ?? args[1] ?? "undef")+"::"+args[3]+" call failed.";}
@@ -174,6 +182,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             }
             case "member": {
                 const base=evalExpr(x.base,env), key=evalExpr(x.key,env);
+                if(isContext(base) && (base !== env.context || x.container !== "array"))throw new Error("Recovered Context hash access refused");
                 if(base === env.context && x.container === "array") {
                     if(key === 0)return {[vtable]:true,context:env.context};
                     if(key === 2)return ctxProps(env.context);
@@ -197,7 +206,16 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             case "sub": return (...args: any[]) => {
                 const local=environment(env);
                 local.vars.set("@_",makeCell(args));
-                if(args[0] && typeof args[0].getFunction === "function")local.context=args[0];
+                // Only native-style returned function bodies establish the executing
+                // Context. An arbitrary object with a getFunction field is
+                // not authority to change host dispatch or output channels.
+                const contextBody=x.body.some(statement=>statement.kind === "expr" &&
+                    statement.expr.kind === "declare" && statement.expr.names.includes("$_ctx"));
+                if(contextBody) {
+                    if(!isContext(args[0]))throw new Error("Recovered function requires authoritative Context");
+                    if(env.context && args[0] !== env.context)throw new Error("Recovered function changed executing Context");
+                    local.context=args[0];
+                }
                 const signal=run(x.body,local,false);
                 return signal?.kind === "return" ? signal.value : undefined;
             };
