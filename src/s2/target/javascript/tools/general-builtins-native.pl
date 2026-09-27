@@ -37,6 +37,7 @@ my @rows=(
     S2::Builtin::LJ::htmlattr($ctx,'WIDTH',$input),
     S2::Builtin::LJ::htmlattr($ctx,'width','0'),
     S2::Builtin::LJ::striphtml($ctx,"a<b>x</b><tag\nfoo>y"),
+    S2::Builtin::LJ::striphtml($ctx,"a<b\rc>d<e\nf>g"),
     S2::Builtin::LJ::clean_css_classname($ctx,'evaluate eval'),
     S2::Builtin::LJ::alternate($ctx,'one','two'),
     S2::Builtin::LJ::alternate($ctx,'one','two'),

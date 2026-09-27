@@ -376,7 +376,7 @@ export interface AnonymousEntryRequest {
 export type LiveFailure = "not-found" | "unsupported" | "changed" | "unavailable";
 export type LiveResult =
     | { readonly ok: false; readonly reason: LiveFailure }
-    | { readonly ok: true; readonly html: string | Uint8Array; readonly setCookie: string | null };
+    | { readonly ok: true; readonly html: string | Uint8Array; readonly contentLength?: number; readonly setCookie: string | null };
 
 export interface AnonymousRecentService {
     // HEAD performs the same authorization/render/recheck as GET. Server strips

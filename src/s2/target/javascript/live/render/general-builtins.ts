@@ -28,7 +28,7 @@ import {escapeNativeHtml} from "./general-diagnostics";
 const bytes = (value: string): NativeString => NativeString.hostUtf8Bytes(value);
 function stripTags(value: NativeString): NativeString {
     // Exact source LJ/S2.pm striphtml regex, not an HTML parser or sanitizer.
-    const view = value.bytes().toString("latin1").replace(/<.*?>/g, "");
+    const view = value.bytes().toString("latin1").replace(/<[^\n]*?>/g, "");
     return NativeString.fromFrame({bytes: Buffer.from(view,"latin1"), utf8:value.flagged()});
 }
 export interface GeneralBuiltinEnvironment {

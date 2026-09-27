@@ -20,6 +20,9 @@ import path from "node:path";
 import {tmpdir} from "node:os";
 import type {NativeProfile} from "../runtime/native-profile";
 import {parentExpandSiteUrl} from "../live/render/general-site-url-host";
+import {nativePageResponse} from "../live/render/general-response";
+import {createLiveApp} from "../live/server/app";
+import {config} from "../live/tests/fixtures";
 import {GeneralRenderer} from "../live/render/general-child";
 
 test("actual sandboxed channel initializes before selection and retains arbitrary bytes", async () => {
@@ -52,7 +55,7 @@ test("actual sandboxed channel initializes before selection and retains arbitrar
                     return "fixed-selected-data";
                 }});
             assert.deepEqual(calls, ["host:initialize", "select"]);
-            assert.deepEqual(Buffer.from(body), Buffer.from([0xff, 0x00, 0x61]));
+            assert.deepEqual(Buffer.from(body.bytes), Buffer.from([0xff, 0x00, 0x61]));
             const profile = JSON.parse(execFileSync("perl",["tools/compile-active.pl",path.resolve("../.."),
                 path.resolve("../../S2.pm")],{input:JSON.stringify({profileOnly:true}),encoding:"utf8",
                 maxBuffer:1048576,timeout:10000})).profile as NativeProfile;
@@ -64,11 +67,38 @@ test("actual sandboxed channel initializes before selection and retains arbitrar
                     assert.throws(()=>parentExpandSiteUrl({...parameters as object,extra:true},config,profile));
                     return parentExpandSiteUrl(parameters,config,profile);
                 },async select(count){assert.equal(count,3);return "fixed-selected-data";}});
-            assert.equal(Buffer.from(expanded).toString(),"https://app.example.invalid/users/mixed_name/");
+            assert.equal(Buffer.from(expanded.bytes).toString(),"https://app.example.invalid/users/mixed_name/");
             const diagnostic = await renderer.render("b".repeat(64), {start: "fixed-preparation-error-test",
                 async host() {throw Error("Init error must not reach later public hosts");},
                 async select() {throw Error("Init error must not read selected entry bodies");}});
-            assert.equal(Buffer.from(diagnostic).toString(), "<b>Error preparing to run:</b> &lt;author&gt;");
+            assert.equal(Buffer.from(diagnostic.bytes).toString(), "<b>Error preparing to run:</b> &lt;author&gt;");
+            const oracle=JSON.parse(execFileSync("perl",["-MJSON::PP","-MMIME::Base64=encode_base64","-MFile::Temp=tempfile","-e",`
+                use utf8; my @rows; for my $text ("café","☺") {utf8::upgrade($text);
+                my ($fh,$path)=tempfile(); my $length=length($text); my $ok=eval {syswrite($fh,$text);1};
+                seek($fh,0,0);local $/;my $bytes=<$fh>;push @rows,{length=>$length,ok=>$ok?1:0,bytes=>encode_base64($bytes,'')};}
+                print encode_json(\\@rows);`],{encoding:"utf8"}));
+            for(const [index,start] of ["fixed-flagged-latin1-test","fixed-flagged-wide-test"].entries()) {
+                const render=()=>renderer.render((index===0?"d":"e").repeat(64),{start,
+                    async host(){throw Error("Flag control needs no public helper");},async select(){return null;}});
+                const frame=await render();assert.equal(frame.utf8,true);
+                const head=nativePageResponse(frame,"HEAD");assert.equal(head.contentLength,oracle[index].length);
+                assert.equal(head.html.length,0);
+                if(oracle[index].ok)assert.equal(Buffer.from(nativePageResponse(frame,"GET").html).toString("base64"),oracle[index].bytes);
+                else assert.throws(()=>nativePageResponse(frame,"GET"),/Wide character/);
+                const serve=async(request:{method:"GET"|"HEAD"})=>({ok:true as const,
+                    ...nativePageResponse(await render(),request.method),setCookie:null});
+                const app=createLiveApp(config,{serve,serveEntry:serve,async close(){}});
+                try {
+                    for(const method of ["HEAD","GET"] as const) {
+                        const response=await app.inject({method,url:"/users/public_name/",headers:{host:"localhost:8081"}});
+                        assert.equal(response.statusCode,method==="GET"&&!oracle[index].ok?503:200);
+                        if(response.statusCode===200)assert.equal(response.headers["content-length"],String(oracle[index].length));
+                        if(method==="HEAD")assert.equal(response.rawPayload.length,0);
+                        else if(oracle[index].ok)assert.equal(response.rawPayload.toString("base64"),oracle[index].bytes);
+                        else assert.ok(!response.rawPayload.includes(Buffer.from("☺")));
+                    }
+                } finally {await app.close();}
+            }
         } finally {renderer.close();}
     } finally {rmSync(root, {recursive: true, force: true});}
 });

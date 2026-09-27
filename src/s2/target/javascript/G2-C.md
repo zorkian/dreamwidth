@@ -74,3 +74,28 @@ wiring. Finally, fresh real-worker closure, ordinary main Recent/Entry GET/HEAD,
 custom source and recovered execution, independent native comparison, browser and
 persistent privacy/revocation proof remain mandatory. None of these gaps is a
 permanent journal/style/content exclusion or a completed replacement claim.
+
+## Native response boundary correction
+
+The private worker retains the final byte payload AND its UTF-8 flag. The parent
+uses native scalar length for Content-Length. GET reaches the native byte-handle
+adapter: flagged Latin-1 characters become their single octets; wider characters
+cannot be written. HEAD skips that adapter and emits no body, including for wide
+flagged pages. Actual protocol and HTTP controls qualify these separately.
+
+Native wide GET may have already sent status/headers when Starman syswrite dies.
+The viewer's terminal infrastructure failure publishes no program page; this is
+a protective response divergence, not response parity. The retained private,
+no-store cache policy differs from native private,proxy-revalidate. This viewer
+also does not reproduce a Deflater middleware transformation.
+
+The eventual final flag/length must apply after TEMP_PARSE_MAKE_JOURNAL,
+insert_html_before_body_close / insert_html_before_journalctx_body_close,
+PageStats and error iejunk processing. These source postprocessing dependencies
+remain mandatory consumer work; this checkpoint does not claim its current
+frame is the completed native page after those operations.
+
+Native recursion diagnostics include both the check_depth newline and the
+run_function wrapper newline, in preparation and rendered error text. Native
+run_function controls independently qualify the fixed recursion and deadline
+messages. General semantic error COP/eval suffix completion remains tracked.

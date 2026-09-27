@@ -12,6 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import type {NativePVFrame} from "../../runtime/native-string";
 import {spawn, type ChildProcess} from "node:child_process";
 import {PrivateFrameDecoder, encodePrivateFrame, PrivateTransportError} from "./private-transport";
 import {PrivateMessageChannel, type SessionPhase} from "./private-protocol";
@@ -43,7 +44,7 @@ export class GeneralRenderer {
     private readonly children = new Set<ChildProcess>();
     constructor(private readonly sandbox: string, private readonly runtime: VerifiedRuntime,
         private readonly limits: RenderLimits) {}
-    render(job: string, conversation: GeneralConversation): Promise<Uint8Array> {
+    render(job: string, conversation: GeneralConversation): Promise<NativePVFrame> {
         if (this.closed || this.children.size >= 2) return Promise.reject(new PrivateTransportError());
         return new Promise((resolve, reject) => {
             const channel = new PrivateMessageChannel(job);
@@ -53,7 +54,7 @@ export class GeneralRenderer {
                 stdio: ["pipe", "pipe", "ignore"], shell: false});
             this.children.add(child);
             let phase: SessionPhase = "initialize";
-            let terminal = false, failed = false, body: Uint8Array | undefined;
+            let terminal = false, failed = false, body: NativePVFrame | undefined;
             let pending = 0, transportBytes = 0;
             let chain: Promise<void> = Promise.resolve();
             const fail = (): void => {
@@ -94,7 +95,7 @@ export class GeneralRenderer {
                     if (bytes.toString("base64") !== result.base64 || bytes.length > this.limits.maxOutputBytes) {
                         throw new PrivateTransportError();
                     }
-                    body = bytes;
+                    body = Object.freeze({bytes,utf8:result.utf8});
                     terminal = true;
                     child.stdin.end();
                 }

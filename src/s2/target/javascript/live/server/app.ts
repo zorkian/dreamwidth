@@ -124,7 +124,7 @@ export function createLiveApp(
         commonHeaders(reply, "private, no-store")
             .code(200)
             .type("text/html; charset=utf-8")
-            .header("Content-Length", String(body.length));
+            .header("Content-Length", String(result.contentLength ?? body.length));
         if (result.setCookie !== null) reply.header("Set-Cookie", result.setCookie);
         return reply.send(decision.request.method === "HEAD" ? "" : body);
     });

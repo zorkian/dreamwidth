@@ -12,6 +12,8 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import type {NativePVFrame} from "../../runtime/native-string";
+import {nativePageResponse} from "./general-response";
 import {randomBytes} from "node:crypto";
 import type {LiveResult, NativeJournalAuthority, NativeSelectedSnapshot, RawPageRequest, PublicAppConfig} from "../contracts";
 import type {MysqlLiveStore} from "../data/mysql";
@@ -44,7 +46,7 @@ export class GeneralRequestPipeline {
         private readonly coordinator: Pick<ProgramCoordinator,"prepare"|"transfer">,
         private readonly renderer: Pick<GeneralRenderer,"render">,
         private readonly config: PublicAppConfig, private readonly operations: GeneralRequestOperations) {}
-    async render(requestInput: RawPageRequest, programInput: ActiveProgramRequest): Promise<LiveResult> {
+    async render(requestInput: RawPageRequest, programInput: ActiveProgramRequest, method: "GET"|"HEAD" = "GET"): Promise<LiveResult> {
         // Capture before any await; later caller mutation cannot redirect the
         // program, selected window or final authority reread.
         const request = structuredClone(requestInput), programRequest = structuredClone(programInput);
@@ -65,10 +67,10 @@ export class GeneralRequestPipeline {
         const prepared = await this.coordinator.prepare(active.program);
         const helpers = this.operations.helpers(prepared,journal);
         let selected: NativeSelectedSnapshot | undefined;
-        let bytes: Uint8Array;
+        let frame: NativePVFrame;
         let missing = false;
         try {
-            bytes = await this.renderer.render(randomBytes(32).toString("hex"),{
+            frame = await this.renderer.render(randomBytes(32).toString("hex"),{
                 start:{version:1,transfer:this.coordinator.transfer(prepared),config:this.config,kind:request.page.kind},
                 host:helpers.host,
                 select:async count=>{
@@ -99,6 +101,8 @@ export class GeneralRequestPipeline {
             return selected ? this.store.revalidateNativeSelectedFingerprint(selected) : true;
         });
         if (!current) return {ok:false,reason:"changed"};
-        return {ok:true,html:bytes,setCookie:null};
+        // Journal.pm sets native scalar length, but HEAD never invokes the byte
+        // socket printer. A wide flagged HEAD is therefore not a GET error.
+        return {ok:true,...nativePageResponse(frame,method),setCookie:null};
     }
 }
