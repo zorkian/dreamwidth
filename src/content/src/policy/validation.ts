@@ -81,7 +81,7 @@ export function validateCleanerLimits(value: CleanerLimits): void {
 export function validateInput(value: EntryContentInput, limits: CleanerLimits): void {
     const input = record(value, ["body", "format", "context"]);
     text(input.body, limits.maxInputBytes);
-    if (!["html_raw0", "html_casual0", "html_casual1"].includes(String(input.format))) throw new UnsupportedContent();
+    if (!["html_raw0", "html_casual0", "html_casual1", "markdown0", "markdown0-magic"].includes(String(input.format))) throw new UnsupportedContent();
     const context = record(input.context, ["policy", "insertionContext", "documentUrl", "entryUrl",
         "journalUsername", "journalId", "entryId", "reader", "imagePlaceholder", "cuts", "urls"]);
     if (context.policy !== "dreamwidth-entry-html-raw0-v1" ||
@@ -128,9 +128,6 @@ export function validateMetadataInput(value: EntryMetadataInput, limits: Cleaner
     text(input.subject, 1024);
     validateInput(input.entry as EntryContentInput, limits);
     if ((input.entry as EntryContentInput).context.cuts !== "source-compatible-entry") {
-        throw new UnsupportedContent();
-    }
-    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test((input.entry as EntryContentInput).body)) {
         throw new UnsupportedContent();
     }
 }

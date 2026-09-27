@@ -144,3 +144,75 @@ test('current child strips support-auth source but final reread retains original
         assert.equal((await get(address.port,'/users/ordinary6/76801.html')).status,200);
     } finally {await app.close();}
 }));
+
+test('current Markdown child renders selected originals with independent OG and revokes source/editor changes',{
+    skip:process.env.S2_SELECTED_FIXTURE!=='1',timeout:120000},async t=>withSelectedFixture(async f=>{
+    const {store,admin,table,g,c,other}=f;
+    const [defs]:any=await admin.query(`SELECT propid,name FROM ${table(g,'logproplist')} WHERE name='editor'`);
+    const prop=defs[0].propid;
+    const markdown='# Markdown heading\n\n3. First\n4. Second\n\n'+
+        '<b style="color:red;font-weight:bold">Styled Markdown</b>\n\n'+
+        '[Destination](https://markdown.slice17.invalid/?x=1&y=2)\n\n'+
+        '<div class="ljcut">Markdown cut body</div>';
+    const setBody=async(body:string)=>admin.query(`UPDATE ${table(c,'logtext2')} SET event=CONVERT(? USING latin1)
+        WHERE journalid=900001 AND jitemid=300`,[Buffer.from(body)]);
+    const setEditor=async(value:string|null)=>{
+        await admin.query(`DELETE FROM ${table(c,'logprop2')} WHERE journalid=900001 AND jitemid=300 AND propid=?`,[prop]);
+        if(value!==null)await admin.query(`INSERT INTO ${table(c,'logprop2')} (journalid,jitemid,propid,value)
+            VALUES(900001,300,?,?)`,[prop,value]);
+    };
+    await admin.query(`UPDATE ${table(c,'logtext2')} SET event=CONVERT(? USING latin1)
+        WHERE journalid=900001 AND jitemid IN (301,302)`,[Buffer.from([255])]);
+    await admin.query(`UPDATE ${table(other,'logtext2')} SET event='FOREIGN_MARKDOWN' WHERE journalid=900002`);
+    const service=await createAnonymousRecentService({repository:store,secretSource:store,config,capabilities,limits,
+        artifact:{path:process.env.S2_LIVE_TEST_ARTIFACT!}});
+    const app=createLiveApp(config,service);const original=Renderer.prototype.render;
+    const capture=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,input:RenderInput){
+        assert.ok(!JSON.stringify(input).includes('FOREIGN_MARKDOWN'));
+        assert.ok(input.journal.entries.every(entry=>!entry.rawBody.includes('\uFFFD')));
+        return original.call(this,input);
+    });
+    try {
+        await app.listen({host:'127.0.0.1',port:process.env.S2_MARKDOWN_BROWSER_OUTPUT?8081:0});
+        const address=app.server.address();assert.ok(address&&typeof address!=='string');
+        for(const editor of ['markdown0','markdown','markdown_latest',null]){
+            await setEditor(editor);await setBody(editor===null?'!markdown\n'+markdown:markdown);
+            const baseline=await store.loadRawSnapshot(f.request('ordinary6'));assert.ok(baseline);
+            for(const path of ['/users/ordinary6/','/users/ordinary6/76801.html']){
+                const page=await get(address.port,path);assert.equal(page.status,200,page.body);
+                assert.equal(page.headers['cache-control'],'private, no-store');
+                assert.ok(page.body.includes('<h1>Markdown heading</h1>'));
+                assert.ok(page.body.includes('<ol>'));assert.ok(!page.body.includes('<ol start="3">'));
+                assert.ok(page.body.includes('href="https://markdown.slice17.invalid/?x=1&amp;y=2"'));
+                assert.ok(!page.body.includes('FOREIGN_MARKDOWN'));
+                if(path.endsWith('.html')){
+                    assert.ok(page.body.includes('Markdown cut body'));
+                    if(editor===null)assert.ok(page.body.includes('&lt;h1&gt;Markdown heading&lt;/h1&gt;'));
+                    else assert.ok(page.body.includes('# Markdown heading&lt;br /&gt;'));
+                }else assert.ok(!page.body.includes('Markdown cut body'));
+            }
+            assert.equal((await store.loadRawSnapshot(f.request('ordinary6')))!.fingerprint,baseline.fingerprint);
+        }
+        await setEditor('html_raw0');await setBody('!markdown\n**Independent OG**');
+        const raw=await get(address.port,'/users/ordinary6/76801.html');assert.equal(raw.status,200);
+        assert.ok(raw.body.includes('!markdown\n**Independent OG**'));
+        assert.ok(raw.body.includes('&lt;p&gt;&lt;strong&gt;Independent OG&lt;/strong&gt;&lt;/p&gt;'));
+        await setEditor('markdown0');await setBody('**Freshness Markdown**');
+        const baseline=await store.loadRawSnapshot(f.request('ordinary6'));assert.ok(baseline);
+        for(const change of ['source','editor']){
+            const hook=t.mock.method(Renderer.prototype,'render',async function(this:Renderer,input:RenderInput){
+                const result=await original.call(this,input);
+                if(change==='source')await setBody('**Changed Markdown**');else await setEditor('html_raw0');
+                return result;
+            });
+            try{
+                const revoked=await get(address.port,'/users/ordinary6/76801.html');assert.equal(revoked.status,409);
+                assert.equal(revoked.headers['set-cookie'],undefined);assert.ok(!revoked.body.includes('Freshness Markdown'));
+            }finally{hook.mock.restore();await setEditor('markdown0');await setBody('**Freshness Markdown**');}
+            assert.equal((await store.loadRawSnapshot(f.request('ordinary6')))!.fingerprint,baseline.fingerprint);
+        }
+        await setEditor(null);await setBody('!markdown\n'+markdown);
+        const page=await get(address.port,'/users/ordinary6/76801.html');assert.equal(page.status,200);
+        await editorsBrowser(address.port,page.body,'markdown');
+    }finally{capture.mock.restore();await app.close();}
+}));

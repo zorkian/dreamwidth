@@ -28,7 +28,8 @@ import {repairFormatting} from "./policy/formatting";
 import {replaceCuts, type LocateNode} from "./policy/cuts";
 import {ImagePass, parseSrcset} from "./policy/images";
 import {cleanStyle} from "./policy/css";
-import {metadataText} from "./policy/metadata";
+import {metadataText, casualMentions} from "./policy/metadata";
+import {convertMarkdown, hasMagicMarkdown, stripMagicMarkdown} from "./markdown";
 import {initialNewlines} from "./policy/newlines";
 import {stripRequestAuth} from "./policy/request-auth";
 import {formDestination, resolveDocumentUrl, retainedAttributeValue} from "./policy/urls";
@@ -248,14 +249,6 @@ function commentTransform(root:Element,anonymous:boolean,links:ReadonlyMap<Eleme
 }
 
 // Native inputs are byte strings; keep ASCII word classes and escape-pair order.
-function casualMentions(value:string):string {
-    if(/^@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/m.test(value))throw new UnsupportedContent();
-    return value.replace(/(\\.)|(?<=[^\w/])@([\w-]+)(?:\.[\w.-]*[\w-])?(?=$|\W)/gm,(match,escape)=>{
-        if(escape)return escape==='\\@'?'@':escape;
-        throw new UnsupportedContent();
-    });
-}
-
 // html_casual1 autolinks and breaks are a distinct original-source operation.
 function casualText(root:Element,source:string,comment=false,mentions=true,autoLinks=true,entry=false,recent=false,locate?:LocateNode):void {
     if(!comment&&!entry&&/^\s*!markdown\s*\r?\n/i.test(source))throw new UnsupportedContent();
@@ -313,6 +306,27 @@ function casualText(root:Element,source:string,comment=false,mentions=true,autoL
     }
 }
 
+function qualifyMarkdownHtml(root: Element): void {
+    for (const element of root.querySelectorAll("[markdown]")) {
+        if (["1", "on", "yes"].includes((element.getAttribute("markdown") ?? "").toLowerCase()))
+            throw new UnsupportedContent();
+    }
+}
+
+function markdownText(root: Element, source: string, locate: LocateNode): void {
+    const walker = root.ownerDocument.createTreeWalker(root, 4);
+    while (walker.nextNode()) {
+        const node = walker.currentNode as Text;
+        const parent = node.parentElement!;
+        if (parent.closest("code,pre,textarea,lj-raw,blockquote.twitter-tweet") ||
+            [...eatenTags].some(tag => parent.closest(tag))) continue;
+        const location = locate(node);
+        if (!location) continue; // Generated cut controls are not author text.
+        casualMentions(source.slice(location.startOffset, location.endOffset));
+        node.data = casualMentions(node.data);
+    }
+}
+
 export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
     validateCleanerLimits(limits);
     const bounds = Object.freeze({...limits});
@@ -326,7 +340,13 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 // Bounds and exchange identity cover ORIGINAL input. All parser
                 // locations and source slices below cover the stripped copy.
                 input = {...input, body: stripRequestAuth(input.body)};
-                const entryCasual = !casual && !comment && input.format !== "html_raw0";
+                const entryMarkdown = !casual && !comment && ["markdown0", "markdown0-magic"].includes(input.format) && input.body !== "" && input.body !== "0";
+                const conversion = entryMarkdown ? convertMarkdown(
+                    input.format === "markdown0-magic" ? stripMagicMarkdown(input.body) : input.body,
+                    bounds.maxInputBytes, bounds.maxNodes, bounds.maxDepth) : undefined;
+                if (conversion) input = {...input, body: conversion.html};
+                const entryCasual = !casual && !comment && !entryMarkdown &&
+                    ["html_casual0", "html_casual1"].includes(input.format);
                 // No runScripts, resources, fromURL or caller DOM. This worker is
                 // also denied network/files/children by the outer kernel/runtime
                 // boundary; DOMPurify is not treated as a resource-privacy tool.
@@ -336,6 +356,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     // use the typed result below, not jsdom's ambient console.
                     virtualConsole: new VirtualConsole()});
                 const root = dom.window.document.body;
+                if (entryMarkdown) qualifyMarkdownHtml(root);
                 checkTree(root, bounds, dom.window.document.head);
                 auditSource(dom.window.document, input.body, input.context.documentUrl,
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
@@ -346,8 +367,8 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 repairFormatting(root, node => dom!.nodeLocation(node) ?? null);
                 // Resolve entry cuts first: omitted Recent bodies must not reach
                 // format/capability checks, and generated labels are not source text.
-                if(entryCasual)for(const element of root.querySelectorAll("[id]"))element.removeAttribute("id");
-                const earlyIds=entryCasual?replaceCuts(root,input.context,
+                if(entryCasual||entryMarkdown)for(const element of root.querySelectorAll("[id]"))element.removeAttribute("id");
+                const earlyIds=entryCasual||entryMarkdown?replaceCuts(root,input.context,
                     node=>dom!.nodeLocation(node)??null,bounds.maxCuts):undefined;
                 if(casual||comment||entryCasual) {
                     // Full-document parsing discards a source-leading ASCII
@@ -363,6 +384,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                     if(casual||entryCasual)casualText(root,input.body,!!comment,
                         entryCasual?input.format!=="html_casual0":comment?.formatting!=="html_casual0",!comment?.anonymous,entryCasual,input.context.cuts==="source-compatible-recent",node=>dom!.nodeLocation(node)??null);
                 }
+                if (entryMarkdown) markdownText(root, input.body, node=>dom!.nodeLocation(node)??null);
                 // Source body wrappers are removed by clean_event, including all
                 // their attributes. The private BODY remains only as context.
                 for (const attribute of [...root.attributes]) root.removeAttribute(attribute.name);
@@ -423,7 +445,10 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                 if (Buffer.byteLength(html) > bounds.maxOutputBytes) throw new UnsupportedContent();
                 return {kind: "ok", fragment: {context: "html-div-flow", html} as BodyFragment,
                     provenance: {policy: input.context.policy, inputSha256: hash,
-                        outputSha256: createHash("sha256").update(html).digest("hex"), cutsOmitted: ids.size / 2}};
+                        outputSha256: createHash("sha256").update(html).digest("hex"), cutsOmitted: ids.size / 2,
+                        ...(conversion ? {markdown: {converter: conversion.converter,
+                            optionsSha256: conversion.optionsSha256, sourceSha256: conversion.sourceSha256,
+                            htmlSha256: conversion.htmlSha256, tokenCount: conversion.tokenCount}} : {})}};
             } catch (error) {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
             } finally { dom?.window.close(); }
@@ -455,13 +480,17 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
             let dom: JSDOM | undefined;
             try {
                 validateMetadataInput(input, bounds);
-                const entry = {...input.entry, body: stripRequestAuth(input.entry.body)};
+                let entry = {...input.entry, body: stripRequestAuth(input.entry.body)};
+                const markdown = entry.body !== "" && entry.body !== "0" && hasMagicMarkdown(entry.body);
+                if (markdown) entry = {...entry, body: convertMarkdown(stripMagicMarkdown(entry.body),
+                    bounds.maxInputBytes, bounds.maxNodes, bounds.maxDepth).html};
                 // Independent RAW-input parse; never derive helper strings from
                 // the displayed fragment. No scripts/resources or ambient console.
                 dom = new JSDOM(entry.body, {url: entry.context.documentUrl,
                     includeNodeLocations: true, contentType: "text/html",
                     virtualConsole: new VirtualConsole()});
                 const root = dom.window.document.body;
+                if (markdown) qualifyMarkdownHtml(root);
                 checkTree(root, bounds, dom.window.document.head);
                 auditSource(dom.window.document, entry.body, entry.context.documentUrl,
                     node => dom!.nodeLocation(node) ?? null, bounds.maxInputBytes);
@@ -477,7 +506,7 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
                         if (result.kind !== "ok") throw new UnsupportedContent();
                         return result.subject.all;
                     })(),
-                    eventText: metadataText(root, entry, bounds, node => dom!.nodeLocation(node) ?? null)}};
+                    eventText: metadataText(root, entry, bounds, node => dom!.nodeLocation(node) ?? null, markdown)}};
             } catch (error) {
                 return {kind: "failure", reason: error instanceof UnsupportedContent ? "unsupported" : "unavailable"};
             } finally { dom?.window.close(); }

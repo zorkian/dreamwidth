@@ -205,12 +205,18 @@ test("actual full-cut raw re-entry matches the explicit native exception", () =>
 test("metadata refuses contextual unsupported helpers, never plain email or inert examples", () => {
     const cleaner = createEntryCleaner(limits);
     try {
-        for (const body of ["!markdown\n**bold**", " \r\n!MARKDOWN\r\ntext", "@person",
+        for (const body of ["@person",
             "hello @person", "hello \\@person", '<lj user="person">', '<user name="person">',
             'x</b>y', 'x</textarea>y', 'x</span title=">">y',
             '<head><p>body exposure</p>', '<body><head>lost head</head>body']) {
             assert.deepEqual(cleaner.metadata({subject: "subject", entry: input(body)}),
                 {kind: "failure", reason: "unsupported"}, body);
+        }
+        for (const [body, expected] of [["!markdown\n**bold**", "<p><strong>bold</strong></p>\n"],
+            [" \r\n!MARKDOWN\r\ntext", "<p>text</p>\n"]]) {
+            const result = cleaner.metadata({subject: "subject", entry: input(body!)});
+            assert.equal(result.kind, "ok");
+            if (result.kind === "ok") assert.equal(result.metadata.eventText, expected);
         }
         for (const body of ["a@example.test", '<pre>@person</pre>', '<code>@person</code>',
             '<p title="@person">safe</p>', '<!-- @person --><script>@person</script>safe']) {

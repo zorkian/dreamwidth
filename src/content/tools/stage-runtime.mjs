@@ -226,7 +226,7 @@ export function stageRuntime(artifact, sources = {}) {
     const modules = collectModules(workerDist, 'live/render/worker.js',
         new Set(['@dreamwidth/content']));
     const contentModules = collectModules(contentDist, 'index.js',
-        new Set(['css-tree', 'dompurify', 'jsdom']));
+        new Set(['css-tree', 'dompurify', 'jsdom', 'markdown-it']));
     const finalRoot = `${artifact}.runtime`;
     const tempRoot = fs.mkdtempSync(`${finalRoot}.${artifactSha256.slice(0, 12)}.` +
         `${contentLockSha256.slice(0, 12)}.tmp-`);
