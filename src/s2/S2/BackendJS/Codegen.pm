@@ -88,6 +88,23 @@ sub asJS {
 
     my $isHash = $this->{isHash};
 
+    # General artifacts evaluate key/value expressions as data. Object literal
+    # syntax treats __proto__ specially and cannot represent computed S2 keys.
+    # Keep historical artifact emission stable until its consumers migrate.
+    if ($isHash && $bp->{opts}{generalHashes}) {
+        $o->write("s2.runtime.makeHash([");
+        for (my $i = 0; $i < $size; $i++) {
+            $o->write(",") if $i;
+            $o->write("[");
+            $this->{keys}[$i]->asJS($bp, $o);
+            $o->write(",");
+            $this->{vals}[$i]->asJS($bp, $o);
+            $o->write("]");
+        }
+        $o->write("])");
+        return;
+    }
+
     if ($size == 0) {
         $o->write($isHash ? "{}" : "[]");
         return;
@@ -164,6 +181,13 @@ package S2::NodeDeleteStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    if ($bp->{opts}{generalHashes}) {
+        $o->tabwrite("delete ");
+        $this->{'var'}{'varReturnType'} = undef;
+        $this->{'var'}->asJS($bp, $o);
+        $o->writeln(";");
+        return;
+    }
     $o->tabwrite("");
     $this->{'var'}->asJS($bp, $o);
     $o->writeln(" = null;");
@@ -799,6 +823,10 @@ sub asJS {
                 $o->write($this->{'derefLine'}+0);
                 if ($this->{'var'}->isSuper()) {
                     $o->write(",true");
+                    # The checker already selected the exact native super class.
+                    # Runtime alias frames do not identify the declaring class.
+                    $o->write("," . $bp->quoteString($this->{'funcClass'}))
+                        if $bp->{opts}{generalHashes};
                 }
                 $o->write(")");
             } else {
@@ -864,7 +892,7 @@ sub asJS {
         if ($t->isArrayOf()) {
             $o->write(" = []");
         } elsif ($t->isHashOf()) {
-            $o->write(" = {}");
+            $o->write($bp->{opts}{generalHashes} ? " = s2.runtime.makeHash([])" : " = {}");
         } elsif ($t->equals($S2::Type::STRING)) {
             $o->write(" = \"\"");
         } elsif ($t->equals($S2::Type::BOOL)) {
