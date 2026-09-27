@@ -34,6 +34,9 @@ export function validateStockFontFamily(source:string):void {
 export function cleanStockStylesheet(source:string):string {
     if(Buffer.byteLength(source)>65536)throw new UnsupportedContent();
     safeText(source);
+    // The qualified retained ProxyCSSLinks callback scans raw strings/comments,
+    // not CSS nodes. It is an identity only without this literal byte trigger.
+    if(/\burl\(/i.test(source))throw new UnsupportedContent();
     let count=0,depth=0;
     const ast=tree.parse(source,{context:"stylesheet",parseCustomProperty:true,
         onParseError(){throw new UnsupportedContent();}});
@@ -53,5 +56,6 @@ export function cleanStockStylesheet(source:string):string {
     },leave(){depth--;}});
     const output=tree.generate(ast);
     safeText(output);
+    if(/\burl\(/i.test(output))throw new UnsupportedContent();
     return output;
 }

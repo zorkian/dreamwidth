@@ -43,10 +43,16 @@ unsupported pseudo and active CSS syntax refuses. The sheet is bounded to64KiB,
 ordinary font-family value; style-end, declaration injection and functions refuse.
 No retained journal stylesheet is used to mask the generated overrides.
 
-The exporter records only whether `css_cleaner_transform` is installed. A missing
-fact or installed unported hook refuses a page needing this new stylesheet path,
-not startup or pages that retain the original external stylesheet. Re-export the
-private configuration after an upgrade. Cache/proxy/request-defense omissions and
+The no-connect exporter classifies actual registered callback provenance as
+`none`, `proxy-css-links-only`, or `unsupported`, using the exact in-tree module
+source digest, loaded path, package and callback location without executing or
+exporting callbacks. The core ProxyCSSLinks hook is an identity for this admitted
+domain only because BOTH raw stock CSS and final serialization forbid its literal
+case-insensitive word-boundary `url(` trigger, including strings/comments; absence
+of CSS Url nodes alone is insufficient. The known core hook therefore works on an
+ordinary installation. Missing facts/other callbacks refuse only pages needing
+this new stylesheet path, not startup or original external-style pages. Re-export
+the private configuration after an upgrade. Cache/proxy/request-defense omissions and
 restart snapshot semantics remain as documented in [Slice6](SLICE-6.md).
 
 Native Color accepts optional `#` plus three or six hex digits, normalizing valid
@@ -95,6 +101,11 @@ cd ../s2/target/javascript
 mkdir -p /tmp/styles-check
 perl tools/live-compile.pl --themes /tmp/styles-check/stock.json
 /opt/dw-node24/bin/node ../../../content/tools/stage-runtime.mjs /tmp/styles-check/stock.json
+sha256sum /tmp/styles-check/stock.json.runtime/manifest.json
+perl -I"$LJHOME/cgi-bin" tools/site-config.pl \
+  --output /tmp/styles-check/site-config.json --artifact /tmp/styles-check/stock.json \
+  --app-origin http://localhost:8080 --listen-origin http://localhost:8081
+export S2_SITE_CONFIG=/tmp/styles-check/site-config.json
 S2_LIVE_TEST_ARTIFACT=/tmp/styles-check/stock.json \
   /opt/dw-node24/bin/node --test dist/live/tests/styles-native.test.js
 S2_SELECTED_FIXTURE=1 S2_LIVE_TEST_ARTIFACT=/tmp/styles-check/stock.json \
@@ -103,10 +114,13 @@ S2_SELECTED_FIXTURE=1 S2_LIVE_TEST_ARTIFACT=/tmp/styles-check/stock.json \
 /opt/dw-node24/bin/node --test dist/tools/site-config.test.js
 ```
 
+Record the manifest digest immediately after staging; other regression drivers
+may legitimately restage that same artifact root. No-feature parity drivers compile
+without themes, so restore `--themes` and fresh stage before the style tests.
 The SQL test uses guarded temporary fixture schemas and cleans them in its existing
 finally path; ordinary records are untouched. It proves Recent/Entry inline output,
 both themes, typed properties, source/compiled/selection and theme-credit status
-changes producing409, exact restoration, unsafe font refusal and foreign
+changes producing409, exact restoration, unsafe font (including quoted raw hook triggers) refusal and foreign
 owner/parent/unqualified-source isolation. Compact independent native assertions
 cover both page CSS contexts, typed wrappers/Color/null/multiply and present/absent
 credit. Engine mutation tests verify frozen credit bytes and unknown-name refusal.

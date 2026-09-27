@@ -30,6 +30,9 @@ BEGIN {
 }
 use LJ::Config;
 use LJ::Hooks;
+use B qw(svref_2object);
+use Cwd qw(abs_path);
+use Digest::SHA qw(sha256_hex);
 use File::Basename qw(dirname);
 use File::Spec;
 use File::Temp qw(tempfile);
@@ -39,6 +42,38 @@ use Scalar::Util qw(looks_like_number);
 use URI;
 
 sub fail { die bless { message => $_[0] }, 'SiteConfigError'; }
+
+# No callback is executed or exported. This fixed source/provenance proof only
+# qualifies the core URL-rewriter; the worker separately forbids its raw trigger.
+sub css_hook_kind {
+    LJ::Hooks::are_hooks('css_cleaner_transform');
+    my $hooks = $LJ::HOOKS{css_cleaner_transform};
+    return 'none' unless defined $hooks;
+    return 'unsupported' unless ref $hooks eq 'ARRAY' && @$hooks <= 16;
+    return 'none' unless @$hooks;
+    my $expected = abs_path("$ENV{LJHOME}/cgi-bin/DW/Hooks/ProxyCSSLinks.pm");
+    my $loaded = $INC{'DW/Hooks/ProxyCSSLinks.pm'};
+    my $loaded_path = $loaded ? abs_path($loaded) : undef;
+    return 'unsupported' unless $expected && $loaded_path && $loaded_path eq $expected;
+    return 'unsupported' unless -f $expected && -s $expected <= 32768;
+    open my $source, '<:raw', $expected or return 'unsupported';
+    my $bytes = do { local $/; <$source> };
+    close $source;
+    return 'unsupported' unless defined $bytes && sha256_hex($bytes) eq
+        'fd3fbec1dcb22842882b6d353b608895f1f6253c4da3c99331b3b82f35c102cd';
+    for my $hook (@$hooks) {
+        return 'unsupported' unless ref $hook eq 'CODE';
+        my $qualified = eval {
+            my $cv = svref_2object($hook);
+            my $file = abs_path($cv->FILE);
+            $file && $file eq $expected
+                && $cv->GV->STASH->NAME eq 'DW::Hooks::ProxyCSSLinks'
+                && $cv->START->line == 24;
+        };
+        return 'unsupported' unless $qualified;
+    }
+    return 'proxy-css-links-only';
+}
 
 sub string {
     my ( $value, $limit ) = @_;
@@ -270,7 +305,7 @@ sub export_config {
             palImgRoot  => string( $LJ::PALIMGROOT   // '' ),
             userpicRoot => string( $LJ::USERPIC_ROOT // '' ),
             userpicUrlHookConfigured => truth($userpic_hook),
-            cssCleanerHookConfigured => truth( LJ::Hooks::are_hooks('css_cleaner_transform') ),
+            cssCleanerHookKind       => css_hook_kind(),
             headIconHookConfigured   => truth( LJ::Hooks::are_hooks('head_icon') ),
             tagsEnabled              => truth( !$tags_disabled ),
             tagListHookConfigured    => truth($tag_hook),

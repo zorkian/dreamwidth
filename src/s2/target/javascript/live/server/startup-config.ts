@@ -73,9 +73,9 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
         "statPrefix", "jsPrefix", "userDomain", "journalUrls", "usernameMaxLength", "maxScrollback",
         "imgPrefix", "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev",
         "appleTouchIcon", "facebookPreviewIcon", ...(Object.hasOwn(root.app as object,"commentSettings")?["commentSettings"]:[]),
-        ...(Object.hasOwn(root.app as object,"cssCleanerHookConfigured")?["cssCleanerHookConfigured"]:[]),
+        ...(Object.hasOwn(root.app as object,"cssCleanerHookKind")?["cssCleanerHookKind"]:[]),
         ...(Object.hasOwn(root.app as object,"headIconHookConfigured")?["headIconHookConfigured"]:[])]);
-    if(app.cssCleanerHookConfigured!==undefined)boolean(app.cssCleanerHookConfigured);
+    if(app.cssCleanerHookKind!==undefined&&(typeof app.cssCleanerHookKind!=="string"||!["none","proxy-css-links-only","unsupported"].includes(app.cssCleanerHookKind)))invalid();
     if(app.headIconHookConfigured!==undefined)boolean(app.headIconHookConfigured);
     if(app.commentSettings!==undefined) {
         const c=record(app.commentSettings,["pageSize","threadPoint","maxSubjects"]);

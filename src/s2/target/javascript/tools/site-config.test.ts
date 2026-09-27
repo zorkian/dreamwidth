@@ -192,7 +192,7 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
     assert.equal(config.capabilities.s2ViewEntry.hookConfigured, true);
     assert.equal(config.app.journalUrls.hookConfigured, true);
     assert.equal(config.app.userpicUrlHookConfigured, true);
-    assert.equal(config.app.cssCleanerHookConfigured,true);
+    assert.equal(config.app.cssCleanerHookKind,'unsupported');
     assert.equal(config.app.tagListHookConfigured,true);
     assert.equal(config.app.tagsEnabled,true);
     assert.deepEqual(config.placeholder.descriptor,

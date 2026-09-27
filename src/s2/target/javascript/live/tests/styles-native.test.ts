@@ -67,7 +67,7 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
 
 test("theme credit freezes complete prepared emission and refuses later altered chunks",()=>{
  const artifact=validateArtifact(JSON.parse(readFileSync(process.env.S2_LIVE_TEST_ARTIFACT!,'utf8')));
- const cfg={...config,cssCleanerHookConfigured:false};
+ const cfg={...config,cssCleanerHookKind:'none' as const};
  const journal={...approveSnapshot(snapshot(),cfg,capabilities),theme:'dazzle' as const,themeLayoutId:980002,inlineStylesheet:true,
    themeAuthors:[{name:'zvi',author:{userid:900003,username:'zvi',badgeKind:'personal' as const,badgeDeleted:false}}]};
  const input:RenderInput={page:{kind:'recent',pageSkip:0,itemshow:20,maxScrollback:100,hasPrevious:false},journal,config:cfg,skip:0,skipPresent:false,
@@ -76,7 +76,7 @@ test("theme credit freezes complete prepared emission and refuses later altered 
    stylesheet:cleanStockStylesheet,fontFamily:validateStockFontFamily};
  assert.ok(renderStock(artifact,input,2097152,content).includes("lj:user='zvi'"));
  assert.ok(renderStock(artifact,{...input,journal:{...journal,themeAuthors:[{name:'zvi',author:null}]}},2097152,content).includes("class='style-author'>zvi</span>"));
- for(const hook of [undefined,true])assert.throws(()=>renderStock(artifact,{...input,config:{...cfg,cssCleanerHookConfigured:hook}},2097152,content),/Missing qualified stylesheet/);
+ for(const hook of [undefined,'unsupported'] as const)assert.throws(()=>renderStock(artifact,{...input,config:{...cfg,cssCleanerHookKind:hook}},2097152,content),/Missing qualified stylesheet/);
  const original=Context.prototype.runMethod;
  Context.prototype.runMethod=function(value,name){
    if(name==='print()'&&(value as any)['.type']==='RecentPage')this.prop._text_theme_authors='changed';

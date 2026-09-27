@@ -395,7 +395,7 @@ export interface PublicAppConfig {
     readonly palImgRoot: string;
     readonly userpicRoot: string;
     readonly userpicUrlHookConfigured: boolean;
-    readonly cssCleanerHookConfigured?: boolean;
+    readonly cssCleanerHookKind?: "none" | "proxy-css-links-only" | "unsupported";
     readonly headIconHookConfigured?: boolean; // required only for reached comment-author badges
     readonly tagsEnabled: boolean;
     readonly tagListHookConfigured: boolean;

@@ -16,6 +16,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {gzipSync} from 'node:zlib';
+import {mkdtempSync,rmSync} from 'node:fs';
+import path from 'node:path';
+import {readStartupConfig} from '../server/startup-config';
 import {withSelectedFixture} from '../../tools/selected-fixture';
 import {createAnonymousRecentService} from '../policy/service';
 import {createLiveApp} from '../server/app';
@@ -47,7 +50,21 @@ test('actual theme/user property snapshots, stylesheet, isolation and final rere
  await admin.query(`INSERT INTO ${table(c,'userkeywords')} (userid,kwid,keyword) VALUES(900001,1,'Visible tag')`);
  await admin.query(`INSERT INTO ${table(c,'usertags')} (journalid,kwid,display) VALUES(900001,1,'1')`);
  await admin.query(`INSERT INTO ${table(c,'logkwsum')} (journalid,kwid,security,entryct) VALUES(900001,1,9223372036854775808,1)`);
- const appConfig={...config,cssCleanerHookConfigured:false};
+ // Actual owning-site hook provenance, exported without connecting to DB or
+ // executing callbacks. Other fixture config fields describe isolated schemas.
+ const exported=mkdtempSync('/tmp/slice18-site-');
+ let hook;
+ try {
+   const output=path.join(exported,'site.json');
+   const exportRun=spawnSync('perl',['-I',path.join(process.env.LJHOME!,'cgi-bin'),'tools/site-config.pl',
+     '--output',output,'--artifact',process.env.S2_LIVE_TEST_ARTIFACT!,
+     '--app-origin',config.canonicalAppOrigin,'--listen-origin',config.listenOrigin],
+     {encoding:'utf8',timeout:15000});
+   assert.equal(exportRun.status,0,exportRun.stderr);
+   hook=readStartupConfig(output).app.cssCleanerHookKind;
+   assert.equal(hook,'proxy-css-links-only');
+ }finally{rmSync(exported,{recursive:true,force:true});}
+ const appConfig={...config,cssCleanerHookKind:hook};
  const service=await createAnonymousRecentService({repository:store,secretSource:store,config:appConfig,capabilities,limits,artifact:{path:process.env.S2_LIVE_TEST_ARTIFACT!}});
  const app=createLiveApp(appConfig,service);
  if(process.env.S2_STYLES_BROWSER_OUTPUT)await app.listen({host:'127.0.0.1',port:8081});
@@ -94,6 +111,8 @@ test('actual theme/user property snapshots, stylesheet, isolation and final rere
    for(const value of ['Arial; color:red','</style><script>alert(1)</script>','url(https://bad.invalid)']) {
      await set(user.compiled.replace('Georgia',value));assert.equal((await get()).statusCode,422,value);
    }
+   await set(user.compiled.replace('Georgia',JSON.stringify('"url(foo)"').slice(1,-1)));
+   assert.equal((await get()).statusCode,422,'Raw hook trigger inside a legal quoted font string refuses');
    await set(user.compiled);
    for(const [query,restore] of [
      [`UPDATE ${table(g,'s2layers')} SET userid=900002 WHERE s2lid=980005`,`UPDATE ${table(g,'s2layers')} SET userid=900001 WHERE s2lid=980005`],
@@ -103,5 +122,19 @@ test('actual theme/user property snapshots, stylesheet, isolation and final rere
    await admin.query(`UPDATE ${table(c,'s2stylelayers2')} SET s2lid=980003 WHERE userid=900001 AND styleid=44 AND type='theme'`);
    assert.equal(await store.revalidateFingerprint(baseline),true);
    assert.equal((await get()).statusCode,200);
+   // A second immutable config snapshot models an extra unported callback. The
+   // real SQL repository is shared; only this service's close ownership differs.
+   const other=await createAnonymousRecentService({repository:{
+     loadRawSnapshot:request=>store.loadRawSnapshot(request),
+     revalidateFingerprint:snapshot=>store.revalidateFingerprint(snapshot),close:async()=>{}},
+     secretSource:store,config:{...appConfig,cssCleanerHookKind:'unsupported'},capabilities,limits,
+     artifact:{path:process.env.S2_LIVE_TEST_ARTIFACT!}});
+   const otherApp=createLiveApp({...appConfig,cssCleanerHookKind:'unsupported'},other);
+   try {
+     const refusal=await otherApp.inject({url:'/users/ordinary6/',headers:{host:'localhost:8081'}});
+     assert.equal(refusal.statusCode,422);assert.equal(refusal.body,'Unsupported journal state\n');
+     assert.equal(refusal.headers['cache-control'],'private, no-store');
+     assert.equal(refusal.headers['set-cookie'],undefined);assert.equal(refusal.headers.location,undefined);
+   }finally{await otherApp.close();await other.close();}
  } finally {await app.close();await service.close();}
 }));
