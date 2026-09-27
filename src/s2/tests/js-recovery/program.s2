@@ -1,0 +1,73 @@
+# program.s2
+#
+# Independent active-recovery language and dispatch fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = core;
+property string label;
+set label = "A";
+class Box { var int value; function describe(): string; }
+class Child extends Box { }
+class Grandchild extends Child { }
+function Box::describe(): string { return "box=" + $.value; }
+function Child::describe(): string { return "child(" + $super->describe() + ")"; }
+function builtin int(string input): int;
+function decorate(int n): string {
+    var int sum = 0;
+    foreach var int item (1..$n) { $sum = $sum + $item; }
+    return "base=" + $sum;
+}
+function main() {
+    var string text = "0";
+    if ($text) { print $*label; } else { print "WRONG"; }
+    var int[] values = [1,2,3];
+    push $values, 4;
+    var int tail = pop $values;
+    var int total = 0;
+    foreach var int v ($values) { $total = $total + $v; }
+    var string{} names = {"__proto__" => "kept", "constructor" => "ordinary"};
+    var Box box = new Grandchild;
+    $box.value = $total;
+    print ":" + $box->describe() + ":" + $tail;
+    var int index = 0;
+    while ($index < 3) { $index++; if ($index == 2) { continue; } print ":" + $index; }
+    print ":" + decorate(6) + ":" + $names{"__proto__"};
+    print ":" + int("-4") + ":" + (7 / 2) + ":" + (-7 % 3);
+    var int[] reversed = reverse $values;
+    print ":reverse=" + $reversed[0] + ":size=" + size $reversed;
+    var string letters = "é猫";
+    var string result = "";
+    foreach var string ch ($letters) { $result = $ch + $result; }
+    print ":unicode=" + $result;
+    var int{} keyed = {"one" => 1, "two" => 2};
+    var int count = 0;
+    foreach var string key ($keyed) { $count = $count + $keyed{$key}; }
+    print ":keys=" + $count;
+    var Child child = $box as Child;
+    if ($child isa Box and $child instanceof Grandchild) { print ":type=child"; }
+    var Box empty = null Box;
+    if (isnull $empty) { print ":null"; }
+
+    var string bytes = "猫é";
+    var string backward = reverse $bytes;
+    print ":byte=" + $bytes + ":byte-size=" + size $bytes;
+    print ":scalar-reverse=" + $backward + ":direct-reverse=";
+    print reverse $bytes;
+    print ":compare=";
+    if ("猫" < "é") { print "less"; } else { print "greater"; }
+    var int wide = 9007199254740993;
+    var int root = 94906267;
+    print ":wide=" + $wide + ":product=" + ($root * $root);
+    var int alias = 1;
+    print ":alias=" + $alias + ":" + ++$alias;
+    println ":done";
+}
