@@ -34,16 +34,25 @@ const helpers = new Set(["get_func_num", "get_object_func_num", "S2::Object::new
 
 function validate(program: Stmt[], id: number): string[] {
     const host = new Set<string>();
-    const checkExpr = (x: Expr, scope: Set<string>, top=false): void => {
+    const checkExpr = (x: Expr, scope: Set<string>, top=false, contextArgument=false): void => {
         switch(x.kind) {
             case "literal": if(typeof x.value === "number" && !Number.isSafeInteger(x.value))throw new RecoveryGap("Integer representation needs native-width lowering");break;
             case "name": if(!["VTABLE","STATIC","PROPS"].includes(x.name))throw new RecoveryGap("Unknown generated constant");break;
             case "variable":
+                if(x.name === "$_ctx" && !contextArgument)throw new RecoveryGap("Context is only a generated slot receiver or argument");
                 if(!scope.has(x.name) && !["$S2::pout","$S2::pout_s","$S2::sub_ctr","$S2::depth_check_every"].includes(x.name))throw new RecoveryGap("Unbound generated lexical " + x.name);
                 break;
             case "array": case "tuple": x.items.forEach(v=>checkExpr(v,scope));break;
             case "hash": x.entries.forEach(([k,v])=>{checkExpr(k,scope);checkExpr(v,scope);});break;
-            case "member": checkExpr(x.base,scope);checkExpr(x.key,scope);break;
+            case "member":
+                if(x.base.kind === "variable" && x.base.name === "$_ctx") {
+                    const slot=x.key;
+                    if(x.container !== "array" || !((slot.kind === "name" && ["VTABLE","PROPS"].includes(slot.name)) ||
+                        (slot.kind === "literal" && [0,2].includes(slot.value as number))))
+                        throw new RecoveryGap("Non-generated Context member");
+                    checkExpr(x.base,scope,false,true);
+                } else checkExpr(x.base,scope);
+                checkExpr(x.key,scope);break;
             case "conditional": checkExpr(x.test,scope);checkExpr(x.yes,scope);checkExpr(x.no,scope);break;
             case "declare":
                 if(x.value)checkExpr(x.value,scope);
@@ -53,7 +62,7 @@ function validate(program: Stmt[], id: number): string[] {
                 const builtin=/^S2::Builtin(?:::LJ)?::[A-Za-z_][A-Za-z0-9_]*$/.test(x.name);
                 if(!helpers.has(x.name) && !(top && registrations.has(x.name)) && !builtin)throw new RecoveryGap("Non-S2 capability " + x.name);
                 if(builtin)host.add(x.name);
-                x.args.forEach(a=>checkExpr(a,scope));break;
+                x.args.forEach(a=>checkExpr(a,scope,false,true));break;
             }
             case "invoke": {
                 const c=x.callee;
@@ -63,7 +72,7 @@ function validate(program: Stmt[], id: number): string[] {
                     ((c.base.key.kind === "name" && c.base.key.name === "VTABLE") ||
                         (c.base.key.kind === "literal" && c.base.key.value === 0));
                 if(!output && !virtual)throw new RecoveryGap("Computed non-S2 callable");
-                checkExpr(c,scope);x.args.forEach(a=>checkExpr(a,scope));break;
+                checkExpr(c,scope);x.args.forEach(a=>checkExpr(a,scope,false,true));break;
             }
             case "binary":
                 if(x.op === "=" && x.left.kind !== "variable" && x.left.kind !== "member")throw new RecoveryGap("Invalid generated assignment");

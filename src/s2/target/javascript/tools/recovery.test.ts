@@ -18,6 +18,8 @@ import {execFileSync} from "node:child_process";
 import {resolve} from "node:path";
 import {runInNewContext} from "node:vm";
 import {s2, Context, Layer} from "../runtime/s2runtime";
+import {Parser} from "../live/render/recovery/parser";
+import {instantiate} from "../live/render/recovery/execute";
 import {recoverActiveLayer, type RecoveryInput} from "../live/render/recovery";
 
 function input(code: string, id=101): RecoveryInput {
@@ -29,6 +31,7 @@ function input(code: string, id=101): RecoveryInput {
 function testRuntime() {
     const metadata: unknown[]=[];
     return {metadata, api:{...s2, runtime:{...s2.runtime,
+        isContext(value: unknown) {return value instanceof Context;},
         makeHash(pairs: [unknown,unknown][]) {
             const hash=Object.create(null);for(const [k,v] of pairs)hash[String(k)]=v;return hash;
         },recoveryCheckpoint() {}},
@@ -145,4 +148,47 @@ test("retained native operator precedence and array autovivification are explici
     };});`));
     let output="";new Context([layer],s=>{output+=s;}).runFunction("main()");
     assert.equal(output,"223");
+});
+
+test("Context fields and alternate builtin contexts cannot be nominated by active code", () => {
+    for(const body of [
+        `$_ctx->{"safeOutput"}=sub {my ($x)=@_;return $x;};$S2::pout_s->("<script>x</script>");`,
+        `my $x=$_ctx->{"builtin"};`,
+        `$_ctx->[1]{"safeOutput"}="changed";`,
+        `my $alias=$_ctx;`,
+    ]) {
+        const result=recoverActiveLayer(input(envelope(`register_function(101,["main()"],sub {return sub {my ($_ctx)=@_;${body}};});`)),1);
+        assert.equal(result.kind,"gap");
+    }
+    const {layer}=recovered(envelope(`register_function(101,["main()"],sub {return sub {my ($_ctx)=@_;
+        S2::Builtin::LJ::Page__print_body({"builtin"=>{}},{});
+    };});`));
+    assert.throws(()=>new Context([layer],()=>{}).runFunction("main()"),/requires executing Context/);
+});
+
+
+test("executor independently protects Context and refuses forged function contexts", () => {
+    const {layer}=recovered(envelope(`register_function(101,["main()"],sub {return sub {my ($_ctx)=@_;
+        $S2::pout_s->("<script>x</script>");
+    };});`));
+    const fn=layer.functions.get("main()")!;
+    let bypass=false;
+    assert.throws(()=>fn({getFunction(){},safePrint(){bypass=true;},print(){bypass=true;}} as unknown as Context),/authoritative Context/);
+    assert.equal(bypass,false);
+    let safe="";
+    new Context([layer],()=>{},undefined,undefined,text=>{safe+=text;return "clean";}).runFunction("main()");
+    assert.equal(safe,"<script>x</script>");
+});
+
+
+test("executor refuses Context hash reads and writes even without frontend validation", () => {
+    for(const body of [
+        `$_ctx->{"safeOutput"}=sub {my ($x)=@_;return $x;};`,
+        `my $x=$_ctx->{"builtin"};`,
+        `my $alias=$_ctx;my $x=$alias->{"write"};`,
+    ]) {
+        const ast=new Parser(envelope(`register_function(101,["main()"],sub {return sub {my ($_ctx)=@_;${body}};});`)).parse();
+        const layer=instantiate(ast,testRuntime().api,101) as Layer;
+        assert.throws(()=>new Context([layer],()=>{}).runFunction("main()"),/Context (mutation|hash access) refused/);
+    }
 });
