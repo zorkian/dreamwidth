@@ -83,6 +83,23 @@ function validateProfile(value:any):NativeProfile {
         }
         Object.freeze(map.ranges);Object.freeze(map.values);Object.freeze(map);
     }
+    for(const name of ["word","space"]) {
+        const classes=value[name];
+        if(!classes||typeof classes!=="object")throw new CompilerFailure();
+        for(const mode of ["byte","unicode"]) {
+            const ranges=classes[mode];
+            if(!Array.isArray(ranges)||!ranges.length||ranges.length%2||ranges.length>100000)
+                throw new CompilerFailure();
+            let previous=-1;
+            for(const boundary of ranges) {
+                if(!Number.isSafeInteger(boundary)||boundary<0||boundary<=previous||
+                    boundary>(mode==="byte"?256:0x110000))throw new CompilerFailure();
+                previous=boundary;
+            }
+            Object.freeze(ranges);
+        }
+        Object.freeze(classes);
+    }
     return Object.freeze(value);
 }
 

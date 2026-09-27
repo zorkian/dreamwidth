@@ -16,6 +16,10 @@ export interface NativeCaseMap {
     readonly ranges: readonly number[];
     readonly values: readonly (number | readonly number[])[];
 }
+export interface NativeCharacterClass {
+    readonly byte: readonly number[];
+    readonly unicode: readonly number[];
+}
 export interface NativeProfile {
     readonly version: string;
     readonly archname: string;
@@ -25,6 +29,8 @@ export interface NativeProfile {
     readonly nvtype: string;
     readonly nv_preserves_uv_bits: string;
     readonly unicodeVersion: string;
+    readonly word: NativeCharacterClass;
+    readonly space: NativeCharacterClass;
     readonly lower: NativeCaseMap;
     readonly upper: NativeCaseMap;
     readonly title: NativeCaseMap;
@@ -41,4 +47,19 @@ export function mapNativeCase(codepoint: number, table: NativeCaseMap): readonly
     if (mapped === undefined || mapped === 0) return [codepoint];
     if (typeof mapped === 'number') return [mapped + codepoint - table.ranges[index]!];
     return mapped;
+}
+
+// Perl /d selects its native byte class until the scalar has the UTF-8 flag.
+// These inversion lists come from the same installed Perl as the compiled code.
+export function nativeCharacterClass(profile: NativeProfile, kind: 'word' | 'space',
+    codepoint: number, utf8: boolean): boolean {
+    if (!Number.isInteger(codepoint) || codepoint < 0 || codepoint > 0x10ffff) return false;
+    const ranges = profile[kind][utf8 ? 'unicode' : 'byte'];
+    let low = 0, high = ranges.length;
+    while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (ranges[middle]! <= codepoint) low = middle + 1;
+        else high = middle;
+    }
+    return (low & 1) === 1;
 }
