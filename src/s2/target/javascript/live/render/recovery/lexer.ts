@@ -19,7 +19,11 @@ import {RecoveryGap, type Token} from "./ast";
 export function tokenize(source: string): Token[] {
     const tokens: Token[] = [];
     let i = 0;
-    const push = (kind: Token["kind"], value: string, offset: number) => tokens.push({kind, value, offset});
+    const starts=[0];
+    for(let at=0;at<source.length;at++)if(source[at]==='\n')starts.push(at+1);
+    const lineAt=(offset:number)=>{let lo=0,hi=starts.length;while(lo+1<hi){const mid=(lo+hi)>>1;if(starts[mid]!<=offset)lo=mid;else hi=mid;}return lo+1;};
+    const push = (kind: Token["kind"], value: string, offset: number) => tokens.push({kind, value, offset,
+        endOffset:i,line:lineAt(offset),endLine:lineAt(Math.max(offset,i-1))});
     while (i < source.length) {
         const start = i, c = source[i]!;
         if (/\s/.test(c)) { i++; continue; }

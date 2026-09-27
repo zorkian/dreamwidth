@@ -17,6 +17,14 @@ sub asJS {
 # NodeExpr. :(
 # Generated native Perl imposes context at expression boundaries. Carry that
 # explicitly so a function returning reverse sees its caller's list/scalar mode.
+# A mutable caller-frame COP, not a lexical call-site scope. While conditions
+# retain the last executed body COP on their later evaluations.
+sub nativeCOP {
+    my ($this, $bp, $o) = @_;
+    return unless $bp->{opts}{generalScalars} && $this->{native_cop_line};
+    $o->tabwriteln("s2.runtime.nativeCOP(ctx, $bp->{layerid}, $this->{native_cop_line});");
+}
+
 sub asJS_context {
     my ($this, $bp, $o, $context) = @_;
     unless ($bp->{opts}{generalScalars}) { $this->asJS($bp, $o); return; }
@@ -256,6 +264,7 @@ package S2::NodeDeleteStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
     if ($bp->{opts}{generalScalars}) {
         $o->tabwrite("s2.runtime.deleteSlot(");
         $this->{var}->asJS_slot($bp, $o);
@@ -308,6 +317,7 @@ package S2::NodeExprStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
    
     $o->tabwrite("");
     $this->{expr}->asJS_context($bp, $o, "void");
@@ -318,6 +328,7 @@ package S2::NodeForeachStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
     if ($bp->{opts}{generalScalars}) {
         my $name = $this->{vardecl}
             ? $bp->decorateLocal($this->{vardecl}{nt}->getName(), $this->{stmts})
@@ -328,6 +339,7 @@ sub asJS {
         $o->tabwrite("for (const $slot of s2.runtime.iterationSlots(");
         $this->{listexpr}->asJS_context($bp, $o, $this->{isString} ? "list" : "scalar");
         $o->write("," . $bp->quoteString($kind) . ")) ");
+        local $bp->{native_loop_line} = $this->{native_cop_line};
         local $bp->{iteration_slots} = {%{$bp->{iteration_slots} || {}}, $name => $slot};
         $this->{stmts}->asJS($bp, $o);
         $o->newline();
@@ -351,6 +363,7 @@ sub asJS {
     $o->write(")");
     $o->write(") ");
 
+    local $bp->{native_loop_line} = $this->{native_cop_line};
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
 }
@@ -359,7 +372,11 @@ package S2::NodeBranchStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
     my $keyword = $this->{type} == $S2::TokenKeyword::BREAK ? "break" : "continue";
+    if ($bp->{opts}{generalScalars} && $keyword eq 'continue' && $bp->{native_loop_line}) {
+        $o->tabwriteln("s2.runtime.nativeCOP(ctx, $bp->{layerid}, $bp->{native_loop_line});");
+    }
     $o->tabwriteln("$keyword;");
 }
 
@@ -390,6 +407,7 @@ package S2::NodePushStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
     if ($bp->{opts}{generalScalars}) {
         $o->tabwrite("s2.runtime.pushSlot(");
         $this->{lhs}{var}->asJS_slot($bp, $o);
@@ -409,6 +427,7 @@ package S2::NodeForStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
 
     $o->tabwrite("for (");
     $this->{'vardecl'}->asJS($bp, $o, { as_expr => 1 }) if $this->{'vardecl'};
@@ -417,15 +436,20 @@ sub asJS {
     $o->write("; ");
 
     $o->write("s2.runtime.scalarTruthy(") if $bp->{opts}{generalScalars};
+    $o->write("(s2.runtime.executionCheckpoint(ctx), s2.runtime.nativeCOP(ctx, $bp->{layerid}, $this->{native_cop_line}), ") if $bp->{opts}{generalScalars};
     $this->{'condexpr'}->asJS_context($bp, $o, "scalar");
+    $o->write(")") if $bp->{opts}{generalScalars};
     $o->write(")") if $bp->{opts}{generalScalars};
 
     $o->write("; ");
 
+    $o->write("(s2.runtime.executionCheckpoint(ctx), s2.runtime.nativeCOP(ctx, $bp->{layerid}, $this->{native_cop_line}), ") if $bp->{opts}{generalScalars};
     $this->{'iterexpr'}->asJS($bp, $o);
+    $o->write(")") if $bp->{opts}{generalScalars};
     
     $o->write(") ");
 
+    local $bp->{native_loop_line} = $this->{native_cop_line};
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
 }
@@ -488,7 +512,8 @@ sub asJS {
     
     # end the outer function
     $o->tabOut();
-    $o->tabwriteln("});");
+    $o->tabwriteln($bp->{opts}{generalScalars} && $this->{native_entry_line}
+        ? "}, $this->{native_entry_line});" : "});");
 
 #    $o->tabOut();
 #    $o->tabwriteln(");");
@@ -499,6 +524,7 @@ package S2::NodeIfStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
 
     # if
     $o->tabwrite("if (");
@@ -605,6 +631,7 @@ package S2::NodePrintStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
     if ($bp->untrusted() || $this->{'safe'}) {
         $o->tabwrite("ctx.safePrint(");
     } else {
@@ -776,6 +803,7 @@ package S2::NodeReturnStmt;
 
 sub asJS {
     my ($this, $bp, $o, $atend) = @_;
+    $this->nativeCOP($bp, $o);
     $o->tabwrite("");
     $o->write("return");
     if ($this->{'expr'}) {
@@ -806,6 +834,7 @@ sub asJS {
 
     $o->writeln("{");
     $o->tabIn();
+    $o->tabwriteln("s2.runtime.executionCheckpoint(ctx);") if $bp->{opts}{generalScalars} && $bp->{native_loop_line};
 
     my $stmtc = $#{$this->{'stmtlist'}};
     foreach my $ns (@{$this->{'stmtlist'}}) {
@@ -1092,6 +1121,7 @@ package S2::NodeVarDeclStmt;
 
 sub asJS {
     my ($this, $bp, $o, $opts) = @_;
+    $this->nativeCOP($bp, $o) unless $opts && $opts->{as_expr};
     $o->tabwrite("") unless ($opts && $opts->{as_expr});
     $this->{'nvd'}->asJS($bp, $o);
     if ($this->{'expr'}) {
@@ -1244,13 +1274,16 @@ package S2::NodeWhileStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    $this->nativeCOP($bp, $o);
 
     $o->tabwrite("while (");
     $o->write("s2.runtime.scalarTruthy(") if $bp->{opts}{generalScalars};
+    $o->write("(s2.runtime.executionCheckpoint(ctx), ") if $bp->{opts}{generalScalars};
     $this->{'expr'}->asJS_context($bp, $o, "scalar");
-    $o->write(")") if $bp->{opts}{generalScalars};
+    $o->write("))") if $bp->{opts}{generalScalars};
     $o->write(") ");
 
+    local $bp->{native_loop_line} = $this->{native_cop_line};
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
 }

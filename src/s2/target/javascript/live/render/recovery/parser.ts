@@ -61,6 +61,31 @@ export class Parser {
     }
     private parenthesis(): Expr { this.need("("); const x = this.expr(); this.need(")"); return x; }
     private statement(): Stmt {
+        const start=this.at;
+        const statement=this.statementShape();
+        const initial=this.tokens[start]!;
+        // The ordinary emitter keeps a statement on one line except literal
+        // arrays/hashes. Those retain the statement-start COP, not element lines.
+        const end=this.tokens[this.at-1]!;
+        const before=end.value===';' ? this.tokens[this.at-2]! : end;
+        statement.copLine ??= initial.line;
+        if(statement.kind==='expr' || statement.kind==='return') {
+            const span=this.tokens.slice(start,this.at);
+            const literal=span.some((token,i)=>['[','{'].includes(token.value) &&
+                span.slice(i+1).some(next=>next.line>token.line));
+            if(!literal)statement.copLine=before.endLine;
+        }
+        const share=(body:Stmt[],line:number)=>{
+            if(body.length!==1)return;
+            const only=body[0]!;
+            if(only.kind==='if')only.branches.forEach(branch=>share(branch.body,line));
+            else if(!['while','for','foreach'].includes(only.kind))only.copLine=line;
+        };
+        if(statement.kind==='if')statement.branches.forEach(branch=>share(branch.body,statement.copLine!));
+        if(statement.kind==='for')share(statement.body,statement.copLine!);
+        return statement;
+    }
+    private statementShape(): Stmt {
         if (this.is("{")) return {kind:"block", body:this.block()};
         if (this.eat("if")) {
             const branches = [{test:this.parenthesis(), body:this.block()}];
@@ -75,7 +100,14 @@ export class Parser {
         }
         if (this.eat("foreach")) {
             const variable = this.eat("my") ? this.declaration(false) : this.prefix();
-            const list = this.parenthesis(); return {kind:"foreach",variable,list,body:this.block()};
+            this.need("(");
+            const from=this.at;const list=this.expr();const to=this.at;this.need(")");
+            const statement:Stmt={kind:"foreach",variable,list,body:this.block()};
+            const tokens=this.tokens.slice(from,to);
+            const literal=tokens.findIndex((token,i)=>['[','{'].includes(token.value) && tokens[i+1] && tokens[i+1]!.line>token.line);
+            if(literal>=0 && tokens[literal+1] && tokens[literal+1]!.line>tokens[literal]!.line)
+                statement.copLine=tokens[literal+1]!.line;
+            return statement;
         }
         if (this.eat("return")) {
             const value = this.is(";") ? undefined : this.expr(); this.need(";");
