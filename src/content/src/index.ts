@@ -514,3 +514,5 @@ export function createEntryCleaner(limits: CleanerLimits): EntryCleaner {
         close() { closed = true; },
     };
 }
+
+export {cleanStockStylesheet,validateStockFontFamily} from "./policy/stylesheet";

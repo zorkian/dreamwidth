@@ -183,7 +183,7 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
         "package LJ::Hooks::Slice6Fixture; use LJ::Hooks; " +
         "LJ::Hooks::register_hook('check_cap_s2viewentry', sub {1}); " +
         "LJ::Hooks::register_hook('journal_base', sub {'https://custom.example'}); " +
-        "LJ::Hooks::register_hook('augment_s2_tag_list', sub {die 'must-not-execute'}); " +
+        "LJ::Hooks::register_hook('css_cleaner_transform', sub {die 'must-not-execute'}); LJ::Hooks::register_hook('augment_s2_tag_list', sub {die 'must-not-execute'}); " +
         "LJ::Hooks::register_hook('construct_userpic_url', sub {die 'must-not-execute'}); 1;\n");
     const output = path.join(base, "site.json");
     const positive = exportSite(home, output);
@@ -192,6 +192,7 @@ test("config and hook connection attempts/errors cannot publish or leak credenti
     assert.equal(config.capabilities.s2ViewEntry.hookConfigured, true);
     assert.equal(config.app.journalUrls.hookConfigured, true);
     assert.equal(config.app.userpicUrlHookConfigured, true);
+    assert.equal(config.app.cssCleanerHookConfigured,true);
     assert.equal(config.app.tagListHookConfigured,true);
     assert.equal(config.app.tagsEnabled,true);
     assert.deepEqual(config.placeholder.descriptor,

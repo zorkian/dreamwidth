@@ -272,11 +272,13 @@ export type FixtureBuiltins = Record<string, BuiltinFunction>;
 
 export const builtin = {
     construct_Color(value: string): S2Object | undefined {
-        const match = /^#?([0-9a-fA-F]{6})$/.exec(value);
-        if (!match) return undefined;
-        const hex = match[1]!;
+        let hex = value.replace(/^#/, "");
+        if (hex === "") return {".type": "Color", _as_string: ""};
+        if (/^[0-9a-fA-F]{3}$/.test(hex)) hex = [...hex].map(char => char + char).join("");
+        if (!/^[0-9a-fA-F]{6}$/.test(hex)) return undefined;
         return {
             ".type": "Color",
+            _as_string: "#" + hex.toLowerCase(),
             _r: parseInt(hex.slice(0, 2), 16),
             _g: parseInt(hex.slice(2, 4), 16),
             _b: parseInt(hex.slice(4, 6), 16),

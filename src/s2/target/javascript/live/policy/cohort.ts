@@ -19,6 +19,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {THEMES, type ThemeName} from "../render/theme-catalog";
 import type { RawJournalSnapshot, RawEntryHeader, PublicAppConfig } from "../contracts";
 import type { SourceCapabilities } from "../startup-types";
 import type { ApprovedJournal, ApprovedEntry } from "../render/types";
@@ -33,7 +34,7 @@ import {moodSelection} from "../domain/moods";
 import {locationCurrent} from "../domain/location";
 import {approveCrosspostUrls,opaqueCrosspostBytes} from "../domain/crossposts";
 
-import {approveComments,commentCapabilityValue} from "../domain/comments";
+import {approveComments,commentCapabilityValue,authorBadge} from "../domain/comments";
 
 import {UserpicSelection} from "../domain/userpics";
 
@@ -229,7 +230,7 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
     }
     if(![null,"","N","R","F","A"].includes(p.opt_whoscreened))throw new Unsupported();
     const style = snapshot.style;
-    if (!style || ![2,3].includes(style.layers.length) || !integer(style.modtime) ||
+    if (!style || style.layers.length<2 || style.layers.length>4 || !integer(style.modtime) ||
         (style.origin === "persisted" ? (style.ownerid !== u.userid ||
             !/^0*2$/.test(p.stylesys ?? "") || !/^[0-9]+$/.test(p.s2_style ?? "") ||
             Number(p.s2_style) !== style.styleid || !integer(style.styleid, 1)) :
@@ -243,15 +244,39 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             !Number.isSafeInteger(layer.s2lid) || layer.s2lid <= 0 ||
             !integer(layer.compiledTime)) throw new Unsupported();
     }
+    if(style.layers.some(layer=>!['core','layout','theme','user'].includes(layer.type)) ||
+        new Set(style.layers.map(layer=>layer.type)).size!==style.layers.length)throw new Unsupported();
+    const themeLayer=style.layers.find(layer=>layer.type==='theme');
+    let theme:ThemeName|undefined;
+    if(themeLayer) {
+        theme=(Object.keys(THEMES) as ThemeName[]).find(name=>THEMES[name].sourceHash===themeLayer.sourceHash);
+        if(!theme||themeLayer.ownerUsername!=='system'||themeLayer.nativeType!=='theme'||
+            themeLayer.parentId!==style.layers.find(layer=>layer.type==='layout')!.s2lid||
+            !integer(themeLayer.compiledTime))throw new Unsupported();
+    }
+    const expectedAuthors=theme?THEMES[theme].authors:[];
+    const rawAuthors=snapshot.themeAuthors??[];
+    if(rawAuthors.length!==expectedAuthors.length||new Set(rawAuthors.map(row=>row.name)).size!==rawAuthors.length)throw new Unsupported();
+    const themeAuthors=rawAuthors.map(row=>{
+        if(!expectedAuthors.some(name=>name===row.name))throw new Unsupported();
+        const author=row.author;
+        if(!author)return {name:row.name,author:null};
+        if(author.user!==row.name||!integer(author.userid,1)||!integer(author.clusterid)||
+            !/^[A-Z]$/.test(author.status)||!['V','D','X','S','L','M','O'].includes(author.statusvis)||
+            author.journaltype!=='P'||!/^[0-9]+$/.test(author.caps))throw new Unsupported();
+        return {name:row.name,author:{userid:author.userid,username:author.user,...authorBadge(author,config,capabilities)}};
+    });
     const userLayer=style.layers.find(layer=>layer.type==='user');
     let customtextProperties;
     if(userLayer) {
         const layout=style.layers.find(layer=>layer.type==='layout')!;
-        if(style.layers.length!==3 || userLayer.ownerid!==u.userid || userLayer.ownerUsername!==u.user ||
+        if(userLayer.ownerid!==u.userid || userLayer.ownerUsername!==u.user ||
             userLayer.nativeType!=='user' || userLayer.parentId!==layout.s2lid ||
             !integer(userLayer.compiledTime)||!userLayer.propertyCompiled)throw new Unsupported();
         customtextProperties=readPropertyLayer(userLayer.propertyCompiled,userLayer.s2lid);
-    } else if(style.layers.length!==2)throw new Unsupported();
+    }
+    const inlineStylesheet=!!theme||!!customtextProperties&&["color_page_background","font_base","module_tags_show","module_tags_order"].some(key=>Object.hasOwn(customtextProperties!,key));
+    if(inlineStylesheet&&config.cssCleanerHookConfigured!==false)throw new Unsupported();
     const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
     for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {
         if(value && value!=='0') {
@@ -375,6 +400,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
         websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
-        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, customtextProperties,customtextStored,
+        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, themeAuthors, theme, themeLayoutId:theme?style.layers.find(layer=>layer.type==='layout')!.s2lid:undefined, inlineStylesheet, customtextProperties,customtextStored,
     };
 }

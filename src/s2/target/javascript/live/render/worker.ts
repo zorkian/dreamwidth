@@ -12,7 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
-import {createEntryCleaner} from "@dreamwidth/content";
+import {createEntryCleaner,cleanStockStylesheet,validateStockFontFamily} from "@dreamwidth/content";
 import type {EntryContentInput} from "@dreamwidth/content/contracts";
 import {renderStock} from "./engine";
 import {validateArtifact} from "./artifact";
@@ -92,6 +92,8 @@ process.stdin.on("end", () => {
             allowedComments.add(node);addComments(node.replies);}};
         addComments(request.journal.comments?.roots??[]);
         const content: RenderContentPreparation = {
+            stylesheet(source) {try{return cleanStockStylesheet(source);}catch{throw new Unsupported();}},
+            fontFamily(source) {try{validateStockFontFamily(source);}catch{throw new Unsupported();}},
             comment(comment,entryUrl) {
                 if(!entryPage||!allowedComments.has(comment)||!comment.full||comment.rawBody===null||
                     entryUrl!==documentUrl)throw new Unsupported();

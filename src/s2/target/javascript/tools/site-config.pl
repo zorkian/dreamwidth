@@ -270,6 +270,7 @@ sub export_config {
             palImgRoot  => string( $LJ::PALIMGROOT   // '' ),
             userpicRoot => string( $LJ::USERPIC_ROOT // '' ),
             userpicUrlHookConfigured => truth($userpic_hook),
+            cssCleanerHookConfigured => truth( LJ::Hooks::are_hooks('css_cleaner_transform') ),
             headIconHookConfigured   => truth( LJ::Hooks::are_hooks('head_icon') ),
             tagsEnabled              => truth( !$tags_disabled ),
             tagListHookConfigured    => truth($tag_hook),

@@ -27,8 +27,18 @@
 import type { Context } from "../../runtime/s2runtime";
 import type { RenderContentPreparation, RenderInput, ApprovedEntry, ApprovedUserpic, ApprovedTag, ApprovedTagDetail } from "./types";
 import { object, date, nullObject, S2Object } from "./objects";
+import {THEMES} from "./theme-catalog";
 import {prepareComments} from "./comment-model";
 import { escapeHtml } from "./builtins";
+
+function styleNames(input:RenderInput):Record<string,string> {
+    const theme=input.journal.theme;
+    if(!theme)return {layout_name:"Tabula Rasa",theme_name:"(Layout Default)",layout_url:""};
+    const layoutid=input.journal.themeLayoutId;
+    if(!Number.isSafeInteger(layoutid)||layoutid!<=0)throw new Error("Missing approved theme layout identity");
+    return {layout_name:"Tabula Rasa",theme_name:THEMES[theme].title,
+        layout_url:`${input.config.siteRoot}/customize/?layoutid=${layoutid}`};
+}
 
 function customtext(input:RenderInput,ctx:Context,content:RenderContentPreparation):Record<string,string> {
     const stored=input.journal.customtextStored;
@@ -135,7 +145,7 @@ export function prepare(input: RenderInput, ctx: Context,
     const links = Object.fromEntries(["rss", "atom"].map(kind => [kind,
         object("Link", {url: base + "/data/" + kind, caption: kind === "rss" ? "RSS" : "Atom", icon: image(kind), extra: {}})]));
     return object("RecentPage", {view: "recent", args: {}, journal: user, journal_type: "P",
-        layout_name: "Tabula Rasa", theme_name: "(Layout Default)", layout_url: "",
+        ...styleNames(input),
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
         view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),
@@ -209,7 +219,7 @@ function prepareEntry(input: RenderInput, ctx: Context, content: RenderContentPr
         memories: `${c.siteRoot}/tools/memories?user=${j.username}`,
     };
     return object("EntryPage", {view: "entry", args: {}, journal: user, journal_type: "P",
-        layout_name: "Tabula Rasa", theme_name: "(Layout Default)", layout_url: "",
+        ...styleNames(input),
         time: date(input.nowSeconds), local_time: date(input.nowSeconds), base_url: base,
         stylesheet_url: `${base}/res/${j.styleid}/stylesheet?${j.styleTime}`,
         view_url: views, linklist: j.links.map(link=>object("UserLink",{is_heading:Number(link.isHeading),

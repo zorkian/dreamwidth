@@ -20,6 +20,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 //
 
+import {THEMES} from "../render/theme-catalog";
 import {gunzipSync} from "node:zlib";
 import { createHash } from "node:crypto";
 import { sql } from "kysely";
@@ -336,7 +337,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             if (!facts || digest(facts) !== digest(initial)) unsupported();
             const raw: RawField[] = [], owner = this.user(facts.owner, this.settings(facts, plan, raw), raw);
             const style = await this.loadStyle(connection, owner, plan, raw);
-            return {facts, style, raw};
+            return {facts, style, raw, themeAuthors:await this.loadThemeAuthors(connection,style)};
         });
         const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...CLUSTER_TABLES,"s2compiled2"] : CLUSTER_TABLES, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts);
@@ -398,15 +399,17 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
             const moods = await this.loadMoods(connection,owner,selected.entries,raw);
-            return {owner, style, posters, moods, raw};
+            const themeAuthors=await this.loadThemeAuthors(connection,style);
+            if(digest(themeAuthors)!==digest(before.themeAuthors))unsupported();
+            return {owner, style, posters, moods, raw,themeAuthors};
         });
         const effectiveStyle = after.style && selected.compiled ? {...after.style,layers:after.style.layers.map(layer=>
             layer.type==='user'?{...layer,compiledTime:selected.compiled!.time,propertyCompiled:selected.compiled!.text}:layer)} : after.style;
         const rawFields = [...after.raw, ...selected.raw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
-            plan.layers, this.config.styles, this.config.capabilities, after.moods];
-        return {comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
+            plan.layers, this.config.styles, this.config.capabilities, after.moods, after.themeAuthors];
+        return {themeAuthors:after.themeAuthors,comments:comments?.data,request: frozenRequest, selection: selected.selection, owner: after.owner, posters: after.posters,
             style: effectiveStyle, entries: selected.entries, calendar: selected.calendar, features: selected.features, userpics: selected.userpics, links: selected.links, tags: selected.tags, moods: after.moods,
             fingerprint: fingerprint(after.owner, after.posters, effectiveStyle, selected.entries, selected.features,
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
@@ -422,6 +425,28 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
     }
 
 
+    // Only fixed names in the selected source-qualified catalog can cause reads.
+    // No child-supplied name, profile, picture, timezone or email query exists.
+    private async loadThemeAuthors(connection:Connection,style:RawStyle|null):Promise<NonNullable<RawJournalSnapshot['themeAuthors']>> {
+        const selected=Object.values(THEMES).find(theme=>style?.layers.some(layer=>layer.type==='theme'&&layer.sourceHash===theme.sourceHash));
+        if(!selected)return [];
+        const authors: {name:string;author:import('../contracts').RawThemeAuthor|null}[]=[];
+        for(const name of selected.authors) {
+            const rows=(await sql<Row>`SELECT userid,user,clusterid,status,statusvis,journaltype,CAST(caps AS CHAR) AS caps
+                FROM user WHERE BINARY user=BINARY ${name} LIMIT 2`.execute(connection)).rows;
+            if(rows.length>1)unsupported();
+            const id=rows[0]?number(rows[0].userid,1):0;
+            const maps=(await sql<Row>`SELECT userid,user FROM useridmap
+                WHERE BINARY user=BINARY ${name} OR userid=${id} LIMIT 3`.execute(connection)).rows;
+            if(!rows.length) {if(maps.length)unsupported();authors.push({name,author:null});continue;}
+            if(maps.length!==1||number(maps[0]!.userid,1)!==id||requiredString(maps[0]!.user)!==name||
+                requiredString(rows[0]!.user)!==name)unsupported();
+            const row=rows[0]!;
+            authors.push({name,author:{userid:id,user:name,clusterid:number(row.clusterid),status:requiredString(row.status),
+                statusvis:requiredString(row.statusvis),journaltype:requiredString(row.journaltype),caps:unsigned(row.caps,16)}});
+        }
+        return authors;
+    }
     private async loadStyle(connection: Connection, owner: RawUser, selected: ClusterSettings,
         raw: RawField[]): Promise<RawStyle | null> {
         const styleId = selectedStyleId(owner.publicSettings);
@@ -483,7 +508,7 @@ export class MysqlLiveStore implements RawRecentRepository, LocalSecretSource, P
                 return {type: layer.type, s2lid: layer.s2lid, ownerid: number(definition.ownerid, 1),
                     ownerUsername: requiredString(definition.owner_username),
                     compiledTime: layer.type === "user" ? 0 : number(definition.compiled_time),
-                    ...(layer.type === "user" ? {parentId:number(definition.parent_id),
+                    ...(['user','theme'].includes(layer.type) ? {parentId:number(definition.parent_id),
                         nativeType:requiredString(definition.native_type)} : {}),
                     sourceHash: requiredString(definition.source_hash).toLowerCase()};
             })};

@@ -241,7 +241,9 @@ export interface RawComments {
     readonly texts:readonly RawCommentText[];
 }
 
+export type RawThemeAuthor = Pick<RawCommentAuthor,"userid"|"user"|"clusterid"|"status"|"statusvis"|"journaltype"|"caps">;
 export interface RawJournalSnapshot {
+    readonly themeAuthors?: readonly {readonly name:string;readonly author:RawThemeAuthor|null}[];
     readonly comments?:RawComments;
     readonly request: RawPageRequest;
     readonly selection: RawPageSelection;
@@ -393,6 +395,7 @@ export interface PublicAppConfig {
     readonly palImgRoot: string;
     readonly userpicRoot: string;
     readonly userpicUrlHookConfigured: boolean;
+    readonly cssCleanerHookConfigured?: boolean;
     readonly headIconHookConfigured?: boolean; // required only for reached comment-author badges
     readonly tagsEnabled: boolean;
     readonly tagListHookConfigured: boolean;

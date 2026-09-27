@@ -17,9 +17,10 @@ import {Unsupported} from "../policy/content";
 export type CustomtextProperties = Partial<Record<
     "module_customtext_show" | "module_customtext_order" | "module_customtext_section" |
     "text_module_customtext" | "text_module_customtext_url" | "text_module_customtext_content",
-    string | number>>;
+    string | number>> & Partial<Record<"color_page_background" | "font_base" | "module_tags_show" | "module_tags_order", string | number>>;
 
 const types: Record<string,string> = {
+    color_page_background:"Color", font_base:"string", module_tags_show:"bool", module_tags_order:"int",
     module_customtext_show:"bool", module_customtext_order:"int", module_customtext_section:"string",
     text_module_customtext:"string", text_module_customtext_url:"string", text_module_customtext_content:"string",
 };
@@ -69,7 +70,10 @@ export function readPropertyLayer(source:string,id:number):CustomtextProperties 
             const key=string();take(",");
             const type=types[key];if(!type)throw new Unsupported();
             let value:string|number;
-            if(type==='string')value=string();
+            if(type==='Color') {
+                take('S2::Builtin::LJ::Color__Color('); value=string(); take(')');
+                if(!/^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})?$/.test(value))throw new Unsupported();
+            } else if(type==='string')value=string();
             else {
                 const match=/^-?(?:0|[1-9][0-9]*)/.exec(source.slice(position));
                 if(!match)throw new Unsupported();
