@@ -208,14 +208,19 @@ sub asJS {
     my ($this, $bp, $o, $operand) = @_;
 
     if ($bp->{opts}{generalScalars}) {
-        $o->write("s2.runtime.assignSlot(");
-        $this->{lhs}{var}->asJS_slot($bp, $o);
-        $o->write(",");
-        $this->{rhs}->asJS_context($bp, $o, "scalar");
         my $notags = $bp->untrusted() && $this->{lhs}->isProperty() &&
             $this->{lhs}->getType()->equals($S2::Type::STRING);
-        $o->write($notags ? ",true" : ",false");
-        $o->write($operand ? ",true)" : ",false)");
+        # Perl evaluates the RHS first, retaining a borrowed SV through LHS
+        # autovivification and computed keys. notags is a computed RHS snapshot.
+        $o->write("(()=>{const rhs=");
+        if ($notags) {
+            $o->write("s2.runtime.notags(s2.runtime.scalarPV(");
+            $this->{rhs}->asJS_context($bp, $o, "scalar");
+            $o->write("))");
+        } else { $this->{rhs}->asJS_operand($bp, $o, "scalar"); }
+        $o->write(";return s2.runtime.assignSlot(");
+        $this->{lhs}{var}->asJS_slot($bp, $o);
+        $o->write($operand ? ",rhs,false,true);})()" : ",rhs,false,false);})()");
         return;
     }
     $this->{'lhs'}{'var'}{'varReturnType'} = undef;
@@ -1144,7 +1149,7 @@ sub asJS {
         } elsif ($t->equals($S2::Type::INT)) {
             $o->write($bp->{opts}{generalScalars} ? " = s2.runtime.numericLiteral(\"0\")" : " = 0");
         } else {
-            $o->write(" = {}");
+            $o->write($bp->{opts}{generalHashes} ? " = s2.runtime.makeHash([])" : " = {}");
         }
     }
     $o->writeln(";") unless ($opts && $opts->{as_expr});
@@ -1179,15 +1184,17 @@ sub asJS_slot {
         $o->write("({get:()=>" . $base . ",set:(value)=>" . $base . "=value})");
         return;
     }
-    $base = $bp->{iteration_slots}{$base} . ".get()" if $bp->{iteration_slots}{$base};
-    $o->write("(()=>{let receiver=" . $base . ";let slot;");
+    my $root = $bp->{iteration_slots}{$base} ||
+        ($this->{type} == $LOCAL ? "({get:()=>" . $base . ",set:(value)=>" . $base . "=value})" :
+            "({get:()=>" . $base . "})");
+    $o->write("(()=>{let slot=" . $root . ";let receiver;");
     for my $step (@steps) {
+        my $kind = exists $step->{field} ? "field" : $step->{type} eq "[" ? "array" : "hash";
+        $o->write("receiver=s2.runtime.referenceValue(slot,\"" . $kind . "\");");
         $o->write("slot=s2.runtime.memberSlot(receiver,");
         if (exists $step->{field}) { $o->write($bp->quoteString($step->{field})); }
         else { $step->{expr}->asJS($bp, $o); }
-        $o->write(exists $step->{field} ? ',"field");' :
-            $step->{type} eq "[" ? ',"array");' : ',"hash");');
-        $o->write("receiver=slot.get();") unless $step == $steps[-1];
+        $o->write(",\"" . $kind . "\");");
     }
     $o->write("return slot;})()");
 }
@@ -1196,13 +1203,10 @@ sub asJS {
     my ($this, $bp, $o) = @_;
     my $first = 1;
     if ($bp->{opts}{generalScalars}) {
-        my $type = $this->{varReturnType};
-        my $wrapper = $type && $type->equals($S2::Type::STRING) ? "scalarPV" :
-            $type && $type->equals($S2::Type::INT) ? "scalarNumber" : undef;
-        $o->write("s2.runtime." . $wrapper . "(") if $wrapper;
+        # Native dereference returns the original scalar, including undef.
+        # Conversion belongs to arithmetic/casts/output, not a field read.
         $this->asJS_slot($bp, $o);
         $o->write(".get()");
-        $o->write(")") if $wrapper;
         return;
     }
 

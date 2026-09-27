@@ -80,21 +80,38 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
         if(!Object.hasOwn(context.prop,props))Object.defineProperty(context.prop,props,{value:true});
         return context.prop;
     };
-    const reference = (x: Expr, env: Env, create=false): Cell => {
+    const reference = (x: Expr, env: Env, _create=false): Cell => {
         if(x.kind === "variable")return lookup(env,x.name);
         if(x.kind !== "member")throw new Error("Invalid recovered lvalue");
-        let base=evalExpr(x.base,env);
-        if(base === null || base === undefined) {
-            if(!create) return makeCell(undefined);
-            base=x.container === "array" ? [] : object([]);
-            reference(x.base,env,true).set(base);
+        const parent=x.base.kind === "variable" || x.base.kind === "member" ? reference(x.base,env) : makeCell(evalAs(x.base,env,"scalar"));
+        let base=parent.get();
+        const fixed=(value: any): Cell=>({get:()=>value,set:()=>{throw new Error("Recovered Context projection mutation refused");}});
+        if(isContext(base)) {
+            if(base !== env.context || x.container !== "array")throw new Error("Recovered Context hash access refused");
+            const key=evalAs(x.key,env,"scalar");
+            if(string(key) === "0")return fixed({[vtable]:true,context:env.context});
+            if(string(key) === "2")return fixed(ctxProps(env.context));
+            throw new Error("Unimplemented recovered context slot");
         }
-        if(isContext(base))throw new Error("Recovered Context mutation refused");
+        // Capture the real parent lvalue once. Native autovivification precedes
+        // the computed key, including reads of an undefined intermediate ref.
+        base=rt.referenceValue(parent,x.container);
         const key=evalAs(x.key,env,"scalar");
+        if(base && Object.hasOwn(base,vtable)) {
+            if(key && key[method]) {
+                if(!rt.isDefined(key.value)) {
+                    // Reuse the trusted method guard for its private program-error
+                    // authority; untyped autovivified hashes are native nulls.
+                    return fixed(key.context.getMethod(key.value,key.name,layer,Number(string(key.line)),key.super,key.classname));
+                }
+                const type=key.super ? key.classname : key.value[".type"];
+                return fixed(key.context.getFunction(string(type)+"::"+key.name));
+            }
+            return fixed(base.context.getFunction(string(key)));
+        }
         if(!isObject(base))throw new Error("Invalid recovered dereference");
         const field=Object.hasOwn(base,props)||Object.hasOwn(base,".type");
-        return rt.memberSlot(base,field ? keyFor(base,key) : key,
-            field ? "field" : x.container);
+        return rt.memberSlot(base,field ? keyFor(base,key) : key,field ? "field" : x.container);
     };
     const list = (xs: Expr[], env: Env): any[] => {
         const captured=xs.map(x=>evalAs(x,env,"list",true));
@@ -130,7 +147,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 return {[method]:true,classname:string(args[0]),value:args[1],name:string(args[2]),
                 layer:args[3],line:args[4],super:truth(args[5]),context};
             case "S2::Object::new": return object([[".type",string(args[0])]]);
-            case "S2::notags": return s2.runtime.notags(args[0]);
+            case "S2::notags": return s2.runtime.notags(rt.scalarPV(args[0]));
             case "S2::check_defined": return s2.runtime.isDefined(args[0]);
             case "S2::check_elements": return Array.isArray(args[0]) ? args[0].length !== 0 : isObject(args[0]) && Object.keys(args[0]).length !== 0;
             case "S2::get_characters": return s2.runtime.characters(args[0]);
@@ -178,27 +195,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
                 return value;
             }
             case "member": {
-                const base=evalAs(x.base,env,"scalar"), key=evalAs(x.key,env,"scalar");
-                if(isContext(base) && (base !== env.context || x.container !== "array"))throw new Error("Recovered Context hash access refused");
-                if(base === env.context && x.container === "array") {
-                    if(string(key) === "0")return {[vtable]:true,context:env.context};
-                    if(string(key) === "2")return ctxProps(env.context);
-                    throw new Error("Unimplemented recovered context slot");
-                }
-                if(base && Object.hasOwn(base,vtable)) {
-                    if(key && key[method]) {
-                        if(!isObject(key.value) || !Object.hasOwn(key.value,".type") || key.value[".isnull"])
-                            throw new Error("Recovered method called on null object");
-                        // Native helper uses the emitted class unchanged for
-                        // super, otherwise the object's exact runtime type.
-                        const type=key.super ? key.classname : key.value[".type"];
-                        return key.context.getFunction(string(type)+"::"+key.name);
-                    }
-                    return base.context.getFunction(string(key));
-                }
-                if(base === null || base === undefined)return undefined;
-                const field=Object.hasOwn(base,props)||Object.hasOwn(base,".type");
-                const slot=rt.memberSlot(base,field ? keyFor(base,key) : key,field ? "field" : x.container);
+                const slot=reference(x,env);
                 return operand ? rt.captureOperand(slot) : slot.get();
             }
             case "sub": { const fn=(...args: any[]) => {
@@ -245,7 +242,7 @@ export function instantiate(program: Stmt[], s2: any, layerId: number): any {
             }
             case "binary": {
                 if(x.op === "=") {
-                    const right=evalAs(x.right,env,"scalar");
+                    const right=evalAs(x.right,env,"scalar",true);
                     return rt.assignSlot(reference(x.left,env,true),right,false,operand);
                 }
                 const a=evalAs(x.left,env,"scalar",true);

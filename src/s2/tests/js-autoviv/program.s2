@@ -1,0 +1,78 @@
+# program.s2
+#
+# Independent native nested-reference and autovivification fixture.
+#
+# Authors:
+#      Dreamwidth contributors
+#
+# Copyright (c) 2026 by Dreamwidth Studios, LLC.
+#
+# This program is free software; you may redistribute it and/or modify it under
+# the same terms as Perl itself. For a copy of the license, please reference
+# 'perldoc perlartistic' or 'perldoc perlgpl'.
+#
+
+layerinfo type = core;
+class Image { var int width; var int height; var string label; function describe(): string; }
+class Entry { var Image userpic; }
+class Page { var Entry[] entries; var Entry entry; }
+class Box { var Image picture; var Box child; var int[] values; }
+property Box root;
+property int calls;
+property int rhs;
+set rhs = 1;
+set calls = 0;
+function key(): int { $*calls++; return 0; }
+function Image::describe(): string { return "image"; }
+function fail() { var Box box; $box.picture.width = 7; print $box.picture->describe(); }
+function replaceRoot(): int { $*root = new Box; return 31; }
+function missingInt(): int { var Box box; return $box.picture.width; }
+function missingString(): string { var Box box; return $box.picture.label; }
+function aliasKey(): string { $*rhs = 2; return "key"; }
+function main() {
+    var Box box;
+    print "initial=";
+    if (isnull $box) { print "null"; } else { print "typed"; }
+    var int read = $box.picture.width;
+    print ":read=" + $read;
+    $box.picture.width = 7;
+    print ":write=" + $box.picture.width;
+    if (isnull $box.picture) { print ":untyped"; }
+    var Image direct = null Image;
+    $direct.width = 8;
+    print ":direct=" + $direct.width;
+    if (isnull $direct) { print ":null"; }
+    var Box[] entries = [new Box];
+    $entries[key()].picture.width = 9;
+    print ":key=" + $*calls + ":entry=" + $entries[0].picture.width;
+    var Box{} names;
+    $names{"one"}.picture.width = 11;
+    print ":hash=" + $names{"one"}.picture.width;
+    $*root.child.picture.width = 12;
+    var Box alias = $*root.child;
+    $alias.picture.width = 13;
+    print ":alias=" + $*root.child.picture.width;
+    $box.values[2] = 14;
+    print ":array=" + $box.values[2];
+    var Box retained = $*root.child;
+    $*root.child.picture.width = replaceRoot();
+    print ":retained=" + $retained.picture.width;
+    if (isnull $*root.child) { print ":newroot-null"; }
+    var Page page = new Page;
+    $page.entries = [new Entry];
+    $page.entries[0].userpic.width = 7;
+    print ":recent=" + $page.entries[0].userpic.width;
+    if (isnull $page.entries[0].userpic) { print ":null"; }
+    $page.entry = new Entry;
+    $page.entry.userpic = null Image;
+    $page.entry.userpic.width = 7;
+    print ":entry=" + $page.entry.userpic.width;
+    if (isnull $page.entry.userpic) { print ":null"; }
+    var string missing = $box.child.picture.label;
+    print ":undef=" + $missing + ":" + missingInt() + ":" + missingString();
+    print ":arithmetic=" + (missingInt() + 2);
+    var int{} scalarAliases;
+    $scalarAliases{aliasKey()} = $*rhs;
+    print ":rhs=" + $scalarAliases{"key"};
+    println ":done";
+}

@@ -155,6 +155,18 @@ export const runtime = {
         if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error("Invalid native PV literal");
         return NativeString.bytes(Buffer.from(hex, "hex"));
     },
+    // Native dereference creates a missing container through its actual lvalue,
+    // even for reads; the final absent element itself remains absent.
+    referenceValue(slot: {get(): unknown; set?(value: unknown): unknown}, kind: "array" | "hash" | "field"): unknown {
+        let value = slot.get();
+        if (value === undefined || value === null) {
+            value = kind === "array" ? [] : runtime.makeHash([]);
+            if (!slot.set) throw new Error("Missing native reference lvalue");
+            slot.set(value);
+        }
+        if (runtime.isContext(value)) throw new Error("S2 Context dereference refused");
+        return value;
+    },
     memberSlot(receiver: unknown, key: unknown, kind: "array" | "hash" | "field") {
         if (receiver === null || typeof receiver !== "object" || runtime.isContext(receiver)) {
             throw new Error("Invalid S2 lvalue receiver");
@@ -177,6 +189,13 @@ export const runtime = {
                     return value;
                 },
             };
+        }
+        // Untyped native hash references have no class marker. Generated field
+        // spelling still addresses the same logical keys as recovered hash syntax.
+        if (kind === "field" && hashIdentities.has(receiver) && !Object.hasOwn(receiver, ".type")) {
+            const name = String(key);
+            key = NativeString.bytes(Buffer.from(name.startsWith("_") ? name.slice(1) : name, "latin1"));
+            kind = "hash";
         }
         property = kind === "hash" ? nativeHashKey(key) : String(key);
         const target = receiver as Record<string, unknown>;
@@ -213,7 +232,8 @@ export const runtime = {
     },
     assignSlot(slot: {get(): unknown; set(value: unknown): unknown}, value: unknown, notags: boolean,
         operand = false): unknown {
-        const result = slot.set(notags ? scalarNotags(value) : scalarCopy(value));
+        const resolved = readOperand(value);
+        const result = slot.set(notags ? scalarNotags(resolved) : scalarCopy(resolved));
         return operand ? captureOperand(slot) : result;
     },
     incrementSlot(slot: {get(): unknown; set(value: unknown): unknown}, plus: boolean, pre: boolean, operand = false): unknown {
@@ -294,7 +314,7 @@ export const runtime = {
             hash[encoded] = scalarCopy(value);
             if (NativeString.is(key) || NativeNumber.is(key)) identities.set(encoded, scalarPV(key));
         }
-        if (identities.size) hashIdentities.set(hash, identities);
+        hashIdentities.set(hash, identities);
         return hash;
     },
     prepareString(value: unknown): string {
@@ -356,7 +376,7 @@ export const runtime = {
     },
 
     isDefined(value: unknown): boolean {
-        return value !== undefined && value !== null && !(object(value) && value[".isnull"]);
+        return object(value) && value[".type"] !== undefined && value[".type"] !== null && !scalarTruthy(value[".isnull"]);
     },
 
     makeRange(first: number, last: number): number[] {
@@ -757,7 +777,7 @@ export class Context {
     getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false,
         dispatchClass?: string): S2Function {
         const location = `${layer.source}:${line}`;
-        if (!object(value) || value[".isnull"]) {
+        if (!object(value) || !runtime.isDefined(value)) {
             throw nativeProgramError(`${location}: method ${name} called on null object`);
         }
         const type = value[".type"];
