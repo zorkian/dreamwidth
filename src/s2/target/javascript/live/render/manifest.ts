@@ -21,6 +21,13 @@ const nodePath = "/opt/dw-node24/bin/node";
 // Independently pinned by the signed Node24 bootstrap; manifest cannot authorize
 // a different executable or self-declare an expected executable digest.
 const nodeSha256 = "7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c";
+const runtimeFiles = new Set([
+    "app/dist/runtime/s2runtime.js",
+    "app/dist/runtime/native-number.js",
+    "app/dist/runtime/native-profile.js",
+    "app/dist/runtime/native-scalar.js",
+    "app/dist/runtime/native-string.js",
+]);
 function digest(path: string): string {
     return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
@@ -71,7 +78,7 @@ export function verifyRuntime(artifactPath: string): VerifiedRuntime {
             typeof file.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(file.sha256) ||
             typeof file.bytes !== "number" || !Number.isSafeInteger(file.bytes) || file.bytes < 0 ||
             !(file.path.startsWith("app/dist/live/render/") || file.path.startsWith("app/dist/live/policy/") ||
-                file.path === "app/dist/runtime/s2runtime.js" || file.path === "app/package.json" ||
+                runtimeFiles.has(file.path) || file.path === "app/package.json" ||
                 file.path.startsWith("app/node_modules/")) ||
             /(?:^|\/)(?:playwright(?:-core)?|@playwright|canvas|typescript)(?:\/|$)/.test(file.path)) {
             throw new Unsupported();
