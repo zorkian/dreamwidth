@@ -15,7 +15,7 @@ import {randomBytes} from "node:crypto";
 import {constants, lstatSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
     closeSync, writeFileSync, renameSync, rmSync, realpathSync} from "node:fs";
 import path from "node:path";
-import {CompilerFailure, type ActiveStyleSnapshot, type CompilationResult, type ProgramArtifact} from "./layer-artifact";
+import {CompilerFailure, type ActiveStyleSnapshot, type CompilationResult,type DeterministicGap, type ProgramArtifact} from "./layer-artifact";
 import {CompilerCancelled,type CompilerJobOptions} from "./compiler-queue";
 
 export interface ArtifactProducer {
@@ -23,6 +23,8 @@ export interface ArtifactProducer {
     compile(snapshot:ActiveStyleSnapshot,options?:CompilerJobOptions):Promise<CompilationResult>;
     encode(program:ProgramArtifact,secret:Buffer):string;
     restore(snapshot:ActiveStyleSnapshot,bytes:string,secret:Buffer):ProgramArtifact;
+    encodeGap?(result:DeterministicGap,secret:Buffer):string;
+    restoreGap?(snapshot:ActiveStyleSnapshot,bytes:string,secret:Buffer):DeterministicGap;
 }
 interface Pending {promise:Promise<CompilationResult>;controller:AbortController;waiters:number;}
 class CacheSizeMiss extends Error {}
@@ -70,7 +72,9 @@ export class ArtifactCache {
         let pending=this.pending.get(key);
         if(!pending){
             const controller=new AbortController();
-            pending={controller,waiters:0,promise:this.loadOrCompile(captured,key,controller.signal)};
+            // The first waiter's deadline can shorten optional source proof.
+            // Its cancellation cannot expire a surviving coalesced waiter.
+            pending={controller,waiters:0,promise:this.loadOrCompile(captured,key,controller.signal,options.deadline)};
             this.pending.set(key,pending);
             const item=pending;
             void item.promise.finally(()=>{if(this.pending.get(key)===item)this.pending.delete(key);}).catch(()=>{});
@@ -91,7 +95,7 @@ export class ArtifactCache {
                 error=>{if(!done){done=true;cleanup();reject(error);}});
         });
     }
-    private async loadOrCompile(snapshot:ActiveStyleSnapshot,key:string,signal:AbortSignal):Promise<CompilationResult> {
+    private async loadOrCompile(snapshot:ActiveStyleSnapshot,key:string,signal:AbortSignal,proofDeadline?:number):Promise<CompilationResult> {
         const file=path.join(this.root,key+".json");
         let bytes:Buffer|undefined;
         try{bytes=this.read(file,134217728);}
@@ -99,14 +103,15 @@ export class ArtifactCache {
         if(bytes){
             try{return {kind:"compiled",program:this.compiler.restore(snapshot,bytes.toString("utf8"),this.secret)};}
             catch{/* Authenticated format/producer mismatch is a cache miss, not poisoned content. */}
+            if(this.compiler.restoreGap){try{return this.compiler.restoreGap(snapshot,bytes.toString("utf8"),this.secret);}catch{}}
         }
-        const result=await this.compiler.compile(snapshot,{signal});
+        const result=await this.compiler.compile(snapshot,{signal,proofDeadline});
         if(signal.aborted)throw new CompilerCancelled();
-        if(result.kind!=="compiled")return result;
+        if(result.kind!=="compiled"&&(result.kind!=="gap"||!this.compiler.encodeGap))return result;
         const temporary=mkdtempSync(path.join(this.root,".pending-"));
         try{
             const staging=path.join(temporary,"artifact.json");
-            writeFileSync(staging,this.compiler.encode(result.program,this.secret),{mode:0o600,flag:"wx"});
+            writeFileSync(staging,result.kind==="compiled"?this.compiler.encode(result.program,this.secret):this.compiler.encodeGap!(result as DeterministicGap,this.secret),{mode:0o600,flag:"wx"});
             renameSync(staging,file);
         }finally{rmSync(temporary,{recursive:true,force:true});}
         return result;
