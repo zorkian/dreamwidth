@@ -23,6 +23,8 @@ import {NativeString, concatStrings} from './native-string';
 export type NativeScalar = NativeString | NativeNumber;
 export {NativeNumber, NativeString};
 export interface NativeSink {
+    /** Trusted coordinator declaration; page-local output owns native print cadence. */
+    readonly ownsPrintCheckpoints?: true;
     raw(value: NativeString): void;
     safe(value: NativeString): void;
 }
