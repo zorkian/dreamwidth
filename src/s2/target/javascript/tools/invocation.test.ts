@@ -25,7 +25,7 @@ import {scalarPV,legacyText,isNativeExecutionStop,isNativeProgramError,raiseNati
 import {recoverActiveLayer} from '../live/render/recovery';
 import {createNativeOutput} from '../live/render/native-output';
 const native=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-invocation/native.pl')],
-    {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {id:number;code:string;source:string;marks:{label:string;line:number}[];output:string;instrumentationUnchanged:number;nestedError:string};
+    {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as {id:number;code:string;source:string;marks:{label:string;line:number}[];output:string;instrumentationUnchanged:number;nestedError:string;divideError:string};
 
 test('actual emitter COP phases through source-proven and original-byte recovery',async()=>{
     assert.equal(native.instrumentationUnchanged,1);
@@ -174,5 +174,28 @@ test('nested program errors alone gain native run signature wrapping',()=>{
         // A newly assembled real Context uses the actual registered function.
         const actual=new Context([layer],()=>{});
         assert.throws(()=>actual.runNativeFunction('hostile()'),caught=>caught===error);
+    }
+});
+
+
+test('native arithmetic and array semantic dies share the private program-error authority',()=>{
+    const prefix='Died in S2::run_code running outerdivide(): Died in S2::run_code running faildivide(): ';
+    assert.ok(native.divideError.startsWith(prefix+'Illegal division by zero'),native.divideError);
+    const layer=new Layer();
+    layer.registerFunction(['faildivide()'],()=>()=>s2.runtime.scalarBinary('/',s2.runtime.numericLiteral('1'),s2.runtime.numericLiteral('0')),30);
+    layer.registerFunction(['outerdivide()'],()=>ctx=>ctx.runNativeFunction('faildivide()',[],'plural'),31);
+    const ctx=new Context([layer],()=>{});
+    assert.throws(()=>ctx.runNativeFunction('outerdivide()'),error=>isNativeProgramError(error) && error.message===prefix+'Illegal division by zero');
+    assert.throws(()=>s2.runtime.scalarBinary('%',s2.runtime.numericLiteral('1'),s2.runtime.numericLiteral('0')),isNativeProgramError);
+    assert.throws(()=>s2.runtime.memberSlot([],s2.runtime.numericLiteral('-1'),'array').set!(s2.runtime.numericLiteral('1')),isNativeProgramError);
+});
+
+
+test('shared program-error authority initializes in either scalar/number module import order',()=>{
+    const number=resolve('dist/runtime/native-number.js');
+    const scalar=resolve('dist/runtime/native-scalar.js');
+    for(const first of [number,scalar]){
+        const script=`require(${JSON.stringify(first)});const n=require(${JSON.stringify(number)});const s=require(${JSON.stringify(scalar)});try{n.divide(n.NativeNumber.literal('1'),n.NativeNumber.literal('0'));process.exit(2);}catch(e){if(!s.isNativeProgramError(e))throw e;}`;
+        execFileSync(process.execPath,['-e',script],{timeout:5000,maxBuffer:65536});
     }
 });

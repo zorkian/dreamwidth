@@ -169,7 +169,7 @@ export const runtime = {
                 exists: () => Object.hasOwn(receiver, property),
                 get: () => index < 0n || index >= BigInt(receiver.length) ? undefined : receiver[Number(index)],
                 set: (value: unknown) => {
-                    if (index < 0n) throw new Error("Modification of non-creatable array value");
+                    if (index < 0n) throw nativeProgramError("Modification of non-creatable array value");
                     // JavaScript's array length is a transport constraint; do not
                     // wrap a wide positive index into another native element.
                     if (index >= 4294967295n) throw new Error("S2 array allocation exceeds transport bounds");

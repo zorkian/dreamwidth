@@ -28,7 +28,14 @@ active function frame retains its current location until another native statemen
 updates it. While conditions can therefore retain the last body statement's COP;
 for conditions and steps reset to the loop header. Single-statement optimized
 blocks, multiline array/hash expressions, and foreach list evaluation follow the
-native emitter's distinct rules rather than a final-token heuristic.
+native emitter's distinct rules rather than a final-token heuristic. Positions
+are collected first, then effective COPs propagate over the existing AST. Only
+exact NodeExpr wrappers are unwrapped for void-call sharing. A static Perl 5.34
+special case applies only to an if directly last in a function sub body with
+exactly one then statement: each elsif single void call uses that then statement's
+physical line. Otherwise elsif sharing uses the effective if header. This is not
+dynamic value context and never propagates terminal status into nested blocks or
+loop bodies.
 
 `Context.runBoundary(callback, origin)` and `runNativeFunction(name, args, origin)`
 represent explicit application `run_function` calls. Origins are trusted host
@@ -48,7 +55,8 @@ cancellation. Outermost unwind cancels the program deadline before diagnostics.
 
 Private recursion/deadline stop identity survives nested runs. Concrete null-method,
 cast, missing-class and undefined function/method errors carry a separate private
-program-error brand. Explicit function runs wrap only that brand with the native
+program-error brand; division/modulo zero and non-creatable array writes
+use that same authority. Explicit function runs wrap only that brand with the native
 `Died in S2::run_code running <signature>:` prefix and rebrand the result.
 The trusted module guard lets the coordinator classify it; no factory or guard
 is exposed through the author runtime. Unknown errors,
