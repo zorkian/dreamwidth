@@ -238,6 +238,18 @@ test("actual installed recovery and scalar-profile producer changes invalidate a
     }finally{processes.spawn=originalSpawn;}
     // Trusted test-only installed job consumes CPU without executing input code.
     const job=path.join(installation,"dist/live/render/recover-job.js"),jobBytes=readFileSync(job,"utf8");
+    // Recovery's deterministic gap is insufficient if optional proof expired:
+    // another unhurried proof of these same source/active bytes can succeed.
+    writeFileSync(job,"const {Parser}=require('./recovery/parser');const {RecoveryGap}=require('./recovery/ast');Parser.prototype.parse=()=>{throw new RecoveryGap('test incomplete recovery')};\n"+jobBytes);
+    const retry=new Installed(slow,path.join(directory,"retry-source-cache"),{sandbox});
+    const short=retry.prepare(snapshot,{deadline:Date.now()+1000});
+    const long=retry.prepare(snapshot);
+    await Promise.all([assert.rejects(short,/Active program recovery unfinished/),
+        assert.rejects(long,/Active program recovery unfinished/)]);
+    assert.equal(readdirSync(path.join(directory,"retry-source-cache")).filter(name=>name.endsWith(".json")).length,0);
+    const unhurried=await retry.prepare(snapshot);
+    assert.equal(unhurried.program.route,"source");
+    assert.equal(execute(retry,unhurried).base64,oracle.outputs[1].base64);
     // Actual reviewed catch distinguishes a real RangeError from RecoveryGap.
     writeFileSync(job,"const {Parser}=require('./recovery/parser');Parser.prototype.parse=()=>{throw new RangeError('test resource failure')};\n"+jobBytes);
     const transient=new Installed(compiler,path.join(directory,"transient-cache"),{sandbox});
