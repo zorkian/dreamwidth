@@ -58,5 +58,14 @@ for my $value ('blue','Blue','green','false','dup','empty','0','') {
     push @enumerations,{input=>$value,present=>exists($ctx->[S2::PROPS]{tone})?JSON::PP::true:JSON::PP::false,
         value=>$ctx->[S2::PROPS]{tone},other=>$ctx->[S2::PROPS]{other},zero=>$ctx->[S2::PROPS]{zero}};
 }
+my @recursion;
+for my $limit (500,50) {
+    local $S2::MAX_RECURSION=$limit;
+    my $value=eval {S2::run_function(S2::make_context(101,102,103),'depth(int)',120)};
+    my $error=$@;
+    die $error if $error && $error !~ /Excessive recursion detected and stopped/;
+    push @recursion,{maxRecursion=>$limit,value=>$error?undef:$value,
+        refused=>$error?JSON::PP::true:JSON::PP::false};
+}
 print JSON::PP->new->canonical->utf8->encode({snapshot=>{styleId=>77,systemUserId=>11,layers=>\@layers},
-    output=>$output,safe=>\@safe,enumerations=>\@enumerations});
+    output=>$output,safe=>\@safe,enumerations=>\@enumerations,recursion=>\@recursion});

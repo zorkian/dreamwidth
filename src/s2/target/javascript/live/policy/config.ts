@@ -76,7 +76,9 @@ export function validateConfig(config: PublicAppConfig): void {
         "palImgRoot", "userpicRoot", "userpicUrlHookConfigured", "tagsEnabled", "tagListHookConfigured", "siteName", "siteNameShort", "siteNameAbbrev", "appleTouchIcon",
         "facebookPreviewIcon", ...(config.commentSettings === undefined ? [] : ["commentSettings"]),
         ...(config.cssCleanerHookKind===undefined?[]:["cssCleanerHookKind"]),
-        ...(config.headIconHookConfigured===undefined?[]:["headIconHookConfigured"])]);
+        ...(config.headIconHookConfigured===undefined?[]:["headIconHookConfigured"]),
+        ...(config.maxRecursion===undefined?[]:["maxRecursion"])]);
+    if(config.maxRecursion!==undefined&&(!Number.isSafeInteger(config.maxRecursion)||config.maxRecursion<1))throw new Unsupported();
     if(config.commentSettings!==undefined) {
         const c=exactRecord(config.commentSettings,["pageSize","threadPoint","maxSubjects"]);
         if(Object.values(c).some(n=>typeof n!=="number"||!Number.isSafeInteger(n)||n<1||n>10000))throw new Unsupported();
