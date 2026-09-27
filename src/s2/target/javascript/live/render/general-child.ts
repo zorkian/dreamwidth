@@ -22,7 +22,7 @@ import type {RenderLimits} from "../contracts";
 import type {GeneralHostOperation} from "./general-worker-channel";
 import {initializedRecentCount} from "./general-selection";
 
-const hostNames = new Set<GeneralHostOperation>(["user-lite", "expand-user", "template-error",
+const hostNames = new Set<GeneralHostOperation>(["user-lite", "user-url", "expand-user", "template-error",
     "video-error", "markup-error", "valid-stylesheet", "embed-transform", "expand-site-url",
     "rewrite-blocked-href", "normalize-image-url", "standard-images"]);
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> {

@@ -115,6 +115,8 @@ export interface GeneralEntryPageOperations {
     /** Native empty navigation still needs the validated permalink/style options. */
     emptyComments(page:GeneralModel,entry:GeneralModel):Omit<GeneralEntryCommentNavigationInput,
         "comments"|"noPosts">;
+    /** LJ_cmtinfo/need_res contribution runs even when comment loading is disabled. */
+    prepareCommentHead(page:GeneralModel,entry:GeneralModel):void;
 }
 
 /** Same admitted Context, with disabled comments gated before any comment helper reads. */
@@ -134,6 +136,7 @@ export function generalEntryPageFromSource(context:Context,input:GeneralEntryPag
         operations.comments(page,entry):
         {...operations.emptyComments(page,entry),comments:[],noPosts:true};
     page._comments=selected.comments;
+    operations.prepareCommentHead(page,entry);
     attachGeneralEntryCommentNavigation(page,selected,operations.navigation);
     return page;
 }

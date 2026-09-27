@@ -28,6 +28,14 @@ const runtimeFiles = new Set([
     "app/dist/runtime/native-scalar.js",
     "app/dist/runtime/native-string.js",
 ]);
+// Exact pure model closure of the installed general worker factory. Parent SQL,
+// source witnesses and configuration loaders are not worker dependencies.
+const generalModelFiles = new Set([
+    "general-model-primitives", "general-navigation-url", "general-comment-navigation",
+    "general-page-assembly", "general-page-model", "general-model-date", "general-model-links",
+    "general-entry-from-source", "general-entry-page-source", "general-entry-content",
+    "general-entry-model", "general-recent-from-source",
+].map(name => "app/dist/live/domain/" + name + ".js"));
 function digest(path: string): string {
     return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
@@ -93,7 +101,7 @@ function verifyRuntimeEntry(artifactPath: string, expectedEntry: string): Verifi
             !(file.path.startsWith("app/dist/live/render/") || file.path.startsWith("app/dist/live/policy/") ||
                 runtimeFiles.has(file.path) ||
                 (expectedEntry === "app/dist/live/render/general-worker.js" &&
-                    ["app/dist/live/domain/general-model-primitives.js","app/dist/live/domain/general-navigation-url.js"].includes(file.path)) ||
+                    generalModelFiles.has(file.path)) ||
                 file.path === "app/package.json" ||
                 file.path.startsWith("app/node_modules/")) ||
             /(?:^|\/)(?:playwright(?:-core)?|@playwright|canvas|typescript)(?:\/|$)/.test(file.path)) {

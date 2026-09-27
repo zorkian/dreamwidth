@@ -20,17 +20,62 @@
 // included in the LICENSE file in this distribution.
 //
 
-import type {BuiltinFunction, Context} from "../../runtime/s2runtime";
+import {runtime,type BuiltinFunction,type Context} from "../../runtime/s2runtime";
 import {NativeString, scalarPV, nativeProgramError} from "../../runtime/native-scalar";
-import {concatStrings, hashKeyBytes, caseString, replaceString, stringIndex} from "../../runtime/native-string";
+import {concatStrings, hashKeyBytes, caseString, replaceString, stringIndex,
+    byteCharacters,characterCodepoint} from "../../runtime/native-string";
+import {nativeCharacterClass} from "../../runtime/native-profile";
 import {escapeNativeHtml} from "./general-diagnostics";
 import {generalCssCallbacks} from "./general-css-builtins";
+import {generalEscapeUrl} from "../domain/general-navigation-url";
 
 const bytes = (value: string): NativeString => NativeString.hostUtf8Bytes(value);
 function stripTags(value: NativeString): NativeString {
     // Exact source LJ/S2.pm striphtml regex, not an HTML parser or sanitizer.
     const view = value.bytes().toString("latin1").replace(/<[^\n]*?>/g, "");
     return NativeString.fromFrame({bytes: Buffer.from(view,"latin1"), utf8:value.flagged()});
+}
+/** Native whitespace-delimited double-slash split, preserving flags and trailing empties. */
+function pluralForms(ctx:Context,value:NativeString):NativeString[] {
+    if(!ctx.scalarProfile)throw Error("Missing admitted native character profile");
+    const characters=byteCharacters(value),result:NativeString[]=[];
+    const space=(index:number)=>index>=0&&index<characters.length&&nativeCharacterClass(
+        ctx.scalarProfile!,"space",Number(characterCodepoint(characters[index]!)),value.flagged());
+    const slash=(index:number)=>index<characters.length&&characterCodepoint(characters[index]!)===47n;
+    const part=(from:number,to:number)=>NativeString.fromFrame({
+        bytes:Buffer.concat(characters.slice(from,to).map(character=>character.bytes())),utf8:value.flagged()});
+    let start=0;
+    for(let index=0;index+1<characters.length;index++) {
+        if(!slash(index)||!slash(index+1))continue;
+        let end=index;while(end>start&&space(end-1))end--;
+        result.push(part(start,end));index+=2;
+        while(space(index))index++;
+        start=index;index--;
+    }
+    result.push(part(start,characters.length));
+    while(result.length&&!result[result.length-1]!.bytes().length)result.pop();
+    return result;
+}
+function pluralPhrase(ctx:Context,n:unknown,property:unknown):NativeString {
+    if(n===undefined||n===null)n=0;
+    const form=ctx.runNativeFunction("lang_map_plural(int)",[n],"plural");
+    const key=hashKeyBytes(scalarPV(property));
+    // Registration names are native byte-view metadata. A non-downgradeable
+    // flagged key is distinct from those byte keys; retain its full identity
+    // for the internal plural cache instead of decoding invalid/wide UTF8.
+    const name=key.utf8?"\0native-wide:"+key.bytes.toString("hex"):key.bytes.toString("latin1");
+    const cache="__plurals_"+name;
+    let forms=ctx.prop[cache];
+    if(!Array.isArray(forms))forms=ctx.prop[cache]=pluralForms(ctx,scalarPV(ctx.prop["_"+name]));
+    const values=forms as unknown[];
+    let text=runtime.memberSlot(values,form,"array").get();
+    if(text===undefined||text===null)text=values[values.length-1];
+    const original=scalarPV(text),characters=byteCharacters(original);
+    const index=characters.findIndex(character=>characterCodepoint(character)===35n);
+    if(index<0)return escapeNativeHtml(original);
+    const part=(from:number,to:number)=>NativeString.fromFrame({
+        bytes:Buffer.concat(characters.slice(from,to).map(character=>character.bytes())),utf8:original.flagged()});
+    return escapeNativeHtml(concatStrings(concatStrings(part(0,index),scalarPV(n)),part(index+1,characters.length)));
 }
 export interface GeneralBuiltinEnvironment {
     page(): unknown;
@@ -42,6 +87,12 @@ export function generalScalarCallbacks(environment: GeneralBuiltinEnvironment): 
     return {
         ...generalCssCallbacks(),
         _get_page: () => environment.page(),
+        _get_plural_phrase:pluralPhrase,
+        _eurl:(_ctx,value)=>generalEscapeUrl(value),
+        _clean_url:(_ctx,input)=>{
+            const value=scalarPV(input),view=value.bytes().toString("latin1");
+            return /^https?:\/\/[^'"\\]*$/.test(view)?value:bytes("");
+        },
         _ehtml: (_ctx, value) => escapeNativeHtml(value),
         _etags: (_ctx, value) => replaceString(replaceString(scalarPV(value),bytes("<"),bytes("&lt;")),bytes(">"),bytes("&gt;")),
         _striphtml: (_ctx, value) => stripTags(scalarPV(value)),

@@ -13,14 +13,19 @@
 //
 
 import type {BuiltinFunction} from "../../runtime/s2runtime";
-import {scalarPV} from "../../runtime/native-scalar";
+import {NativeString,NativeNumber,scalarPV} from "../../runtime/native-scalar";
 import type {GeneralWorkerChannel} from "./general-worker-channel";
 import {GeneralUserBindings} from "./general-user-bindings";
-import {workerLoadUser,workerUserEquals} from "./general-user-client";
+import {workerLoadUser,workerUserEquals,workerUserUrl} from "./general-user-client";
 
 export function generalUserConstructor(channel:GeneralWorkerChannel,
     bindings:GeneralUserBindings):Record<string,BuiltinFunction> {
     const equals:BuiltinFunction=(_ctx,left,right)=>workerUserEquals(channel,bindings,left,right);
     return {_UserLite:(_ctx,name)=>workerLoadUser(channel,bindings,scalarPV(name)),
+        _get_url:(_ctx,object,view)=>{
+            const name=object&&typeof object==="object"&&!Array.isArray(object)&&
+                !NativeString.is(object)&&!NativeNumber.is(object)?(object as Record<string,unknown>)._user:object;
+            return workerUserUrl(channel,scalarPV(name),scalarPV(view));
+        },
         _UserLite__equals:equals,_User__equals:equals,_Friend__equals:equals};
 }
