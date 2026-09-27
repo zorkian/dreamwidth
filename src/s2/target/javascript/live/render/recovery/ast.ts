@@ -14,7 +14,8 @@
 
 export interface Token {value: string; kind: "word" | "variable" | "number" | "string" | "symbol" | "end"; offset: number;}
 export type Expr =
-    | {kind: "literal"; value: string | number | null}
+    | {kind: "literal"; value: string | number | null; numeric?: string}
+    | {kind: "concat"; items: Expr[]}
     | {kind: "name"; name: string}
     | {kind: "variable"; name: string}
     | {kind: "array" | "tuple"; items: Expr[]}

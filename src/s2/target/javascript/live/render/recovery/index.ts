@@ -36,13 +36,13 @@ function validate(program: Stmt[], id: number): string[] {
     const host = new Set<string>();
     const checkExpr = (x: Expr, scope: Set<string>, top=false, contextArgument=false): void => {
         switch(x.kind) {
-            case "literal": if(typeof x.value === "number" && !Number.isSafeInteger(x.value))throw new RecoveryGap("Integer representation needs native-width lowering");break;
+            case "literal": break;
             case "name": if(!["VTABLE","STATIC","PROPS"].includes(x.name))throw new RecoveryGap("Unknown generated constant");break;
             case "variable":
                 if(x.name === "$_ctx" && !contextArgument)throw new RecoveryGap("Context is only a generated slot receiver or argument");
                 if(!scope.has(x.name) && !["$S2::pout","$S2::pout_s","$S2::sub_ctr","$S2::depth_check_every"].includes(x.name))throw new RecoveryGap("Unbound generated lexical " + x.name);
                 break;
-            case "array": case "tuple": x.items.forEach(v=>checkExpr(v,scope));break;
+            case "concat": case "array": case "tuple": x.items.forEach(v=>checkExpr(v,scope));break;
             case "hash": x.entries.forEach(([k,v])=>{checkExpr(k,scope);checkExpr(v,scope);});break;
             case "member":
                 if(x.base.kind === "variable" && x.base.name === "$_ctx") {
@@ -123,7 +123,11 @@ export function recoverActiveLayer(input: RecoveryInput, abi: number): RecoveryR
             !Number.isSafeInteger(input.parentId) || input.parentId < 0 || !["core","i18nc","layout","theme","i18n","user"].includes(input.type) || !Number.isSafeInteger(abi) || abi < 1)
             throw new RecoveryGap("Invalid authoritative recovery identity");
         const bytes=Uint8Array.from(input.activeBytes);
-        const source=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
+        // This is a reversible one-byte lexical view, not a decoded program.
+        // Literal octets become shared PV literals only at execution.
+        let source="";
+        for(let offset=0;offset<bytes.length;offset+=8192)
+            source+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
         const program=new Parser(source).parse();
         const hostCalls=validate(program,input.id);
         const data=JSON.stringify(program).replaceAll("\u2028","\\u2028").replaceAll("\u2029","\\u2029");

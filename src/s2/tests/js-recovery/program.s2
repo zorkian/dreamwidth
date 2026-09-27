@@ -57,5 +57,17 @@ function main() {
     var Box empty = null Box;
     if (isnull $empty) { print ":null"; }
 
+    var string bytes = "猫é";
+    var string backward = reverse $bytes;
+    print ":byte=" + $bytes + ":byte-size=" + size $bytes;
+    print ":scalar-reverse=" + $backward + ":direct-reverse=";
+    print reverse $bytes;
+    print ":compare=";
+    if ("猫" < "é") { print "less"; } else { print "greater"; }
+    var int wide = 9007199254740993;
+    var int root = 94906267;
+    print ":wide=" + $wide + ":product=" + ($root * $root);
+    var int alias = 1;
+    print ":alias=" + $alias + ":" + ++$alias;
     println ":done";
 }

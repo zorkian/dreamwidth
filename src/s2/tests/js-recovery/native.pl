@@ -17,19 +17,21 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../..";
-use Encode qw(decode encode FB_CROAK);
+use MIME::Base64 qw(encode_base64);
+sub octets { use bytes; return substr($_[0],0); }
 use JSON::PP;
 use S2;
 use S2::Compiler;
 use S2::Checker;
 my $compiler = S2::Compiler->new({checker => S2::Checker->new});
-my @codes;
+my (@codes,@sources);
 my $id = 100;
 for my $spec (["program.s2", "core"], ["override.s2", "layout"]) {
     open my $file, '<:raw', "$FindBin::Bin/$spec->[0]" or die "Fixture read failed";
     local $/;
     my $bytes = <$file>;
-    my $source = decode('UTF-8', $bytes, FB_CROAK);
+    my $source = $bytes;
+    push @sources, $bytes;
     my $output = '';
     $compiler->compile_source({type=>$spec->[1],source=>\$source,output=>\$output,
         layerid=>++$id,untrusted=>($id == 102),builtinPackage=>'S2::Builtin'});
@@ -46,9 +48,11 @@ for my $layers ([101], [101,102]) {
     S2::set_output_safe(sub { $text .= "SAFE(" . $_[0] . ")" });
     my $context = S2::make_context(@$layers);
     S2::run_code($context, 'main()');
-    push @outputs, $text;
+    push @outputs, {base64=>encode_base64(octets($text),''),utf8=>utf8::is_utf8($text)?1:0};
 }
 my $wide = 94906267;
 no warnings 'numeric';
 my $numeric = {literal => "" . 9007199254740993, product => "" . ($wide * $wide), concat => ("x" . 1 + 2)};
-print JSON::PP->new->canonical->utf8->encode({codes=>\@codes, outputs=>\@outputs, numeric=>$numeric});
+print JSON::PP->new->canonical->utf8->encode({codes=>[map {encode_base64(octets($_),'')} @codes],
+    sources=>[map {encode_base64($_,'')} @sources],
+    codesUtf8=>[map {utf8::is_utf8($_)?1:0} @codes], outputs=>\@outputs, numeric=>$numeric});
