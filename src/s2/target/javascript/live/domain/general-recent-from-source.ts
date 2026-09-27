@@ -62,7 +62,7 @@ export function generalRecentFromSource(input:GeneralRecentInput,operations:Gene
     page._filter_active=input.filterActive;page._filter_name=input.filterName;page._filter_tags=input.filterTags;
     page._head_content=add(page._head_content,input.selectionHead);
     page._data_link=runtime.makeHash(["rss","atom"].map(kind=>[pv(kind),generalLink(
-        add(add(page._base_url,pv("/data/"+kind)),input.feedTagQuery),pv(kind.toUpperCase()),
+        add(add(page._base_url,pv("/data/"+kind)),input.feedTagQuery),pv(kind==="rss"?"RSS":"Atom"),
         operations.standardImage(kind as "rss"|"atom"))]));
     page._data_links_order=[pv("rss"),pv("atom")];
     const entries=page._entries as GeneralModel[];
