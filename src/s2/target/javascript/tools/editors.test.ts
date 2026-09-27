@@ -138,15 +138,15 @@ test('native support-auth scalar removal binds original hashes and stripped pars
     } finally {cleaner.close();}
 });
 
-test('23 independent Markdown contexts preserve exact fields and name CommonMark boundaries',()=>{
+test('27 independent Markdown contexts preserve exact fields and name CommonMark boundaries',()=>{
     const root=resolve(__dirname,'../../../../../..');
     const oracle=spawnSync('perl',[resolve(root,'src/s2/target/javascript/tools/editors-native.pl'),'--markdown'],
         {cwd:root,env:{...process.env,LJHOME:root},encoding:'utf8',timeout:10000,maxBuffer:262144});
     assert.equal(oracle.status,0,oracle.stderr);assert.equal(oracle.stderr,'');
-    const rows=JSON.parse(oracle.stdout);assert.equal(rows.length,23);
+    const rows=JSON.parse(oracle.stdout);assert.equal(rows.length,27);
     const cleaner=createEntryCleaner(limits);
     const refused=new Set(['multiline_code','edge_code','mention','inline_cut','recursive']);
-    const exact=new Set(['explicit','latest','magic','raw_magic','list','ordinary_list','multiline_paragraph','code_mention','escaped_mention','false','auth']);
+    const exact=new Set(['explicit','latest','magic','raw_magic','list','ordinary_list','multiline_paragraph','code_mention','escaped_mention','escaped_space','escaped_start','magic_escaped_space','magic_escaped_start','false','auth']);
     try {
         for(const row of rows){
             const format=entryBodyFormat(row.source,row.props,row.logtime);
@@ -180,17 +180,19 @@ test('23 independent Markdown contexts preserve exact fields and name CommonMark
             if(row.id==='block_cut')assert.ok(result.fragment.html.includes('<a name="cutid1"></a>'));
             if(row.id==='literal_attribute')assert.equal(result.fragment.html,'<p><code>&lt;div markdown="1"&gt;</code></p>\n');
             const helper=cleaner.metadata({subject:'Title',entry:input});
-            if(row.metadata.mentions.length || ['escaped_mention','email'].includes(row.id)){
+            if(row.metadata.mentions.length || ['escaped_mention','escaped_space','escaped_start','email'].includes(row.id)){
                 assert.deepEqual(helper,{kind:'failure',reason:'unsupported'},row.id+' helper');continue;
             }
             assert.equal(helper.kind,'ok',row.id+' helper: '+JSON.stringify(helper));
             if(helper.kind!=='ok')continue;
             if(row.id==='preview_email'){
-                const expected='<p>'+'x'.repeat(270)+' <a href="mailto:mail@example.invalid">mail@example.invalid</a></p>\n';
+                const expected='<p>'+'x'.repeat(250)+' <a href="mailto:mail@example.invalid">mail@example.invalid</a></p>\n';
                 assert.equal(helper.metadata.eventText,expected);
                 assert.match(row.metadata.output,/&#(?:x[0-9A-Fa-f]+|[0-9]+);/);
                 const og=helper.metadata.eventText.replace(/[\t\n\v\f\r ]+/g,' ').trim().slice(0,300).trim();
-                assert.equal(og,'<p>'+'x'.repeat(270)+' <a href="mailto:mail@examp');
+                assert.equal(og,'<p>'+'x'.repeat(250)+' <a href="mailto:mail@example.invalid">mail@exa');
+                const escaped=og.replaceAll('&','&amp;').replaceAll('\"','&quot;').replaceAll("'",'&#39;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+                assert.notEqual(row.og,escaped,'native entity spelling changes the literal300 preview');
             }else assert.equal(helper.metadata.eventText,row.metadata.output,row.id+' independent helper');
         }
     }finally{cleaner.close();}
