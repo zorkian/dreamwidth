@@ -177,3 +177,22 @@ void main().catch(error => {
         (error instanceof Error ? error.message : "unknown") + "\n");
     process.exitCode = 1;
 });
+
+async function binaryResponse(): Promise<void> {
+    const bytes = Uint8Array.from([0x3c, 0x70, 0x3e, 0xff, 0xc3, 0, 0x3c, 0x2f, 0x70, 0x3e]);
+    const response = async () => ({ok: true as const, html: bytes, setCookie: null});
+    const app = createLiveApp(config, {serve: response, serveEntry: response, close: async () => {}});
+    try {
+        for (const url of [path, path + "384.html"]) {
+            const get = await app.inject({method: "GET", url, headers: {host: "localhost:8081"}});
+            assert.equal(get.statusCode, 200);
+            assert.deepEqual(get.rawPayload, Buffer.from(bytes));
+            assert.equal(get.headers["content-length"], String(bytes.length));
+            const head = await app.inject({method: "HEAD", url, headers: {host: "localhost:8081"}});
+            assert.equal(head.statusCode, 200);
+            assert.equal(head.rawPayload.length, 0);
+            assert.equal(head.headers["content-length"], String(bytes.length));
+        }
+    } finally {await app.close();}
+}
+void binaryResponse().catch(error => {console.error(error); process.exitCode = 1;});
