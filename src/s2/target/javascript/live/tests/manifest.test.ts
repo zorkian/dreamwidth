@@ -65,6 +65,25 @@ test("manifest validates a closed fixture and derives the root rather than accep
     });
 });
 
+test("manifest admits the four reviewed scalar modules but rejects another inventoried runtime file", () => {
+    const scalarFiles = ["native-number.js", "native-profile.js", "native-scalar.js", "native-string.js"];
+    for (const extra of [null, "native-unreviewed.js"]) fixture((artifact, root, manifest) => {
+        modes(root, 0o755, 0o444);
+        mkdirSync(join(root, "app/dist/runtime"));
+        const files = [...manifest.files];
+        for (const name of [...scalarFiles, ...(extra ? [extra] : [])]) {
+            const path = "app/dist/runtime/" + name;
+            const code = "// Synthetic admission-only runtime fixture: " + name + "\n";
+            writeFileSync(join(root, path), code);
+            files.push({path, sha256: hash(code), bytes: Buffer.byteLength(code)});
+        }
+        rewrite(root, {...manifest, files});
+        modes(root, 0o555, 0o444);
+        if (extra) assert.throws(() => verifyRuntime(artifact));
+        else assert.equal(verifyRuntime(artifact).root, root);
+    });
+});
+
 test("manifest rejects non-traversable and writable directories even when root could read them", () => {
     for (const mode of [0o444, 0o755, 0o777]) fixture((artifact, root) => {
         chmodSync(join(root, "app/dist"), mode);
