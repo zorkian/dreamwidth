@@ -87,6 +87,7 @@ export class ProgramCoordinator {
             this.assertInstalled(true);
             const dependenciesDigest=this.key(snapshot);
             let source:CompilationResult;
+            let sourceOrigin:"returned"|"service-failure"="returned";
             const proof=new AbortController();let proofExpired=false;
             const cancelProof=()=>proof.abort();signal.addEventListener("abort",cancelProof,{once:true});
             if(signal.aborted)cancelProof();
@@ -101,6 +102,7 @@ export class ProgramCoordinator {
                 // An unavailable source-proof job is not active-program authority.
                 // Identity/input checks must still pass before recovery is attempted.
                 this.compiler.key(snapshot);this.assertInstalled();
+                sourceOrigin="service-failure";
                 source={kind:"recovery",layerId:snapshot.layers[0]?.id??0,reason:"source-prerequisites"};
             }finally{clearTimeout(proofTimer);signal.removeEventListener("abort",cancelProof);}
             if(signal.aborted)throw new CompilerCancelled();
@@ -124,6 +126,9 @@ export class ProgramCoordinator {
                 if(missing?.kind==="gap") {
                     this.assertInstalled(true);this.compiler.key(snapshot);
                     if(signal.aborted)throw new CompilerCancelled();
+                    // Recovery syntax can be incomplete while an unhurried source
+                    // proof is valid. A transient proof cannot authorize a negative.
+                    if(sourceOrigin==="service-failure")throw new RecoveryIncomplete(missing.id,missing.reason);
                     const gap:DeterministicGap=Object.freeze({kind:"gap",deterministic:true,layerId:missing.id,
                         reason:missing.reason,compilerDigest:this.digest,recoveryDigest:this.recoveryDigest,dependenciesDigest});
                     gaps.add(gap);return gap;
