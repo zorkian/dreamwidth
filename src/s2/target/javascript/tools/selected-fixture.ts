@@ -91,7 +91,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
         await admin.query(`INSERT INTO ${table(g,"s2compiled")} (s2lid,comptime)
             SELECT s2lid,comptime FROM dw_global.s2compiled WHERE s2lid IN (${ids})`);
         const [defs] = await admin.query<mysql.RowDataPacket[]>(`SELECT upropid,name FROM ${table(g,"userproplist")}
-            WHERE name IN ('stylesys','s2_style','journaltitle','timezone')`);
+            WHERE name IN ('stylesys','s2_style','journaltitle','timezone','sticky_entry')`);
         const prop = (name:string) => Number(defs.find(row => row.name===name)!.upropid);
         await admin.query(`INSERT INTO ${table(g,"s2styles")} (styleid,userid,name,modtime)
             VALUES (44,900001,'Ordinary style without a fixture name',1)`);
@@ -138,6 +138,7 @@ export async function withSelectedFixture(run: (fixture: SelectedFixture) => Pro
             clusters:[7,19],clusterPairActive:{"19":"b"}},styles:{defaultStyle:{core:"core2",layout:"core2base/layout"},
                 layerRemap:{}},commentSettings:{pageSize:25,threadPoint:50,maxSubjects:200},maxScrollback:100,capabilities:{...capabilities,threadExpander:{defaultValue:1,byBit:[],hookConfigured:false},
                 threadExpandAll:{defaultValue:1,byBit:[],hookConfigured:false},
+                maxStickies:{defaultValue:2,byBit:[],hookConfigured:false},
                 maxComments:{defaultValue:5000,byBit:[],hookConfigured:false}}};
         store = await MysqlLiveStore.open(startup);
         const request = (username="ordinary6",page:RawPageRequest["page"]={kind:"recent",skip:0,itemshow:20}):RawPageRequest =>

@@ -123,12 +123,17 @@ export function validateStartupConfig(value: unknown): StandaloneStartupConfig {
     list(db.clusters, item => integer(item, 1));
     map(db.clusterPairActive, item => { if (item !== "a" && item !== "b") invalid(); });
     const caps = record(root.capabilities, ["moveInProgressMask", "s2ViewEntry",
-        ...["threadExpander","threadExpandAll","maxComments","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"].filter(key=>Object.hasOwn(root.capabilities as object,key)),
+        ...["threadExpander","threadExpandAll","maxComments","maxStickies","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"].filter(key=>Object.hasOwn(root.capabilities as object,key)),
         ...(Object.hasOwn(root.capabilities as object,"authorReadonlyClusters")?["authorReadonlyClusters"]:[])]);
-    for(const key of ["threadExpander","threadExpandAll","maxComments","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"])if(caps[key]!==undefined) {
+    for(const key of ["threadExpander","threadExpandAll","maxComments","maxStickies","authorStaffHeadicon","authorReadonly","authorAvoidReadonly"])if(caps[key]!==undefined) {
         const cap=record(caps[key],["defaultValue","byBit","hookConfigured"]);
-        nullable(cap.defaultValue,n=>integer(n,Number.MIN_SAFE_INTEGER));boolean(cap.hookConfigured);
-        list(cap.byBit,row=>{const b=record(row,["bit","value"]);integer(b.bit,0,31);integer(b.value,Number.MIN_SAFE_INTEGER);});
+        const value=(n:unknown)=>{
+            if(key!=="maxStickies")return integer(n,Number.MIN_SAFE_INTEGER);
+            if(typeof n!=="number"||!Number.isFinite(n)||Math.abs(n)>Number.MAX_SAFE_INTEGER)invalid();
+            return n;
+        };
+        nullable(cap.defaultValue,value);boolean(cap.hookConfigured);
+        list(cap.byBit,row=>{const b=record(row,["bit","value"]);integer(b.bit,0,31);value(b.value);});
     }
     if(caps.authorReadonlyClusters!==undefined) {
         const seen=new Set<number>();

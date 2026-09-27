@@ -42,6 +42,7 @@ export interface SourceCapabilities {
     readonly threadExpander?:SourceCapability;
     readonly threadExpandAll?:SourceCapability;
     readonly maxComments?:SourceCapability;
+    readonly maxStickies?:SourceCapability;
     readonly authorStaffHeadicon?:SourceCapability;
     readonly authorReadonly?:SourceCapability;
     readonly authorAvoidReadonly?:SourceCapability;

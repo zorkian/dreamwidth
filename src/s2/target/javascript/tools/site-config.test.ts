@@ -51,8 +51,8 @@ $DEFAULT_LANG='en'; @CLUSTERS=(7,9); %CLUSTER_PAIR_ACTIVE=(7=>'B');
   other=>{sock=>'/tmp/example-mysql.sock',dbname=>'custom_cluster',user=>'fixture',pass=>'${secret}',role=>{cluster7b=>3,cluster9=>1}});
 $DEFAULT_STYLE={core=>'core2',layout=>'core2base/layout'};
 $DEFAULT_FEED_STYLE={core=>'core2',layout=>'sitefeeds/layout',theme=>'sitefeeds/default'}; %S2LID_REMAP=(4=>12);
-$CAP_DEF{maxcomments}=0;
-%CAP=(1=>{s2viewentry=>0,maxcomments=>123},5=>{_name=>'_moveinprogress',readonly=>1,s2viewentry=>1});
+$CAP_DEF{maxcomments}=0; $CAP_DEF{stickies}=2;
+%CAP=(1=>{s2viewentry=>0,maxcomments=>123,stickies=>4},5=>{_name=>'_moveinprogress',readonly=>1,s2viewentry=>1});
 %KNOWN_HTTPS_SITES=('UPPER.example'=>1,'lower.example'=>1,'false.example'=>0);
 %FORM_DOMAIN_BANNED=('Banned.example'=>1,'blocked.example'=>1,'false.example'=>0);
 $PROXY_URL='https://proxy.example.test'; $PROXY_SALT_FILE='/not-existing-secret-salt';
@@ -82,6 +82,7 @@ test("source configuration export preserves arbitrary endpoints, URL facts and p
     assert.equal(config.database.sources[0]!.password, secret);
     assert.equal(config.capabilities.moveInProgressMask, 32);
     assert.deepEqual(config.capabilities.maxComments,{defaultValue:0,byBit:[{bit:1,value:123}],hookConfigured:false});
+    assert.deepEqual(config.capabilities.maxStickies,{defaultValue:2,byBit:[{bit:1,value:4}],hookConfigured:false});
     assert.deepEqual(config.styles.defaultStyle, {core: "core2", layout: "core2base/layout"});
     assert.equal(config.app.entryContent.urls.siteDomain, "");
     assert.deepEqual(config.app.entryContent.urls.knownHttpsSites, ["UPPER.example", "lower.example"]);

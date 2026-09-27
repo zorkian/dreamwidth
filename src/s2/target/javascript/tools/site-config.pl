@@ -250,6 +250,7 @@ sub export_config {
         [ threadExpander      => 'thread_expander' ],
         [ threadExpandAll     => 'thread_expand_all' ],
         [ maxComments         => 'maxcomments' ],
+        [ maxStickies         => 'stickies' ],
         [ authorStaffHeadicon => 'staff_headicon' ],
         [ authorReadonly      => 'readonly' ],
         [ authorAvoidReadonly => 'avoid_readonly' ]
@@ -265,6 +266,9 @@ sub export_config {
             hookConfigured => truth( LJ::Hooks::are_hooks("check_cap_$native") )
         };
     }
+    # User::get_cap short-circuits ordinary capability resolution in test mode.
+    $comment_caps{maxStickies} = { defaultValue => 1, byBit => [], hookConfigured => JSON::PP::false }
+        if $LJ::T_HAS_ALL_CAPS;
     my %readonly_clusters = map { $_ => 1 }
         grep { $LJ::READONLY_CLUSTER{$_} || $LJ::READONLY_CLUSTER_ADVISORY{$_} }
         ( keys %LJ::READONLY_CLUSTER, keys %LJ::READONLY_CLUSTER_ADVISORY );

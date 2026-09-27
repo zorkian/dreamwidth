@@ -33,10 +33,13 @@ import type {
     RawPageRequest, RawPageSelection, RawEntryHeader, RawCalendarSummary, PlaceholderResolver,
     PlaceholderResolutionSpec, RawUserpics, RawLink, RawTags, RawComments, RawCommentHeader, RawCommentAuthor, RawCommentText,
 } from "../contracts";
-import {selectComments,commentCapability,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
+import {selectComments,commentCapability,commentCapabilityValue,PUBLIC_COMMENT_PROPS,validateCommentQuery} from "../domain/comments";
 import { EntryRecord, UserRecord } from "../domain/records";
 import { SnapshotError } from "./errors";
 import { decodeLegacyText, decodeLegacyBytes, decodeLegacyPayload } from "./legacy-text";
+
+import {NativeString,scalarNumber} from "../../runtime/native-scalar";
+import {arrayIndex} from "../../runtime/native-number";
 
 type Connection = ReadConnection;
 type Row = SqlRow;
@@ -213,6 +216,7 @@ function header(row: Row, journalid: number): RawEntryHeader {
 
 interface NativeSnapshotEvidence {
     readonly oldEncoding: number;
+    readonly stickyEntryCount: number;
     readonly undefinedEvents: readonly number[];
     readonly sources: readonly {readonly key: string; readonly value: {readonly base64: string; readonly utf8: false} | null}[];
 }
@@ -388,7 +392,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         if (!facts) return null;
         const evidence = this.nativeSnapshots.get(facts)!;
         const snapshot: NativeSelectedSnapshot = Object.freeze({encoding: "dbi-byte-view", facts,
-            oldEncoding: evidence.oldEncoding,
+            oldEncoding: evidence.oldEncoding, stickyEntryCount:evidence.stickyEntryCount,
             undefinedEntryEvents: evidence.undefinedEvents, sources: evidence.sources});
         // Preserve the issued request independently of mutable parent projection
         // work. Neither a copied wrapper nor a different store can issue authority.
@@ -446,14 +450,17 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         // pagination/freshness witness while withholding hidden body reads.
         const visibility = byteView ? await this.databases.snapshot(clusterId, clusterTables,
             connection => this.nativeEntryVisibility(connection, ownerId, frozenRequest,
-                before.facts.logNames)) : undefined;
+                before.facts.logNames,this.settings(before.facts,plan,[]).sticky_entry,unsigned(before.facts.owner.caps,16))) : undefined;
         if (byteView && !visibility) return null;
         const authorFacts = visibility ? await this.databases.snapshot(undefined, globalTables,
             connection => this.nativeEntryAuthors(connection, before.facts,
-                visibility.window.rows.map(row => number(row.posterid,1)))) : undefined;
-        const visibleRows = visibility && authorFacts ? visibility.window.rows.filter(row =>
+                visibility.rows.map(row => number(row.posterid,1)))) : undefined;
+        const visible = (row:Row) => row.security==="public" && visibility && authorFacts &&
             !visibility.suspended.includes(number(row.jitemid,1)) &&
-            authorFacts.find(facts => number(facts.owner.userid,1)===number(row.posterid,1))!.owner.statusvis!=="S") : undefined;
+            authorFacts.find(facts=>number(facts.owner.userid,1)===number(row.posterid,1))!.owner.statusvis!=="S";
+        const stickyRows = visibility ? visibility.sticky.filter((row):row is Row=>row!==null && !!visible(row)) : [];
+        const visibleRows = visibility && authorFacts ? [...stickyRows,...visibility.window.rows.filter(row =>
+            visible(row) && !visibility.activeIds.includes(String(number(row.jitemid,1)*256+number(row.anum,0,255))))] : undefined;
         if (byteView && frozenRequest.page.kind==="entry" && !visibleRows?.length) return null;
         const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
@@ -462,13 +469,18 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             if (!window) return null;
             if (visibility) {
                 const fresh = await this.nativeEntryVisibility(connection, ownerId, frozenRequest,
-                    before.facts.logNames);
+                    before.facts.logNames,this.settings(before.facts,plan,[]).sticky_entry,unsigned(before.facts.owner.caps,16));
                 if (!fresh || digest(fresh)!==digest(visibility)) throw new SnapshotError("unavailable");
             }
             const raw = new RawFields(byteView);
             const bodyRows = visibleRows ?? window.rows;
-            const loaded = await this.loadEntries(connection, ownerId, bodyRows,
-                bodyRows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            const uniqueRows=[...new Map(bodyRows.map(row=>[number(row.jitemid,1),row])).values()];
+            const loaded = await this.loadEntries(connection, ownerId, uniqueRows,
+                uniqueRows.map(row => number(row.jitemid, 1)), raw, this.names(before.facts.logNames, "propid"));
+            if(byteView) {
+                const byId=new Map(loaded.entries.map(entry=>[entry.jitemid,entry]));
+                loaded.entries=bodyRows.map(row=>byId.get(number(row.jitemid,1))!);
+            }
             const statusId = before.facts.logNames.find(row => row.name === "statusvis")?.propid;
             const calendar = await this.loadCalendar(connection, ownerId, frozenRequest,
                 statusId === undefined ? 0 : number(statusId, 1), raw,
@@ -521,7 +533,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             if (digest(style) !== digest(before.style) || digest(raw) !== digest(before.raw)) unsupported();
             if (visibility && authorFacts) {
                 const freshAuthors = await this.nativeEntryAuthors(connection, facts,
-                    visibility.window.rows.map(row => number(row.posterid,1)));
+                    visibility.rows.map(row => number(row.posterid,1)));
                 if (digest(freshAuthors)!==digest(authorFacts)) throw new SnapshotError("unavailable");
             }
             const posters = await this.loadPosters(connection, owner, selected.entries, raw);
@@ -543,7 +555,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 selected.rawText, [ownerId, request.username], rawFields, frozenRequest, selected.selection, selected.calendar, sourceFacts, selected.userpics, selected.links, selected.tags)};
         if (byteView) {
             const sources = [...after.raw.sources, ...selected.raw.sources, ...(comments?.sources ?? [])];
-            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
+            this.nativeSnapshots.set(result, {oldEncoding: number(before.facts.owner.oldenc), stickyEntryCount:stickyRows.length, undefinedEvents: Object.freeze([...selected.raw.undefinedEvents]),
                 sources: Object.freeze(sources.map(([key,value]) => Object.freeze({key,
                     value: value === undefined ? null : Object.freeze({base64: Buffer.from(value).toString("base64"), utf8: false as const})})))});
         }
@@ -660,19 +672,41 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             })};
     }
     private async nativeEntryVisibility(connection: Connection, ownerId: number,
-        request: RawPageRequest, definitions: readonly Row[]) {
+        request: RawPageRequest, definitions: readonly Row[], stickyValue:string|null,caps:string) {
         const window = await this.loadWindow(connection,ownerId,request);
         if (!window) return null;
+        const activeIds:string[]=[];
+        const sticky:(Row|null)[]=[];
+        if(request.page.kind==="recent" && request.page.skip===0 && stickyValue!==null) {
+            const ids=stickyValue.split(",");
+            while(ids.at(-1)==="")ids.pop();
+            if(ids.length) {
+                const max=commentCapabilityValue(this.config.capabilities.maxStickies,caps)??0;
+                activeIds.push(...(ids.length>max?ids.slice(0,Math.max(0,Math.trunc(max-1)+1)):ids));
+                for(const text of activeIds) {
+                    const id=arrayIndex(scalarNumber(NativeString.bytes(Buffer.from(text,"latin1"))));
+                    const item=id>>8n,anum=Number(id&255n);
+                    if(item<=0n || item>BigInt(Number.MAX_SAFE_INTEGER)) {sticky.push(null);continue;}
+                    const rows=(await sql<Row>`SELECT journalid,jitemid,anum,posterid,eventtime,logtime,rlogtime,revttime,
+                        year,month,day,security,CAST(allowmask AS CHAR) AS allowmask,replycount,compressed
+                        FROM log2 WHERE journalid=${ownerId} AND jitemid=${Number(item)} LIMIT 2`.execute(connection)).rows;
+                    if(rows.length>1)unsupported();
+                    const row=rows[0];
+                    sticky.push(row && number(row.anum,0,255)===anum?row:null);
+                }
+            }
+        }
+        const rows=[...window.rows,...sticky.filter((row):row is Row=>row!==null)];
         const status = definitions.find(row => row.name==="statusvis")?.propid;
-        const ids = window.rows.map(row => number(row.jitemid,1));
+        const ids = [...new Set(rows.map(row => number(row.jitemid,1)))];
         const statuses = status===undefined || !ids.length ? [] : (await sql<Row>`
             SELECT jitemid,HEX(value) AS value FROM logprop2
             WHERE journalid=${ownerId} AND propid=${number(status,1)}
-                AND jitemid IN (${sql.join(ids)}) ORDER BY jitemid LIMIT 201`.execute(connection)).rows;
+                AND jitemid IN (${sql.join(ids)}) ORDER BY jitemid LIMIT ${ids.length+1}`.execute(connection)).rows;
         if (statuses.length>ids.length || new Set(statuses.map(row=>number(row.jitemid,1))).size!==statuses.length)
             unsupported();
         // Entry::statusvis recognizes only the original one-byte S value.
-        return {window,statuses,suspended:statuses.filter(row=>row.value==="53").map(row=>number(row.jitemid,1))};
+        return {window,rows,sticky,activeIds,statuses,suspended:statuses.filter(row=>row.value==="53").map(row=>number(row.jitemid,1))};
     }
     private async nativeEntryAuthors(connection: Connection, owner: GlobalFacts,
         ids: readonly number[]): Promise<GlobalFacts[]> {
