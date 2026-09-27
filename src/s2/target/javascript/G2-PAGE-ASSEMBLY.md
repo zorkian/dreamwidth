@@ -83,3 +83,21 @@ opaque crosspost data is copied into this input, including extra fields on a cal
 options object. Independent retained-native date controls and the existing actual SQL
 encoding/privacy fixture qualify this projection; they do not establish ordinary content
 cleaning or complete HTTP serving.
+
+Official administrator posts use current native maintainer authority, not the stored
+`admin_post` property alone. A personal journal always projects false. A community
+requires an existing poster who is either the journal account itself or the current
+administrator in global `reluser` (journal userid → poster targetid, type `A`); only
+then does the stored property's native truthiness apply. Native one-character
+relationship types bypass the clustered relationship hook. The parent performs these
+SELECTs in the reviewed read-only authorization transaction and witnesses both account
+identities, two-way names, and the relationship. It retains all these facts privately;
+only the derived administrator-post scalar enters the approved Entry input.
+
+Selected-text preparation collects this witness through the same request public
+session. Demotion during preparation/rendering prevents final release before the final
+private authority reread; the next request renders an ordinary nonofficial entry.
+Focused guarded SQL/native controls cover personal/community, self-account, a distinct
+maintainer, demotion, a missing poster and reversed relationship direction. This is an
+installed parent authority/projection proof, not completed ordinary cleaner or HTTP
+acceptance. Native cache behavior remains explicitly deferred.

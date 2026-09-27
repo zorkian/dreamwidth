@@ -23,6 +23,7 @@
 import type {PublicUserSnapshot} from "../data/public-users";
 import type {PublicEncodingSnapshot} from "../data/public-encodings";
 import type {PublicTranslationSnapshot} from "../data/public-translations";
+import type {PublicMaintainerSnapshot} from "../data/public-maintainers";
 import type {SubjectTranslationName,GeneralMlLookup,GeneralMlRequestContext} from "./public-translation";
 import {NativeString} from "../../runtime/native-string";
 import {caseString} from "../../runtime/native-string";
@@ -36,6 +37,10 @@ interface PublicUsers {
 interface PublicEncodings {
     snapshot(): Promise<PublicEncodingSnapshot>;
     revalidate(snapshot: PublicEncodingSnapshot): Promise<boolean>;
+}
+interface PublicMaintainers {
+    snapshot(journalId:number,posterId:number):Promise<PublicMaintainerSnapshot>;
+    revalidate(snapshot:PublicMaintainerSnapshot):Promise<boolean>;
 }
 interface PublicTranslations {
     snapshot(name: SubjectTranslationName): Promise<PublicTranslationSnapshot>;
@@ -72,11 +77,13 @@ export class GeneralPublicSession {
     private readonly users: PublicUserSnapshot[] = [];
     private readonly translations: PublicTranslationSnapshot[] = [];
     private readonly encodings: PublicEncodingSnapshot[] = [];
+    private readonly maintainers:PublicMaintainerSnapshot[]=[];
     private pending = 0;
     constructor(private readonly userStore: PublicUsers, private readonly translationStore: PublicTranslations,
         private readonly profile: NativeProfile, private readonly usernameMaximum: number,
         private readonly encodingStore?: PublicEncodings,
-        private readonly languageContext?:GeneralMlRequestContext) {}
+        private readonly languageContext?:GeneralMlRequestContext,
+        private readonly maintainerStore?:PublicMaintainers) {}
     /** The child initialization result precedes native S2's language merge. */
     afterContextInitialization():void {
         this.assertOpen();
@@ -131,6 +138,20 @@ export class GeneralPublicSession {
         } catch (error) {this.state = "failed"; throw error;}
         finally {this.pending--;}
     }
+    /** Trusted selected-entry projection only; there is no child maintainer operation. */
+    async entryMaintainer(journalId:number,posterId:number):Promise<boolean> {
+        this.assertOpen();
+        if(!this.maintainerStore)throw Error("Community maintainer authority is not installed");
+        this.pending++;
+        try {
+            const witness=await this.maintainerStore.snapshot(journalId,posterId);
+            this.assertOpen();
+            if(witness.journalId!==journalId||witness.posterId!==posterId)
+                throw Error("Community maintainer witness mismatch");
+            this.maintainers.push(witness);return witness.canManage;
+        }catch(error){this.state="failed";throw error;}
+        finally{this.pending--;}
+    }
     /** Complete selected journal/program authority is the LAST await before release. */
     async finish(recheckAuthority: () => Promise<boolean>): Promise<boolean> {
         this.assertOpen();
@@ -145,6 +166,9 @@ export class GeneralPublicSession {
             }
             for (const witness of this.encodings) if (!await this.encodingStore!.revalidate(witness)) {
                 this.state = "failed"; return false;
+            }
+            for(const witness of this.maintainers)if(!await this.maintainerStore!.revalidate(witness)) {
+                this.state="failed";return false;
             }
             const current = await recheckAuthority();
             this.state = current ? "complete" : "failed";
