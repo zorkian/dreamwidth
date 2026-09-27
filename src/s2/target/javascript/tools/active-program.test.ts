@@ -26,7 +26,8 @@ function native() {
     return JSON.parse(execFileSync('/usr/bin/prlimit', ['--as=536870912', '--cpu=5', '--', '/usr/bin/perl',
         resolve('tools/active-style-native.pl')], {timeout: 10000, maxBuffer: 1048576}).toString()) as {
         layers: {id: number; type: string; parentId: number; sourceBase64: string; activeBase64: string}[];
-        outputBase64: string; selection: {persisted: Record<string, number>; default: Record<string, number>; siteviews: Record<string, number>; incomplete: Record<string, number>};
+        outputBase64: string; selection: {persisted: Record<string, number>; default: Record<string, number>; siteviews: Record<string, number>; incomplete: Record<string, number>; sitefeeds: Record<string, number>;
+            feedInfo: [number, string]; corruptGzipAbsent: boolean};
         syntheticWrites: string[];
     };
 }
@@ -51,6 +52,14 @@ test('actual native map/remap/default keeps user exclusion and compiled version 
     assert.deepEqual(selectActiveStyle(0, {}, aliases, {...config,
         defaultStyle: {core: 'missing/core', layout: 'missing/layout'}},
         {...request, selection: 'default'}).effective, expected.selection.incomplete);
+    assert.deepEqual(expected.selection.feedInfo, [2, 'sitefeeds']);
+    assert.equal(expected.selection.corruptGzipAbsent, true);
+    const feed = selectActiveStyle(44, {core: 1, user: 2}, aliases, {...config,
+        defaultFeedStyle: {core: 'core2', layout: 'fixture/layout', theme: 'missing/theme'}},
+        {...request, selection: 'sitefeeds'});
+    assert.equal(feed.origin, 'sitefeeds');
+    assert.deepEqual(feed.effective, expected.selection.sitefeeds);
+    assert.deepEqual(feed.unresolvedRoles, []);
     assert.deepEqual(expected.syntheticWrites, ['status', 'remap']);
     assert.equal(activeStyleId({stylesys: '2abc', s2_style: '44'}), 44);
 });
@@ -91,6 +100,22 @@ test('actual primary owner groups, opaque binaries, absent source and complete r
         // The same numeric style ID owned by another journal is not authority.
         await admin.query(`INSERT INTO ${table(c, 's2stylelayers2')} (userid,styleid,type,s2lid)
             VALUES (900002,44,'user',999999)`);
+        const feedRepository = new MysqlActivePrograms({...config, styles: {...config.styles,
+            defaultFeedStyle: {...config.styles.defaultStyle, theme: 'missing/theme'},
+            layerRemap: {'991010': 999997}}});
+        try {
+            await admin.query(`UPDATE ${table(g, 'user')} SET journaltype='Y' WHERE userid=900001`);
+            const feed = await feedRepository.load(request); assert.ok(feed);
+            assert.equal(feed.selection.origin, 'sitefeeds');
+            assert.equal(feed.selection.styleId, 0);
+            assert.deepEqual(feed.selection.unresolvedRoles, []);
+            assert.ok(feed.program.layers.every(layer => layer.ownerId === feed.program.systemUserId));
+            await admin.query(`UPDATE ${table(c, 's2stylelayers2')} SET s2lid=999997 WHERE userid=900001 AND styleid=44 AND type='user'`);
+            assert.equal(await feedRepository.revalidate(feed), true);
+            await admin.query(`UPDATE ${table(c, 's2stylelayers2')} SET s2lid=? WHERE userid=900001 AND styleid=44 AND type='user'`, [expected.layers[3]!.id]);
+            await admin.query(`UPDATE ${table(g, 'user')} SET journaltype='P' WHERE userid=900001`);
+            assert.equal(await feedRepository.revalidate(feed), false);
+        } finally {await feedRepository.close();}
         const snapshot = await repository.load(request); assert.ok(snapshot);
         assert.deepEqual(snapshot.program.layers.map(layer => layer.id), expected.layers.map(layer => layer.id));
         for (const [index, layer] of snapshot.program.layers.entries()) {
@@ -135,6 +160,20 @@ test('actual primary owner groups, opaque binaries, absent source and complete r
         assert.equal(missingSource.program.layers[3]!.sourceBytes, null);
         await admin.query(`UPDATE ${table(other, 's2compiled2')} SET comptime=2 WHERE s2lid=?`, [expected.layers[1]!.id]);
         assert.equal(await repository.revalidate(missingSource), false);
+        const corrupt = Buffer.from([31,139,98,114,111,107,101,110]);
+        await admin.query(`UPDATE ${table(c, 's2compiled2')} SET compdata=? WHERE s2lid=?`, [corrupt,user.id]);
+        const corruptOptional = await repository.load(request); assert.ok(corruptOptional);
+        assert.equal(corruptOptional.program.layers.some(layer => layer.id === user.id), false);
+        const corruptWitness = corruptOptional.dependencies.find(layer => layer.id === user.id)!;
+        assert.ok(corruptWitness.storedSha256);
+        assert.equal(corruptWitness.decodedSha256, null);
+        await admin.query(`UPDATE ${table(c, 's2compiled2')} SET compdata=? WHERE s2lid=?`, [gzipSync(Buffer.from(user.activeBase64,'base64')),user.id]);
+        assert.equal(await repository.revalidate(corruptOptional), false);
+        await admin.query(`UPDATE ${table(c, 's2compiled2')} SET compdata=? WHERE s2lid=?`, [corrupt,expected.layers[0]!.id]);
+        const corruptCritical = await repository.load(request); assert.ok(corruptCritical);
+        assert.equal(corruptCritical.selection.origin, 'default');
+        assert.equal(corruptCritical.dependencies.find(layer => layer.id === expected.layers[0]!.id)!.decodedSha256,null);
+        await admin.query(`UPDATE ${table(c, 's2compiled2')} SET compdata=? WHERE s2lid=?`, [gzipSync(Buffer.from(expected.layers[0]!.activeBase64,'base64')),expected.layers[0]!.id]);
         // Positive owner cluster never falls back to an unrelated global record.
         await admin.query(`INSERT INTO ${table(g, 's2compiled')} (s2lid,comptime,compdata) VALUES (?,9,?)`, [user.id, Buffer.from('WRONG_GLOBAL')]);
         await admin.query(`DELETE FROM ${table(c, 's2compiled2')} WHERE s2lid=?`, [user.id]);
