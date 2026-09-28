@@ -153,6 +153,10 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const registeredPrepared=await GeneralSelectedText.prepare(registered,noEncoding);
     const registeredTree=generalSelectedComments(registered,sourceConfig,registeredPrepared,navigation);
     assert.equal(registeredTree?.roots[0]?.posterUsername?.bytes().toString(),"restoredauthor");
+    const invalidName={...registered,facts:{...registered.facts,comments:{...registered.facts.comments!,
+        authors:registered.facts.comments!.authors.map(author=>author.userid===900999?
+            {...author,user:"café"}:author)}}};
+    assert.throws(()=>generalSelectedComments(invalidName,sourceConfig,registeredPrepared,navigation));
     const registeredRecords=generalCommentRecords(registeredTree!,{journal:{'.type':'UserLite'},
         ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
         shown(){return {hasPicture:false};}});
