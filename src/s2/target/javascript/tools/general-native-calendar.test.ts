@@ -21,7 +21,8 @@ import {tmpdir} from 'node:os';
 import type {NativeProfile} from '../runtime/native-profile';
 import {NativeNumber, NativeString} from '../runtime/native-scalar';
 import {loadGeneralCalendarProfile, verifyGeneralCalendarSources, createGeneralCalendarSession,
-    generalNativeDayOfWeek, type GeneralCalendarResult} from '../live/domain/general-native-calendar';
+    generalNativeDayOfWeek, generalNativeMysqlDateToTime, type GeneralCalendarResult,
+    type GeneralMysqlDateResult} from '../live/domain/general-native-calendar';
 
 const scalar: NativeProfile = JSON.parse(execFileSync('perl', ['tools/compile-active.pl'], {
     input: JSON.stringify({profileOnly: true}), encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024,
@@ -123,4 +124,83 @@ test('empty TZDIR uses the installed default timezone directory', () => {
     assert.match(raw.timezone.path, /\/America\/New_York$/);
     const profile = loadGeneralCalendarProfile(raw, scalar);
     verifyGeneralCalendarSources(profile, path => readFileSync(path));
+});
+
+type MysqlCivil = string | undefined | {unicode: string};
+const mysqlCivils: readonly MysqlCivil[] = [
+    undefined, 'bad', '0000-00-00', '2026-09-26', '2026-09-26 01:02',
+    '2026-09-26 01:02:03', '2026-02-31 01:02:03', '2024-02-30',
+    '2026-02-00', '2026-02-29', '2026-13-01', '2026-00-01',
+    '2026-01-01 24:00:00', '2026-01-01 00:60:00', '2026-01-01 00:00:60',
+    '2026-09-26\n', '2026-09-26\n\n', '2026-09-26\r\n',
+    {unicode: '２０２６-０９-２６'}, {unicode: '٢٠٢٦-٠٩-٢٦'},
+    '2026-09-26 01:02:03\n', '2026-09-26 1:02:03', '2026-09-26 01:02:03x',
+    '2026-01-01 01:02:03', '9999-99-99',
+];
+const mysqlNativeSource = String.raw`
+use strict;use warnings;use JSON::PP;use MIME::Base64 qw(decode_base64 encode_base64);use Encode ();use DBI ();
+our $attempted;BEGIN{no warnings 'redefine';*DBI::connect=sub{$attempted=1;die'DB forbidden'};*DBI::connect_cached=sub{$attempted=1;die'DB forbidden'}}
+require '/workspaces/dreamwidth/cgi-bin/LJ/Time.pm';local$/;my$rows=decode_json(<STDIN>);my@out;
+for my$row(@$rows){my$civil;
+if($row->{civil}){$civil=decode_base64($row->{civil}{base64});utf8::decode($civil)or die'invalid oracle UTF8'if$row->{civil}{utf8}}
+my($value,$during);my$ok=eval{$@='prior';$value=LJ::mysqldate_to_time($civil,1);$during=$@;1};
+my$exception=$ok?$during:$@;push@out,{kind=>$ok?'returned':'program-error',value=>defined($value)?"$value":undef,
+exception=>{base64=>encode_base64(utf8::is_utf8($exception)?Encode::encode('UTF-8',$exception):$exception,''),utf8=>utf8::is_utf8($exception)?JSON::PP::true:JSON::PP::false}}}
+die'DB attempted'if$attempted;print JSON::PP->new->canonical->encode(\@out);
+`;
+function mysqlCivil(value: MysqlCivil): NativeString | undefined {
+    return value === undefined ? undefined : typeof value === 'string'
+        ? NativeString.bytes(Buffer.from(value, 'latin1')) : NativeString.hostUnicode(value.unicode);
+}
+function actualMysql(timezone: string, rows: readonly MysqlCivil[]): any[] {
+    const civil = rows.map(value => value === undefined ? {civil: null} : {
+        civil: {base64: mysqlCivil(value)!.bytes().toString('base64'), utf8: typeof value !== 'string'},
+    });
+    return JSON.parse(execFileSync('/usr/bin/prlimit', ['--as=268435456', '--cpu=10', '--', 'perl', '-e', mysqlNativeSource], {
+        env: {...process.env, TZ: timezone}, input: JSON.stringify(civil), encoding: 'utf8', timeout: 15000,
+    }));
+}
+function checkMysql(result: GeneralMysqlDateResult, expected: any): void {
+    assert.equal(result.kind, expected.kind);
+    assert.equal(result.kind === 'returned' ? result.value?.pv().bytes().toString() ?? null : null, expected.value);
+    const error = expected.exception;
+    if (error.base64 === 'cHJpb3I=') assert.deepEqual(result.exceptionEffect, {kind: 'none'});
+    else if (error.base64 === '') assert.deepEqual(result.exceptionEffect, {kind: 'cleared'});
+    else {
+        assert.equal(result.exceptionEffect.kind, 'set');
+        if (result.exceptionEffect.kind !== 'set') throw Error('missing native error effect');
+        assert.equal(result.exceptionEffect.message.bytes().toString('base64'), error.base64);
+        assert.equal(result.exceptionEffect.message.flagged(), error.utf8);
+        if (result.kind === 'program-error') assert.equal(result.message.bytes().toString('base64'), error.base64);
+    }
+}
+for (const zone of ['UTC', 'America/New_York']) {
+    test(`Entry MySQL date uses native parse, eval effect and operation suffix in ${zone}`, () => {
+        const profile = loadGeneralCalendarProfile(setup(zone), scalar);
+        const session = createGeneralCalendarSession(profile), expected = actualMysql(zone, mysqlCivils);
+        mysqlCivils.forEach((civil, index) => checkMysql(generalNativeMysqlDateToTime(session, mysqlCivil(civil)), expected[index]));
+    });
+}
+test('day-of-week and Entry time share one explicit Time::Local cache', () => {
+    const profile = loadGeneralCalendarProfile(setup('UTC'), scalar), session = createGeneralCalendarSession(profile);
+    const first = generalNativeDayOfWeek(session, 67562, 1, 1);
+    const subsequent = generalNativeMysqlDateToTime(session, NativeString.bytes(Buffer.from('2026-01-01')));
+    const native = JSON.parse(execFileSync('/usr/bin/prlimit', ['--as=268435456', '--cpu=10', '--', 'perl', '-e',
+        String.raw`use strict;use DBI ();BEGIN{no warnings 'redefine';*DBI::connect=sub{die'DB forbidden'}}require '/workspaces/dreamwidth/cgi-bin/LJ/Time.pm';use JSON::PP;my$a=LJ::day_of_week(67562,1,1);my$b=LJ::mysqldate_to_time('2026-01-01',1);print JSON::PP->new->encode([$a,$b])`],
+    {env: {...process.env, TZ: 'UTC'}, encoding: 'utf8', timeout: 15000}));
+    assert.equal(first.value?.pv().bytes().toString(), String(native[0]));
+    assert.equal(subsequent.kind, 'returned');
+    if (subsequent.kind === 'returned') assert.equal(subsequent.value?.pv().bytes().toString(), String(native[1]));
+});
+test('Entry operation-specific Carp site is bound to the installed LJ source', () => {
+    const raw = setup('UTC'), changed = structuredClone(raw);
+    const source = changed.sources.find((row: {path: string}) => row.path.endsWith('/cgi-bin/LJ/Time.pm'));
+    assert.ok(source);
+    source.sha256 = '0'.repeat(64);
+    const session = createGeneralCalendarSession(loadGeneralCalendarProfile(changed, scalar));
+    assert.throws(() => generalNativeMysqlDateToTime(session, NativeString.bytes(Buffer.from('2026-02-31'))),
+        /source is unqualified/);
+    assert.throws(() => generalNativeMysqlDateToTime(session, {} as NativeString), /source is unqualified/);
+    const valid = createGeneralCalendarSession(loadGeneralCalendarProfile(raw, scalar));
+    assert.throws(() => generalNativeMysqlDateToTime(valid, {} as NativeString), /original native scalar/);
 });

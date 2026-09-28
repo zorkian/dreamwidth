@@ -51,7 +51,8 @@
 import {createHash} from 'node:crypto';
 import type {NativeProfile} from '../../runtime/native-profile';
 import {NativeNumber, NativeString, scalarNumber, scalarPV} from '../../runtime/native-scalar';
-import {NativeOutput} from '../../runtime/native-string';
+import {NativeOutput, byteCharacters, characterCodepoint} from '../../runtime/native-string';
+import {nativeCharacterClass} from '../../runtime/native-profile';
 import {arithmetic, arrayIndex, intCast, modulo, divide, numericCompare} from '../../runtime/native-number';
 
 export interface GeneralCalendarProfile {readonly schema: 1}
@@ -467,8 +468,9 @@ function daygm(session: GeneralCalendarSession, day: NativeNumber, month: Native
     return add(day, base);
 }
 function timegm(session: GeneralCalendarSession, originalYear: NativeNumber, month: NativeNumber, day: NativeNumber,
-    dayInput?: {value: unknown}): NativeNumber {
+    dayInput?: {value: unknown}, clock?: readonly [NativeNumber, NativeNumber, NativeNumber], suffix?: Buffer): NativeNumber {
     const state = sessionData(session), zero = constant(0);
+    const [sec, min, hour] = clock ?? [zero, zero, zero];
     let year = originalYear;
     if (numericCompare(year, constant(1000)) >= 0) year = sub(year, constant(1900));
     else if (numericCompare(year, constant(100)) < 0 && numericCompare(year, zero) >= 0)
@@ -479,7 +481,7 @@ function timegm(session: GeneralCalendarSession, originalYear: NativeNumber, mon
         // the shared flag-aware concatenation, including mixed raw/wide strings.
         const output = new NativeOutput();
         for (const value of parts) output.append(scalarPV(value));
-        output.append(NativeString.bytes(state.facts.suffix));
+        output.append(NativeString.bytes(suffix ?? state.facts.suffix));
         throw new CalendarSemanticError(output.scalar());
     };
     if (numericCompare(month, constant(11)) > 0 || numericCompare(month, zero) < 0) die("Month '", month, "' out of range 0..11");
@@ -489,12 +491,16 @@ function timegm(session: GeneralCalendarSession, originalYear: NativeNumber, mon
     const divisible = (by: number): boolean => numericCompare(modulo(full, constant(by)), zero) === 0;
     if (numericCompare(month, constant(1)) === 0 && divisible(4) && (!divisible(100) || divisible(400))) max++;
     if (numericCompare(day, constant(max)) > 0 || numericCompare(day, constant(1)) < 0) die("Day '", originalDay, `' out of range 1..${max}`);
+    if (numericCompare(hour, constant(23)) > 0 || numericCompare(hour, zero) < 0) die("Hour '", hour, "' out of range 0..23");
+    if (numericCompare(min, constant(59)) > 0 || numericCompare(min, zero) < 0) die("Minute '", min, "' out of range 0..59");
+    if (numericCompare(sec, constant(60)) >= 0 || numericCompare(sec, zero) < 0) die("Second '", sec, "' out of range 0..59");
     const days = daygm(session, day, month, year);
     if (!(Math.abs(nv(days)) < 365 * 2 ** 31)) {
         const prefix: unknown[] = nv(days) > 365 * 2 ** 31 ? ['Day too big - ', days, ' > ', constant(365 * 2 ** 31), '\n'] : [];
-        die(...prefix, 'Cannot handle date (0, 0, 0, ', originalDay, ', ', month, ', ', full, ')');
+        die(...prefix, 'Cannot handle date (', sec, ', ', min, ', ', hour, ', ', originalDay, ', ', month, ', ', full, ')');
     }
-    return mul(constant(86400), days);
+    return add(add(add(add(sec, zero), mul(constant(60), min)), mul(constant(3600), hour)),
+        mul(constant(86400), days));
 }
 function fromParts(session: GeneralCalendarSession, parts: Parts): NativeNumber {
     const days = daygm(session, constant(parts[3]), constant(parts[4]), constant(parts[5]));
@@ -529,4 +535,99 @@ export function generalNativeDayOfWeek(session: GeneralCalendarSession, year: un
     }
     // Native LJ::day_of_week performs this localtime outside its eval.
     return {value: constant(local(result)[6]), exceptionEffect: {kind: 'cleared'}};
+}
+
+export type GeneralMysqlDateResult =
+    | {readonly kind: 'returned'; readonly value: NativeNumber | undefined;
+        readonly exceptionEffect: {readonly kind: 'none' | 'cleared'} | {readonly kind: 'set'; readonly message: NativeString}}
+    | {readonly kind: 'program-error'; readonly message: NativeString;
+        readonly exceptionEffect: {readonly kind: 'set'; readonly message: NativeString}};
+
+// LJ::mysqldate_to_time's $ anchor accepts exactly one final LF. Match its
+// source grammar on native characters so the installed /d digit class, not a
+// JavaScript or Unicode-default regexp, decides flagged versus byte scalars.
+function mysqlFields(civil: NativeString, profile: NativeProfile): readonly NativeString[] | undefined {
+    const chars = byteCharacters(civil), utf8 = civil.flagged();
+    if (chars.length && characterCodepoint(chars.at(-1)!) === 10n) chars.pop();
+    let offset = 0;
+    const digit = (length: number): NativeString | undefined => {
+        const parts = chars.slice(offset, offset + length);
+        if (parts.length !== length || parts.some(part =>
+            !nativeCharacterClass(profile, 'digit', Number(characterCodepoint(part)), utf8))) return undefined;
+        offset += length;
+        const bytes = Buffer.concat(parts.map(part => part.bytes()));
+        return utf8 ? NativeString.flagged(bytes) : NativeString.bytes(bytes);
+    };
+    const punctuation = (point: number): boolean => {
+        if (offset >= chars.length || characterCodepoint(chars[offset]!) !== BigInt(point)) return false;
+        offset++; return true;
+    };
+    const year = digit(4); if (!year || !punctuation(45)) return undefined;
+    const month = digit(2); if (!month || !punctuation(45)) return undefined;
+    const day = digit(2); if (!day) return undefined;
+    if (offset === chars.length) return [year, month, day];
+    if (!punctuation(32)) return undefined;
+    const hour = digit(2); if (!hour || !punctuation(58)) return undefined;
+    const minute = digit(2); if (!minute) return undefined;
+    if (offset === chars.length) return [year, month, day, hour, minute];
+    if (!punctuation(58)) return undefined;
+    const second = digit(2);
+    return second && offset === chars.length ? [year, month, day, hour, minute, second] : undefined;
+}
+
+function mysqlSuffix(state: Facts): Buffer {
+    // This operation calls Time::Local at LJ/Time.pm:87, while the existing
+    // source-bound day_of_week profile records LJ/Time.pm:52. A changed source
+    // cannot inherit the old line by guesswork; the installed hash must match.
+    const match = /^ at (\/.*\/cgi-bin\/LJ\/Time\.pm) line 52\.\n$/.exec(state.suffix.toString('latin1'));
+    if (!match || !state.sources.some(source => source.path === match[1] &&
+        source.sha256 === '78d46e58d3354855429428340d3bc8f693a2efc3e2b4b4f6e82de6d17cc8642d'))
+        throw Error('Installed LJ::mysqldate_to_time source is unqualified');
+    return Buffer.from(` at ${match[1]} line 87.\n`, 'latin1');
+}
+
+function mysqlDaysInMonth(month: NativeNumber, year: NativeNumber): NativeNumber | undefined {
+    const zero = constant(0), two = constant(2);
+    if (numericCompare(month, two) === 0) {
+        if (numericCompare(modulo(year, constant(4)), zero) === 0 &&
+            (numericCompare(modulo(year, constant(400)), zero) === 0 ||
+                numericCompare(modulo(year, constant(100)), zero) !== 0)) return constant(29);
+        return constant(28);
+    }
+    const index = Number(arrayIndex(sub(month, constant(1))));
+    // Perl's list index -1 refers to December; >11 is undef.
+    const days = monthDays[index < 0 ? monthDays.length + index : index];
+    return days === undefined ? undefined : constant(days);
+}
+
+/** The caller applies eval effects in order; only the second semantic die is outside eval. */
+export function generalNativeMysqlDateToTime(session: GeneralCalendarSession,
+    civil: NativeString | undefined): GeneralMysqlDateResult {
+    const state = sessionData(session), suffix = mysqlSuffix(state.facts);
+    if (civil === undefined) return {kind: 'returned', value: undefined, exceptionEffect: {kind: 'none'}};
+    if (!NativeString.is(civil)) throw Error('MySQL date requires an original native scalar');
+    const fields = mysqlFields(civil, state.facts.scalar);
+    if (!fields) return {kind: 'returned', value: undefined, exceptionEffect: {kind: 'none'}};
+    const [year, month, day, hour, minute, second] = fields;
+    if (year!.bytes().equals(Buffer.from('0000')) && month!.bytes().equals(Buffer.from('00')) &&
+        day!.bytes().equals(Buffer.from('00'))) return {kind: 'returned', value: undefined, exceptionEffect: {kind: 'none'}};
+    const mon = scalarNumber(month), y = scalarNumber(year);
+    const clock = [scalarNumber(second), scalarNumber(minute), scalarNumber(hour)] as const;
+    const calculate = (currentDay: NativeString | NativeNumber | undefined): NativeNumber =>
+        timegm(session, y, sub(mon, constant(1)), scalarNumber(currentDay), {value: currentDay}, clock, suffix);
+    try {
+        return {kind: 'returned', value: calculate(day), exceptionEffect: {kind: 'cleared'}};
+    } catch (error) {
+        if (!(error instanceof CalendarSemanticError)) throw error;
+        const maximum = mysqlDaysInMonth(mon, y);
+        const clamped = numericCompare(scalarNumber(day), scalarNumber(maximum)) > 0 ? maximum : day;
+        try {
+            return {kind: 'returned', value: calculate(clamped),
+                exceptionEffect: {kind: 'set', message: error.value}};
+        } catch (second) {
+            if (!(second instanceof CalendarSemanticError)) throw second;
+            return {kind: 'program-error', message: second.value,
+                exceptionEffect: {kind: 'set', message: second.value}};
+        }
+    }
 }
