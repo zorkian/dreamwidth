@@ -131,12 +131,12 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.deepEqual(nativeCommentDefinedProps(),[1,1]);
     const missingRecords=generalCommentRecords(missingTree!,{journal:{'.type':'UserLite'},
         ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
-        lastTalkid:0,lastJournalId:0,
-        shown(){return {anonymous:true,hasPicture:false};}});
+        shown(){return {hasPicture:false};}});
     const missingInput=missingRecords[0]?.input;
     assert.equal(missingInput?.kind,'shown');
     if(missingInput?.kind!=='shown')throw Error('Missing selected shown comment');
     assert.equal(missingInput.importSourceDefined,true);
+    assert.equal(missingInput.anonymous,true);
     assert.equal(scalarPV(missingInput.subjectIcon).bytes().toString(),'sm01');
     assert.equal(missingInput.body?.bytes().toString(),'VISIBLE_MISSING_AUTHOR');
     assert.equal(missingInput.permalinkUrl,missingTree!.roots[0]!.urls.permalink);
@@ -276,7 +276,6 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const model=generalCommentFromSource(ctx,input,modelOperations);
     const approved=generalCommentRecords(selectedTree!,{journal:input.journal,
         ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
-        lastTalkid:0,lastJournalId:0,
         shown(){throw Error('Suspended selected author must not be presented');}});
     const [assembled]=generalCommentTreeFromSource(ctx,1,()=>approved,()=>modelOperations);
     assert.equal(assembled?._fromsuspended,1);

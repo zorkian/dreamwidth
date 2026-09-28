@@ -255,6 +255,20 @@ construction. Calendar creation/reuse is still a separate user decision; the
 test's logtime value is declared fixture input. Real cleaner, edit, timezone,
 head and installed worker/HTTP providers remain required.
 
+For a selected, shown identity poster, the parent now issues the native
+`treat_as_anon` decision from current public identity and relationship rows.
+Personal journals use the low trust bit in `wt_edges`, including the native
+same-account shortcut; communities use the journal-to-poster `reluser` E edge.
+The complete owner/poster/name/mapping and relation witness is checked again
+before publication. A missing poster is anonymous; hidden and suspended-only
+authors trigger no relationship read. Only the named boolean decision, never a
+relationship row or source account record, can enter the selected child model.
+Anonymous requests also leave `get_lastcomment` values
+undefined, so the Comment-posted notice cannot be inferred from a stored ID.
+An isolated read-only SQL/native test checks trust, watch-only, membership,
+rename and final-reread revocation. Installed Comment cleaning and worker
+binding remain required.
+
 Loaded selected Comment edit metadata now uses the original stored edit time
 truthiness, raw edit reason, the approved Entry URL and the same native
 `link_thread_arg` as reply links. A child thread-root link uses the approved

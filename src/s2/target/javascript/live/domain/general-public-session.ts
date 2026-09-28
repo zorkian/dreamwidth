@@ -24,6 +24,7 @@ import type {PublicUserSnapshot} from "../data/public-users";
 import type {PublicEncodingSnapshot} from "../data/public-encodings";
 import type {PublicTranslationSnapshot} from "../data/public-translations";
 import type {PublicMaintainerSnapshot} from "../data/public-maintainers";
+import type {PublicCommentAnonymitySnapshot} from "../data/public-comment-authors";
 import type {SubjectTranslationName,GeneralMlLookup,GeneralMlRequestContext} from "./public-translation";
 import {NativeString} from "../../runtime/native-string";
 import {caseString} from "../../runtime/native-string";
@@ -41,6 +42,11 @@ interface PublicEncodings {
 interface PublicMaintainers {
     snapshot(journalId:number,posterId:number):Promise<PublicMaintainerSnapshot>;
     revalidate(snapshot:PublicMaintainerSnapshot):Promise<boolean>;
+}
+interface PublicCommentAuthors {
+    snapshot(ownerId:number,posterId:number,ownerType:string,
+        posterName:string):Promise<PublicCommentAnonymitySnapshot>;
+    revalidate(snapshot:PublicCommentAnonymitySnapshot):Promise<boolean>;
 }
 interface PublicTranslations {
     snapshot(name: SubjectTranslationName): Promise<PublicTranslationSnapshot>;
@@ -78,12 +84,14 @@ export class GeneralPublicSession {
     private readonly translations: PublicTranslationSnapshot[] = [];
     private readonly encodings: PublicEncodingSnapshot[] = [];
     private readonly maintainers:PublicMaintainerSnapshot[]=[];
+    private readonly commentAuthors:PublicCommentAnonymitySnapshot[]=[];
     private pending = 0;
     constructor(private readonly userStore: PublicUsers, private readonly translationStore: PublicTranslations,
         private readonly profile: NativeProfile, private readonly usernameMaximum: number,
         private readonly encodingStore?: PublicEncodings,
         private readonly languageContext?:GeneralMlRequestContext,
-        private readonly maintainerStore?:PublicMaintainers) {}
+        private readonly maintainerStore?:PublicMaintainers,
+        private readonly commentAuthorStore?:PublicCommentAuthors) {}
     /** The child initialization result precedes native S2's language merge. */
     afterContextInitialization():void {
         this.assertOpen();
@@ -152,6 +160,22 @@ export class GeneralPublicSession {
         }catch(error){this.state="failed";throw error;}
         finally{this.pending--;}
     }
+    /** Only selected shown identity posters require a current cleaner-trust edge. */
+    async commentAnonymous(ownerId:number,posterId:number,ownerType:string,
+        posterName:string):Promise<boolean> {
+        this.assertOpen();
+        if(!this.commentAuthorStore)throw Error("Comment identity authority is not installed");
+        this.pending++;
+        try {
+            const witness=await this.commentAuthorStore.snapshot(ownerId,posterId,ownerType,posterName);
+            this.assertOpen();
+            if(witness.ownerId!==ownerId||witness.posterId!==posterId||
+                witness.ownerType!==ownerType||witness.posterName!==posterName)
+                throw Error("Comment identity witness mismatch");
+            this.commentAuthors.push(witness);return witness.anonymous;
+        }catch(error){this.state="failed";throw error;}
+        finally{this.pending--;}
+    }
     /** Complete selected journal/program authority is the LAST await before release. */
     async finish(recheckAuthority: () => Promise<boolean>): Promise<boolean> {
         this.assertOpen();
@@ -168,6 +192,9 @@ export class GeneralPublicSession {
                 this.state = "failed"; return false;
             }
             for(const witness of this.maintainers)if(!await this.maintainerStore!.revalidate(witness)) {
+                this.state="failed";return false;
+            }
+            for(const witness of this.commentAuthors)if(!await this.commentAuthorStore!.revalidate(witness)) {
                 this.state="failed";return false;
             }
             const current = await recheckAuthority();

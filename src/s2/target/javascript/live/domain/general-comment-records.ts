@@ -30,9 +30,9 @@ export interface GeneralCommentRecordAuthority {
     /** Same authorized selected Entry and source-issued logtime result. */
     readonly journal:GeneralModel;readonly ditemid:number;
     readonly entryLogtimeUnix:NativeNumber|undefined;
-    readonly noHtml:unknown;readonly lastTalkid:unknown;readonly lastJournalId:unknown;
-    /** Resolved by parent public identity and picture witnesses, only on shown records. */
-    shown(node:GeneralSelectedComment):{readonly anonymous:boolean;readonly hasPicture:boolean};
+    readonly noHtml:unknown;
+    /** Resolved by parent public picture witnesses, only on shown records. */
+    shown(node:GeneralSelectedComment):{readonly hasPicture:boolean};
 }
 
 /** No raw talkprops, author rows or unselected bodies enter the source model. */
@@ -58,7 +58,9 @@ export function generalCommentRecords(page:GeneralSelectedCommentPage,
             // Anonymous admitted requests do not enable top-only/flat or
             // opt_echi_display. Native leaves these keys undefined here.
             hideChildren:undefined,hiddenChild:undefined,echi:undefined,
-            lastTalkid:authority.lastTalkid,lastJournalId:authority.lastJournalId};
+            // LJ::get_lastcomment reads MemCache only for a remote user. The
+            // anonymous request has neither value and never emits the notice.
+            lastTalkid:undefined,lastJournalId:undefined};
         let input:GeneralApprovedCommentNode["input"];
         if(!node.show||node.state==="D"||node.state==="S")input={kind:"stub",...common};
         else if(node.posterLoaded&&node.posterSuspended)input={kind:"suspended-loaded",...common,
@@ -66,12 +68,12 @@ export function generalCommentRecords(page:GeneralSelectedCommentPage,
             importedFrom:fields?.importedFrom,adminPost:fields?.adminPost};
         else {
             const presentation=authority.shown(node);
-            if(typeof presentation.anonymous!=="boolean"||typeof presentation.hasPicture!=="boolean")
+            if(typeof node.anonymous!=="boolean"||typeof presentation.hasPicture!=="boolean")
                 throw Error("Invalid approved Comment presentation");
             input={kind:"shown",...common,loaded:fields?.loaded??false,
                 subject:fields?.subject??(!node.full&&!node.subjectOnly?
                     NativeString.hostUtf8Bytes("..."):undefined),body:fields?.body,
-                noHtml:authority.noHtml,anonymous:presentation.anonymous,
+                noHtml:authority.noHtml,anonymous:node.anonymous,
                 preformatted:fields?.preformatted,editor:fields?.editor,datepost:node.datepost,
                 importSourceDefined:fields?.importSourceDefined??false,
                 importedFrom:fields?.importedFrom,pictureKeyword:fields?.pictureKeyword,

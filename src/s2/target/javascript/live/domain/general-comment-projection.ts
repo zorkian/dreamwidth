@@ -33,6 +33,8 @@ export interface GeneralSelectedComment {
     readonly show:boolean;readonly full:boolean;readonly subjectOnly:boolean;
     readonly showableChildren:number;readonly posterId:number;
     readonly posterLoaded:boolean;readonly posterSuspended:boolean;
+    /** Parent-issued native treat_as_anon result for shown, nonredacted authors. */
+    readonly anonymous:boolean|undefined;
     readonly datepost:NativeString;readonly datepostUnix:string|null;
     readonly urls:GeneralCommentUrls;
     /** Exact selected full/subject or suspended metadata cells; absent on structural stubs. */
@@ -96,6 +98,8 @@ export function generalSelectedComments(snapshot:NativeSelectedSnapshot,
             state:header.state as GeneralSelectedComment["state"],show:node.show,full:node.full,
             subjectOnly:node.subject&&!node.full,showableChildren:node.showableChildren,
             posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==="S",
+            anonymous:node.show&&author?.statusvis!=="S"?
+                prepared.commentAnonymous(header.posterid):undefined,
             datepost:NativeString.bytes(Buffer.from(header.datepost,"ascii")),
             datepostUnix:header.datepostUnix,urls,
             fields:fields?Object.freeze({...fields,loaded:node.full}):undefined,
