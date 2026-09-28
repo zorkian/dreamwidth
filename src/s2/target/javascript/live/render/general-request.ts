@@ -26,16 +26,24 @@ import type {GeneralRenderer, GeneralConversation} from "./general-child";
 import {assertSelectedRequest} from "./general-selection";
 import {encodeGeneralModel} from "./general-model-wire";
 import {PrivateTransportError} from "./private-transport";
+import type {GeneralSelectedCommentPage} from "../domain/general-comment-projection";
 
 export interface GeneralRequestHelpers {
     readonly session: GeneralPublicSession;
     readonly host: GeneralConversation["host"];
+    /** Parent request-private UserLite authority, before the worker resumes. */
+    bindSelectedCommentPosters(page:GeneralSelectedCommentPage):void;
+}
+export interface GeneralProjectedPage {
+    readonly page:unknown;
+    /** Parent-only; never enters the child resume graph. */
+    readonly selectedComments?:GeneralSelectedCommentPage;
 }
 export interface GeneralRequestOperations {
     /** Installed public helper authority, never renderer-controlled handlers. */
     helpers(prepared: PreparedProgram, journal: NativeJournalAuthority): GeneralRequestHelpers;
     /** Explicit public-field approval/post-source transformations only. */
-    project(snapshot: NativeSelectedSnapshot, helpers: GeneralRequestHelpers): Promise<unknown>;
+    project(snapshot: NativeSelectedSnapshot, helpers: GeneralRequestHelpers): Promise<GeneralProjectedPage>;
 }
 class MissingSelectedData extends Error {}
 
@@ -87,8 +95,10 @@ export class GeneralRequestPipeline {
                         throw new PrivateTransportError();
                     }
                     selected = snapshot;
-                    const page = await this.operations.project(snapshot,helpers);
-                    return {kind:request.page.kind,page:encodeGeneralModel(page)};
+                    const projected = await this.operations.project(snapshot,helpers);
+                    if(projected.selectedComments&&request.page.kind!=="entry")throw new PrivateTransportError();
+                    if(projected.selectedComments)helpers.bindSelectedCommentPosters(projected.selectedComments);
+                    return {kind:request.page.kind,page:encodeGeneralModel(projected.page)};
                 },
             });
         } catch (error) {

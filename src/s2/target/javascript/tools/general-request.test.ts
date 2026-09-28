@@ -18,14 +18,14 @@ import {GeneralRequestPipeline} from "../live/render/general-request";
 import {decodeGeneralModel} from "../live/render/general-model-wire";
 import {NativeString} from "../runtime/native-string";
 import {config,snapshot} from "../live/tests/fixtures";
-import type {NativeJournalAuthority,NativeSelectedSnapshot} from "../live/contracts";
+import type {NativeJournalAuthority,NativeSelectedSnapshot,RawPageRequest} from "../live/contracts";
 import type {ActiveProgramSnapshot} from "../live/data/active-program";
 import type {PreparedProgram,PrivateProgramTransfer} from "../live/render/program-coordinator";
 import type {GeneralPublicSession} from "../live/domain/general-public-session";
 
-function fixture(initError=false) {
+function fixture(initError=false,withPoster=false) {
     const raw=snapshot(), order:string[]=[];
-    const request=raw.request;
+    const request:RawPageRequest=withPoster?{...raw.request,page:{kind:"entry",ditemid:257}}:raw.request;
     const programRequest={username:request.username,view:request.page.kind,selection:"journal" as const};
     const u=raw.owner;
     let journal:NativeJournalAuthority={userid:u.userid,username:u.user,clusterid:u.clusterid,status:u.status,
@@ -39,8 +39,8 @@ function fixture(initError=false) {
         async loadNativeJournalAuthority(){order.push("journal");return journal;},
         async revalidateNativeJournalAuthority(value){assert.equal(value,journal);order.push("check-journal");return true;},
         async loadNativeSelectedSnapshot(bound){
-            order.push("selected");assert.equal(bound.page.kind,"recent");
-            assert.equal((bound.page as {itemshow:number}).itemshow,3);
+            order.push("selected");assert.equal(bound.page.kind,request.page.kind);
+            if(bound.page.kind==="recent")assert.equal(bound.page.itemshow,3);
             return {encoding:"dbi-byte-view",oldEncoding:0,undefinedEntryEvents:[],sources:[],
                 facts:{...raw,request:bound}} as NativeSelectedSnapshot;
         },
@@ -61,11 +61,15 @@ function fixture(initError=false) {
             order.push("print");return {bytes:Buffer.from([255,0,97]),utf8:false};
         },
     },config,{
-        helpers(){return {host:async()=>{throw Error("Unexpected host");},session:{
+        helpers(){return {host:async()=>{throw Error("Unexpected host");},
+            bindSelectedCommentPosters(page){if(!withPoster)throw Error("Unexpected Comment selection");
+                assert.equal(page.roots.length,0);order.push("bind-poster");},session:{
             afterContextInitialization(){order.push("context-language");},
             async finish(operation:()=>Promise<boolean>){order.push("check-public");return operation();},
         } as GeneralPublicSession};},
-        async project(){order.push("project");return {".type":"RecentPage",_title:NativeString.bytes(Buffer.from([255]))};},
+        async project(){order.push("project");return {page:{".type":withPoster?"EntryPage":"RecentPage",
+            _title:NativeString.bytes(Buffer.from([255]))},...(withPoster?{selectedComments:{roots:[],
+                selection:{page:1,pages:1,first:0,last:0,items:0,collapsed:false,thread:0}}}: {})};},
     });
     return {pipeline,request,programRequest,order,setChanged(){selectedCurrent=false;},
         setPrivate(){journal={...journal,statusvis:"S"};}};
@@ -79,6 +83,13 @@ test("general parent init precedes selected data, approved wire and final reread
         "check-public","check-journal","check-active","check-selected"]);
     const changed=fixture();changed.setChanged();
     assert.deepEqual(await changed.pipeline.render(changed.request,changed.programRequest),{ok:false,reason:"changed"});
+});
+test("parent registers selected Comment poster identity before worker resume",async()=>{
+    const control=fixture(false,true);
+    const result=await control.pipeline.render(control.request,control.programRequest);
+    assert.equal(result.ok,true);
+    assert.deepEqual(control.order,["journal","active","compile","init","context-language","selected",
+        "project","bind-poster","print","check-public","check-journal","check-active","check-selected"]);
 });
 test("init errors recheck without selected SQL; private owner cannot initialize",async()=>{
     const control=fixture(true);

@@ -53,6 +53,12 @@ static dependency checks, Node permissions and unchanged kernel sandbox remain.
 The fixed site-URL client imports no parent SQL/domain implementation; parent URL
 expansion is typed scalar IPC, not a navigation grant.
 
+For selected Comment posters, the parent project result carries the selected
+Comment page separately from the child resume model. The request pipeline binds
+its name-to-userid constraints to the request-private UserLite authority before
+sending resume. The selected tree is never serialized as a helper request;
+the installed projector still must supply this source-approved result.
+
 ## Evidence boundary
 
 The maintained tests distinguish actual installed native helpers, actual isolated
