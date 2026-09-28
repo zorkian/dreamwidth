@@ -55,7 +55,7 @@ export class GeneralUserAuthority {
     }
     async load(name: NativeString): Promise<PreparedPublicUser | undefined> {
         const snapshot = await this.session.user(name);
-        const selected=snapshot&&this.selectedPosters.get(snapshot.requestedName);
+        const selected=snapshot?this.selectedPosters.get(snapshot.requestedName):undefined;
         if(selected!==undefined&&snapshot?.user?.userid!==selected)
             throw new SnapshotError("unavailable");
         if (!snapshot?.user) return undefined;
