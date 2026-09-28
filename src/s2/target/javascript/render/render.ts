@@ -28,6 +28,7 @@ import { PageOutput } from "./page-output";
 import { EntryPage } from "./entry-page";
 import { DayPage, MonthPage, YearPage } from "./archive-pages";
 import { IconsPage } from "./icons-page";
+import { FriendsPage } from "./reading-page";
 import {
     type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
@@ -67,6 +68,11 @@ export interface RenderResult {
 }
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
+
+// For pages Perl renders in the site's own style (siteviews and error pages).
+export const SITE_STYLE_PAGE: RenderResult = {
+    status: 501, body: "This page is shown in the site's own style, which this server does not render.\n",
+};
 
 // What a stylesheet request runs, skipping any the style does not define.
 const STYLESHEET_FUNCTIONS = ["Page::print_contextual_stylesheet()", "Page::print_default_stylesheet()",
@@ -117,9 +123,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
-    if (usesSiteviews(site.config, journal, request, s2.ctx)) {
-        return { status: 501, body: "This page is shown in the site's own style, which this server does not render.\n" };
-    }
+    if (usesSiteviews(site.config, journal, request, s2.ctx)) return SITE_STYLE_PAGE;
 
     if (stylesheet) {
         // s2_run calls these with no page, and cleans the whole of what they print as CSS.
@@ -154,6 +158,13 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         case "icons":
             page = await IconsPage(pc, request.requestPath.split("?")[0]!);
             break;
+        case "read":
+        case "network": {
+            const result = await FriendsPage(pc, request.view as "read" | "network", request.pathextra, request.filter);
+            if ("response" in result) return result.response;
+            page = result;
+            break;
+        }
         case "archive":
             page = await YearPage(pc, counts, request.pathextra);
             break;
@@ -200,7 +211,7 @@ function usesSiteviews(config: SiteConfig, journal: User, request: RenderRequest
     const view = request.view;
     if (view === "entry" || view === "reply") {
         const prop = journal.props.use_journalstyle_entry_page;
-        const journalStyle = prop === "Y" || prop !== "N" && truthy(String(ctx.prop._use_journalstyle_entry_page ?? ""));
+        const journalStyle = prop === "Y" || prop !== "N" && truthy(ctx.prop._use_journalstyle_entry_page);
         return journal.journaltype === "Y" || !journalStyle || !Number(journal.getCap(config, `s2view${view}`));
     }
     if (view === "icons") {

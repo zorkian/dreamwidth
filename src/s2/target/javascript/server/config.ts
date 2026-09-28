@@ -50,6 +50,8 @@ export interface SiteConfig {
     readonly tagIntersection: number;
     // 0 for no limit.
     readonly maxIconsPerPage: number;
+    readonly maxFriendsViewAge: number;
+    readonly maxScrollbackFriends: number;
     readonly talkPageSize: number;
     readonly talkMaxSubjects: number;
     readonly talkThreadPoint: number;

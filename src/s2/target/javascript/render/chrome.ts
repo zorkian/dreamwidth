@@ -107,7 +107,12 @@ export function createChrome(request: ChromeRequest): Chrome & { string(key: str
                 current !== "original" ? ["original", "original"] : undefined,
             ].filter(option => option).map(option => `<a href='${styleLink(option![0]!)}'>${option![1]}</a>`)
                 .join("&nbsp;&nbsp; ");
-            const kind = journal.journaltype === "C" ? "community" : "journal";
+            // LJ::control_strip's status for a logged-out viewer.
+            const type = journal.journaltype;
+            const status = type === "P" || type === "I"
+                ? request.view === "read" ? "personalreadingpage" : request.view === "network" ? "personalnetworkpage" : "personal"
+                : type === "C" ? "community" : type === "Y" ? "syn" : "other";
+            const statusText = string(`web.controlstrip.status.${status}`).replaceAll("[[user]]", ljuser(journal.userid, ""));
             return `
 <div id='lj_controlstrip'>
 
@@ -117,7 +122,7 @@ export function createChrome(request: ChromeRequest): Chrome & { string(key: str
   <div id='lj_controlstrip_login'>${login}
   </div>
 <div id='lj_controlstrip_actionlinks'>
-  <span id='lj_controlstrip_statustext'>You're viewing ${ljuser(journal.userid, "")}'s ${kind}</span>
+  <span id='lj_controlstrip_statustext'>${statusText}</span>
   <br /><a href='${config.siteRoot}/create'>Create a ${config.siteNameShort} Account</a>&nbsp;&nbsp;<a href='${config.siteRoot}/'>Learn More</a></div>
 
 <div id='lj_controlstrip_search'>${search}
