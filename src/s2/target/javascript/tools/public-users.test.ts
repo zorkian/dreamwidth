@@ -48,5 +48,14 @@ test("arbitrary public user, absence, identity and persistent changes are primar
             assert.equal(await users.revalidate(identity), false);
             await admin.query(`UPDATE ${table(g,"useridmap")} SET user='renamed_user' WHERE userid=900001`);
             assert.equal(await users.revalidate(deleted), false);
+            await admin.query(`UPDATE ${table(g,"user")} SET user='renamed_user' WHERE userid=900001`);
+            await admin.query(`INSERT INTO ${table(g,"user")}
+                (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,
+                 opt_whocanreply,opt_forcemoodtheme,moodthemeid,defaultpicid,dversion,caps)
+                VALUES (900778,?,0,'A','V','P','Reused public name','Y','all','N',1,NULL,10,2)`,[name]);
+            await admin.query(`INSERT INTO ${table(g,"useridmap")}(userid,user) VALUES (900778,?)`,[name]);
+            const reused = await users.snapshot(name);
+            assert.equal(reused.user?.userid, 900778);
+            assert.equal(await users.revalidate(deleted), false);
         } finally {await users.close();}
     }, false, true));

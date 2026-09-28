@@ -79,15 +79,24 @@ test("parent-issued accounts remain request-private and carry the final user wit
     const user:PublicUserFacts={userid:111,username:"public_name",clusterid:0,status:"V",statusvis:"X",journaltype:"I",
         dversion:1,caps:"0",name:NativeString.hostUtf8Bytes("Public"),identity:null};
     const snapshot={requestedName:"public_name",user,fingerprint:"original"};
+    const absent={requestedName:"not_existing",user:null,fingerprint:"absent"};
+    let served=snapshot;
     let current=true,reads=0;
-    const store={async snapshot(){reads++;return snapshot;},async revalidate(value:unknown){assert.equal(value,snapshot);return current;}};
+    const store={async snapshot(name:string){reads++;return name==="not_existing"?absent:served;},
+        async revalidate(value:unknown){assert.ok(value===snapshot||value===served||value===absent);return current;}};
     const translations={async snapshot():Promise<never>{throw Error("No translation read");},async revalidate(){return true;}};
     const session=new GeneralPublicSession(store,translations,profile,25);
     const operations={displayName:()=>NativeString.hostUtf8Bytes("public_name"),
         journalBase:()=>NativeString.hostUtf8Bytes("https://public.example.invalid"),tellFriend:false};
     const authority=new GeneralUserAuthority(session,operations);
+    for(const invalid of ["","?","a".repeat(26)]) {
+        const before=reads;
+        assert.equal(await parentLoadUser({name:encodeScalar(NativeString.bytes(Buffer.from(invalid)))},authority),null);
+        assert.equal(reads,before);
+    }
+    assert.equal(await parentLoadUser({name:encodeScalar(NativeString.bytes(Buffer.from("not_existing")))},authority),null);
     const prepared=(await authority.load(NativeString.hostUtf8Bytes("PUBLIC-NAME")))!;
-    assert.equal(reads,1);assert.equal(authority.account(prepared.account),user);
+    assert.equal(reads,2);assert.equal(authority.account(prepared.account),user);
     const response=await parentLoadUser({name:encodeScalar(NativeString.hostUtf8Bytes("public_name"))},authority);
     const bindings=new GeneralUserBindings();
     const workerModel=decodePreparedUser(response,bindings) as Record<string,unknown>;
@@ -134,6 +143,15 @@ test("parent-issued accounts remain request-private and carry the final user wit
     assert.deepEqual(urls,nativeUrls);
     await assert.rejects(parentUserUrl({name:encodeScalar(NativeString.hostUtf8Bytes("public_name")),
         view:encodeScalar(NativeString.hostUtf8Bytes("recent")),userid:111},authority));
+    authority.bindSelectedCommentPosters({roots:[{show:true,posterLoaded:true,
+        posterSuspended:false,posterId:111,posterUsername:NativeString.bytes(Buffer.from("public_name")),
+        children:[]}]});
+    assert.throws(()=>authority.bindSelectedCommentPosters({roots:[{show:true,posterLoaded:true,
+        posterSuspended:false,posterId:111,posterUsername:NativeString.bytes(Buffer.from([0xe9])),
+        children:[]}]}));
+    assert.equal((await authority.load(NativeString.bytes(Buffer.from("public_name"))))?.model[".type"],"UserLite");
+    served={requestedName:"public_name",user:{...user,userid:222},fingerprint:"reused"};
+    await assert.rejects(parentLoadUser({name:encodeScalar(NativeString.bytes(Buffer.from("public_name")))},authority));
     current=false;
     assert.equal(await session.finish(async()=>{throw Error("Stale user must prevent private release");}),false);
 });
