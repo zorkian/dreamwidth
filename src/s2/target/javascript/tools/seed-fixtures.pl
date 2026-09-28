@@ -59,16 +59,23 @@ comments( $themed, $commenter, entries( $themed, 25 ) );
 my $custom = journal('s2fix_custom');
 LJ::Customize->apply_theme( $custom, LJ::S2Theme->load_by_uniq('practicality/alittlefire') )
     if new_journal($custom);
-my %style = LJ::S2::get_style( $custom, 'verify' );
-unless ( $style{user} && LJ::S2::load_layer_source( $style{user} ) ) {
-    my $lid = $style{user} || LJ::S2::create_layer( $custom->userid, $style{layout}, 'user' )
-        or die "Cannot create user layer\n";
-    my $error;
-    LJ::S2::layer_compile( LJ::S2::load_layer($lid), \$error, { s2ref => \$USER_LAYER } )
-        or die "User layer: $error\n";
-    LJ::S2::set_style_layers( $custom, $custom->prop('s2_style'), user => $lid );
-}
+user_layer( $custom, $USER_LAYER );
 comments( $custom, $commenter, entries( $custom, 4 ) );
+
+# A user layer that never finishes printing, for render time limits.
+my $loop = journal('s2fix_loop');
+entries( $loop, 1 );
+user_layer( $loop, <<'LOOP' );
+layerinfo "type" = "user";
+function Page::print() {
+    foreach var int i (1..100000) { foreach var int j (1..100000) { } }
+}
+LOOP
+
+# A suspended journal, which anonymous visitors cannot see at all.
+my $suspended = journal('s2fix_suspended');
+entries( $suspended, 1 );
+$suspended->update_self( { statusvis => 'S' } ) unless $suspended->is_suspended;
 
 print "Fixture journals ready\n";
 
@@ -88,6 +95,26 @@ sub journal {
 }
 
 sub new_journal { return $_[0]->{_fixture_new} }
+
+# Give the journal's style a user layer with this source, once.
+sub user_layer {
+    my ( $u, $source ) = @_;
+    my %style = LJ::S2::get_style( $u, 'verify' );
+    return if $style{user} && LJ::S2::load_layer_source( $style{user} );
+    my $styleid = $u->prop('s2_style');
+    unless ($styleid) {
+        $styleid = LJ::S2::create_style( $u, 'fixture' ) or die "Cannot create style\n";
+        LJ::S2::set_style_layers( $u, $styleid, core => $style{core}, layout => $style{layout},
+            theme => $style{theme} );
+        $u->set_prop( s2_style => $styleid );
+    }
+    my $lid = $style{user} || LJ::S2::create_layer( $u->userid, $style{layout}, 'user' )
+        or die "Cannot create user layer\n";
+    my $error;
+    LJ::S2::layer_compile( LJ::S2::load_layer($lid), \$error, { s2ref => \$source } )
+        or die "User layer: $error\n";
+    LJ::S2::set_style_layers( $u, $styleid, user => $lid );
+}
 
 sub entry_count {
     my ($u) = @_;
