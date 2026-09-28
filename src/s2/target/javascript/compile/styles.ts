@@ -28,16 +28,39 @@ export interface LayerRef {
 
 // Layers in run order for a style, or the site default.
 export async function styleLayers(db: Databases, config: SiteConfig, styleid: number): Promise<LayerRef[]> {
-    const owner = styleid ? await db.global("SELECT userid FROM s2styles WHERE styleid = ?", [styleid]) : [];
-    const user = owner[0] ? (await User.byIds(db, [int(owner[0].userid)])).values().next().value : undefined;
-    if (user) {
-        const rows = await user.cluster(db, "SELECT type, s2lid FROM s2stylelayers2 WHERE userid = ? AND styleid = ?",
-            [user.userid, styleid]);
-        const layers = await loadLayers(db, rows.map(row => int(row.s2lid)).filter(Boolean));
-        // A style whose core or layout was deleted falls back to the default.
-        if (layers.some(layer => layer.type === "core") && layers.some(layer => layer.type === "layout")) return layers;
-    }
+    const layers = await ownLayers(db, styleid);
+    // A style whose core or layout was deleted falls back to the default.
+    if (layers?.some(layer => layer.type === "core") && layers.some(layer => layer.type === "layout")) return layers;
     return defaultLayers(db, config);
+}
+
+// The userid of a style's owner, if the style exists.
+export async function styleOwner(db: Databases, styleid: number): Promise<number | undefined> {
+    const rows = await db.global("SELECT userid FROM s2styles WHERE styleid = ?", [styleid]);
+    return rows[0] ? int(rows[0].userid) : undefined;
+}
+
+// LJ::S2::style_is_public: every layer but core is a system layer or marked public.
+export async function styleIsPublic(db: Databases, styleid: number): Promise<boolean> {
+    const layers = await ownLayers(db, styleid);
+    if (!layers) return false;
+    const ids = layers.filter(layer => layer.type !== "core").map(layer => layer.id);
+    if (!ids.length) return true;
+    const rows = await db.global(
+        `SELECT l.s2lid FROM s2layers l LEFT JOIN user u ON u.userid = l.userid
+         LEFT JOIN s2info i ON i.s2lid = l.s2lid AND i.infokey = 'is_public'
+         WHERE l.s2lid IN (?) AND (u.user = 'system' OR i.value NOT IN ('', '0'))`, [ids]);
+    return rows.length === ids.length;
+}
+
+// A style's layers as its owner set them, or undefined if there is no such style.
+async function ownLayers(db: Databases, styleid: number): Promise<LayerRef[] | undefined> {
+    const owner = styleid ? await styleOwner(db, styleid) : undefined;
+    const user = owner ? (await User.byIds(db, [owner])).get(owner) : undefined;
+    if (!user) return undefined;
+    const rows = await user.cluster(db, "SELECT type, s2lid FROM s2stylelayers2 WHERE userid = ? AND styleid = ?",
+        [user.userid, styleid]);
+    return loadLayers(db, rows.map(row => int(row.s2lid)).filter(Boolean));
 }
 
 async function defaultLayers(db: Databases, config: SiteConfig): Promise<LayerRef[]> {

@@ -148,3 +148,34 @@ export function ItemRange(fields: Record<string, unknown>, urlOf: (n: number) =>
     if (current !== total) range._url_last = urlOf(total);
     return range;
 }
+
+// LJ::viewing_style_opts: the arguments that choose how a page is styled.
+export function styleOpts(args: Readonly<Record<string, string>>): [string, string][] {
+    const valid: Record<string, string[]> = {
+        style: ["light", "site", "mine", "original"], format: ["light"], fallback: ["s2", "bml"],
+    };
+    const opts: [string, string][] = /^\d+$/.test(args.s2id ?? "") && args.s2id !== "0" ? [["s2id", args.s2id!]] : [];
+    for (const [key, values] of Object.entries(valid)) {
+        if (values.includes(args[key] ?? "")) opts.push([key, args[key]!]);
+    }
+    return opts;
+}
+
+// LJ::viewing_style_args
+export function styleArgs(args: Readonly<Record<string, string>>): string {
+    return styleOpts(args).map(([key, value]) => `${key}=${value}`).join("&");
+}
+
+// LJ::create_url with viewing_style: `extra` and the viewing style arguments, sorted.
+export function styleUrl(args: Readonly<Record<string, string>>, url: string,
+    extra: Readonly<Record<string, string | number>> = {}): string {
+    const all: Record<string, string | number> = { ...Object.fromEntries(styleOpts(args)), ...extra };
+    const query = Object.keys(all).sort().map(key => `${eurl(key)}=${eurl(String(all[key]))}`).join("&");
+    return query ? `${url}?${query}` : url;
+}
+
+// LJ::Talk::talkargs
+export function talkargs(url: string, ...args: string[]): string {
+    const query = args.filter(Boolean).join("&");
+    return query ? url + (url.includes("?") ? "&" : "?") + query : url;
+}

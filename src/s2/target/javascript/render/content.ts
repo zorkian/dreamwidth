@@ -70,13 +70,13 @@ export class ContentCleaner {
         }
     }
 
-    // LJ::Entry::event_html. Recent pages link cuts to the entry.
-    event(entry: Entry, cuts: "recent" | "entry", suspended = false): string {
+    // LJ::Entry::event_html. Recent pages link cuts to `cuturl`.
+    event(entry: Entry, cuturl: string | undefined, suspended = false): string {
         return cleanEvent(entry.event, {
             editor: entry.props.editor, preformatted: truthy(entry.props.opt_preformatted),
             isImported: "import_source" in entry.props, logtime: entry.logtime,
             isSyndicated: entry.journal.journaltype === "Y",
-            cuturl: cuts === "recent" ? entry.url(this.pageSite) : undefined,
+            cuturl,
             journal: entry.journal.user, ditemid: entry.ditemid, suspendMsg: suspended,
         }, this.site, this.hooks);
     }

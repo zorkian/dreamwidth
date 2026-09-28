@@ -37,6 +37,8 @@ export interface RenderState {
     readonly chrome: Chrome;
     readonly showControlStrip: boolean;
     readonly showThreadExpander: boolean;
+    // The query arguments.
+    readonly args: Readonly<Record<string, string>>;
     page(): S2Object;
     siteRoot(): string;
     // The scheme and host pages are served from.
