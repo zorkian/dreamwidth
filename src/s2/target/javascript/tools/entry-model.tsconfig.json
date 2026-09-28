@@ -1,8 +1,0 @@
-{
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "../dist/entry-model-test",
-    "rootDir": ".."
-  },
-  "include": ["entry-model-test.ts", "../live/server/app.ts"]
-}
