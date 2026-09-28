@@ -81,6 +81,7 @@ print JSON->new->canonical->pretty->encode(
         userpicRoot        => $LJ::USERPIC_ROOT,
         palImgRoot         => $LJ::PALIMGROOT,
         maxScrollback      => $LJ::MAX_SCROLLBACK_LASTN + 0,
+        tagIntersection    => $LJ::TAG_INTERSECTION + 0,
         talkPageSize       => ( $LJ::TALK_PAGE_SIZE || 25 ) + 0,
         talkMaxSubjects    => ( $LJ::TALK_MAX_SUBJECTS || 200 ) + 0,
         talkThreadPoint    => ( $LJ::TALK_THREAD_POINT || 50 ) + 0,
@@ -88,6 +89,7 @@ print JSON->new->canonical->pretty->encode(
         strings            => \%strings,
         capBits            => \%LJ::CAP,
         capDefaults        => \%LJ::CAP_DEF,
+        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter ) },
         robotBlockingContent => LJ::is_enabled('adult_content')
         ? [ sort grep { $LJ::CONTENT_FLAGS{$_}{block_robots} } keys %LJ::CONTENT_FLAGS ]
         : [],

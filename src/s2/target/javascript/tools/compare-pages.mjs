@@ -48,6 +48,12 @@ const unorigin = (value, origins) => origins.reduce((text, origin) =>
     text.replaceAll(origin, "ORIGIN").replaceAll(new URL(origin).host, "HOST"), value)
     .replace(/LJWidget_\d+/g, "LJWidget_N");
 
+// Perl builds some links from a hash, so their query order varies.
+const sortQuery = url => {
+    const match = /^([^?#]*)\?([^?#]*&[^#]*)(#.*)?$/.exec(url);
+    return match ? `${match[1]}?${match[2].split("&").sort().join("&")}${match[3] ?? ""}` : url;
+};
+
 export function normalize(html, origins) {
     const document = new JSDOM(html).window.document;
     const lines = [];
@@ -68,6 +74,7 @@ export function normalize(html, origins) {
         const attrs = [...node.attributes]
             .map(({ name: key, value }) => {
                 if (key === "value" && VOLATILE.has(name)) value = "*";
+                if (key === "href") value = sortQuery(value);
                 return `${key}=${JSON.stringify(unorigin(value.replace(/\s+/g, " ").trim(), origins))}`;
             })
             .sort();
