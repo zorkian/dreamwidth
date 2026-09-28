@@ -36,6 +36,8 @@ export interface GeneralCommentUrlInput {
 export interface GeneralCommentUrls {
     readonly talkId:number;readonly permalink:NativeString;readonly reply:NativeString;
     readonly parent:NativeString|undefined;readonly expand:NativeString;readonly jsExpand:NativeString;
+    /** The same source link_thread_arg also follows Comment->edit_url. */
+    readonly linkThreadArgument:NativeString|undefined;
 }
 
 /** Native talkargs joins truthy arguments and chooses ? or & from the input URL. */
@@ -73,5 +75,6 @@ export function generalCommentUrls(input:GeneralCommentUrlInput):GeneralCommentU
     const destination=input.destinationThread!==undefined?input.destinationThread:input.viewingThread||0;
     const jsExpand=concatStrings(generalTalkArgs(input.permalink,
         [pv("thread="+external),pv("destination_thread="+destination),style]),anchor);
-    return Object.freeze({talkId:external,permalink,reply,parent:parentUrl,expand,jsExpand});
+    return Object.freeze({talkId:external,permalink,reply,parent:parentUrl,expand,jsExpand,
+        linkThreadArgument:link});
 }
