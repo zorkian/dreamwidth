@@ -101,7 +101,8 @@ print JSON::PP->new->canonical->encode(\@rows);`;
             pictureKeyword:loaded?pv('kw'):undefined,importedFrom:loaded?pv('Source &<'):undefined,
             adminPost:loaded?1:0}:
             hidden?{...common,kind:"stub"}:{...common,kind:"shown",
-            loaded,body:pv('one<b>two</b>'),subject:pv('Q<"&'),
+            loaded,posterUsername:row.posterLoaded?pv('registered'):undefined,
+            body:pv('one<b>two</b>'),subject:pv('Q<"&'),
             noHtml:0,anonymous:true,preformatted:undefined,editor:undefined,datepost:pv("2026-09-27 00:00:00"),
             importSourceDefined:false,importedFrom:loaded?pv('Source &<'):undefined,pictureKeyword:undefined,
             subjectIcon:loaded?3:undefined,hasPicture:loaded,adminPost:loaded?1:0};
@@ -118,7 +119,8 @@ print JSON::PP->new->canonical->encode(\@rows);`;
             dateTimeUnix:value=>({".type":"DateTime",_value:value}),
             posterTime:value=>{posterTimes++;return {".type":"DateTime",_value:value,
                 _zone:row.suspended?'S':'V'};},
-            poster(){posters++;assert.ok(loaded);return posterModel;},
+            poster(username){posters++;assert.ok(loaded);
+                assert.equal(username.bytes().toString(),"registered");return posterModel;},
             edit(){assert.ok(loaded);return {edited:1,url:pv('/edit?'),reason:pv('edited <&'),time:1020,threadrootUrl:pv('/root')};},
             subjectImage(){assert.ok(loaded);return generalImage(pv('/icon.gif'),3,4,undefined);},
             picture(style){assert.ok(loaded);assert.equal(style,'small');return generalImage(pv('/picture'),
