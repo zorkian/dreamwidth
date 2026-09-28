@@ -19,3 +19,13 @@ initialized Context through GB output and match native bytes. This is model/sess
 proof, not acceptance of the ordinary installed worker or HTTP route. Actual subject,
 clean_event, public-helper, request-context and final page postprocessing integration
 remain mandatory. The held subject component is not consumed.
+
+The anonymous CommentInfo source provider uses the selected Entry's defined
+replycount property before its log2 count, even when that property is false.
+It applies the owner's showtalklinks and both entry disable properties before
+the count, then compares the effective count with the exported maxcomments
+cap. The read-link field retains the native scalar count, including spelling
+such as `0007`; talkargs keeps its native URL argument order. Native and
+isolated SQL tests qualify these fields and their mutation witness. The
+installed Recent/Entry operations still need to bind this approved input and
+the final request authority; the provider alone does not render a page.
