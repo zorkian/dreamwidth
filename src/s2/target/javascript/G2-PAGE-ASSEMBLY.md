@@ -219,3 +219,15 @@ is revalidated before release. An isolated SQL fixture compares installed
 then passes the approved suspended record into a real Context Comment model.
 The test supplies declared fixed URL/date/edit providers and never claims
 installed comment cleaning or complete worker/HTTP serving.
+
+The parent now projects the actual selected Comment tree with the same bounded
+thread/page selection used for its SQL reads. It carries only named selected
+fields, witnessed page-wide poster presence, structural stub facts and the
+original `UNIX_TIMESTAMP(datepost)` scalar. Full membership comes from the
+selection, so a selected full Comment with a NULL stored body remains loaded as
+native Talk marks it. The byte-view path retains that NULL source cell; the
+legacy finite loader's prior body rule is unchanged. The isolated schema proof
+feeds the approved suspended record from this tree into the same Context and
+checks native timestamp, nullable full membership and property-mutation reread.
+Source-derived URL, date/timezone, edit, author and original-cleaner providers,
+plus final worker/HTTP binding, remain required before ordinary serving.
