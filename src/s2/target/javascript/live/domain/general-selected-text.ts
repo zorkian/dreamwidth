@@ -235,6 +235,9 @@ export class GeneralSelectedText {
         if(!comments||!comments.headers.some(header=>header.jtalkid===node.id&&
             header.posterid===node.posterId)||!node.show||!['A','F'].includes(node.state))
             throw Error("Unselected Comment picture");
+        // Talk resolves picid/pickw only for @posts_to_load. Collapsed
+        // subject-only and ignored records never enter that loop.
+        if(!node.full)return Object.freeze({hasPicture:false,image:undefined});
         const author=comments.authors.find(row=>row.userid===node.posterId);
         if(!author||author.statusvis==="S")return Object.freeze({hasPicture:false,image:undefined});
         const source=comments.texts.find(row=>row.jtalkid===node.id);
@@ -427,7 +430,7 @@ export class GeneralSelectedText {
         const props=converted.props;
         const pictureKeyword=author&&author.dversion>=9?
             scalarTruthy(props.picture_mapid)?this.mapKeyword(author.userid,author.pictures,props.picture_mapid!):
-                undefined:props.picture_keyword;
+                undefined:scalarTruthy(props.picture_keyword)?props.picture_keyword:undefined;
         return Object.freeze({state:header.state as 'A'|'F'|'S'|'D',show:header.state==='A'||header.state==='F',
             posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==='S',
             loaded:comment.body!==null||this.metadataOnlyComments.has(comment),
