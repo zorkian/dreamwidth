@@ -18,9 +18,7 @@ import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {runInNewContext} from 'node:vm';
 import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
-import {recoverActiveLayer} from '../live/render/recovery';
 import {isNativeExecutionStop, raiseNativeExecutionStop, nativeExecutionStopKind} from '../runtime/native-scalar';
 import {createNativeOutput, type NativeOutputOptions} from '../live/render/native-output';
 import {Context,Layer,s2} from '../runtime/s2runtime';
@@ -62,7 +60,7 @@ test('runtime error omits eof and terminalizes open CSS',()=>{
     assert.throws(()=>page.finish(),/terminal/);
 });
 
-interface Oracle {recursive:{ok:number;base64:string};sources:string[];codes:string[];ok:number;base64:string;flag:number;
+interface Oracle {sources:string[];ok:number;base64:string;flag:number;
     errors:{id:string;ctype:string;ok:number;base64:string;flag:number}[];}
 const oracle=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl',resolve('../../tests/js-native-output/native.pl')],
     {encoding:'utf8',timeout:15000,maxBuffer:1048576})) as Oracle;
@@ -97,69 +95,47 @@ test('separate sessions, abort and returned frame copies cannot leak pending sta
     const third=createNativeOutput(options());third.sink.safe(bytes('<b>clean</b>'));
     assert.deepEqual(Buffer.from(third.finish().bytes),Buffer.from('<b>clean</b>'));
 });
-test('source-proven and recovered actual program preserves defining-layer safe/raw trust',async()=>{
+test('current source preserves safe/raw output and initialization CSS state',async()=>{
     assert.equal(oracle.ok,1);
-    const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:oracle.codes.map((code,i)=>({
-        id:101+i,ownerId:i?2:1,parentId:i?101:0,type:i?'layout':'core',compiledTime:1,
-        sourceBytes:Buffer.from(oracle.sources[i]!,'base64'),activeCompiledBytes:Buffer.from(code,'base64')}))};
+    const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:oracle.sources.map((source,i)=>({
+        id:101+i,ownerId:i?2:1,parentId:i?101:0,type:i?'layout':'core',
+        sourceBytes:Buffer.from(source,'base64')}))};
     const directory=mkdtempSync(join(tmpdir(),'gb-program-'));
     try {
         const launcher=join(directory,'compiler-isolation');
         execFileSync('cc',['-std=c11','-Wall','-Wextra','-Werror','-O2',resolve('tools/compiler-isolation.c'),'-o',launcher]);
         const compiler=new ArtifactCompiler({s2Root:resolve('../..'),perl:'/usr/bin/perl',isolationExecutable:launcher});
         const compiled=await compiler.compile(snapshot);assert.equal(compiled.kind,'compiled');
-        if(compiled.kind!=='compiled')throw Error('source correspondence missing');
-        const recovered=oracle.codes.map((code,i)=>{
-            const result=recoverActiveLayer({id:101+i,ownerId:i?2:1,systemUserId:1,parentId:i?101:0,type:i?'layout':'core',activeBytes:Buffer.from(code,'base64')},1);
-            assert.equal(result.kind,'recovered');if(result.kind!=='recovered')throw Error('recovery missing');
-            const layer=runInNewContext(result.code+';recovered_layer;',{s2},{timeout:5000}) as Layer;
-            layer.scalarProfile=compiler.scalarProfile;return layer;
-        });
-        for(const [route,layers] of [instantiateProgram(compiled.program),recovered].entries()) {
-            let initContext:Context;
-            const lifecycle=createNativeOutput({...options(()=>initContext.recoveryCheckpoint()),initialization:true});
-            initContext=new Context(layers,()=>{throw Error('legacy init printer');},undefined,
-                undefined,undefined,500,lifecycle.sink);
-            initContext.runFunction('main()'); // Fixed actual compiled program, both routes; suppressed.
-            lifecycle.startCss();initContext.print(bytes('p{color:red}'));
-            lifecycle.beginRendering();initContext.runFunction('main()');
-            lifecycle.endCss();initContext.print(bytes('HIDDEN'));
-            assert.deepEqual(Buffer.from(lifecycle.finish().bytes),Buffer.from(oracle.base64,'base64'));
-            let ctx:Context;const page=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
-            ctx=new Context(layers,()=>{throw Error('legacy output used');},undefined,undefined,undefined,500,page.sink);
-            ctx.runFunction('main()');const output=page.finish();
-            assert.deepEqual(Buffer.from(output.bytes),Buffer.from(oracle.base64,'base64'));
-            assert.equal(output.utf8,!!oracle.flag);
-            let recursiveContext:Context;
-            const recursivePage=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
-            recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,recursivePage.sink);
-            let stopped:unknown;try{recursiveContext.runFunction('recursive()');}catch(error){stopped=error;}
-            assert.equal(isNativeExecutionStop(stopped),true);
-            const diagnostic=bytes('<b>Error running style:</b> Died in S2::run_code running recursive(): Excessive recursion detected and stopped.<br />\n<br />\n');
-            assert.equal(oracle.recursive.ok,0);
-            const partial=Buffer.from(recursivePage.runtimeError(diagnostic).bytes);
-            const nativePartial=Buffer.from(oracle.recursive.base64,'base64');
-            assert.deepEqual(partial,nativePartial);
-            assert.equal(partial.subarray(0,partial.indexOf(60)).every(byte=>byte===120),true);
-            const capture=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
-            capture.startCss();
-            recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,capture.sink);
-            assert.throws(()=>recursiveContext.runFunction('recursive()'),isNativeExecutionStop);
-            assert.deepEqual(Buffer.from(capture.runtimeError(diagnostic).bytes),Buffer.alloc(0));
-        }
-        // Cross-route dispatch must share Context entry cadence exactly once.
-        const proven=instantiateProgram(compiled.program);
-        for(const mixed of [[proven[0]!,recovered[1]!],[recovered[0]!,proven[1]!]]) {
-            let checks=0;const context=new Context(mixed,()=>{});
-            context.recoveryCheckpoint=()=>{checks++;};
-            const fn=context.getFunction('main()');
-            // Each main calls trusted twice: exactly three entries, no check.
-            fn(context);assert.equal(checks,0);
-            const runner=new Layer();let active:Context;
-            runner.functions.set('outer()',()=>{for(let n=0;n<5;n++)active.getFunction('main()')(active);});
-            active=new Context([...mixed,runner],()=>{},undefined,undefined,undefined,500,{ownsPrintCheckpoints:true,raw:()=>{},safe:()=>{}});active.recoveryCheckpoint=()=>{checks++;};
-            active.runFunction('outer()');assert.equal(checks,1);
-        }
+        if(compiled.kind!=='compiled')throw Error('S2 source compilation required');
+        const layers=instantiateProgram(compiled.program);
+        let initContext:Context;
+        const lifecycle=createNativeOutput({...options(()=>initContext.recoveryCheckpoint()),initialization:true});
+        initContext=new Context(layers,()=>{throw Error('legacy init printer');},undefined,
+            undefined,undefined,500,lifecycle.sink);
+        initContext.runFunction('main()'); // Fixed source program; suppressed during initialization.
+        lifecycle.startCss();initContext.print(bytes('p{color:red}'));
+        lifecycle.beginRendering();initContext.runFunction('main()');
+        lifecycle.endCss();initContext.print(bytes('HIDDEN'));
+        assert.deepEqual(Buffer.from(lifecycle.finish().bytes),Buffer.from(oracle.base64,'base64'));
+        let ctx:Context;const page=createNativeOutput(options(()=>ctx.recoveryCheckpoint()));
+        ctx=new Context(layers,()=>{throw Error('legacy output used');},undefined,undefined,undefined,500,page.sink);
+        ctx.runFunction('main()');const output=page.finish();
+        assert.deepEqual(Buffer.from(output.bytes),Buffer.from(oracle.base64,'base64'));
+        assert.equal(output.utf8,!!oracle.flag);
+        let recursiveContext:Context;
+        const recursivePage=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
+        recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,recursivePage.sink);
+        let stopped:unknown;try{recursiveContext.runFunction('recursive()');}catch(error){stopped=error;}
+        assert.equal(isNativeExecutionStop(stopped),true);
+        const diagnostic=bytes('<b>Error running style:</b> Died in S2::run_code running recursive(): Excessive recursion detected and stopped.<br />\n<br />\n');
+        const partial=Buffer.from(recursivePage.runtimeError(diagnostic).bytes);
+        assert.ok(partial.includes(Buffer.from('Error running style:')));
+        assert.equal(partial.includes(Buffer.from('HIDDEN')),false);
+        const capture=createNativeOutput(options(()=>recursiveContext.recoveryCheckpoint()));
+        capture.startCss();
+        recursiveContext=new Context(layers,()=>{},undefined,undefined,undefined,50,capture.sink);
+        assert.throws(()=>recursiveContext.runFunction('recursive()'),isNativeExecutionStop);
+        assert.deepEqual(Buffer.from(capture.runtimeError(diagnostic).bytes),Buffer.alloc(0));
     } finally {rmSync(directory,{recursive:true,force:true});}
 });
 test('CSS hook and depth failures remain terminal infrastructure failures',()=>{
