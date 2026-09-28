@@ -77,12 +77,15 @@ export function ImageStd(config: SiteConfig, props: Record<string, unknown>, nam
 }
 
 // Image_userpic
-export function ImageUserpic(config: SiteConfig, owner: User, pic: Userpic | undefined, keyword?: string): S2Object {
+// Marked as the default when `markDefault` says so, or else when no keyword is given.
+export function ImageUserpic(config: SiteConfig, owner: User, pic: Userpic | undefined, keyword?: string,
+    markDefault?: boolean): S2Object {
     if (!pic) return nullObject("Image");
     const description = pic.description;
+    const isDefault = markDefault ?? keyword === undefined;
     const alt = `${owner.user}:${description ? " " + description : ""}` +
-        (keyword !== undefined ? ` (${keyword})` : " (Default)");
-    const title = `${owner.user}:${keyword !== undefined ? " " + keyword : " (Default)"}` +
+        (keyword !== undefined ? ` (${keyword})` : "") + (isDefault ? " (Default)" : "");
+    const title = `${owner.user}:${keyword !== undefined ? " " + keyword : ""}${isDefault ? " (Default)" : ""}` +
         (description ? ` (${description})` : "");
     return Image(`${config.userpicRoot}/${pic.picid}/${owner.userid}`, pic.width, pic.height, ehtml(alt),
         { title: ehtml(title) });

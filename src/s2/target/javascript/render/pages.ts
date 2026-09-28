@@ -49,7 +49,8 @@ export interface PageContext {
 
 export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "url", "urlname", "customtext_title",
     "customtext_url", "customtext_content", "opt_blockrobots", "icbm", "control_strip_display",
-    "control_strip_color", "sticky_entry", "timezone", "adult_content"];
+    "control_strip_color", "sticky_entry", "timezone", "adult_content", "use_journalstyle_entry_page",
+    "use_journalstyle_icons_page"];
 
 const props = (pc: PageContext) => pc.ctx.prop as Record<string, any>;
 
@@ -479,6 +480,18 @@ export function YearMonth(pc: PageContext, counts: DayCounts, year: number, mont
 export async function visibleTags(pc: PageContext): Promise<S2Object[]> {
     const base = pc.journal.journalBase(pc.site);
     return (await publicTags(pc.db, pc.journal)).filter(tag => tag.display).map(tag => TagDetail(base, tag));
+}
+
+// LJ::S2::TagsPage
+export async function TagsPage(pc: PageContext): Promise<S2Object> {
+    const { journal, site } = pc;
+    const page = await Page(pc, "tags", await journalDefaultPic(pc));
+    page[".type"] = "TagsPage";
+    let head = page._head_content + `<link rel="openid.server" href="${site.config.siteRoot}/openid/server" />\n`;
+    if (journal.shouldBlockRobots(site.config)) head += robotMetaTags();
+    page._head_content = head;
+    page._tags = (await visibleTags(pc)).sort((a, b) => a._name < b._name ? -1 : a._name > b._name ? 1 : 0);
+    return page;
 }
 
 export function TagDetail(base: string, tag: UserTag): S2Object {

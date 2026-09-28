@@ -61,7 +61,9 @@ export function normalize(html, origins) {
     const walk = (node, depth, verbatim) => {
         const indent = "  ".repeat(depth);
         if (node.nodeType === 3) {
-            const text = verbatim ? sortSiteKeys(node.data) : node.data.replace(/\s+/g, " ").trim();
+            let text = verbatim ? sortSiteKeys(node.data) : node.data.replace(/\s+/g, " ").trim();
+            // Pages rendered a minute apart.
+            if (node.parentNode?.id === "load-time") text = text.replace(/\d+:\d\d [ap]m$/, "TIME");
             if (text) lines.push(indent + JSON.stringify(unorigin(text, origins)));
             return;
         }
