@@ -25,6 +25,7 @@ import {SnapshotError} from "../data/errors";
 import {NativeString} from "../../runtime/native-string";
 import {commentCapability,selectComments,type CommentNode,type CommentSelection} from "./comments";
 import type {GeneralSelectedText} from "./general-selected-text";
+import {generalCommentUrls,type GeneralCommentUrls} from "./general-comment-urls";
 
 type PublicFields=ReturnType<GeneralSelectedText["commentPublicFields"]>;
 export interface GeneralSelectedComment {
@@ -33,6 +34,7 @@ export interface GeneralSelectedComment {
     readonly showableChildren:number;readonly posterId:number;
     readonly posterLoaded:boolean;readonly posterSuspended:boolean;
     readonly datepost:NativeString;readonly datepostUnix:string|null;
+    readonly urls:GeneralCommentUrls;
     /** Exact selected full/subject or suspended metadata cells; absent on structural stubs. */
     readonly fields:(Omit<PublicFields,"loaded">&{readonly loaded:boolean})|undefined;
     readonly children:readonly GeneralSelectedComment[];
@@ -41,18 +43,27 @@ export interface GeneralSelectedCommentPage {
     readonly roots:readonly GeneralSelectedComment[];
     readonly selection:Pick<CommentSelection,"page"|"pages"|"first"|"last"|"items"|"collapsed"|"thread">;
 }
+export interface GeneralSelectedCommentNavigation {
+    /** Source-qualified Entry->url for this selected public Entry. */
+    readonly permalink:NativeString;
+    readonly styleArgument:NativeString|undefined;
+}
 
 /** No raw talkprop, hidden body, or author record crosses this parent projection. */
 export function generalSelectedComments(snapshot:NativeSelectedSnapshot,
     config:Pick<LiveStoreConfig,"commentSettings"|"capabilities">,
-    prepared:GeneralSelectedText):GeneralSelectedCommentPage|undefined {
+    prepared:GeneralSelectedText,navigation:GeneralSelectedCommentNavigation):GeneralSelectedCommentPage|undefined {
     const raw=snapshot.facts.comments;
     if(!raw)return undefined;
     if(snapshot.facts.request.page.kind!=="entry"||!config.commentSettings)
         throw new SnapshotError("unsupported");
+    const entry=snapshot.facts.entries[0];
+    if(!entry||entry.jitemid*256+entry.anum!==snapshot.facts.request.page.ditemid)
+        throw new SnapshotError("unsupported");
     const selection=selectComments(raw.headers,snapshot.facts.request.page.comments,
         config.commentSettings,commentCapability(config.capabilities.threadExpandAll,snapshot.facts.owner.caps));
     const authors=new Map(raw.authors.map(author=>[author.userid,author]));
+    const headerIds=new Set(raw.headers.map(header=>header.jtalkid));
     const texts=new Map(raw.texts.map(text=>[text.jtalkid,text]));
     if(authors.size!==raw.authors.length||texts.size!==raw.texts.length)
         throw new SnapshotError("unsupported");
@@ -76,12 +87,18 @@ export function generalSelectedComments(snapshot:NativeSelectedSnapshot,
         if(fields&&(fields.state!==header.state||fields.posterId!==header.posterid||
             fields.show!==node.show))throw new SnapshotError("unsupported");
         const children:GeneralSelectedComment[]=[];
-        const result:GeneralSelectedComment={id:header.jtalkid,parentId:header.parenttalkid,
+        const parentId=headerIds.has(header.parenttalkid)?header.parenttalkid:0;
+        const urls=generalCommentUrls({permalink:navigation.permalink,styleArgument:navigation.styleArgument,
+            talkId:header.jtalkid,parentTalkId:parentId,entryAnum:entry.anum,
+            viewingThread:snapshot.facts.request.page.comments?.thread,
+            destinationThread:snapshot.facts.request.page.comments?.destinationThread});
+        const result:GeneralSelectedComment={id:header.jtalkid,parentId,
             state:header.state as GeneralSelectedComment["state"],show:node.show,full:node.full,
             subjectOnly:node.subject&&!node.full,showableChildren:node.showableChildren,
             posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==="S",
             datepost:NativeString.bytes(Buffer.from(header.datepost,"ascii")),
-            datepostUnix:header.datepostUnix,fields:fields?Object.freeze({...fields,loaded:node.full}):undefined,
+            datepostUnix:header.datepostUnix,urls,
+            fields:fields?Object.freeze({...fields,loaded:node.full}):undefined,
             children};
         dest.push(result);created.push(result);
         for(let index=node.children.length-1;index>=0;index--)
