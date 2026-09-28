@@ -15,7 +15,7 @@
 
 import type { BuiltinFunction, Context } from "../runtime/s2runtime";
 import { cleanCss } from "@dreamwidth/content";
-import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2 } from "./objects";
+import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2, styleUrl } from "./objects";
 import type { RenderState } from "./state";
 
 type Builtin = (ctx: Context, ...args: any[]) => unknown;
@@ -216,8 +216,7 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
     const entryLink = (ctx: Context, item: S2Object, key: string) => {
         const journal = item._journal?._user;
         const p = props(ctx);
-        // LJ::create_url sorts its arguments.
-        const go = (dir: string) => `${state.origin()}/go?dir=${dir}&itemid=${item._itemid}&journal=${journal}`;
+        const go = (dir: string) => styleUrl(state.args, `${state.origin()}/go`, { dir, itemid: item._itemid, journal });
         switch (key) {
             case "mem_add":
                 return Link(`${state.siteRoot()}/tools/memadd?journal=${journal}&amp;itemid=${item._itemid}`,

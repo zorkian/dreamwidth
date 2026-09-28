@@ -23,7 +23,7 @@ import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
 import { PageOutput } from "./page-output";
-import { type EntryArgs, EntryPage } from "./entry-page";
+import { EntryPage } from "./entry-page";
 import { JOURNAL_PROPS, type PageContext, RecentPage, latestMonth, showControlStrip, visibleTags } from "./pages";
 import type { RenderState } from "./state";
 
@@ -83,6 +83,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     let tags: S2Object[] = [];
     const state: RenderState = {
         site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
+        args: request.args,
         page: () => page!,
         siteRoot: () => site.config.siteRoot,
         origin: () => `${site.config.protocol}://${site.host}`,
@@ -103,7 +104,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const cleaners = content.propertyCleaners();
     const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
     const pc: PageContext = {
-        db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
+        args: request.args, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
@@ -128,7 +129,6 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     await preloadNamedUsers(db, request.layers, users);
 
     const head = chrome.resourceHead();
-    const number = (value?: string) => value !== undefined && /^\d+$/.test(value) ? Number(value) : undefined;
     const args = request.args;
     switch (request.view || "lastn") {
         case "lastn":
@@ -138,8 +138,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             const entry = request.slug
                 ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
                 : await Entry.byDitemid(db, journal, request.ditemid!);
-            const entryArgs: EntryArgs = { thread: number(args.thread), page: number(args.page), view: args.view, mode: args.mode };
-            page = entry ? await EntryPage(pc, entry, entryArgs, head) ?? undefined : undefined;
+            page = entry ? await EntryPage(pc, entry, head) ?? undefined : undefined;
             break;
         }
     }

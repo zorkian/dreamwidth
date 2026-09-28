@@ -14,7 +14,7 @@
 
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
-import { styleInfo, styleLayers } from "../compile/styles";
+import { styleInfo, styleIsPublic, styleLayers, styleOwner } from "../compile/styles";
 import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
@@ -69,7 +69,11 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
 
     // Stylesheets name their style, and are served for suspended journals.
     let styleid = int(journal.props.s2_style);
-    if (mode === "res") {
+    const s2id = /^\d+$/.test(args.s2id ?? "") ? Number(args.s2id) : 0;
+    if (s2id && (await styleOwner(db, s2id) === journal.userid && Number(journal.getCap(config, "s2styles"))
+        || await styleIsPublic(db, s2id))) {
+        styleid = s2id;
+    } else if (mode === "res") {
         const res = /^\/(\d+)\/stylesheet$/.exec(view.pathextra ?? "");
         if (!res) return notFound;
         styleid = Number(res[1]);
