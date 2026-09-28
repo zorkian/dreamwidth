@@ -269,6 +269,19 @@ An isolated read-only SQL/native test checks trust, watch-only, membership,
 rename and final-reread revocation. Installed Comment cleaning and worker
 binding remain required.
 
+The parent also resolves a shown Comment's picture using only that page-loaded
+author and selected Comment properties. Native Talk first chooses map ID or
+keyword/default, then loads the actual picture row; a resolved ID without a
+loaded row emits no Image. Redirects, usable-map filtering and direct default
+rows retain their separate source rules. Full, small and smaller dimensions
+use the source fractions, including noninteger values. The picture provider
+returns an approved Image model and a separate presence decision; raw map and
+picture rows stay in the parent. An isolated SQL test changes and removes the
+selected picture row, checks final fingerprint revocation and compares the
+map redirect/fallback with the installed native user helper. Actual installed
+Comment model/worker binding still has to call this provider under its S2
+property gate.
+
 Loaded selected Comment edit metadata now uses the original stored edit time
 truthiness, raw edit reason, the approved Entry URL and the same native
 `link_thread_arg` as reply links. A child thread-root link uses the approved
