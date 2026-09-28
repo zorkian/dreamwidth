@@ -27,8 +27,7 @@ directory, dependency, syscall or permission grant expands.
 
 Focused evidence includes installed no-connect export/private-file controls, actual
 SELECT-only MyISAM descriptor witnesses and mutations, native ML debug undefined/flag
-controls, closed-runtime manifest negatives, and source-corresponding plus missing-source
-recovered programs with initialization/prepared/render Image aliases. The worker test
+controls, closed-runtime manifest negatives, and source-compiled programs with initialization/prepared/render Image aliases. The worker test
 uses the explicitly declared model test entry with the owning exported facts and actual
 SQL/file translation provider. The native Image oracle declares synthetic, unused ML
 labels; native translation precedence is proved independently. This is not the

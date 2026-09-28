@@ -30,7 +30,7 @@ function native() {
         syntheticWrites: string[];
     };
 }
-test('actual native map/remap/default keeps user exclusion and compiled version authority', () => {
+test('actual native map/remap/default selection keeps owner and user-layer boundaries', () => {
     const expected = native();
     assert.equal(Buffer.from(expected.outputBase64, 'base64').toString(), 'custom:userA');
     const config = {defaultStyle: {core: 'core2', layout: 'fixture/layout'},

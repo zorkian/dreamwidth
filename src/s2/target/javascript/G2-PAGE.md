@@ -33,7 +33,7 @@ access, and does not turn generated CSS into trusted HTML.
 The compact oracle invokes the actual native Page constructor for personal,
 identity and syndicated types with explicitly synthetic public helper providers
 and database tripwires. A compiled trusted custom program prints the constructed
-Page through both matched source and missing-source active recovery, using one
+Page through current-source compilation, using one
 Context from initialization through output. Its CSS callback is invoked through
 the installed assembler and raw output bytes match the independent native run.
 The oracle's native HTML property cleaner is a TEST-ONLY provider, not a serving

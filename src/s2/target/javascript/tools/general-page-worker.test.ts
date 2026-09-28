@@ -52,7 +52,7 @@ function RecentPage::print() { print label("recent") + $.global_title + ":" + $*
 function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.entry.subject + ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
 `;
 
-test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
+test("real factory prepares Page/Entry after one init and resumes source custom functions",async()=>{
     const native=JSON.parse(execFileSync("perl",["-e",String.raw`use strict;use warnings;no warnings 'once';
         use lib '/workspaces/dreamwidth/cgi-bin','/workspaces/dreamwidth/src/s2';
         BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};*DBI::connect_cached=sub{die 'DB forbidden'};}

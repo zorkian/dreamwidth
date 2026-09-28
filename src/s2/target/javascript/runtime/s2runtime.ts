@@ -191,7 +191,7 @@ export const runtime = {
             };
         }
         // Untyped native hash references have no class marker. Generated field
-        // spelling still addresses the same logical keys as recovered hash syntax.
+        // spelling still addresses the same logical keys as source hash syntax.
         if (kind === "field" && hashIdentities.has(receiver) && !Object.hasOwn(receiver, ".type")) {
             const name = String(key);
             key = NativeString.bytes(Buffer.from(name.startsWith("_") ? name.slice(1) : name, "latin1"));
@@ -807,7 +807,7 @@ export class Context {
         throw nativeProgramError(`${location}: undefined method ${type}::${name}`);
     }
 
-    /** Installed compiler/recovery only; source text cannot nominate filenames. */
+    /** Installed compiler only; source text cannot nominate filenames. */
     setNativeCOP(layer: Layer, line: number): void {
         if (!contextBrands.has(this) || !this.loadedLayers.has(layer) || !this.callFrames.length)
             throw new Error('Native COP requires active loaded Context frame');
