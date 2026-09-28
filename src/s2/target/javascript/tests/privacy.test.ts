@@ -20,30 +20,30 @@ before(() => { journals = new TestJournals(); });
 after(() => journals.close());
 
 test("recent pages leave out locked and private entries", async () => {
-    const page = await journals.recent("s2fix_theme");
+    const page = await journals.get("/~s2fix_theme/");
     assert.equal(page.status, 200);
-    assert.match(page.html, /Entry 25/);
-    assert.doesNotMatch(page.html, /Locked entry|Private entry|secret/);
+    assert.match(page.body, /Entry 25/);
+    assert.doesNotMatch(page.body, /Locked entry|Private entry|secret/);
 });
 
 test("locked and private entries are not found", async () => {
     for (const subject of ["Locked entry", "Private entry"]) {
-        const page = await journals.entry("s2fix_theme", await journals.ditemid("s2fix_theme", subject));
+        const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", subject)}.html`);
         assert.equal(page.status, 404, subject);
-        assert.doesNotMatch(page.html, /secret/);
+        assert.doesNotMatch(page.body, /secret/);
     }
 });
 
 test("screened comments are hidden", async () => {
-    const page = await journals.entry("s2fix_theme", await journals.ditemid("s2fix_theme", "Entry 25:"));
+    const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Entry 25:")}.html`);
     assert.equal(page.status, 200);
-    assert.match(page.html, /Top comment/);
-    assert.doesNotMatch(page.html, /Screened comment/);
+    assert.match(page.body, /Top comment/);
+    assert.doesNotMatch(page.body, /Screened comment/);
 });
 
 test("suspended journals are not found", async () => {
-    const recent = await journals.recent("s2fix_suspended");
+    const recent = await journals.get("/~s2fix_suspended/");
     assert.equal(recent.status, 404);
-    const entry = await journals.entry("s2fix_suspended", await journals.ditemid("s2fix_suspended", "Entry 1:"));
+    const entry = await journals.get(`/~s2fix_suspended/${await journals.ditemid("s2fix_suspended", "Entry 1:")}.html`);
     assert.equal(entry.status, 404);
 });

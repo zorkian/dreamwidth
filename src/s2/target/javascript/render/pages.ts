@@ -146,7 +146,7 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
         atom: Link(`${base}/data/atom`, "Atom", ImageStd(config, p, "atom")),
     };
     page._data_links_order = ["rss", "atom"];
-    if (truthy(journal.props.opt_blockrobots) || hasSkip && skipArg) head += robotMetaTags();
+    if (journal.shouldBlockRobots(config) || hasSkip && skipArg) head += robotMetaTags();
     if (journal.props.icbm) head += `<meta name="ICBM" content="${journal.props.icbm}" />\n`;
     head += `
   <script type='text/javascript'>

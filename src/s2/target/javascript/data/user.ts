@@ -101,6 +101,13 @@ export class User {
         return max ?? config.capDefaults[name];
     }
 
+    // LJ::User::should_block_robots. Needs opt_blockrobots and adult_content loaded.
+    shouldBlockRobots(config: SiteConfig): boolean {
+        return this.journaltype === "Y" || this.journaltype === "I" 
+            || !!this.props.opt_blockrobots && this.props.opt_blockrobots !== "0"
+            || config.robotBlockingContent.includes(this.props.adult_content ?? "");
+    }
+
     isVisible(): boolean {
         return this.statusvis === "V";
     }
