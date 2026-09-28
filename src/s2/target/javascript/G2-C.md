@@ -57,7 +57,14 @@ For selected Comment posters, the parent project result carries the selected
 Comment page separately from the child resume model. The request pipeline binds
 its name-to-userid constraints to the request-private UserLite authority before
 sending resume. The selected tree is never serialized as a helper request;
-the installed projector still must supply this source-approved result.
+The parent selected projector now prepares source text once, derives the same
+selected Comment tree for the approved page builder and poster binding, and
+keeps that tree outside the child model. Its CommentInfo helper resolves the
+viewed journal's exported maxComments fact. A missing or hooked capability is
+an unavailable source fact; null is passed only for an established native undef.
+The fixed worker control uses this projector over isolated selected SQL instead
+of reading raw selected source bytes into its page model. The ordinary installed
+page builder and its remaining source operations are still required.
 
 ## Evidence boundary
 
