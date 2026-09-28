@@ -35,6 +35,8 @@ import {withSelectedFixture} from "./selected-fixture";
 import {MysqlActivePrograms} from "../live/data/active-program";
 import {MysqlPublicUsers} from "../live/data/public-users";
 import {GeneralRequestPipeline} from "../live/render/general-request";
+import {generalSelectedProjection} from "../live/render/general-selected-projector";
+import type {GeneralTextEncoding} from "../live/domain/general-text-encoding";
 
 import {nativePageResponse} from "../live/render/general-response";
 import {createLiveApp} from "../live/server/app";
@@ -150,11 +152,18 @@ test("closed real worker preserves native models and private UserLite across ini
                         return result;
                     }};
                 },
-                async project(selected){
-                    const entry=selected.facts.entries[0];assert.ok(entry);
-                    const title=selected.sources.find(cell=>cell.key===`entry:${entry.jitemid}:subject`);assert.ok(title?.value);
-                    return {page:{title:NativeString.bytes(Buffer.from(title.value.base64,"base64")),
-                        username:NativeString.hostUtf8Bytes("public_name")}};
+                async project(selected,helpers){
+                    return generalSelectedProjection(selected,helpers,{
+                        commentSettings:startup.commentSettings,capabilities:startup.capabilities},{
+                        encoding:()=>({async item(){throw Error("Unexpected charset conversion");}} as
+                            unknown as GeneralTextEncoding),
+                        navigation:()=>({permalink:NativeString.hostUtf8Bytes("/257.html"),styleArgument:undefined}),
+                        page(facts,prepared){
+                            const entry=facts.entries[0];assert.ok(entry);
+                            const title=prepared.entry(entry).subject;assert.ok(title);
+                            return {title,username:NativeString.hostUtf8Bytes("public_name")};
+                        },
+                    });
                 },
             });
             const serve=async(input:{method:"GET"|"HEAD";username:string;skip:number})=>{
