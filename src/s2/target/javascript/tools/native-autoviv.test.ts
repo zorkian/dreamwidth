@@ -1,6 +1,6 @@
 // native-autoviv.test.ts
 //
-// Native nested-reference semantics through source and active recovery.
+// Native nested-reference semantics through the current S2 source backend.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -18,10 +18,8 @@ import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {runInNewContext} from 'node:vm';
 import {ArtifactCompiler,instantiateProgram,type ActiveStyleSnapshot} from '../live/render/layer-artifact';
-import {recoverActiveLayer} from '../live/render/recovery';
-import {Context,Layer,s2,runtime} from '../runtime/s2runtime';
+import {Context,runtime} from '../runtime/s2runtime';
 import {NativeOutput,NativeString} from '../runtime/native-string';
 import {scalarPV,isNativeProgramError} from '../runtime/native-scalar';
 const oracle=JSON.parse(execFileSync('/usr/bin/prlimit',['--as=268435456','--cpu=10','--','perl','-e',String.raw`
@@ -35,22 +33,19 @@ print JSON::PP->new->canonical->encode({source=>encode_base64($source,''),code=>
  read=>[ref$x,exists$x->{a}?1:0,ref$y,ref$y->[2],exists$y->[2]{b}?1:0,ref$z->{a}],defined=>[map{S2::check_defined($_)?1:0}({}, {_type=>''},{_type=>'X',_isnull=>'0'},{_type=>'X',_isnull=>'1'})]});
 `],{encoding:'utf8',timeout:15000,maxBuffer:1048576}));
 const text=NativeString.hostUtf8Bytes;
-test('native source and recovery nested references preserve absent type and aliases',async()=>{
+test('current source preserves visible nested-reference output and null picture handling',async()=>{
  const expected='initial=null:read=:write=7:untyped:direct=8:null:key=1:entry=9:hash=11:alias=13:array=14:retained=13:newroot-null:recent=7:null:entry=7:null:undef=:::arithmetic=2:rhs=2:done\n';
  assert.equal(Buffer.from(oracle.output,'base64').toString(),expected);assert.match(oracle.error,/null Image object/);
  const directory=mkdtempSync(join(tmpdir(),'native-autoviv-'));
  try{const launcher=join(directory,'compiler-isolation');execFileSync('cc',['-std=c11','-Wall','-Wextra','-Werror','-O2',resolve('tools/compiler-isolation.c'),'-o',launcher]);
  const compiler=new ArtifactCompiler({s2Root:resolve('../..'),perl:'/usr/bin/perl',isolationExecutable:launcher});
- const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:'core',compiledTime:1,sourceBytes:Buffer.from(oracle.source,'base64'),activeCompiledBytes:Buffer.from(oracle.code,'base64')}]};
- const source=await compiler.compile(snapshot);assert.equal(source.kind,'compiled');if(source.kind!=='compiled')throw Error('source correspondence');
- const recovery=recoverActiveLayer({id:101,ownerId:1,systemUserId:1,parentId:0,type:'core',activeBytes:Buffer.from(oracle.code,'base64')},1);
- assert.equal(recovery.kind,'recovered',recovery.kind==='gap'?recovery.reason:'');if(recovery.kind!=='recovered')throw Error('recovery');
- const recovered=runInNewContext(recovery.code+';recovered_layer;',{s2},{timeout:5000}) as Layer;recovered.scalarProfile=compiler.scalarProfile;
- for(const[route,layers]of [['source',instantiateProgram(source.program)],['recovery',[recovered]]]as const){
+ const snapshot:ActiveStyleSnapshot={styleId:71,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:'core',sourceBytes:Buffer.from(oracle.source,'base64')}]};
+ const source=await compiler.compile(snapshot);assert.equal(source.kind,'compiled');
+ if(source.kind!=='compiled')throw Error('S2 source compilation required');
+ const layers=instantiateProgram(source.program);
  const output=new NativeOutput(),ctx=new Context([...layers],()=>{throw Error('legacy output');},undefined,undefined,undefined,500,{raw:v=>output.append(v),safe:v=>output.append(v)});
- ctx.runNativeFunction('main()');assert.equal(output.bytes().toString('base64'),oracle.output,route);
- assert.throws(()=>ctx.runNativeFunction('fail()'),error=>isNativeProgramError(error)&&/null object/.test((error as Error).message),route);
- }
+ ctx.runNativeFunction('main()');assert.equal(output.bytes().toString('base64'),oracle.output);
+ assert.throws(()=>ctx.runNativeFunction('fail()'),error=>isNativeProgramError(error)&&/null object/.test((error as Error).message));
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
 test('native read containers, missing final fields and private hash identity',()=>{
@@ -67,6 +62,4 @@ test('Context and prototype fields cannot acquire reference authority',()=>{
  const ctx=new Context([],()=>{});assert.throws(()=>runtime.referenceValue({get:()=>ctx,set:()=>{throw Error('unexpected');}},'hash'),/Context/);
  assert.throws(()=>runtime.memberSlot(ctx,text('prop'),'hash'),/receiver/);
  const hash=runtime.makeHash([]);runtime.memberSlot(hash,text('__proto__'),'hash').set(text('inert'));assert.equal(Object.getPrototypeOf(hash),null);
- const hostile='package S2; use strict; register_layer(101); register_function(101,"main()",sub { $_ctx->{safeOutput} = sub { "forged"; }; }); 1;';
- const result=recoverActiveLayer({id:101,ownerId:1,systemUserId:1,parentId:0,type:'core',activeBytes:Buffer.from(hostile)},1);assert.equal(result.kind,'gap');
 });

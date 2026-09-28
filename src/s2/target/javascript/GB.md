@@ -29,15 +29,18 @@ Build content and S2 normally, then from src/s2/target/javascript run:
 /opt/dw-node24/bin/node --test dist/tools/native-output.test.js
 ```
 
-The tests use selected independent retained GO traces, fixed trusted raw-byte native compiler fixtures, and actual source-proven/recovered products with installed shared scalar and Context brands. Identity CSS/embed callbacks qualify bridge mechanics only. Installed hooks, child wiring, HTTP completion and final privacy rechecks remain the general coordinator's obligations. No stored generated Perl is executed by the oracle. No serving completeness claim follows from these component tests.
+Focused tests keep safe/raw output ordering, CSS capture, byte/UTF8 frames,
+fixed trusted source execution and error terminality. The renderer and its
+coordinator must also prove actual HTTP completion, public visibility and final
+privacy rechecks. This component test alone is not a serving claim.
 
-Context checkpoint recursion/deadline stops carry private WeakSet authority from the runtime scalar module. The bridge rethrows these without poisoning the page; arbitrary lookalike errors and cleaner/hook/page bounds remain terminal. The outermost function unwind cancels the program deadline before diagnostic output, matching native alarm lifetime while retaining the independent page/worker deadline. The brand is not exported through `s2.runtime`.
-
-The fixed native checkpoint-failure trace proves exact bridge partial bytes and current-printer/no-eof completion. Actual recursive native, source-proven and recovered programs now agree at the same configured bound (277 bytes). The recovery frontend recognizes only NodeFunction.pm327's exact first generated entry-prologue AST, immediately followed by the generated Context argument declaration, and removes that statement because Context.invoke already owns the shared every-16th compiled-function entry check. Counter globals and standalone check_depth outside this proven form are rejected. No per-layer persistent counter remains. Mixed source/recovered dispatch counts once per entry.
-
-Native NodeFunction.pm omits this prologue in standalone OO compiler output; persisted LJ deployment uses the non-OO registration envelope. Historical accepted closures without the prologue continue to enter through Context.invoke, with the same shared checkpoint ownership; no new trust classification is inferred from omission.
-
-S2.pm447–471 resets entry cadence on each run_function, including host re-entry from plural (LJ/S2.pm2909) and date ordinal (4072). G2 must use an explicit run boundary for those reset points. Native nested run_function cancels the outer alarm; JS deliberately retains its outer four-second deadline on nested entry, avoiding unbounded execution after re-entry. This protective divergence does not widen worker/page limits. Symbolic-frame versus native call-site recursion granularity remains separate general-runtime follow-through; no general call-site rewrite is made here.
+Context recursion/deadline stops have private runtime authority. The bridge
+propagates them without poisoning the page; arbitrary lookalike errors and
+cleaner, hook or page-bound failures remain terminal. That authority is not
+exposed through `s2.runtime`. Nested application callbacks use the explicit
+run boundary while the outer four-second deadline and page/worker limits remain
+in force. The fixed native checkpoint-failure trace is a focused source
+control, not a requirement for exhaustive internal checkpoint-byte parity.
 
 Initialization uses `initialization: true` and the same frozen sink supplied to
 Context from its construction. After prop_init/modules_init, the trusted
@@ -45,5 +48,6 @@ coordinator calls `beginRendering()` once. This replaces the current printer
 pair without clearing saved CSS scratch; no temporary sink or second cleaner
 is used. The type remains fixed in options. An initialization failure can use
 the coordinator-classified diagnostic path without starting rendering or
-ending an implicit text/css entry. Actual source-proven and recovered programs
-exercise suppressed initialization and rendering on one Context/sink.
+ending an implicit text/css entry. Source-compiled programs exercise suppressed
+initialization and rendering on one Context/sink. Stored generated Perl has no
+renderer path.
