@@ -71,6 +71,7 @@ export function generalCommentRecords(page:GeneralSelectedCommentPage,
             if(typeof node.anonymous!=="boolean"||typeof presentation.hasPicture!=="boolean")
                 throw Error("Invalid approved Comment presentation");
             input={kind:"shown",...common,loaded:fields?.loaded??false,
+                posterUsername:node.posterUsername,
                 subject:fields?.subject??(!node.full&&!node.subjectOnly?
                     NativeString.hostUtf8Bytes("..."):undefined),body:fields?.body,
                 noHtml:authority.noHtml,anonymous:node.anonymous,

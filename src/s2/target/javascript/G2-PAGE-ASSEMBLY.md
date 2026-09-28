@@ -287,6 +287,14 @@ On the legacy keyword branch, Perl-false empty or byte `0` becomes an absent
 keyword before selection and metadata construction, preserving native Default
 text even when a picture is named `0`. The same SQL proof covers both values.
 
+The shown Comment's page-loaded author now contributes only its canonical
+public username to the approved record. The source model passes that name to
+the existing same-Context UserLite operation; a missing author stays on the
+native blank UserLite path. Structural stubs and suspended authors carry no
+poster username. The isolated SQL and source-model tests assert the selected
+name, blank redaction and operation argument. The installed worker still must
+bind this operation to its private public-user host and final witness.
+
 Loaded selected Comment edit metadata now uses the original stored edit time
 truthiness, raw edit reason, the approved Entry URL and the same native
 `link_thread_arg` as reply links. A child thread-root link uses the approved
