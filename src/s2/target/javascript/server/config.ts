@@ -46,6 +46,7 @@ export interface SiteConfig {
     readonly userpicRoot: string;
     readonly palImgRoot: string;
     readonly maxScrollback: number;
+    readonly tagIntersection: number;
     readonly talkPageSize: number;
     readonly talkMaxSubjects: number;
     readonly talkThreadPoint: number;
@@ -53,6 +54,8 @@ export interface SiteConfig {
     readonly strings: Readonly<Record<string, string>>;
     readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
     readonly capDefaults: Readonly<Record<string, unknown>>;
+    // The LJ::is_enabled features journal views check.
+    readonly enabled: Readonly<Record<"tags" | "security_filter", boolean>>;
     // Adult content levels whose journals and entries ask robots to stay away.
     readonly robotBlockingContent: readonly string[];
 }

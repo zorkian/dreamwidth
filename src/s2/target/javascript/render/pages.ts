@@ -17,9 +17,12 @@ import type { StyleInfo } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
 import { Entry, truthy } from "../data/entry";
 import { Moods } from "../data/moods";
+import { type UserTag, publicTags } from "../data/tags";
+import { canonicalUsername } from "@dreamwidth/content";
 import { type Site, User } from "../data/user";
 import { Userpics } from "../data/userpic";
 import type { ContentCleaner } from "./content";
+import type { JournalFilter } from "./render";
 import { escapeValue, type PropertyCleaners } from "./context";
 import {
     type S2Object, DateTimeParts, DateTimeUnix, Image, ImageStd, ImageUserpic, Link, S2Date, Tag, UserLite,
@@ -47,7 +50,9 @@ export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "ur
 const props = (pc: PageContext) => pc.ctx.prop as Record<string, any>;
 
 // LJ::S2::Page
-export async function Page(pc: PageContext, view: string, defaultPic: S2Object, discovery = false): Promise<S2Object> {
+// `discovery` adds feed and OpenID links, with feeds for any tags filtered on.
+export async function Page(pc: PageContext, view: string, defaultPic: S2Object,
+    discovery?: { tags?: readonly string[] }): Promise<S2Object> {
     const { site, journal, style } = pc;
     const config = site.config;
     const base = journal.journalBase(site);
@@ -88,7 +93,7 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object, 
         show_control_strip: showControlStrip(journal) ? 1 : 0,
         // The journal handler asks Page to state the charset first.
         head_content: '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' +
-            (discovery ? metaDiscoveryLinks(pc) : "") +
+            (discovery ? metaDiscoveryLinks(pc, discovery.tags) : "") +
             `<link rel="help" href="${config.siteRoot}/support/faq" />\n` +
             '<meta property="og:image:width" content="363"/>\n<meta property="og:image:height" content="363"/>\n',
         is_canary: 0, data_link: {}, data_links_order: [], timeformat24: 0,
@@ -106,7 +111,7 @@ export function showControlStrip(journal: User): boolean {
 }
 
 // LJ::S2::RecentPage
-export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: boolean,
+export async function RecentPage(pc: PageContext, args: Readonly<Record<string, string>>, filter: JournalFilter,
     chromeHead: string): Promise<S2Object> {
     const { site, journal, db } = pc;
     const config = site.config;
@@ -117,36 +122,42 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
     if (itemshow < 1) itemshow = 20;
     else if (itemshow > 50) itemshow = 50;
     const maxskip = config.maxScrollback - itemshow;
-    const skip = Math.max(0, Math.min(skipArg, maxskip));
+    const skip = Math.max(0, Math.min(Math.trunc(Number(args.skip)) || 0, maxskip));
 
-    const window = await Entry.recent(db, journal, itemshow + 1, skip, config.maxScrollback);
+    const poster = args.poster !== undefined ? await User.byName(db, canonicalUsername(args.poster)) : null;
+    const window = await Entry.recent(db, journal, {
+        itemshow: itemshow + 1, skip, maxScrollback: config.maxScrollback, tagIntersection: config.tagIntersection,
+        tagids: filter.tagids, tagmode: filter.tagmode, security: filter.security, posterid: poster?.userid,
+    });
     const more = window.length > itemshow;
     const items = window.slice(0, itemshow);
 
-    // Stickies lead the first page and are not repeated in place.
-    const stickyIds = skip === 0 ? (journal.props.sticky_entry ?? "").split(",").map(Number).filter(Boolean) : [];
+    // Stickies lead the unfiltered first page and are not repeated in place.
+    const showStickies = skip === 0 && !filter.security && !filter.tagids && !poster;
+    const stickyIds = showStickies ? (journal.props.sticky_entry ?? "").split(",").map(Number).filter(Boolean) : [];
     const stickies = (await Promise.all(stickyIds.map(id => Entry.byDitemid(db, journal, id))))
         .filter((entry): entry is Entry => !!entry && entry.isPublic());
     const stickySet = new Set(stickies.map(entry => entry.ditemid));
     await Entry.fill(db, journal, [...stickies, ...items]);
 
     const defaultPic = await journalDefaultPic(pc);
-    const page = await Page(pc, "recent", defaultPic, true);
+    const page = await Page(pc, "recent", defaultPic, { tags: filter.tags });
     page[".type"] = "RecentPage";
     page._entries = [];
-    page._filter_active = 0;
-    page._filter_name = "";
-    page._filter_tags = 0;
+    page._filter_active = filter.tags || filter.security ? 1 : 0;
+    page._filter_name = filter.security ?? filter.tags?.join(", ") ?? "";
+    page._filter_tags = filter.tags ? 1 : 0;
 
     const kind = journal.journaltype === "C" ? "members" : "friends";
     let head = page._head_content +
         `<link rel="group ${journal.journaltype === "C" ? "members" : "friends made"}" title="${ehtml(`${config.siteNameShort} ${kind}`)}" href="${ehtml(`${base}/read`)}" />\n`;
+    const tagQuery = filter.tags ? `?tag=${filter.tags.map(eurl).join(",")}` : "";
     page._data_link = {
-        rss: Link(`${base}/data/rss`, "RSS", ImageStd(config, p, "rss")),
-        atom: Link(`${base}/data/atom`, "Atom", ImageStd(config, p, "atom")),
+        rss: Link(`${base}/data/rss${tagQuery}`, "RSS", ImageStd(config, p, "rss")),
+        atom: Link(`${base}/data/atom${tagQuery}`, "Atom", ImageStd(config, p, "atom")),
     };
     page._data_links_order = ["rss", "atom"];
-    if (journal.shouldBlockRobots(config) || hasSkip && skipArg) head += robotMetaTags();
+    if (journal.shouldBlockRobots(config) || truthy(args.skip)) head += robotMetaTags();
     if (journal.props.icbm) head += `<meta name="ICBM" content="${journal.props.icbm}" />\n`;
     head += `
   <script type='text/javascript'>
@@ -183,10 +194,20 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
     if (page._entries.length) page._entries.at(-1)._end_day = 1;
 
     const nav = s2("RecentNav", { version: 1, skip, count: items.length });
+    // LJ::S2::make_link over these, in Perl's hash order, which varies.
+    const link = (newskip: number) => {
+        const tagmode = args.mode === "all" || args.mode === "and" ? "all" : "";
+        const query = Object.entries({
+            skip: newskip || "", style: args.style === "mine" ? "mine" : "", mode: tagmode,
+            s2id: eurl(args.s2id ?? ""), tag: eurl(args.tag ?? ""), security: eurl(args.security ?? ""),
+            poster: poster?.user ?? "",
+        }).filter(([, value]) => value !== "").map(([key, value]) => `${key}=${value}`).join("&");
+        return `${base}/${query ? `?${query}` : ""}`;
+    };
     if (skip) {
         const back = Math.max(0, skip - itemshow);
         nav._forward_skip = back;
-        nav._forward_url = back ? `${base}/?skip=${back}` : `${base}/`;
+        nav._forward_url = link(back);
         nav._forward_count = itemshow;
         head += `<link rel="next" href="${nav._forward_url}" />\n`;
     }
@@ -196,7 +217,7 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
             nav._backward_url = `${base}/${lastdate.replaceAll(" ", "/")}`;
         } else if (more) {
             nav._backward_skip = skip + itemshow;
-            nav._backward_url = `${base}/?skip=${skip + itemshow}`;
+            nav._backward_url = link(skip + itemshow);
         }
         head += `<link rel="prev" href="${nav._backward_url ?? ""}" />\n`;
     }
@@ -206,10 +227,15 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
 }
 
 // LJ::User::meta_discovery_links with feeds and openid, then Page's own links.
-function metaDiscoveryLinks(pc: PageContext): string {
+function metaDiscoveryLinks(pc: PageContext, tags?: readonly string[]): string {
     const base = pc.journal.journalBase(pc.site);
     const root = pc.site.config.siteRoot;
-    return `<link rel="alternate" type="application/rss+xml" title="RSS: all entries" href="${base}/data/rss" />\n` +
+    const taglist = tags?.map(eurl).join(",");
+    const filtered = taglist
+        ? `<link rel="alternate" type="application/rss+xml" title="RSS: filtered by selected tags" href="${base}/data/rss?tag=${taglist}" />\n` +
+          `<link rel="alternate" type="application/atom+xml" title="Atom: filtered by selected tags" href="${base}/data/atom?tag=${taglist}" />\n`
+        : "";
+    return filtered + `<link rel="alternate" type="application/rss+xml" title="RSS: all entries" href="${base}/data/rss" />\n` +
         `<link rel="alternate" type="application/atom+xml" title="Atom: all entries" href="${base}/data/atom" />\n` +
         `<link rel="service" type="application/atomsvc+xml" title="AtomAPI service document" href="${root}/interface/atom" />\n` +
         `<link rel="openid.server" href="${root}/openid/server" />\n`;
@@ -405,20 +431,17 @@ export async function latestMonth(pc: PageContext): Promise<S2Object> {
     return result;
 }
 
-// Page::visible_tag_list: public use counts only.
+// Page::visible_tag_list: displayed tags, as TagDetail for a logged-out viewer.
 export async function visibleTags(pc: PageContext): Promise<S2Object[]> {
-    const { journal, site } = pc;
-    const rows = await journal.cluster(pc.db,
-        `SELECT k.kwid, k.keyword, COUNT(*) AS uses FROM logtags t
-         JOIN log2 l ON l.journalid = t.journalid AND l.jitemid = t.jitemid AND l.security = 'public'
-         JOIN userkeywords k ON k.userid = t.journalid AND k.kwid = t.kwid
-         WHERE t.journalid = ? GROUP BY k.kwid, k.keyword`, [journal.userid]);
-    const base = journal.journalBase(site);
-    return rows.map(row => {
-        const tag = Tag(base, int(row.kwid), text(row.keyword));
-        return { ...tag, ".type": "TagDetail", _visibility: "public", _use_count: int(row.uses),
-            _security_counts: { public: int(row.uses) } };
-    });
+    const base = pc.journal.journalBase(pc.site);
+    return (await publicTags(pc.db, pc.journal)).filter(tag => tag.display).map(tag => TagDetail(base, tag));
+}
+
+export function TagDetail(base: string, tag: UserTag): S2Object {
+    return {
+        ...Tag(base, tag.kwid, tag.name), ".type": "TagDetail", _visibility: "public", _use_count: tag.publicUses,
+        _security_counts: { public: tag.publicUses },
+    };
 }
 
 export { eurl };

@@ -18,7 +18,7 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import type { SiteConfig } from "../server/config";
 import type { Site, User } from "../data/user";
-import { type S2Object, Image, Link, ehtml, nullObject } from "./objects";
+import { type S2Object, Image, Link, ehtml, eurl, nullObject } from "./objects";
 import type { Chrome } from "./state";
 
 // Resource groups registered for journal views, in LJ::need_res order.
@@ -46,6 +46,12 @@ const JS_ENTRY = ["jquery.replyforms.js", "jquery.poll.js", "journals/jquery.tag
 
 const mtimes = new Map<string, number>();
 
+// LJ::determine_viewing_style for a logged-out viewer.
+export function viewingStyle(args: Readonly<Record<string, string>>): string {
+    if (args.format === "light") return "light";
+    return ["light", "site", "mine", "original"].includes(args.style ?? "") ? args.style! : "original";
+}
+
 export interface ChromeRequest {
     readonly site: Site;
     readonly journal: User;
@@ -53,6 +59,8 @@ export interface ChromeRequest {
     readonly view: string;
     // The request path and query, for login return URLs.
     readonly requestPath: string;
+    // The query arguments, with any tag or security filter from the path.
+    readonly args: Readonly<Record<string, string>>;
     readonly showControlStrip: boolean;
     readonly users: ReadonlyMap<number, User>;
 }
@@ -98,9 +106,9 @@ export function createChrome(request: ChromeRequest): Chrome & {
         // views/journal/controlstrip.tt, logged-out branch
         controlStrip() {
             if (!request.showControlStrip) return "";
-            const current = origin + request.requestPath;
+            const here = origin + request.requestPath;
             const login = `<form action="${config.siteRoot}/login" method="post" class="lj_login_form pkg">
-    <div id="login-form">${hidden("lj_form_auth", "")}${hidden("returnto", current)}${label("login_user", "invisible", "Account name:")}` +
+    <div id="login-form">${hidden("lj_form_auth", "")}${hidden("returnto", here)}${label("login_user", "invisible", "Account name:")}` +
                 '<input type="text" tabindex="1" id="login_user" aria-required="true" maxlength="27" default="" value="" ' +
                 'class="text" name="user" size="7" placeholder="Username" />' +
                 label("login_password", "invisible", "Password:") +
@@ -109,7 +117,7 @@ export function createChrome(request: ChromeRequest): Chrome & {
                 '<input type=\'submit\' value="Log in" class="submit" id="login_submit" tabindex="4" />' + `    </div>
     <div id="login-other">    <ul>
         <li><a href='${config.siteRoot}/lostinfo' >(Forgot it?)</a></li>
-        <li><a href='${config.siteRoot}/openid/?returnto=${ehtml(current)}' >(OpenID?)</a></li>
+        <li><a href='${config.siteRoot}/openid/?returnto=${ehtml(here)}' >(OpenID?)</a></li>
     </ul>` + '<input type=\'checkbox\' class="checkbox" tabindex="3" name="remember_me" id="login_remember_me" value="1" />' +
                 label("login_remember_me", "checkboxlabel", "Remember me") + `    </div>
 </form>`;
@@ -126,10 +134,20 @@ export function createChrome(request: ChromeRequest): Chrome & {
 <input type='submit' value="Go" class="submit" />
 </form></div><!-- end .appwidget-search -->
 `;
-            const light = current + (current.includes("?") ? "&amp;" : "?") + "style=light";
-            const styles = request.view === "entry"
-                ? `<a href='${current}?style=site'>site</a>&nbsp;&nbsp; <a href='${light}'>light</a>`
-                : `<a href='${light}'>light</a>`;
+            // LJ::control_strip's style links, through LJ::create_url with keep_args.
+            const path = request.requestPath.split("?")[0];
+            const styleLink = (style: string) => {
+                const args: Record<string, string> = { ...request.args, style };
+                const query = Object.keys(args).sort().map(key => `${eurl(key)}=${eurl(args[key]!)}`).join("&");
+                return ehtml(`${origin}${path}?${query}`);
+            };
+            const current = viewingStyle(request.args);
+            const styles = [
+                current !== "site" && ["entry", "reply", "icons"].includes(request.view) ? ["site", "site"] : undefined,
+                current !== "light" ? ["light", "light"] : undefined,
+                current !== "original" ? ["original", "original"] : undefined,
+            ].filter(option => option).map(option => `<a href='${styleLink(option![0]!)}'>${option![1]}</a>`)
+                .join("&nbsp;&nbsp; ");
             const kind = journal.journaltype === "C" ? "community" : "journal";
             return `
 <div id='lj_controlstrip'>
@@ -181,7 +199,7 @@ export function createChrome(request: ChromeRequest): Chrome & {
 <script type='text/javascript'>
 jQuery(function(jQ){
     if (jQ("#lj_controlstrip").length == 0) {
-        jQ.getJSON("/${journal.user}/__rpc_controlstrip?user=${journal.user}&host=${site.host}&uri=${pathname}&args=${encodeURIComponent(query)}&view=${request.view}", {},
+        jQ.getJSON("/${journal.user}/__rpc_controlstrip?user=${journal.user}&host=${site.host}&uri=${pathname}&args=${eurl(query)}&view=${request.view}", {},
             function(data) {
                 jQ("<div></div>").html(data.control_strip).prependTo("body");
             }

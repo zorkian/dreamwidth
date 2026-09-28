@@ -17,7 +17,8 @@ import type { Compiler } from "../compile/compiler";
 import { styleInfo, styleLayers } from "../compile/styles";
 import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
-import type { RenderRequest, RenderResult } from "../render/render";
+import { publicTags, parseTagFilter } from "../data/tags";
+import type { JournalFilter, RenderRequest, RenderResult } from "../render/render";
 import type { SiteConfig } from "./config";
 import { determineView } from "./views";
 
@@ -57,6 +58,15 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     }
     if (mode && !S2_VIEWS.has(mode)) return notFound;
 
+    let pathextra = view.pathextra;
+    const filtered = /^\/(tag|security)\/(.*)$/s.exec(pathextra ?? "");
+    if (filtered && (filtered[1] === "tag" ? mode === "lastn" && filtered[2] : mode === "lastn" || mode === "read")) {
+        args[filtered[1]!] = durl(filtered[2]!);
+        pathextra = undefined;
+    }
+    const filter = await journalFilter(config, db, journal, args, base);
+    if ("status" in filter) return filter;
+
     // Stylesheets name their style, and are served for suspended journals.
     let styleid = int(journal.props.s2_style);
     if (mode === "res") {
@@ -71,10 +81,46 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     const layers = await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
     return {
-        username: journal.user, view: mode, pathextra: view.pathextra, ditemid: view.ditemid,
+        username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
         args, requestPath: url, host, layers: compiled, style,
     };
+}
+
+// make_journal's tag and security filters. Where Perl shows an error page,
+// this gives a bare status.
+async function journalFilter(config: SiteConfig, db: Databases, journal: User, args: Record<string, string>,
+    base: string): Promise<JournalFilter | RenderResult> {
+    const filter: { -readonly [K in keyof JournalFilter]: JournalFilter[K] } = {};
+    if ("tag" in args) {
+        if (!args.tag) return redirect(`${base}/tag/`);
+        const tags = config.enabled.tags ? parseTagFilter(args.tag) : undefined;
+        if (!tags) return notFound;
+        const kwids = new Map((await publicTags(db, journal)).map(tag => [tag.name, tag.kwid]));
+        if (!tags.every(tag => kwids.has(tag))) return notFound;
+        filter.tags = tags;
+        filter.tagids = tags.map(tag => kwids.get(tag)!);
+        filter.tagmode = args.mode === "and" || args.mode === "all" ? "and" : "or";
+    }
+    if ("security" in args) {
+        if (!args.security) return notFound;
+        if (!Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))) {
+            return { status: 403, body: "Forbidden\n" };
+        }
+        const security = args.security.toLowerCase();
+        if (!config.enabled.security_filter || !/^(public|access|private|friends)$/.test(security)) return notFound;
+        filter.security = security === "friends" ? "access" : security;
+    }
+    return filter;
+}
+
+// LJ::durl
+function durl(text: string): string {
+    try {
+        return decodeURIComponent(text.replaceAll("+", " "));
+    } catch {
+        return text;
+    }
 }
 
 export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer): FastifyInstance {
