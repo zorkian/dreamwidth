@@ -13,7 +13,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import {
-    type CleanHooks, type CleanSite, canonicalUsername, cleanComment, cleanCss, cleanEvent, cleanSubject,
+    type CleanHooks, type CleanSite, canonicalUsername, clean, cleanComment, cleanCss, cleanEvent, cleanSubject,
     cleanSubjectAll, removeLinks, userReferences,
 } from "@dreamwidth/content";
 import type { Databases } from "../data/db";
@@ -94,6 +94,11 @@ export class ContentCleaner {
             editor: props.editor, preformatted: truthy(props.opt_preformatted), isImported: "import_source" in props,
             datepost, anonymous, nocss: anonymous,
         }, this.site, this.hooks);
+    }
+
+    // An icon's comment or description, as IconsPage cleans them.
+    iconText(text: string): string {
+        return text ? clean(text, { addbreaks: false, mode: "deny" }, this.site, this.hooks) : text;
     }
 
     // The subject as S2 shows it, and the forms formatted_subject uses.

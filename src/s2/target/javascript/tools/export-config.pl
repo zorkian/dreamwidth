@@ -83,6 +83,7 @@ print JSON->new->canonical->pretty->encode(
         palImgRoot         => $LJ::PALIMGROOT,
         maxScrollback      => $LJ::MAX_SCROLLBACK_LASTN + 0,
         tagIntersection    => $LJ::TAG_INTERSECTION + 0,
+        maxIconsPerPage    => $LJ::MAX_ICONS_PER_PAGE + 0,
         talkPageSize       => ( $LJ::TALK_PAGE_SIZE || 25 ) + 0,
         talkMaxSubjects    => ( $LJ::TALK_MAX_SUBJECTS || 200 ) + 0,
         talkThreadPoint    => ( $LJ::TALK_THREAD_POINT || 50 ) + 0,

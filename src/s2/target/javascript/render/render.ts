@@ -12,13 +12,14 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import type { CompiledLayer } from "../compile/compiler";
-import { S2Error } from "../runtime/s2runtime";
+import { type Context, S2Error } from "../runtime/s2runtime";
+import type { SiteConfig } from "../server/config";
 import type { StyleInfo } from "../compile/styles";
 import type { Databases } from "../data/db";
-import { Entry } from "../data/entry";
+import { Entry, truthy } from "../data/entry";
 import { type Site, User } from "../data/user";
 import { createBuiltins } from "./builtins";
-import { createChrome } from "./chrome";
+import { createChrome, viewingStyle } from "./chrome";
 import { journalResources, siteSettings, standardResources } from "./resources";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
@@ -26,8 +27,9 @@ import { type S2Object, UserLite } from "./objects";
 import { PageOutput } from "./page-output";
 import { EntryPage } from "./entry-page";
 import { DayPage, MonthPage, YearPage } from "./archive-pages";
+import { IconsPage } from "./icons-page";
 import {
-    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, journalDayCounts, latestMonth, showControlStrip,
+    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
 } from "./pages";
 import type { RenderState } from "./state";
@@ -115,6 +117,10 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
+    if (usesSiteviews(site.config, journal, request, s2.ctx)) {
+        return { status: 501, body: "This page is shown in the site's own style, which this server does not render.\n" };
+    }
+
     if (stylesheet) {
         // s2_run calls these with no page, and cleans the whole of what they print as CSS.
         s2.printing = true;
@@ -141,6 +147,12 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     switch (request.view || "lastn") {
         case "lastn":
             if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
+            break;
+        case "tag":
+            if (!request.pathextra) page = await TagsPage(pc);
+            break;
+        case "icons":
+            page = await IconsPage(pc, request.requestPath.split("?")[0]!);
             break;
         case "archive":
             page = await YearPage(pc, counts, request.pathextra);
@@ -178,6 +190,23 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     // The journal controller adds LJ::PageStats' container before </body>.
     const stats = "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
     return { status: 200, body: output.finish().replace(/<\/body>/i, `${stats}</body>`) };
+}
+
+// Whether LJ::User::make_journal and LJ::S2::make_journal would render this
+// page with the siteviews style instead of the journal's.
+function usesSiteviews(config: SiteConfig, journal: User, request: RenderRequest, ctx: Context): boolean {
+    const style = viewingStyle(request.args);
+    if (style === "site" || style === "light") return true;
+    const view = request.view;
+    if (view === "entry" || view === "reply") {
+        const prop = journal.props.use_journalstyle_entry_page;
+        const journalStyle = prop === "Y" || prop !== "N" && truthy(String(ctx.prop._use_journalstyle_entry_page ?? ""));
+        return journal.journaltype === "Y" || !journalStyle || !Number(journal.getCap(config, `s2view${view}`));
+    }
+    if (view === "icons") {
+        return journal.journaltype === "Y" || !ctx.hasClass("IconsPage") || !truthy(journal.props.use_journalstyle_icons_page);
+    }
+    return false;
 }
 
 // UserLite("name") calls in the style look users up by name mid-render, so
