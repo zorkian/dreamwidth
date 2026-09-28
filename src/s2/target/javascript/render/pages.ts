@@ -37,6 +37,7 @@ export interface PageContext {
     readonly nowSeconds: number;
     // Everyone whose name or icon appears on the page, by userid.
     readonly users: Map<number, User>;
+    readonly userpics: Map<number, Userpics>;
 }
 
 export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "url", "urlname", "customtext_title",
@@ -46,7 +47,7 @@ export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "ur
 const props = (pc: PageContext) => pc.ctx.prop as Record<string, any>;
 
 // LJ::S2::Page
-export async function Page(pc: PageContext, view: string, defaultPic: S2Object): Promise<S2Object> {
+export async function Page(pc: PageContext, view: string, defaultPic: S2Object, discovery = false): Promise<S2Object> {
     const { site, journal, style } = pc;
     const config = site.config;
     const base = journal.journalBase(site);
@@ -85,7 +86,12 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object):
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
         global_title: ehtml(jp.journaltitle || journal.name), global_subtitle: ehtml(jp.journalsubtitle),
         show_control_strip: showControlStrip(journal) ? 1 : 0,
-        head_content: "", is_canary: 0, data_link: {}, data_links_order: [], timeformat24: 0,
+        // The journal handler asks Page to state the charset first.
+        head_content: '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' +
+            (discovery ? metaDiscoveryLinks(pc) : "") +
+            `<link rel="help" href="${config.siteRoot}/support/faq" />\n` +
+            '<meta property="og:image:width" content="363"/>\n<meta property="og:image:height" content="363"/>\n',
+        is_canary: 0, data_link: {}, data_links_order: [], timeformat24: 0,
         include_meta_viewport: 1, session_msgs: [], has_activeentries: 0,
     });
     if (journal.journaltype === "Y") page._views_order = ["recent", "archive", "userinfo"];
@@ -125,7 +131,7 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
     await Entry.fill(db, journal, [...stickies, ...items]);
 
     const defaultPic = await journalDefaultPic(pc);
-    const page = await Page(pc, "recent", defaultPic);
+    const page = await Page(pc, "recent", defaultPic, true);
     page[".type"] = "RecentPage";
     page._entries = [];
     page._filter_active = 0;
@@ -133,10 +139,7 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
     page._filter_tags = 0;
 
     const kind = journal.journaltype === "C" ? "members" : "friends";
-    // The journal handler asks Page to state the charset first.
-    let head = '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' + metaDiscoveryLinks(pc) +
-        `<link rel="help" href="${config.siteRoot}/support/faq" />\n` +
-        '<meta property="og:image:width" content="363"/>\n<meta property="og:image:height" content="363"/>\n' +
+    let head = page._head_content +
         `<link rel="group ${journal.journaltype === "C" ? "members" : "friends made"}" title="${ehtml(`${config.siteNameShort} ${kind}`)}" href="${ehtml(`${base}/read`)}" />\n`;
     page._data_link = {
         rss: Link(`${base}/data/rss`, "RSS", ImageStd(config, p, "rss")),
@@ -218,9 +221,16 @@ export function robotMetaTags(): string {
         '<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet" />\n';
 }
 
-async function journalDefaultPic(pc: PageContext): Promise<S2Object> {
-    const pics = await Userpics.load(pc.db, pc.journal);
-    return ImageUserpic(pc.site.config, pc.journal, pics.get(pc.journal.defaultpicid));
+export async function journalDefaultPic(pc: PageContext): Promise<S2Object> {
+    await loadUserpics(pc, [pc.journal.userid]);
+    return ImageUserpic(pc.site.config, pc.journal, pc.userpics.get(pc.journal.userid)!.get(pc.journal.defaultpicid));
+}
+
+export async function loadUserpics(pc: PageContext, userids: readonly number[]): Promise<void> {
+    for (const id of new Set(userids)) {
+        const user = pc.users.get(id);
+        if (user && !pc.userpics.has(id)) pc.userpics.set(id, await Userpics.load(pc.db, user));
+    }
 }
 
 // Entry_from_entryobj for each entry, loading posters, icons and moods together.
@@ -232,11 +242,8 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[], d
 
     const posterIds = [...new Set(entries.map(entry => entry.posterid))].filter(id => !pc.users.has(id));
     for (const [id, user] of await User.byIds(db, posterIds)) pc.users.set(id, user);
-    const pics = new Map<number, Userpics>();
-    for (const id of new Set([journal.userid, ...entries.map(entry => entry.posterid)])) {
-        const user = pc.users.get(id);
-        if (user) pics.set(id, await Userpics.load(db, user));
-    }
+    await loadUserpics(pc, [journal.userid, ...entries.map(entry => entry.posterid)]);
+    const pics = pc.userpics;
     const moodTheme = (poster: User) => journal.optForcemoodtheme === "Y" ? journal.moodthemeid : poster.moodthemeid;
     const moods = await Moods.load(db, [...new Set(entries.map(entry =>
         moodTheme(pc.users.get(entry.posterid) ?? journal)))]);

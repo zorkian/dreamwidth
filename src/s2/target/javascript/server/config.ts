@@ -46,6 +46,9 @@ export interface SiteConfig {
     readonly userpicRoot: string;
     readonly palImgRoot: string;
     readonly maxScrollback: number;
+    readonly talkPageSize: number;
+    readonly talkMaxSubjects: number;
+    readonly talkThreadPoint: number;
     readonly images: Readonly<Record<string, StandardImage>>;
     readonly strings: Readonly<Record<string, string>>;
     readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
