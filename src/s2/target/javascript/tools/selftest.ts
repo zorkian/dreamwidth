@@ -83,7 +83,7 @@ function main(): void {
             process.execPath, [path.join(__dirname, "execute.js"), artifact], __dirname,
         );
         assert.notEqual(generatedMismatch.status, 0);
-        assert.match(generatedMismatch.stderr.toString("utf8"), /test.s2: generated layer failed: Error: S2 artifact ABI 2/);
+        assert.match(generatedMismatch.stderr.toString("utf8"), /test.s2: generated layer failed: Error: S2 layer ABI 2/);
     } finally {
         rmSync(temporary, { recursive: true, force: true });
     }
