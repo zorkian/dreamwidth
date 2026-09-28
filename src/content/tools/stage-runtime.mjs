@@ -240,6 +240,7 @@ export function stageRuntime(artifact, sources = {}) {
     const exports = general ? {
         './general-contexts': './dist/general-contexts.js',
         './page-output': './dist/page-output.js',
+        './general-subject': './dist/general-subject.js',
     } : { '.': './dist/index.js' };
     const modules = collectModules(workerDist, workerEntry,
         new Set(Object.keys(exports).map(name => name === '.' ? '@dreamwidth/content'

@@ -37,12 +37,14 @@ export interface GeneralRunFailure {
 export class GeneralProgramSession {
     readonly context: Context;
     readonly layers: readonly Layer[];
+    readonly outputLimits:NativeOutputOptions["limits"];
     private phase: "new" | "initializing" | "ready" | "rendering" | "complete" | "failed" = "new";
     private readonly output: NativePageOutput;
     private initializationException: Error | NativeString | undefined;
     private initializationSignature: "prop_init()" | "modules_init()" | undefined;
     constructor(transfer: PrivateProgramTransfer, private readonly config: PublicAppConfig,
         callbacks: Record<string, BuiltinFunction>, output: Omit<NativeOutputOptions, "checkDepth" | "initialization">) {
+        this.outputLimits=Object.freeze({...output.limits});
         this.layers = instantiateAdmittedProgram(admitProgram(transfer.program, transfer.admission));
         // Native S2::layer_name uses active layerinfo, not stored-source paths.
         for (let index = 0; index < this.layers.length; index++) {
@@ -99,6 +101,18 @@ export class GeneralProgramSession {
         if (value !== undefined && !NativeString.is(value)) throw new Error("Invalid initialization exception scalar");
         this.initializationException = value?.clone();
         this.initializationSignature = undefined;
+    }
+    /** Named native helpers update the same request's eval register in call order. */
+    applyNativeExceptionEffect(effect:{readonly kind:"none"}|{readonly kind:"cleared"}|
+        {readonly kind:"set";readonly message:NativeString}):void {
+        this.assertOutputPhase();
+        if(effect.kind==="none")return;
+        if(effect.kind==="cleared")this.initializationException=undefined;
+        else {
+            if(!NativeString.is(effect.message))throw Error("Invalid native helper exception scalar");
+            this.initializationException=effect.message.clone();
+        }
+        this.initializationSignature=undefined;
     }
     /** Only the trusted worker calls this after parent-selected data arrives. */
     beginRender(): NativePageOutput {

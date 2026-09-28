@@ -48,8 +48,8 @@ function civil_day():Date { var Date d=new Date; $d.year=2026; $d.month=9; $d.da
 function label(string name):string { return "[" + $name + "]"; }
 function prop_init() { $*initialized++; $*num_items_recent = 3; $*text_module_customtext = "Initialized"; print "suppressed"; }
 function modules_init() {}
-function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entries[0].userpic.width=7; if (isnull $.entries[0].userpic) { print ":null"; } else { print ":object"; } }
-function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
+function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.entries[0].subject + ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entries[0].userpic.width=7; if (isnull $.entries[0].userpic) { print ":null"; } else { print ":object"; } }
+function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.entry.subject + ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
 `;
 
 test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
@@ -69,7 +69,9 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
         for my $kind('recent','entry'){my $ctx=S2::make_context(101);S2::set_output(sub{});S2::set_output_safe(sub{});
             S2::run_code($ctx,'prop_init()');S2::run_code($ctx,'modules_init()');
             # Declared public model fields; native constructor semantics are independently qualified.
-            my $entry={_type=>'Entry',subject=>undef,poster=>{_type=>'UserLite',user=>'public_name',_u=>{userid=>111}},
+            my $subject='<script>discard</script><b>Subject</b>';
+            LJ::CleanHTML::clean_subject(\$subject);
+            my $entry={_type=>'Entry',subject=>$subject,poster=>{_type=>'UserLite',user=>'public_name',_u=>{userid=>111}},
                 userpic=>$kind eq 'entry'?LJ::S2::Null('Image'):undef};
             my $page={_type=>$kind eq 'recent'?'RecentPage':'EntryPage',global_title=>'Title',entry=>$entry,entries=>[$entry],
                 journal=>{_type=>'User',user=>'public_name',_u=>{userid=>111},
@@ -132,7 +134,8 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
                     const entry={journalId:111,posterId:111,forceMoodtheme:undefined,permalinkUrl:pv("/261.html"),
                         dateparts:pv("2026 09 27 00 00 00 00"),systemDateparts:pv("2026 09 27 00 00 00 00"),
                         security:pv("public"),allowmask:0,adultContentLevel:pv(""),adminPost:0,
-                        content:{subject:undefined,event:undefined,journalName:pv("public_name"),ditemid:261,
+                        content:{subject:pv("<script>discard</script><b>Subject</b>"),event:undefined,
+                            journalName:pv("public_name"),ditemid:261,
                             jitemid:1,editor:undefined,preformatted:0,importSourceDefined:false,isSyndicated:0,
                             logtimeMysql:pv("2026-09-27 00:00:00"),suspendMessage:0,noEntryBody:0,noHtml:0,
                             cutUrl:pv("/261.html"),cutDisable:0}};
@@ -152,5 +155,5 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
             assert.ok(reads.length>=1);assert.equal(await session.finish(async()=>true),true);
         }
     }
-    console.log("Actual factory source/recovery evidence (declared empty content): "+directory);
+    console.log("Actual factory source/recovery evidence (cleaned subject, empty event): "+directory);
 });
