@@ -21,7 +21,7 @@ import { createChrome } from "./chrome";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
-import { PageOutput } from "./output-cleaner";
+import { PageOutput } from "./page-output";
 import { type EntryArgs, EntryPage } from "./entry-page";
 import { JOURNAL_PROPS, type PageContext, RecentPage, latestMonth, showControlStrip, visibleTags } from "./pages";
 import type { RenderState } from "./state";
@@ -51,64 +51,59 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     if (!journal || !journal.isVisible()) return { status: 404, html: "" };
     await journal.loadProps(db, JOURNAL_PROPS);
 
-    const base = journal.journalBase(site);
-    const documentUrl = request.view === "entry" ? `${base}/${request.ditemid}.html`
-        : `${base}/${request.skip !== undefined ? `?skip=${request.skip}` : ""}`;
-    const content = new ContentCleaner(site, journal);
+    const content = new ContentCleaner(site);
+    const users = new Map<number, User>([[journal.userid, journal]]);
+    const output = new PageOutput(site.config, MAX_OUTPUT);
+    const control = showControlStrip(journal);
+    const chrome = createChrome({
+        site, journal, view: request.view, requestPath: request.requestPath, showControlStrip: control, users,
+    });
+    let page: S2Object | undefined;
+    let month: S2Object | undefined;
+    let tags: S2Object[] = [];
+    const state: RenderState = {
+        site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
+        page: () => page!,
+        siteRoot: () => site.config.siteRoot,
+        origin: () => `${site.config.protocol}://${site.host}`,
+        userBase: name => [...users.values()].find(u => u.user === name)?.journalBase(site),
+        userLite: name => {
+            const u = [...users.values()].find(user => user.user === name);
+            return u ? UserLite(site, u) : undefined;
+        },
+        visibleTags: limit => {
+            const byName = (a: S2Object, b: S2Object) => a._name < b._name ? -1 : a._name > b._name ? 1 : 0;
+            const list = limit ? [...tags].sort((a, b) => b._use_count - a._use_count).slice(0, limit) : [...tags];
+            return list.sort(byName);
+        },
+        latestMonth: () => month!,
+        journalCurrentDateTime: () => ({ ".type": "DateTime" }),
+    };
+
+    const cleaners = content.propertyCleaners();
+    const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
+    const pc: PageContext = {
+        db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
+        nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
+    };
+    [month, tags] = await Promise.all([latestMonth(pc), visibleTags(pc)]);
+    await preloadNamedUsers(db, request.layers, users);
+
+    page = request.view === "entry"
+        ? await EntryPage(pc, request.ditemid!, request.entryArgs ?? {}, chrome.resourceHead()) ?? undefined
+        : await RecentPage(pc, request.skip ?? 0, request.skip !== undefined, chrome.resourceHead());
+    if (!page) return { status: 404, html: "" };
+    s2.printing = true;
     try {
-        const users = new Map<number, User>([[journal.userid, journal]]);
-        const output = new PageOutput(site.config, MAX_OUTPUT);
-        const control = showControlStrip(journal);
-        const chrome = createChrome({
-            site, journal, view: request.view, requestPath: request.requestPath, showControlStrip: control, users,
-        });
-        let page: S2Object | undefined;
-        let month: S2Object | undefined;
-        let tags: S2Object[] = [];
-        const state: RenderState = {
-            site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
-            page: () => page!,
-            siteRoot: () => site.config.siteRoot,
-            origin: () => `${site.config.protocol}://${site.host}`,
-            userBase: name => [...users.values()].find(u => u.user === name)?.journalBase(site),
-            userLite: name => {
-                const u = [...users.values()].find(user => user.user === name);
-                return u ? UserLite(site, u) : undefined;
-            },
-            visibleTags: limit => {
-                const byName = (a: S2Object, b: S2Object) => a._name < b._name ? -1 : a._name > b._name ? 1 : 0;
-                const list = limit ? [...tags].sort((a, b) => b._use_count - a._use_count).slice(0, limit) : [...tags];
-                return list.sort(byName);
-            },
-            latestMonth: () => month!,
-            journalCurrentDateTime: () => ({ ".type": "DateTime" }),
-        };
-
-        const cleaners = content.propertyCleaners(documentUrl);
-        const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
-        const pc: PageContext = {
-            db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
-            nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
-        };
-        [month, tags] = await Promise.all([latestMonth(pc), visibleTags(pc)]);
-        await preloadNamedUsers(db, request.layers, users);
-
-        page = request.view === "entry"
-            ? await EntryPage(pc, request.ditemid!, request.entryArgs ?? {}, chrome.resourceHead()) ?? undefined
-            : await RecentPage(pc, request.skip ?? 0, request.skip !== undefined, chrome.resourceHead());
-        if (!page) return { status: 404, html: "" };
-        s2.printing = true;
-        try {
-            s2.ctx.runMethod(page, "print()");
-        } catch (error) {
-            // s2_run shows the page so far with the style's error after it.
-            if (!(error instanceof S2Error)) throw error;
-            output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
-        }
-        return { status: 200, html: output.finish() };
-    } finally {
-        content.close();
+        s2.ctx.runMethod(page, "print()");
+    } catch (error) {
+        // s2_run shows the page so far with the style's error after it.
+        if (!(error instanceof S2Error)) throw error;
+        output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
     }
+    // The journal controller adds LJ::PageStats' container before </body>.
+    const stats = "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
+    return { status: 200, html: output.finish().replace(/<\/body>/i, `${stats}</body>`) };
 }
 
 // UserLite("name") calls in the style look users up by name mid-render, so

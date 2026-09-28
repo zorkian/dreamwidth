@@ -698,10 +698,12 @@ sub asJS {
         return;
     }
 
+    # A null object, with its class when one is given. Members can still be
+    # assigned to it, as in Perl, and it stays null.
     if ($type == $NEWNULL) {
-        $o->write("{\".type\": ".
-                  $bp->quoteString($this->{'newClass'}->getIdent()) .
-                  ", \".isnull\":  1}");
+        my $class = $this->{'newClass'}
+            ? "\".type\": " . $bp->quoteString($this->{'newClass'}->getIdent()) . ", " : "";
+        $o->write("{$class\".isnull\": 1}");
         return;
     }
 
@@ -764,11 +766,17 @@ sub asJS {
     if ($type == $OBJ_INTERPOLATE) {
         $o->write("ctx.toString(");
         $this->{'var'}->asJS($bp, $o);
-        $o->write(")");
+        $o->write(", " . $bp->quoteString("$this->{'objint_method'}()") . ")");
         return;
     }
 
     if ($type == $FUNCCALL || $type == $METHCALL) {
+
+        # A builtin that returns no string reads as an empty one, as in Perl.
+        my $ck = $S2::CUR_COMPILER->{'checker'};
+        my $returns = $this->{'funcBuiltin'} && $ck->functionType($this->{'funcID'});
+        my $prepare = $returns && $returns->equals($S2::Type::STRING) && $this->{'funcID'} ne "string(int)";
+        $o->write("s2.runtime.prepareString(") if $prepare;
 
         # builtin functions can be optimized.
         if ($this->{'funcBuiltin'}) {
@@ -802,12 +810,10 @@ sub asJS {
                 $o->write($bp->quoteString($this->{'funcID_noclass'}));
                 $o->write(",$bp->{layerid},");          # The layer itself
                 $o->write($this->{'derefLine'}+0);
-                if ($this->{'var'}->isSuper()) {
-                    $o->write(",true");
-                    # Name the class the checker resolved, since the runtime
-                    # cannot tell which class an inherited method came from.
-                    $o->write("," . $bp->quoteString($this->{'funcClass'}))
-                }
+                # The class the checker resolved: super calls dispatch from
+                # it, and errors about null objects name it.
+                $o->write($this->{'var'}->isSuper() ? ",true" : ",false");
+                $o->write("," . $bp->quoteString($this->{'funcClass'}));
                 $o->write(")");
             } else {
                 $o->write("ctx.getFunction(");
@@ -827,6 +833,7 @@ sub asJS {
         $this->{'funcArgs'}->asJS($bp, $o, 0, 1);
         
         $o->write(")");
+        $o->write(")") if $prepare;
         return;
     }
 

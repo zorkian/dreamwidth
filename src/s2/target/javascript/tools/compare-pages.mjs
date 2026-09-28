@@ -48,7 +48,8 @@ export function normalize(html, origins) {
     const document = new JSDOM(html).window.document;
     const lines = [];
     // Widget ids come from a per-process counter in Perl.
-    const unorigin = value => origins.reduce((text, origin) => text.replaceAll(origin, "ORIGIN"), value)
+    const unorigin = value => origins.reduce((text, origin) =>
+        text.replaceAll(origin, "ORIGIN").replaceAll(new URL(origin).host, "HOST"), value)
         .replace(/LJWidget_\d+/g, "LJWidget_N");
     const walk = (node, depth, verbatim) => {
         const indent = "  ".repeat(depth);
@@ -81,7 +82,7 @@ export function normalize(html, origins) {
 
 // Connect to loopback but send the origin's own Host, which both servers
 // use to build journal URLs.
-function fetchPage(origin, pagePath) {
+export function fetchPage(origin, pagePath) {
     const url = new URL(origin);
     return new Promise((resolve, reject) => {
         http.get({ host: "127.0.0.1", port: url.port || 80, path: pagePath, headers: { host: url.host } },

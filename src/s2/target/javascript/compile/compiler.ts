@@ -33,11 +33,12 @@ export class Compiler {
     private readonly waiting: ((line: string) => void)[] = [];
     private systemUserId?: Promise<number>;
 
-    constructor(private readonly db: Databases) {}
+    // The database is only needed to compile journal styles.
+    constructor(private readonly db?: Databases) {}
 
     // Layers must be in run order, so each parent is compiled before its children.
     async compile(layers: readonly LayerRef[]): Promise<CompiledLayer[]> {
-        const systemUserId = await (this.systemUserId ??= this.db.global("SELECT userid FROM user WHERE user = 'system'")
+        const systemUserId = await (this.systemUserId ??= this.db!.global("SELECT userid FROM user WHERE user = 'system'")
             .then(rows => int(rows[0]?.userid)));
         const keys = new Map(layers.map(layer => [layer.id, `${layer.id}:${layer.sourceHash}`]));
         const compiled: CompiledLayer[] = [];
@@ -59,14 +60,27 @@ export class Compiler {
         this.process?.kill();
     }
 
+    // Compile one layer's source. `key` names the layer for its children's
+    // parentKey; a core layer has no parent.
+    async compileSource(layer: { key: string; parentKey?: string; type: string; untrusted: boolean;
+        variable: string; source: string }): Promise<string> {
+        const response = JSON.parse(await this.request(JSON.stringify({ parentKey: "", ...layer }))) as
+            { code?: string; error?: string };
+        if (response.error !== undefined) throw new Error(response.error);
+        return response.code!;
+    }
+
     private async compileLayer(layer: LayerRef, key: string, parentKey: string, untrusted: boolean): Promise<CompiledLayer> {
-        const rows = await this.db.global("SELECT s2code FROM s2source_inno WHERE s2lid = ?", [layer.id]);
+        const rows = await this.db!.global("SELECT s2code FROM s2source_inno WHERE s2lid = ?", [layer.id]);
         const variable = `layer_${layer.id}`;
-        const response = JSON.parse(await this.request(JSON.stringify({
-            key, parentKey, type: layer.type, untrusted, variable, source: text(rows[0]?.s2code),
-        }))) as { code?: string; error?: string };
-        if (response.error !== undefined) throw new Error(`S2 layer ${layer.id}: ${response.error}`);
-        return { id: layer.id, type: layer.type, variable, code: response.code! };
+        try {
+            const code = await this.compileSource({
+                key, parentKey, type: layer.type, untrusted, variable, source: text(rows[0]?.s2code),
+            });
+            return { id: layer.id, type: layer.type, variable, code };
+        } catch (error) {
+            throw new Error(`S2 layer ${layer.id}: ${(error as Error).message}`);
+        }
     }
 
     // Requests are answered in order, one line each.

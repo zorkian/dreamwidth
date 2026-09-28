@@ -157,9 +157,8 @@ export async function RecentPage(pc: PageContext, skipArg: number, hasSkip: bool
   </script>
     `;
 
-    const documentUrl = `${base}/${hasSkip ? `?skip=${skipArg}` : ""}`;
     const entries = await entryObjects(pc, [...stickies, ...items.filter(entry => !stickySet.has(entry.ditemid))],
-        documentUrl, "recent");
+        "recent");
     const stickyObjects = entries.slice(0, stickies.length).map(entry => ({
         ...entry, ".type": "StickyEntry", _sticky_entry_icon: ImageStd(config, p, "sticky-entry"),
     }));
@@ -234,7 +233,7 @@ export async function loadUserpics(pc: PageContext, userids: readonly number[]):
 }
 
 // Entry_from_entryobj for each entry, loading posters, icons and moods together.
-export async function entryObjects(pc: PageContext, entries: readonly Entry[], documentUrl: string,
+export async function entryObjects(pc: PageContext, entries: readonly Entry[],
     cuts: "recent" | "entry"): Promise<S2Object[]> {
     const { site, journal, db } = pc;
     const config = site.config;
@@ -248,11 +247,12 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[], d
     const moods = await Moods.load(db, [...new Set(entries.map(entry =>
         moodTheme(pc.users.get(entry.posterid) ?? journal)))]);
 
+    await pc.content.preload(db, entries.map(entry => entry.event));
     const userpicPosition = String(p._userpics_position ?? "");
     return entries.map(entry => {
         const poster = pc.users.get(entry.posterid) ?? journal;
         const url = entry.url(site);
-        const subject = pc.content.subject(entry.subject, documentUrl);
+        const subject = pc.content.subject(entry.subject);
 
         let userpic: S2Object = nullObject("Image");
         if (userpicPosition !== "none") {
@@ -294,7 +294,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[], d
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"],
             metadata: {},
             subject: subject.html,
-            text: pc.content.event(entry, documentUrl, cuts),
+            text: pc.content.event(entry, cuts),
             journal: UserLite(site, journal), poster: UserLite(site, poster),
             new_day: 0, end_day: 0, comments, userpic, permalink_url: url, itemid: entry.ditemid, tags,
             timeformat24: 0, admin_post: 0, dom_id: `entry-${journal.user}-${entry.ditemid}`,
@@ -314,19 +314,18 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[], d
             e._adult_content_level = "NSFW";
             e._adult_content_icon = ImageStd(config, p, "adult-nsfw");
         }
-        Object.assign(e._metadata, currents(pc, entry, moods, moodTheme(poster), e, documentUrl));
+        Object.assign(e._metadata, currents(pc, entry, moods, moodTheme(poster), e));
         if (/<(script|object|applet|embed|iframe)\b/i.test(e._text)) e._text_must_print_trusted = 1;
         return e;
     });
 }
 
 // LJ::currents, lowercased as Entry stores them.
-function currents(pc: PageContext, entry: Entry, moods: Moods, themeid: number, e: S2Object,
-    documentUrl: string): Record<string, string> {
+function currents(pc: PageContext, entry: Entry, moods: Moods, themeid: number, e: S2Object): Record<string, string> {
     const result: Record<string, string> = {};
     const p = entry.props;
     if (truthy(p.current_mood) || truthy(p.current_moodid)) {
-        let name = truthy(p.current_mood) ? pc.content.subject(p.current_mood!, documentUrl).html : "";
+        let name = truthy(p.current_mood) ? pc.content.subject(p.current_mood!).html : "";
         const moodid = int(p.current_moodid);
         if (moodid) {
             name ||= moods.name(moodid);
@@ -335,9 +334,9 @@ function currents(pc: PageContext, entry: Entry, moods: Moods, themeid: number, 
         }
         result.mood = name;
     }
-    if (truthy(p.current_music)) result.music = pc.content.subject(p.current_music!, documentUrl).html;
+    if (truthy(p.current_music)) result.music = pc.content.subject(p.current_music!).html;
     if (truthy(p.current_location) || truthy(p.current_coords)) {
-        result.location = pc.content.subject(p.current_location ?? "", documentUrl).html;
+        result.location = pc.content.subject(p.current_location ?? "").html;
     }
     return result;
 }
