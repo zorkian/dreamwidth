@@ -15,7 +15,7 @@
 import type { Context } from "../runtime/s2runtime";
 import type { StyleInfo } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
-import { Entry, dayCounts, truthy } from "../data/entry";
+import { Entry, activeEntries, dayCounts, truthy } from "../data/entry";
 import { Moods } from "../data/moods";
 import { type UserTag, publicTags } from "../data/tags";
 import { canonicalUsername } from "@dreamwidth/content";
@@ -106,6 +106,22 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object,
         include_meta_viewport: 1, session_msgs: [], has_activeentries: 0,
     });
     if (journal.journaltype === "Y") page._views_order = ["recent", "archive", "userinfo"];
+    if (journal.journaltype === "P" && truthy(journal.getCap(config, "friendsfriendsview"))) {
+        page._views_order = ["recent", "archive", "read", "network", "tags", "memories", "userinfo"];
+    }
+
+    // The entries most recently commented on, for journals that can show them.
+    if (truthy(journal.getCap(config, "activeentries"))) {
+        const active = (await Promise.all((await activeEntries(pc.db, journal))
+            .map(jitemid => Entry.byJitemid(pc.db, journal, jitemid))))
+            .filter((entry): entry is Entry => !!entry);
+        await Entry.fill(pc.db, journal, active);
+        const visible = active.filter(entry => entry.isPublic() && pc.users.get(entry.posterid)?.statusvis !== "S");
+        if (visible.length) {
+            page._activeentries = await entryObjects(pc, visible, "month");
+            page._has_activeentries = 1;
+        }
+    }
     return page;
 }
 
@@ -280,7 +296,8 @@ export function tagsText(props: Record<string, unknown>, tags: readonly S2Object
 }
 
 // Entry_from_entryobj for each entry, loading posters, icons and moods together.
-// Recent pages link cuts to the entry; month pages show no entry text.
+// Recent pages link cuts to the entry; month pages show no entry text. Entries
+// on a reading page come from other journals than the page's.
 export async function entryObjects(pc: PageContext, entries: readonly Entry[],
     view: "recent" | "entry" | "month"): Promise<S2Object[]> {
     const { site, journal, db } = pc;
@@ -289,7 +306,8 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
 
     const posterIds = [...new Set(entries.map(entry => entry.posterid))].filter(id => !pc.users.has(id));
     for (const [id, user] of await User.byIds(db, posterIds)) pc.users.set(id, user);
-    await loadUserpics(pc, [journal.userid, ...entries.map(entry => entry.posterid)]);
+    for (const entry of entries) pc.users.set(entry.journal.userid, entry.journal);
+    await loadUserpics(pc, [...entries.map(entry => entry.journal.userid), ...entries.map(entry => entry.posterid)]);
     const pics = pc.userpics;
     const moodTheme = (poster: User) => journal.optForcemoodtheme === "Y" ? journal.moodthemeid : poster.moodthemeid;
     const moods = await Moods.load(db, [...new Set(entries.map(entry =>
@@ -298,14 +316,15 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
     await pc.content.preload(db, entries.map(entry => entry.event));
     const userpicPosition = String(p._userpics_position ?? "");
     return entries.map(entry => {
-        const poster = pc.users.get(entry.posterid) ?? journal;
+        const posted = entry.journal;
+        const poster = pc.users.get(entry.posterid) ?? posted;
         const url = entry.url(site);
         const styled = styleUrl(pc.args, url);
         const subject = pc.content.subject(entry.subject);
 
         let userpic: S2Object = nullObject("Image");
         if (userpicPosition !== "none") {
-            if (entry.posterid === journal.userid || !truthy(p._use_shared_pic)) {
+            if (entry.posterid === posted.userid || !truthy(p._use_shared_pic)) {
                 const posterPics = pics.get(poster.userid)!;
                 const keyword = poster.dversion >= 9
                     ? (entry.props.picture_mapid ? posterPics.keywordFromMapid(int(entry.props.picture_mapid)) : undefined)
@@ -313,8 +332,8 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
                 const picid = posterPics.picidFromKeyword(keyword);
                 userpic = ImageUserpic(config, poster, posterPics.get(picid), keyword);
             } else {
-                const journalPics = pics.get(journal.userid)!;
-                userpic = ImageUserpic(config, journal, journalPics.get(journal.defaultpicid));
+                const journalPics = pics.get(posted.userid)!;
+                userpic = ImageUserpic(config, posted, journalPics.get(posted.defaultpicid));
             }
             const style = p._entry_userpic_style;
             if (userpic._url && (style === "small" || style === "smaller")) {
@@ -324,9 +343,9 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             }
         }
 
-        const tags = entry.tags.map(tag => Tag(journal.journalBase(site), tag.kwid, tag.name))
+        const tags = entry.tags.map(tag => Tag(posted.journalBase(site), tag.kwid, tag.name))
             .sort((a, b) => a._name < b._name ? -1 : a._name > b._name ? 1 : 0);
-        const enabled = journal.optShowtalklinks === "Y" && !entry.commentsDisabled() ? 1 : 0;
+        const enabled = posted.optShowtalklinks === "Y" && !entry.commentsDisabled() ? 1 : 0;
         const replies = enabled ? entry.replyCount() : 0;
         const maxComments = Number(journal.getCap(config, "maxcomments") ?? 0);
         const style = styleArgs(pc.args);
@@ -347,10 +366,10 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             subject: subject.html,
             text: view === "month" ? ""
                 : pc.content.event(entry, view === "recent" ? styled : undefined) +
-                    (truthy(String(p._tags_aware ?? "")) ? "" : tagsText(p, tags)),
-            journal: UserLite(site, journal), poster: UserLite(site, poster),
+                    (truthy(p._tags_aware) ? "" : tagsText(p, tags)),
+            journal: UserLite(site, posted), poster: UserLite(site, poster),
             new_day: 0, end_day: 0, comments, userpic, permalink_url: url, itemid: entry.ditemid, tags,
-            timeformat24: 0, admin_post: 0, dom_id: `entry-${journal.user}-${entry.ditemid}`,
+            timeformat24: 0, admin_post: 0, dom_id: `entry-${posted.user}-${entry.ditemid}`,
             time: DateTimeParts(entry.alldatepart), system_time: DateTimeParts(entry.systemAlldatepart),
             depth: 0, adult_content_level: "",
         });
@@ -359,7 +378,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             e._security = security;
             e._security_icon = ImageStd(config, p, `security-${security}`);
         }
-        const adult = entry.props.adult_content_maintainer || entry.props.adult_content || journal.props.adult_content;
+        const adult = entry.props.adult_content_maintainer || entry.props.adult_content || posted.props.adult_content;
         if (adult === "explicit") {
             e._adult_content_level = "18";
             e._adult_content_icon = ImageStd(config, p, "adult-18");

@@ -18,7 +18,7 @@ import { styleInfo, styleIsPublic, styleLayers, styleOwner } from "../compile/st
 import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
-import type { JournalFilter, RenderRequest, RenderResult } from "../render/render";
+import { type JournalFilter, type RenderRequest, type RenderResult, SITE_STYLE_PAGE } from "../render/render";
 import type { SiteConfig } from "./config";
 import { determineView } from "./views";
 
@@ -80,7 +80,8 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     } else if (!journal.isVisible()) {
         return notFound;
     }
-    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return notFound;
+    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return SITE_STYLE_PAGE;
+    if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) return SITE_STYLE_PAGE;
 
     const layers = await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
@@ -91,8 +92,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     };
 }
 
-// make_journal's tag and security filters. Where Perl shows an error page,
-// this gives a bare status.
+// make_journal's tag and security filters.
 async function journalFilter(config: SiteConfig, db: Databases, journal: User, args: Record<string, string>,
     base: string): Promise<JournalFilter | RenderResult> {
     const filter: { -readonly [K in keyof JournalFilter]: JournalFilter[K] } = {};
@@ -107,12 +107,12 @@ async function journalFilter(config: SiteConfig, db: Databases, journal: User, a
         filter.tagmode = args.mode === "and" || args.mode === "all" ? "and" : "or";
     }
     if ("security" in args) {
-        if (!args.security) return notFound;
-        if (!Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))) {
-            return { status: 403, body: "Forbidden\n" };
+        // Perl explains a missing or refused security filter on a page in the site's style.
+        const security = (args.security ?? "").toLowerCase();
+        if (!security || !Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))
+            || !config.enabled.security_filter || !/^(public|access|private|friends)$/.test(security)) {
+            return SITE_STYLE_PAGE;
         }
-        const security = args.security.toLowerCase();
-        if (!config.enabled.security_filter || !/^(public|access|private|friends)$/.test(security)) return notFound;
         filter.security = security === "friends" ? "access" : security;
     }
     return filter;

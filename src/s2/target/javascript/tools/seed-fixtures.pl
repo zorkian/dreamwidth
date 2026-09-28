@@ -90,6 +90,35 @@ unless ( LJ::Userpic->load_user_userpics($commenter) ) {
     userpic( $commenter, 90, 90, [ 90, 90, 0 ], 'reader', '', '' )->make_default;
 }
 
+# Reading pages: the reader watches three journals, and the themed journal
+# watches the reader, so its network page reaches the other two.
+$commenter->add_edge( $_, watch => { fgcolor => 0x112233, bgcolor => 0xeeddcc, nonotify => 1 } )
+    for $themed, $custom, $archive;
+$themed->add_edge( $commenter, watch => { nonotify => 1 } );
+
+# A community run by the reader, with posts by its members.
+my $community = LJ::load_user('s2fix_comm');
+unless ($community) {
+    $community = LJ::User->create_community(
+        user                   => 's2fix_comm',
+        name                   => 'Fixture community',
+        admin_userid           => $commenter->userid,
+        membership             => 'open',
+        postlevel              => 'members',
+        nonmember_posting      => 0,
+        moderated              => 0,
+        journal_adult_settings => 'none',
+    ) or die "Cannot create s2fix_comm\n";
+    $themed->join_community( $community, 1, 1 );
+    my $n = 0;
+    for my $poster ( $commenter, $themed, $commenter ) {
+        $n++;
+        post( $community, $n, user => $poster->user, usejournal => $community->user,
+            subject => "Community post $n", event => body($n), security => 'public' );
+    }
+}
+$commenter->add_edge( $community, watch => { nonotify => 1 } );
+
 # A user layer that never finishes printing, for render time limits.
 my $loop = journal('s2fix_loop');
 entries( $loop, 1 );
@@ -104,6 +133,22 @@ LOOP
 my $suspended = journal('s2fix_suspended');
 entries( $suspended, 1 );
 $suspended->update_self( { statusvis => 'S' } ) unless $suspended->is_suspended;
+
+# Reading pages show entries logged in the last two weeks; move old fixtures
+# forward, keeping their order.
+for my $u ( $default, $themed, $custom, $archive, $community ) {
+    my $dbh = LJ::get_cluster_master($u);
+    my $age = $dbh->selectrow_array(
+        'SELECT UNIX_TIMESTAMP() - UNIX_TIMESTAMP(MAX(logtime)) FROM log2 WHERE journalid = ?',
+        undef, $u->userid );
+    next unless $age && $age > 7 * 86400;
+    $dbh->do(
+        'UPDATE log2 SET logtime = logtime + INTERVAL ? SECOND, rlogtime = rlogtime - ? WHERE journalid = ?',
+        undef, $age, $age, $u->userid );
+    LJ::get_db_writer()->do( 'UPDATE userusage SET timeupdate = NOW() WHERE userid = ?', undef, $u->userid );
+    LJ::MemCache::delete( [ $u->userid, "log2lt:" . $u->userid ] );
+    LJ::MemCache::delete( [ $u->userid, "tu:" . $u->userid ] );
+}
 
 print "Fixture journals ready\n";
 

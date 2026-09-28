@@ -69,6 +69,11 @@ test("archive pages for a year, a month and a day", async () => {
     }
 });
 
+test("a community and a reading page", async () => {
+    await compare("/~s2fix_comm/");
+    await compare("/~s2fix_reader/read");
+});
+
 test("tags and icons pages", async () => {
     await compare("/~s2fix_theme/tag/");
     await compare("/~s2fix_archive/icons?sortorder=keyword");
