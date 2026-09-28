@@ -59,3 +59,41 @@ async function loadLayers(db: Databases, ids: readonly number[]): Promise<LayerR
     }));
     return LAYER_ORDER.flatMap(type => layers.filter(layer => layer.type === type).slice(0, 1));
 }
+
+export interface StyleInfo {
+    readonly styleid: number;
+    // The newest of the style and its compiled layers, for stylesheet URLs.
+    readonly modtime: number;
+    readonly layoutName?: string;
+    readonly themeName?: string;
+    readonly layoutUrl: string;
+}
+
+// What LJ::S2::Page reports about the style.
+export async function styleInfo(db: Databases, config: SiteConfig, user: User,
+    layers: readonly LayerRef[]): Promise<StyleInfo> {
+    const styleid = int(user.props.s2_style);
+    const ids = layers.map(layer => layer.id);
+    const [styles, compiled, userCompiled, names] = await Promise.all([
+        styleid ? db.global("SELECT modtime FROM s2styles WHERE styleid = ?", [styleid]) : [],
+        db.global("SELECT MAX(comptime) AS t FROM s2compiled WHERE s2lid IN (?)", [ids]),
+        user.cluster(db, "SELECT MAX(comptime) AS t FROM s2compiled2 WHERE userid = ? AND s2lid IN (?)", [user.userid, ids]),
+        db.global("SELECT s2lid, value FROM s2info WHERE infokey = 'name' AND s2lid IN (?)", [ids]),
+    ]);
+    const modtime = Math.max(int(styles[0]?.modtime), int(compiled[0]?.t), int(userCompiled[0]?.t));
+    if (!styleid) return { styleid, modtime, layoutUrl: "" };
+
+    const name = new Map(names.map(row => [int(row.s2lid), text(row.value)]));
+    const layout = layers.find(layer => layer.type === "layout");
+    const theme = layers.find(layer => layer.type === "theme");
+    const layoutName = layout ? name.get(layout.id) ?? "" : "";
+    if (!theme) {
+        return { styleid, modtime, layoutName, themeName: config.strings["s2theme.themename.notheme"] ?? "", layoutUrl: "" };
+    }
+    const system = layout && layers.find(layer => layer.type === "core")?.ownerId === layout.ownerId;
+    return {
+        styleid, modtime, layoutName,
+        themeName: name.get(theme.id) || (config.strings["s2theme.themename.default"] ?? "").replace("[[themeid]]", `#${theme.id}`),
+        layoutUrl: system ? `${config.siteRoot}/customize/?layoutid=${layout!.id}` : "",
+    };
+}

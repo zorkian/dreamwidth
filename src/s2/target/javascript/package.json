@@ -12,7 +12,9 @@
     "typescript": "5.8.3"
   },
   "dependencies": {
+    "entities": "6.0.1",
     "fastify": "5.12.5",
+    "htmlparser2": "10.0.0",
     "kysely": "0.28.12",
     "mysql2": "3.24.4"
   }
