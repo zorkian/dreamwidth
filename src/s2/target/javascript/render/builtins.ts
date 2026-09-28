@@ -392,34 +392,7 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _set_handler: (ctx, hook, statements) => setHandler(ctx, String(hook), statements),
         _journal_current_datetime: () => state.journalCurrentDateTime(),
 
-        // Strings
-        _string__index: (_ctx, text, sub, position) => String(text).indexOf(String(sub), Number(position) || 0),
-        _string__substr: (_ctx, text, start, length) => {
-            const chars = [...String(text)];
-            const from = Number(start) < 0 ? Math.max(0, chars.length + Number(start)) : Number(start);
-            const to = length === undefined ? chars.length
-                : Number(length) < 0 ? chars.length + Number(length) : from + Number(length);
-            return chars.slice(from, to).join("");
-        },
-        _string__length: (_ctx, text) => [...String(text)].length,
-        _string__lower: (_ctx, text) => String(text).toLowerCase(),
-        _string__upper: (_ctx, text) => String(text).toUpperCase(),
-        _string__upperfirst: (_ctx, text) => String(text).charAt(0).toUpperCase() + String(text).slice(1),
-        _string__starts_with: (_ctx, text, sub) => String(text).startsWith(String(sub)),
-        _string__ends_with: (_ctx, text, sub) => String(text).endsWith(String(sub)),
-        _string__contains: (_ctx, text, sub) => String(text).includes(String(sub)),
-        _string__replace: (_ctx, text, find, replacement) => String(find) === "" ? text
-            : String(text).split(String(find)).join(String(replacement)),
-        _string__split: (_ctx, text, by) => {
-            const parts = String(text).split(String(by));
-            while (parts.length && parts[parts.length - 1] === "") parts.pop();
-            return parts;
-        },
-        _string__repeat: (_ctx, text, n) => {
-            const count = Math.trunc(Number(n) || 0);
-            return String(text).length * count > 5000 ? "[too large]" : String(text).repeat(Math.max(0, count));
-        },
-        _string__compare: (_ctx, a, b) => String(b) < String(a) ? -1 : String(b) > String(a) ? 1 : 0,
+        // CSS helpers on strings; the core string methods are in the runtime.
         _string__css_length_value: (_ctx, text) => cssLengthValue(String(text)),
         _string__css_multiply_length: (_ctx, text, multiplier) => {
             const match = /(\d+)(.+)/.exec(String(text));
