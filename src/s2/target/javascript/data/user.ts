@@ -57,6 +57,10 @@ export class User {
     readonly statusvis: string;
     readonly dversion: number;
     readonly caps: number;
+    readonly defaultpicid: number;
+    readonly moodthemeid: number;
+    readonly optShowtalklinks: string;
+    readonly optForcemoodtheme: string;
     readonly props: Record<string, string> = {};
 
     constructor(row: Row) {
@@ -68,6 +72,10 @@ export class User {
         this.statusvis = text(row.statusvis);
         this.dversion = int(row.dversion);
         this.caps = int(row.caps);
+        this.defaultpicid = int(row.defaultpicid);
+        this.moodthemeid = int(row.moodthemeid);
+        this.optShowtalklinks = text(row.opt_showtalklinks);
+        this.optForcemoodtheme = text(row.opt_forcemoodtheme);
     }
 
     static async byName(db: Databases, user: string): Promise<User | null> {
@@ -78,6 +86,19 @@ export class User {
     static async byIds(db: Databases, ids: readonly number[]): Promise<Map<number, User>> {
         const rows = ids.length ? await db.global("SELECT * FROM user WHERE userid IN (?)", [ids]) : [];
         return new Map(rows.map(row => [int(row.userid), new User(row)]));
+    }
+
+    // LJ::get_cap: the largest value any of the user's classes grants.
+    getCap(config: SiteConfig, name: string): unknown {
+        let max: unknown;
+        for (const [bit, caps] of Object.entries(config.capBits)) {
+            if (!(this.caps & (1 << Number(bit)))) continue;
+            const value = caps[name];
+            if (value === undefined || value === null) continue;
+            if (max !== undefined && Number(max) > Number(value)) continue;
+            max = value;
+        }
+        return max ?? config.capDefaults[name];
     }
 
     isVisible(): boolean {

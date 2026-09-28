@@ -27,9 +27,14 @@ export interface SiteConfig {
     readonly databases: Readonly<Record<string, DatabaseInfo>>;
     readonly clusterPairActive: Readonly<Record<string, string>>;
     readonly defaultStyle: Readonly<Record<string, string>>;
+    readonly home: string;
     readonly siteRoot: string;
     readonly protocol: string;
     readonly domain: string;
+    readonly domainWeb: string;
+    readonly trustedCssHosts: readonly string[];
+    readonly cssProxy: string | null;
+    readonly cssCleaner: boolean;
     readonly subdomainRules: Readonly<Record<string, readonly [number, string]>>;
     readonly isDevServer: boolean;
     readonly siteName: string;
@@ -41,6 +46,17 @@ export interface SiteConfig {
     readonly userpicRoot: string;
     readonly palImgRoot: string;
     readonly maxScrollback: number;
+    readonly images: Readonly<Record<string, StandardImage>>;
+    readonly strings: Readonly<Record<string, string>>;
+    readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+    readonly capDefaults: Readonly<Record<string, unknown>>;
+}
+
+export interface StandardImage {
+    readonly src: string;
+    readonly width: number;
+    readonly height: number;
+    readonly alt: string;
 }
 
 export function readConfig(file: string): SiteConfig {
