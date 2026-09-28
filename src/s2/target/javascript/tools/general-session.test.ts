@@ -1,6 +1,6 @@
 // general-session.test.ts
 //
-// Actual native initialization and same-context source/recovery resume.
+// Actual native initialization and same-context source resume.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -31,7 +31,7 @@ const outputOptions:Omit<NativeOutputOptions,"checkDepth"|"initialization">={
     stylesheet:{domain:"example.org",webDomain:"www.example.org",statPrefix:"https://static.example.org",trustedHosts:{},cssCleanerEnabled:true,cssProxy:null},
     transformCss:chunk=>chunk,expandEmbed:chunk=>chunk};
 
-test("native init count drives data resume in the same source/recovered Context",async()=>{
+test("native init count drives data resume in the same source Context",async()=>{
     const oracle=JSON.parse(execFileSync("perl",["../../tests/js-recovery/general-session-native.pl"],{encoding:"utf8",timeout:15000}));
     const root=path.resolve("../..");
     const directory=mkdtempSync(path.join(tmpdir(),"s2-general-session-"));
@@ -40,12 +40,10 @@ test("native init count drives data resume in the same source/recovered Context"
         for(const [source,output] of [["tools/compiler-isolation.c",isolation],["live/render/sandbox.c",sandbox]])
             execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",source!,"-o",output!]);
         const compiler=new ArtifactCompiler({s2Root:root,perl:"/usr/bin/perl",isolationExecutable:isolation});
-        const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
-        const snapshot:ActiveStyleSnapshot={styleId:1,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",compiledTime:1,
-            sourceBytes:Buffer.from(oracle.source,"base64"),activeCompiledBytes:Buffer.from(oracle.code,"base64")}]};
-        for(const missing of [false,true]) {
-            const prepared=await coordinator.prepare({...snapshot,layers:snapshot.layers.map(layer=>({...layer,sourceBytes:missing?null:layer.sourceBytes}))});
-            assert.equal(prepared.program.route,missing?"recovery":"source");
+        const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
+        const snapshot:ActiveStyleSnapshot={styleId:1,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",
+            sourceBytes:Buffer.from(oracle.source,"base64")}]};
+            const prepared=await coordinator.prepare(snapshot);
             const session=new GeneralProgramSession(coordinator.transfer(prepared),config,{},outputOptions);
             const context=session.context;
             const result=session.initialize({clean(){throw Error("Unexpected nonplain property");}});
@@ -119,6 +117,5 @@ test("native init count drives data resume in the same source/recovered Context"
                 }
                 assert.throws(finish,/not rendering/);
             }
-        }
     }finally{rmSync(directory,{recursive:true,force:true});}
 });

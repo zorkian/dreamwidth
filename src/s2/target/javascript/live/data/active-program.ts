@@ -21,7 +21,6 @@
 //
 
 import {createHash} from 'node:crypto';
-import {gunzipSync} from 'node:zlib';
 import {sql} from 'kysely';
 import {PrimaryDatabases, requireTransactionalTables, type ReadConnection, type SqlRow} from './primary';
 import {SnapshotError} from './errors';
@@ -47,9 +46,7 @@ export interface ActiveProgramSnapshot {
 }
 export interface ActiveLayerDependency {
     readonly id: number; readonly ownerId: number | null; readonly ownerCluster: number | null;
-    readonly role: string; readonly storedSha256: string | null;
-    readonly decodedSha256: string | null; readonly sourceSha256: string | null;
-    readonly compiledTime: number | null;
+    readonly role: string; readonly sourceSha256: string | null;
 }
 const GLOBAL_TABLES = ['user', 'useridmap', 'userproplist', 's2layers', 's2info'] as const;
 const STYLE_PROPS = ['stylesys', 's2_style', 'use_journalstyle_entry_page'] as const;
@@ -222,56 +219,19 @@ export class MysqlActivePrograms {
             const ids = [...new Set(ACTIVE_LAYER_ORDER.map(role => selection.effective[role]).filter((id): id is number => !!id))];
             const definitions = await this.layers(ids);
             reads.push(definitions.rows);
-            const active = new Map<number, SqlRow>();
-            const groups = new Map<number, {id: number; ownerId: number}[]>();
-            for (const layerId of ids) {
-                const definition = definitions.definitions.get(layerId);
-                if (!definition) continue;
-                const ownerId = id(definition.userid, 1), owner = definitions.owners.get(ownerId);
-                if (!owner) continue;
-                const cid = ownerId === global.system.userid ? 0 : owner.clusterId;
-                const group = groups.get(cid) ?? []; group.push({id: layerId, ownerId}); groups.set(cid, group);
-            }
-            for (const [cid, group] of groups) {
-                const table = cid ? 's2compiled2' : 's2compiled';
-                const found = await this.databases.snapshot(cid || undefined, [table], async db => {
-                    const predicate = cid ? sql.join(group.map(layer => sql`(userid=${layer.ownerId} AND s2lid=${layer.id})`), sql` OR `) :
-                        sql`s2lid IN (${sql.join(group.map(layer => layer.id))})`;
-                    return (await sql<SqlRow>`SELECT s2lid,comptime,HEX(compdata) AS stored_bytes FROM ${sql.table(table)}
-                        WHERE ${predicate} ORDER BY s2lid`.execute(db)).rows;
-                });
-                reads.push({cid, group, found});
-                for (const row of found) active.set(id(row.s2lid, 1), row);
-            }
             const result: ActiveLayerInput[] = [];
             for (const role of ACTIVE_LAYER_ORDER) {
                 const layerId = selection.effective[role];
                 if (!layerId) continue;
-                const definition = definitions.definitions.get(layerId), compiled = active.get(layerId);
+                const definition = definitions.definitions.get(layerId);
                 const ownerId = definition ? id(definition.userid, 1) : null;
                 const owner = ownerId === null ? undefined : definitions.owners.get(ownerId);
-                let stored: Buffer | null = null, decoded: Buffer | null = null;
-                if (compiled && compiled.stored_bytes !== null) {
-                    stored = hex(compiled.stored_bytes); decoded = stored;
-                    const cid = ownerId === global.system.userid ? 0 : owner?.clusterId;
-                    if (cid && stored[0] === 31 && stored[1] === 139) {
-                        try {decoded = gunzipSync(stored, {maxOutputLength: 16777216});}
-                        catch (error) {
-                            // A native corrupt-stream miss is different from our
-                            // explicit decoded-byte resource ceiling.
-                            if ((error as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') invalid();
-                            decoded = null;
-                        }
-                    }
-                    if (decoded && decoded.length > 16777215) invalid();
-                }
                 const source = definition?.source === null || definition?.source === undefined ? null : hex(definition.source);
                 dependencies.push({id: layerId, role, ownerId, ownerCluster: owner?.clusterId ?? null,
-                    storedSha256: stored === null ? null : digest(stored), decodedSha256: decoded === null ? null : digest(decoded),
-                    sourceSha256: source === null ? null : digest(source), compiledTime: compiled ? id(compiled.comptime) : null});
-                if (definition && owner && decoded?.length) result.push({id: layerId, ownerId: owner.userid,
-                    parentId: id(definition.b2lid), type: text(definition.type) as LayerType, sourceBytes: source,
-                    activeCompiledBytes: decoded, compiledTime: id(compiled!.comptime)});
+                    sourceSha256: source === null ? null : digest(source)});
+                if (definition && owner && source === null) throw new SnapshotError('unavailable');
+                if (definition && owner && source !== null) result.push({id: layerId, ownerId: owner.userid,
+                    parentId: id(definition.b2lid), type: text(definition.type) as LayerType, sourceBytes: source});
             }
             const after = await this.layers(ids);
             if (jsonDigest(after.rows) !== jsonDigest(definitions.rows)) throw new SnapshotError('unavailable');

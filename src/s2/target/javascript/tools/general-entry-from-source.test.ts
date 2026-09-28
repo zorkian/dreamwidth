@@ -84,7 +84,7 @@ test("selected Entry follows native author/picture/theme/tag/comment order and c
     for(const [source,output] of [["tools/compiler-isolation.c",isolation],["live/render/sandbox.c",sandbox]])
         execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",source!,"-o",output!]);
     const compiler=new ArtifactCompiler({s2Root:root,perl:"/usr/bin/perl",isolationExecutable:isolation});
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     for(const [index,position] of ["left","none"].entries()) {
         const layer=new Layer();layer.scalarProfile=profile;const context=new Context([layer],()=>{throw Error("Unexpected print");});
         context.prop._userpics_position=pv(position);context.prop._entry_userpic_style=pv("small");
@@ -112,10 +112,8 @@ test("selected Entry follows native author/picture/theme/tag/comment order and c
             year:Number(str((result._time as Record<string,unknown>)._year)),systemhour:Number(str((result._system_time as Record<string,unknown>)._hour)),metadata,
             tag:str((result._tags as Record<string,unknown>[])[0]!._name),count:Number(str((result._comments as Record<string,unknown>)._count))},native.rows[index]);
         assert.equal(result._journal,journal);assert.equal(result._poster,poster);
-        for(const missing of [false,true]) {
             const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,
-                type:"core",compiledTime:1,sourceBytes:missing?null:Buffer.from(native.source,"base64"),
-                activeCompiledBytes:Buffer.from(native.code,"base64")}]});
+                type:"core",sourceBytes:Buffer.from(native.source,"base64")}]});
             const session=new GeneralProgramSession(coordinator.transfer(prepared),config,generalScalarCallbacks({page:()=>{throw Error("Fixture does not request Page");},seesControlStrip:()=>false}),{
                 contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
                 stylesheet:{domain:"example.org",webDomain:"www.example.org",statPrefix:"https://static.example.org",
@@ -127,6 +125,5 @@ test("selected Entry follows native author/picture/theme/tag/comment order and c
             const frame=session.completePage({".type":"EntryPage",_entry:result},"entry",()=>{throw Error("Unexpected diagnostic");});
             assert.equal(session.context,initializedContext);
             assert.equal(Buffer.from(frame.bytes).toString("base64"),native.outputs[index]);
-        }
     }
 });

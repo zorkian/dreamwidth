@@ -84,12 +84,10 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
     for(const [source,output] of [["tools/compiler-isolation.c",isolation],["live/render/sandbox.c",sandbox]])
         execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",source!,"-o",output!]);
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     for(const [index,skip] of [0,3].entries()) {
-        for(const missing of [false,true]) {
             const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,
-                type:"core",compiledTime:1,sourceBytes:missing?null:Buffer.from(native.source,"base64"),
-                activeCompiledBytes:Buffer.from(native.code,"base64")}]});
+                type:"core",sourceBytes:Buffer.from(native.source,"base64")}]});
             let page:GeneralModel;
             const session=new GeneralProgramSession(coordinator.transfer(prepared),config,
                 generalScalarCallbacks({page:()=>page,seesControlStrip:()=>false}),{
@@ -155,7 +153,6 @@ test("Recent retains native sticky counting, current-entry day flags and maxskip
             session.beginRender();const frame=session.completePage(page,"recent",()=>{throw Error("Unexpected diagnostic");});
             assert.equal(session.context,sameContext);
             assert.equal(Buffer.from(frame.bytes).toString("base64"),native.outputs[index]);
-        }
     }
 });
 
