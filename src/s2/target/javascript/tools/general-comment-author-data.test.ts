@@ -150,6 +150,15 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(await f.store.revalidateNativeSelectedFingerprint(issued),false);
     const registered=await f.store.loadNativeSelectedSnapshot(request);assert.ok(registered?.facts.comments);
     assert.equal(registered.facts.comments.authors.some(row=>row.userid===900999),true);
+    const registeredPrepared=await GeneralSelectedText.prepare(registered,noEncoding);
+    const registeredTree=generalSelectedComments(registered,sourceConfig,registeredPrepared,navigation);
+    assert.equal(registeredTree?.roots[0]?.posterUsername?.bytes().toString(),"restoredauthor");
+    const registeredRecords=generalCommentRecords(registeredTree!,{journal:{'.type':'UserLite'},
+        ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
+        shown(){return {hasPicture:false};}});
+    assert.equal(registeredRecords[0]?.input.kind,"shown");
+    if(registeredRecords[0]?.input.kind==="shown")
+        assert.equal(registeredRecords[0].input.posterUsername?.bytes().toString(),"restoredauthor");
     await f.admin.query(`UPDATE ${f.table(f.g,"user")} SET statusvis='S',clusterid=7
         WHERE userid=900999`);
     // A selected-body decode of this native nullable row would fail; the
@@ -243,6 +252,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const selectedTree=generalSelectedComments(globalZone,sourceConfig,selected,navigation);
     assert.deepEqual(selectedTree?.roots.map(row=>row.id),[77]);
     assert.equal(selectedTree?.roots[0]?.datepostUnix,String(nativeTimes[0]!.datepost_unix));
+    assert.equal(selectedTree?.roots[0]?.posterUsername,undefined);
     const fields=selectedTree!.roots[0]!.fields!;
     assert.equal(fields.loaded,true);assert.equal(fields.posterSuspended,true);
     assert.equal(fields.subject,undefined);assert.equal(fields.body,undefined);

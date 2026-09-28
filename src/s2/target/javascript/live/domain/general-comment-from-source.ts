@@ -45,6 +45,8 @@ interface CommentCommon {
 }
 export interface GeneralPublicCommentInput extends CommentCommon {
     readonly kind:"shown";readonly loaded:boolean;
+    /** Canonical selected public user key; absent only for a missing poster. */
+    readonly posterUsername:NativeString|undefined;
     readonly body:NativeString|undefined;readonly subject:NativeString|undefined;
     readonly noHtml:unknown;readonly anonymous:boolean;readonly preformatted:unknown;
     readonly editor:NativeString|undefined;readonly datepost:NativeString|undefined;
@@ -74,7 +76,8 @@ export interface GeneralCommentSourceOperations {
     // Date/time operations also own their source eval-register effects.
     dateTimeUnix(value:unknown):GeneralModel;
     posterTime(value:unknown):GeneralModel|undefined;
-    poster():GeneralModel;
+    /** Worker resolves the selected public username through its bound UserLite host. */
+    poster(username:NativeString):GeneralModel;
     /** Named source providers operate only on this approved public record. */
     edit():{readonly edited:unknown;readonly url:NativeString|undefined;
         readonly reason:NativeString|undefined;readonly time:unknown;readonly threadrootUrl:NativeString|undefined};
@@ -127,6 +130,8 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
     if(visible!==(input.kind==="shown")||
         suspendedOnly!==(input.kind==="suspended-loaded"))throw Error("Invalid approved comment visibility");
     const shown=input.kind==="shown"?input:undefined;
+    if(shown&&shown.posterLoaded!==!!shown.posterUsername)
+        throw Error("Invalid approved Comment poster identity");
     const loadedInput=input.kind==="shown"||input.kind==="suspended-loaded"?input:undefined;
     let text:NativeString|undefined=pv(""),subject:NativeString|undefined=pv(""),poster:GeneralModel|undefined,
         userpic:GeneralModel|undefined,subjectIcon:GeneralModel|undefined,posterTime:GeneralModel|undefined,
@@ -158,7 +163,7 @@ export function generalCommentFromSource(context:Context,input:GeneralCommentSou
             userpic=operations.picture(runtime.scalarCompare("string","==",style,pv("small"))?"small":
                 runtime.scalarCompare("string","==",style,pv("smaller"))?"smaller":"full");
         }
-        if(scalarTruthy(input.posterId))poster=input.posterLoaded?operations.poster():
+        if(scalarTruthy(input.posterId))poster=input.posterLoaded?operations.poster(shown.posterUsername!):
             {".type":"UserLite",_username:undefined,_user:undefined,_name:undefined,_journal_type:pv("P")};
     }
     if(shown)subject=escapeNativeHtml(scalarPV(shown.subject));
