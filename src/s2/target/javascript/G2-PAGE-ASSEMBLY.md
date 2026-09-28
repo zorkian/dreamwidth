@@ -241,3 +241,16 @@ and the guarded SQL/real Context model proof cover this joined URL path. The
 parent still must supply the actual source-qualified Entry URL/style argument
 and remaining edit/threadroot/timezone/original-cleaner operations in the
 installed worker; test fixture URLs are explicitly declared test context.
+
+The selected Comment record adapter now turns that bounded parent tree into
+the existing source model input, using only named converted subject/body,
+definedness of `import_source`, edit time/reason, subject icon and the approved
+navigation URLs. Its author/picture presentation is a required parent-issued
+operation; it does not infer trust or image visibility from a stored comment.
+The source anonymous path leaves top-only, flat and ECHI fields undefined, and
+the ignored-subject branch supplies native `...`. Isolated SQL checks a shown
+missing author and a suspended loaded author through this adapter, including
+the no-author-presentation rule for the suspended record and actual Context
+construction. Calendar creation/reuse is still a separate user decision; the
+test's logtime value is declared fixture input. Real cleaner, edit, timezone,
+head and installed worker/HTTP providers remain required.

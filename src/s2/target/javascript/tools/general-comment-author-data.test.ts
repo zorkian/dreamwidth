@@ -21,7 +21,8 @@ import {MysqlPublicMaintainers} from "../live/data/public-maintainers";
 import {GeneralSelectedText} from "../live/domain/general-selected-text";
 import {generalSelectedComments} from "../live/domain/general-comment-projection";
 import {generalCommentFromSource,type GeneralSuspendedCommentInput,
-    type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
+    generalCommentTreeFromSource,type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
+import {generalCommentRecords} from "../live/domain/general-comment-records";
 import type {GeneralPublicSession} from "../live/domain/general-public-session";
 import type {GeneralTextEncoding} from "../live/domain/general-text-encoding";
 import {NativeString,scalarPV,scalarTruthy} from "../runtime/native-scalar";
@@ -65,6 +66,18 @@ print encode_json([$poster->get_keyword_from_mapid(undef),$poster->get_keyword_f
         {encoding:'utf8',timeout:10000,maxBuffer:32768}));
 }
 
+function nativeCommentDefinedProps():unknown {
+    const source=String.raw`use strict;use warnings;no warnings 'once';
+use lib '/workspaces/dreamwidth/cgi-bin';use JSON::PP;
+require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::Comment;
+my %props=(import_source=>'',edit_time=>'1020');
+{package FixtureComment;our @ISA=('LJ::Comment');sub prop{$props{$_[1]}}}
+my $comment=bless {},'FixtureComment';
+print encode_json([defined($props{import_source})?1:0,$comment->is_edited?1:0]);`;
+    return JSON.parse(execFileSync('perl',['-e',source],
+        {encoding:'utf8',timeout:10000,maxBuffer:32768}));
+}
+
 test("general byte-view retains absent poster fallback and revokes it on public identity changes",{
     skip:process.env.S2_SELECTED_FIXTURE!=="1"
 },async()=>withSelectedFixture(async f=>{
@@ -74,6 +87,11 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         VALUES (900001,77,'L',300,0,900999,'2026-09-26 01:00:00','A')`);
     await f.admin.query(`INSERT INTO ${texts}(journalid,jtalkid,subject,body)
         VALUES (900001,77,'Missing author','VISIBLE_MISSING_AUTHOR')`);
+    await f.admin.query(`INSERT INTO ${f.table(f.c,"talkprop2")}(journalid,jtalkid,tpropid,value)
+        VALUES (900001,77,?,''),(900001,77,?,'sm01'),
+            (900001,77,?,'1020'),(900001,77,?,'Why')`,
+    [f.talkProp('import_source'),f.talkProp('subjecticon'),
+        f.talkProp('edit_time'),f.talkProp('edit_reason')]);
     await f.admin.query(`INSERT INTO ${talks}
         (journalid,jtalkid,nodetype,nodeid,parenttalkid,posterid,datepost,state)
         VALUES (900001,78,'L',300,0,900998,'2026-09-26 01:00:00','D'),
@@ -105,6 +123,22 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const missingFields=missingTree!.roots[0]!.fields!;
     assert.equal(missingFields.posterLoaded,false);assert.equal(missingFields.posterId,900999);
     assert.equal(missingFields.body?.bytes().toString(),'VISIBLE_MISSING_AUTHOR');
+    assert.equal(missingFields.importSourceDefined,true);
+    assert.equal(missingFields.subjectIcon?.bytes().toString(),'sm01');
+    assert.equal(missingFields.editTime?.bytes().toString(),'1020');
+    assert.equal(missingFields.editReason?.bytes().toString(),'Why');
+    assert.deepEqual(nativeCommentDefinedProps(),[1,1]);
+    const missingRecords=generalCommentRecords(missingTree!,{journal:{'.type':'UserLite'},
+        ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
+        lastTalkid:0,lastJournalId:0,
+        shown(){return {anonymous:true,hasPicture:false};}});
+    const missingInput=missingRecords[0]?.input;
+    assert.equal(missingInput?.kind,'shown');
+    if(missingInput?.kind!=='shown')throw Error('Missing selected shown comment');
+    assert.equal(missingInput.importSourceDefined,true);
+    assert.equal(scalarPV(missingInput.subjectIcon).bytes().toString(),'sm01');
+    assert.equal(missingInput.body?.bytes().toString(),'VISIBLE_MISSING_AUTHOR');
+    assert.equal(missingInput.permalinkUrl,missingTree!.roots[0]!.urls.permalink);
     assert.equal(await f.store.revalidateNativeSelectedFingerprint(issued),true);
     await f.admin.query(`INSERT INTO ${f.table(f.g,"user")}
         (userid,user,clusterid,status,statusvis,journaltype,name,opt_showtalklinks,opt_whocanreply,
@@ -123,9 +157,11 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         WHERE journalid=900001 AND jtalkid=77`);
     await f.admin.query(`INSERT INTO ${f.table(f.c,"talkprop2")}(journalid,jtalkid,tpropid,value)
         VALUES (900001,77,?,'6'),(900001,77,?,'Source &<'),
-            (900001,77,?,'Changed &<'),(900001,77,?,'1'),
-            (900001,77,?,'PRIVATE_IP')`,[f.talkProp('picture_mapid'),f.talkProp('imported_from'),
-        f.talkProp('edit_reason'),f.talkProp('admin_post'),f.talkProp('poster_ip')]);
+            (900001,77,?,'1'),(900001,77,?,'PRIVATE_IP')`,
+    [f.talkProp('picture_mapid'),f.talkProp('imported_from'),
+        f.talkProp('admin_post'),f.talkProp('poster_ip')]);
+    await f.admin.query(`UPDATE ${f.table(f.c,"talkprop2")} SET value='Changed &<' WHERE
+        journalid=900001 AND jtalkid=77 AND tpropid=?`,[f.talkProp('edit_reason')]);
     await f.admin.query(`INSERT INTO ${f.table(f.c,"userkeywords")}(userid,kwid,keyword)
         VALUES (900999,1,'suspended-keyword')`);
     await f.admin.query(`INSERT INTO ${f.table(f.c,"userpicmap3")}(userid,mapid,kwid,picid,redirect_mapid)
@@ -210,6 +246,8 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(fields.loaded,true);assert.equal(fields.posterSuspended,true);
     assert.equal(fields.subject,undefined);assert.equal(fields.body,undefined);
     assert.equal(fields.pictureKeyword?.bytes().toString(),'changed-keyword');
+    assert.equal(fields.editTime?.bytes().toString(),'1020');
+    assert.equal(fields.editReason?.bytes().toString(),'Changed &<');
     assert.deepEqual(nativeMapKeywordWithoutId(),[null,'mapped']);
     const ctx=new Context([],()=>{throw Error('Unreached S2 print');});
     ctx.prop._userpics_position=NativeString.hostUtf8Bytes('none');
@@ -234,6 +272,14 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         picture(){throw Error('Suspended image is redacted');},
         esnEnabled(){return 0;},editCommentsEnabled(){return 0;}};
     const model=generalCommentFromSource(ctx,input,modelOperations);
+    const approved=generalCommentRecords(selectedTree!,{journal:input.journal,
+        ditemid:300*256+1,entryLogtimeUnix:undefined,noHtml:undefined,
+        lastTalkid:0,lastJournalId:0,
+        shown(){throw Error('Suspended selected author must not be presented');}});
+    const [assembled]=generalCommentTreeFromSource(ctx,1,()=>approved,()=>modelOperations);
+    assert.equal(assembled?._fromsuspended,1);
+    assert.equal(assembled?._reply_url,urls.reply);
+    assert.equal((approved[0]?.input as {readonly kind:string}).kind,'suspended-loaded');
     assert.equal(model._fromsuspended,1);assert.equal(model._full,0);
     assert.equal(model._permalink_url,urls.permalink);
     assert.equal(model._reply_url,urls.reply);
