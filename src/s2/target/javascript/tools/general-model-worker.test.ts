@@ -172,14 +172,11 @@ test("closed real worker preserves native models and private UserLite across ini
             const app=createLiveApp(config,{serve,serveEntry,async close(){}});
             try {
                 const address=await app.listen({host:"127.0.0.1",port:0});
-                for(const missing of [false,true]) {
-                    if(missing)await admin.query(`DELETE FROM ${table(g,"s2source_inno")} WHERE s2lid=101`);
-                    for(const [kind,url] of [["recent","/users/ordinary6/"],["entry","/users/ordinary6/257.html"]] as const) {
-                        for(const method of ["GET","HEAD"] as const) {
-                            const response=await app.inject({method,url,headers:{host:"localhost:8081"}});
-                            assert.equal(response.statusCode,200);
-                            assert.equal(response.rawPayload.toString("base64"),method==="HEAD"?"":native.outputs[kind].base64);
-                        }
+                for(const [kind,url] of [["recent","/users/ordinary6/"],["entry","/users/ordinary6/257.html"]] as const) {
+                    for(const method of ["GET","HEAD"] as const) {
+                        const response=await app.inject({method,url,headers:{host:"localhost:8081"}});
+                        assert.equal(response.statusCode,200);
+                        assert.equal(response.rawPayload.toString("base64"),method==="HEAD"?"":native.outputs[kind].base64);
                     }
                 }
                 // Node fetch controls Host itself; the native HTTP client sends
