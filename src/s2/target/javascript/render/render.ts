@@ -21,6 +21,7 @@ import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
 import { PageOutput } from "./output-cleaner";
+import { type EntryArgs, EntryPage } from "./entry-page";
 import { JOURNAL_PROPS, type PageContext, RecentPage, latestMonth, showControlStrip, visibleTags } from "./pages";
 import type { RenderState } from "./state";
 
@@ -29,6 +30,7 @@ export interface RenderRequest {
     readonly view: "recent" | "entry";
     readonly ditemid?: number;
     readonly skip?: number;
+    readonly entryArgs?: EntryArgs;
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
@@ -66,6 +68,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
             page: () => page!,
             siteRoot: () => site.config.siteRoot,
+            origin: () => `${site.config.protocol}://${site.host}`,
             userBase: name => [...users.values()].find(u => u.user === name)?.journalBase(site),
             userLite: name => {
                 const u = [...users.values()].find(user => user.user === name);
@@ -84,12 +87,15 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
         const pc: PageContext = {
             db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
-            nowSeconds: Math.floor(Date.now() / 1000), users,
+            nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
         };
         [month, tags] = await Promise.all([latestMonth(pc), visibleTags(pc)]);
         await preloadNamedUsers(db, request.layers, users);
 
-        page = await RecentPage(pc, request.skip ?? 0, request.skip !== undefined, chrome.resourceHead());
+        page = request.view === "entry"
+            ? await EntryPage(pc, request.ditemid!, request.entryArgs ?? {}, chrome.resourceHead()) ?? undefined
+            : await RecentPage(pc, request.skip ?? 0, request.skip !== undefined, chrome.resourceHead());
+        if (!page) return { status: 404, html: "" };
         s2.printing = true;
         s2.ctx.runMethod(page, "print()");
         return { status: 200, html: output.finish() };

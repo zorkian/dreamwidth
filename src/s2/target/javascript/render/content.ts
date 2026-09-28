@@ -57,6 +57,17 @@ export class ContentCleaner {
         return result.kind === "ok" ? result.fragment.html : escaped(entry.event);
     }
 
+    // The plain subject and body text EntryPage uses for Open Graph tags.
+    metadata(entry: Entry): { subject: string; event: string } {
+        const url = entry.url(this.site);
+        const result = this.cleaner.metadata({
+            subject: entry.subject,
+            entry: { body: entry.event, format: entryFormat(entry), context: this.context(url, url, entry.ditemid, "entry") },
+        });
+        return result.kind === "ok" ? { subject: result.metadata.subjectText, event: result.metadata.eventText }
+            : { subject: this.subject(entry.subject, url).text, event: entry.event.replace(/<[^>]*>/g, "") };
+    }
+
     comment(body: string, props: Record<string, string>, datepost: string, anonymous: boolean, entryUrl: string): string {
         const formatting = truthy(props.editor) ? props.editor! : truthy(props.opt_preformatted) ? "html_raw0"
             : "import_source" in props || datepost < "2019-05" ? "html_casual0" : "html_casual1";

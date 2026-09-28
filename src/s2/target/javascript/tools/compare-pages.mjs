@@ -23,15 +23,26 @@ import { JSDOM } from "jsdom";
 const VOLATILE = new Set(["lj_form_auth", "chrp1"]);
 const VERBATIM = new Set(["PRE", "TEXTAREA", "SCRIPT", "STYLE"]);
 
-// Perl emits the Site settings from a hash in random key order.
-const sortSiteKeys = text => text.replace(/(Object\.assign\(Site, )(\{.*?\})(\);)/s, (whole, open, json, close) => {
-    try {
-        const value = JSON.parse(json);
-        return open + JSON.stringify(Object.fromEntries(Object.entries(value).sort())) + close;
-    } catch {
-        return whole;
-    }
-});
+// Perl emits these script settings from hashes in random key order, and the
+// comment settings carry a per-request form token.
+const sortKeys = value => Array.isArray(value) ? value.map(sortKeys)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort().map(([k, v]) => [k, sortKeys(v)]))
+        : value;
+const sortSiteKeys = text => text
+    .replace(/(Object\.assign\(Site, )(\{.*?\})(\);)/s, (whole, open, json, close) => {
+        try {
+            return open + JSON.stringify(sortKeys(JSON.parse(json))) + close;
+        } catch {
+            return whole;
+        }
+    })
+    .replace(/(var LJ_cmtinfo = )(\{.*\})(\n)/, (whole, open, json, close) => {
+        try {
+            return open + JSON.stringify(sortKeys({ ...JSON.parse(json), form_auth: "*" })) + close;
+        } catch {
+            return whole;
+        }
+    });
 
 export function normalize(html, origins) {
     const document = new JSDOM(html).window.document;
@@ -62,7 +73,10 @@ export function normalize(html, origins) {
         for (const child of node.childNodes) walk(child, depth + 1, verbatim || VERBATIM.has(node.tagName));
     };
     walk(document, 0, false);
-    return lines.join("\n") + "\n";
+    // EntryPage lists article tags from a Perl hash, in random order.
+    const tags = lines.filter(line => line.includes('property="article:tag"'));
+    const sorted = [...tags].sort();
+    return lines.map(line => line.includes('property="article:tag"') ? sorted.shift() : line).join("\n") + "\n";
 }
 
 // Connect to loopback but send the origin's own Host, which both servers

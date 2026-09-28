@@ -39,6 +39,8 @@ export interface RenderState {
     readonly showThreadExpander: boolean;
     page(): S2Object;
     siteRoot(): string;
+    // The scheme and host pages are served from.
+    origin(): string;
     userBase(user: string): string | undefined;
     userLite(user: string): S2Object | undefined;
     visibleTags(limit: number): S2Object[];

@@ -259,7 +259,8 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
     const entryLink = (ctx: Context, item: S2Object, key: string) => {
         const journal = item._journal?._user;
         const p = props(ctx);
-        const go = (dir: string) => `${state.siteRoot()}/go?journal=${journal}&itemid=${item._itemid}&dir=${dir}`;
+        // LJ::create_url sorts its arguments.
+        const go = (dir: string) => `${state.origin()}/go?dir=${dir}&itemid=${item._itemid}&journal=${journal}`;
         switch (key) {
             case "mem_add":
                 return Link(`${state.siteRoot()}/tools/memadd?journal=${journal}&amp;itemid=${item._itemid}`,
