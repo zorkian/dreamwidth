@@ -23,6 +23,8 @@ use LJ::Protocol;
 use LJ::S2;
 use LJ::S2Theme;
 use LJ::Talk;
+use LJ::Userpic;
+use Compress::Zlib qw( compress crc32 );
 
 die "Devcontainer only\n" unless $LJ::IS_DEV_SERVER;
 
@@ -73,6 +75,19 @@ unless ( entry_count($archive) ) {
         post( $archive, $n, subject => "Dated entry $n", event => body($n), security => 'public',
             year => $date->[0], mon => $date->[1], day => $date->[2], hour => 8 + $n );
     }
+}
+
+# Icons, shown on the journal's own icons page and on its entries.
+unless ( LJ::Userpic->load_user_userpics($archive) ) {
+    my $first = userpic( $archive, 100, 100, [ 200, 40, 40 ], 'first, <b>bold</b> keyword',
+        'An <i>icon</i> comment', 'A description' );
+    $first->make_default;
+    userpic( $archive, 60, 80, [ 40, 200, 40 ], 'second, Another', '', '' );
+    userpic( $archive, 50, 50, [ 40, 40, 200 ], 'third', '', 'Third icon' );
+}
+$archive->set_prop( use_journalstyle_icons_page => 1 );
+unless ( LJ::Userpic->load_user_userpics($commenter) ) {
+    userpic( $commenter, 90, 90, [ 90, 90, 0 ], 'reader', '', '' )->make_default;
 }
 
 # A user layer that never finishes printing, for render time limits.
@@ -127,6 +142,29 @@ sub user_layer {
     LJ::S2::layer_compile( LJ::S2::load_layer($lid), \$error, { s2ref => \$source } )
         or die "User layer: $error\n";
     LJ::S2::set_style_layers( $u, $styleid, user => $lid );
+}
+
+sub userpic {
+    my ( $u, $w, $h, $rgb, $keywords, $comment, $description ) = @_;
+    my $pic = LJ::Userpic->create( $u, data => \png( $w, $h, $rgb ) );
+    $pic->set_keywords($keywords);
+    $pic->set_comment($comment)         if $comment;
+    $pic->set_description($description) if $description;
+    return $pic;
+}
+
+# A solid-colour PNG.
+sub png {
+    my ( $w, $h, $rgb ) = @_;
+    my $chunk = sub {
+        my ( $type, $data ) = @_;
+        return pack( 'N', length $data ) . $type . $data . pack( 'N', crc32( $type . $data ) );
+    };
+    my $rows = join '', map { "\0" . pack( 'C*', @$rgb ) x $w } 1 .. $h;
+    return "\x89PNG\r\n\x1a\n"
+        . $chunk->( 'IHDR', pack( 'NNCCCCC', $w, $h, 8, 2, 0, 0, 0 ) )
+        . $chunk->( 'IDAT', compress($rows) )
+        . $chunk->( 'IEND', '' );
 }
 
 sub entry_count {

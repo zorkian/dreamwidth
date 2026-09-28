@@ -48,6 +48,8 @@ export interface SiteConfig {
     readonly palImgRoot: string;
     readonly maxScrollback: number;
     readonly tagIntersection: number;
+    // 0 for no limit.
+    readonly maxIconsPerPage: number;
     readonly talkPageSize: number;
     readonly talkMaxSubjects: number;
     readonly talkThreadPoint: number;

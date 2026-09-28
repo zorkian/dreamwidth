@@ -69,6 +69,11 @@ test("archive pages for a year, a month and a day", async () => {
     }
 });
 
+test("tags and icons pages", async () => {
+    await compare("/~s2fix_theme/tag/");
+    await compare("/~s2fix_archive/icons?sortorder=keyword");
+});
+
 test("stylesheets, cleaned as CSS", async () => {
     await compare("/~s2fix_theme/res/14/stylesheet");
     await compare("/~s2fix_custom/res/16/stylesheet");
