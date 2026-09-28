@@ -46,7 +46,7 @@ export function escapeNativeHtml(input: unknown): NativeString {
 function errorText(error: Error | NativeString): NativeString {
     if (NativeString.is(error)) return error;
     if (!isNativeProgramError(error) && !nativeExecutionStopKind(error)) throw error;
-    // Installed source/recovery registration metadata uses a reversible byte
+    // Installed source registration metadata uses a reversible byte
     // view. Semantic error messages interpolate that metadata, not JS stacks.
     return NativeString.bytes(Buffer.from(error.message, "latin1"));
 }

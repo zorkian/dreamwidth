@@ -21,7 +21,7 @@ only the event's external embedding stage, preserves absent caller cut options, 
 Recent's shared picture, forced mood theme, internal embedding and adult transform are
 not silently applied to direct Entry.
 
-Focused evidence includes actual native source/recovered initialization and rendering,
+Focused evidence includes native and source-compiled initialization and rendering,
 real closed private-worker Recent/Entry CSS calls, parent request ordering, and retained
 native constructor/provider order. The Recent proof now runs actual Page and Entry
 constructors after admitted program initialization. The native constructor oracles use
@@ -50,7 +50,7 @@ same Context. The post-comment `LJ_cmtinfo`/resource head operation is mandatory
 when comments are disabled, separate from the earlier head/OG operation.
 
 A closed-worker control executes custom functions through both matched-source and
-missing-source recovery routes, resumes with the initialized item count, prepares the
+source-compiled routes, resumes with the initialized item count, prepares the
 Page/Entry model, and calls the typed parent public-user URL helper. Its native byte
 comparison uses declared empty original content and fixed public providers. It proves
 factory execution and private transport, not installed original-cleaner, SQL, resource,
@@ -105,14 +105,14 @@ acceptance. Native cache behavior remains explicitly deferred.
 The installed factory now obtains Page's customtext fallback values from its own
 executed, escaped Context properties after initialization. A stale caller-provided
 fallback cannot replace active `prop_init` results. The mandatory Page second clean
-remains in place. A closed source/recovered worker control compares its resulting title
+remains in place. A closed source-compiled worker control compares its resulting title
 against native property escaping; its declared HTML-empty fixture does not exercise or
 replace the held original HTML/subject cleaner.
 
 Direct Entry selected descriptors share only the issued, witnessed public header with
 Recent. They omit Recent-only cut, no-body and forced-mood inputs; the actual direct Entry
 source operation supplies its native event options. Both descriptor paths retain the same
-parent-issued current maintainer gate. SQL encoding/privacy and source/recovery worker
+parent-issued current maintainer gate. SQL encoding/privacy and source-compiled worker
 proofs cover this assembly; complete installed content helpers and ordinary HTTP remain
 mandatory follow-through.
 
@@ -150,14 +150,14 @@ Recent's picture caller maps an approved picid-zero Null Image to an absent user
 after the native poster/shared-picture branch chooses its source. Direct Entry retains
 the separate Null Image. The shared reviewed autovivification implementation allows
 custom code to assign a missing picture's width without inventing a typed Image: the
-native, source-JS and recovered-JS controls retain the native `isnull` result. Earlier
+native and source-JS controls retain the native `isnull` result. Earlier
 failed worker evidence is preserved. User's default picture and the community shared
 picture use direct `defaultpicid`, independently of keyword-list eligibility.
 
 Setup exports `USERPIC_ROOT` as an additive public native byte/flag frame alongside the
 legacy text projection. Parent preparation validates the frame and binds both bytes and
 flag in its source digest. This binding transfers the approved Image model, not the
-native root frame or raw account/picture rows. A closed source/recovered worker control
+native root frame or raw account/picture rows. A closed source-compiled worker control
 reads its bound User's default-image width and exact URL against native Image_userpic.
 The source/model fixture has explicitly empty content and declared public helpers; it
 does not establish installed original cleaning, the general calendar provider, OG image

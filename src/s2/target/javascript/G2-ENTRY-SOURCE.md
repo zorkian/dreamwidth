@@ -14,11 +14,11 @@ site callbacks; that context still requires consumer integration.
 
 Focused proof uses actual retained native Entry construction with declared synthetic
 public providers, guarded SQL formatting rows, and a compiled EntryPage printing the
-prepared fields. Source-corresponding and missing-source recovered programs retain one
+prepared fields. The source-compiled program retains one
 initialized Context through GB output and match native bytes. This is model/session
 proof, not acceptance of the ordinary installed worker or HTTP route. Actual subject,
 clean_event, public-helper, request-context and final page postprocessing integration
-remain mandatory. The held subject component is not consumed.
+remain mandatory. The subject component was later accepted under an explicit user review waiver; this checkpoint predates its integration.
 
 The anonymous CommentInfo source provider uses the selected Entry's defined
 replycount property before its log2 count, even when that property is false.

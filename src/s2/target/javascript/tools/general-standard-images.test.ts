@@ -36,7 +36,7 @@ import {GeneralPublicSession} from "../live/domain/general-public-session";
 import {config} from "../live/tests/fixtures";
 const pv=NativeString.hostUtf8Bytes;
 
-test("real private source/recovered image helpers reset at print and retain prepared aliases",()=>withSelectedFixture(async fixture=>{
+test("real private source image helpers reset at print and retain prepared aliases",()=>withSelectedFixture(async fixture=>{
     const script=String.raw`use strict;use warnings;no warnings 'once';use lib '/workspaces/dreamwidth/cgi-bin';
         BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};*DBI::connect_cached=sub{die 'DB forbidden'};}
         require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::S2;

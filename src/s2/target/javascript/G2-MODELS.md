@@ -7,8 +7,7 @@ approved fields; they do not project arbitrary SQL records or private properties
 
 The model-worker test compiles a fixed trusted custom core and empty layout with
 the unchanged native compiler. It independently executes installed native
-constructors and actual native UserLite/Date methods. The JS run uses both matched
-source and missing-source active recovery. Initialization, property mutation,
+constructors and actual native UserLite/Date methods. The JS run uses current-source compilation. Initialization, property mutation,
 selected count 3, model preparation and Page printing use the same Context and
 native output session. UserLite constructor calls cross the actual synchronous
 private channel during initialization and rendering. Equality stays bound to the
@@ -22,9 +21,8 @@ manifest file outside render/policy/runtime is the explicitly named pure
 Unknown domain files remain refused. No directory, network, filesystem-write,
 compiler or runtime grant changes are made.
 
-Guarded isolated SQL tests supply actual active core/layout bytes, selected public
-entries and public UserLite identity/mapping facts. Source-present and source-missing
-Recent/Entry requests execute the real child and return independently expected
+Guarded isolated SQL tests supply actual selected core/layout source, selected public
+entries and public UserLite identity/mapping facts. Source-present Recent/Entry requests execute the real child and return independently expected
 native bytes through the existing app, including owning-container TCP GET and HEAD.
 A public helper fact changed during rendering gives 409 with no rendered body;
 restoring it recovers. A private Entry whose text row has been deleted remains 404
