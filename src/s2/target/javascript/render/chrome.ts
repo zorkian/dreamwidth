@@ -1,9 +1,9 @@
 // chrome.ts
 //
 // The site markup Perl adds around and inside S2 pages for an anonymous
-// visitor: the control strip, user tags, the user link bar, and the CSS and
-// JavaScript includes. Follows views/journal/controlstrip.tt, LJ::ljuser,
-// DW::Logic::UserLinkBar and the LJ::need_res calls made for journal views.
+// visitor: the control strip, user tags, the user link bar, and the script
+// tags. Follows views/journal/controlstrip.tt, LJ::ljuser and
+// DW::Logic::UserLinkBar.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -14,37 +14,10 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { statSync } from "node:fs";
-import path from "node:path";
-import type { SiteConfig } from "../server/config";
 import type { Site, User } from "../data/user";
 import { type S2Object, Image, Link, ehtml, eurl, nullObject } from "./objects";
+import type { Resources } from "./resources";
 import type { Chrome } from "./state";
-
-// Resource groups registered for journal views, in LJ::need_res order.
-const CSS_LIBRARY = ["lj_base.css", "esn.css", "jquery/jquery.ui.core.css", "jquery/jquery.ui.tooltip.css",
-    "jquery.contextualhover.css", "css/foundation/foundation_minimal.css"];
-const CSS_RECENT = ["css/components/quick-reply.css", "css/components/icon-select.css",
-    "css/components/imageshrink.css", "jquery/jquery.ui.theme.smoothness.css", "controlstrip.css",
-    "controlstrip-COLOR.css", "jquery/jquery.ui.button.css", "jquery/jquery.ui.dialog.css", "canary.css"];
-const CSS_ENTRY = ["css/components/quick-reply.css", "css/components/icon-select.css",
-    "css/components/imageshrink.css", "jquery/jquery.ui.theme.smoothness.css", "jquery/jquery.ui.button.css",
-    "jquery/jquery.ui.dialog.css", "jquery.commentmanage.css", "controlstrip.css", "controlstrip-COLOR.css",
-    "canary.css"];
-const JS_LIBRARY = ["jquery/jquery-1.8.3.js", "foundation/vendor/custom.modernizr.js",
-    "foundation/foundation/foundation.js", "foundation/foundation/foundation.topbar.js", "dw/dw-core.js",
-    "jquery/jquery.ui.core.js", "jquery/jquery.ui.widget.js", "jquery/jquery.ui.tooltip.js", "jquery.ajaxtip.js",
-    "jquery/jquery.ui.position.js", "jquery.hoverIntent.js", "jquery.contextualhover.js"];
-const JS_RECENT = ["jquery.esn.js", "jquery.replyforms.js", "jquery.poll.js", "journals/jquery.tag-nav.js",
-    "jquery.mediaplaceholder.js", "jquery.imageshrink.js", "components/jquery.icon-select.js",
-    "jquery.quickreply.js", "jquery.threadexpander.js", "jquery.cuttag-ajax.js", "jquery.default-editor.js",
-    "jquery/jquery.ui.button.js", "jquery/jquery.ui.dialog.js"];
-const JS_ENTRY = ["jquery.replyforms.js", "jquery.poll.js", "journals/jquery.tag-nav.js",
-    "jquery.mediaplaceholder.js", "jquery.imageshrink.js", "components/jquery.icon-select.js",
-    "jquery.quickreply.js", "jquery.threadexpander.js", "jquery/jquery.ui.button.js", "jquery/jquery.ui.dialog.js",
-    "jquery.commentmanage.js", "jquery.esn.js"];
-
-const mtimes = new Map<string, number>();
 
 // LJ::determine_viewing_style for a logged-out viewer.
 export function viewingStyle(args: Readonly<Record<string, string>>): string {
@@ -63,28 +36,14 @@ export interface ChromeRequest {
     readonly args: Readonly<Record<string, string>>;
     readonly showControlStrip: boolean;
     readonly users: ReadonlyMap<number, User>;
+    readonly resources: Resources;
 }
 
-export function createChrome(request: ChromeRequest): Chrome & {
-    resourceHead(): string;
-    string(key: string): string;
-} {
+export function createChrome(request: ChromeRequest): Chrome & { string(key: string): string } {
     const { site, journal } = request;
     const config = site.config;
     const origin = `${config.protocol}://${site.host}`;
     const string = (key: string) => config.strings[key] ?? "";
-    const color = journal.props.control_strip_color || "dark";
-
-    const lists = () => {
-        const css = (request.view === "entry" ? CSS_ENTRY : CSS_RECENT)
-            .filter(file => request.showControlStrip || !file.startsWith("controlstrip"))
-            .map(file => file.replace("COLOR", color));
-        return { css, js: request.view === "entry" ? JS_ENTRY : JS_RECENT };
-    };
-    const bundle = (prefix: "stc" | "js", files: readonly string[]) => {
-        const version = Math.max(...files.map(file => resourceTime(config, prefix, file)));
-        return `${prefix === "stc" ? config.statPrefix : config.jsPrefix}/??${files.join(",")}?v=${version}`;
-    };
 
     // LJ::ljuser
     const ljuser = (userid: number, linkColor: string) => {
@@ -168,31 +127,9 @@ export function createChrome(request: ChromeRequest): Chrome & {
 `;
         },
 
-        // LJ::res_includes_head: the Site settings and stylesheets.
-        resourceHead() {
-            const settings = {
-                cmax_comment: 16000, statprefix: config.statPrefix, user_domain: config.domain,
-                currentJournal: journal.user, iconprefix: config.userpicRoot, ctx_popup: 1,
-                imgprefix: config.imgPrefix, esn_async: 1, ctx_popup_userhead: 1, ctx_popup_icons: 1,
-                media_embed_enabled: 1, inbox_update_poll: 1, siteroot: config.siteRoot,
-                currentJournalBase: journal.journalBase(site), has_remote: 0,
-            };
-            return `
-            <script type="text/javascript">
-                var Site;
-                if (!Site)
-                    Site = {};
-
-                Site = Object.assign(Site, ${JSON.stringify(settings)});
-           </script>
-        ` + [CSS_LIBRARY, lists().css].map(files =>
-                `<link rel="stylesheet" type="text/css" href="${bundle("stc", files)}" />\n`).join("");
-        },
-
         // LJ::S2::get_script_tags
         scriptTags() {
-            let html = [JS_LIBRARY, lists().js].map(files =>
-                `<script type="text/javascript" src="${bundle("js", files)}"></script>\n`).join("");
+            let html = request.resources.includes("scripts");
             if (request.showControlStrip) {
                 const [pathname, query = ""] = request.requestPath.split("?");
                 html += `
@@ -220,13 +157,6 @@ jQuery(function(jQ){
             const caption = props._userlite_interaction_links === "text" ? link.text : link.title;
             const url = link.url ? `${config.siteRoot}/${link.url}` : "";
             return Link(url, caption, Image(`${config.imgPrefix}/silk/profile/${link.image}`, 20, 18, ""));
-        },
-
-        // LJ::S2::get_tags_text
-        tagsText(props, tags: S2Object[]) {
-            if (!tags.length) return "";
-            const list = tags.map(tag => `<a rel='tag' href='${tag._url}'>${tag._name}</a>`).join(", ");
-            return `<div class='ljtags'>${String(props._text_tags ?? "").replace("#", list)}</div>`;
         },
     };
 }
@@ -302,12 +232,3 @@ function userLinkBar(u: User, key: string, string: (key: string) => string): Bar
     }
 }
 
-function resourceTime(config: SiteConfig, prefix: string, file: string): number {
-    const key = `${prefix}/${file}`;
-    let time = mtimes.get(key);
-    if (time === undefined) {
-        time = Math.floor(statSync(path.join(config.home, "build/static", prefix, file)).mtimeMs / 1000);
-        mtimes.set(key, time);
-    }
-    return time;
-}

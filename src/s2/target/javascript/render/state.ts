@@ -26,7 +26,6 @@ export interface Chrome {
     replyForm(): string;
     ljuser(userid: number, linkColor: string): string;
     userLink(props: Record<string, unknown>, user: S2Object, key: string): S2Object;
-    tagsText(props: Record<string, unknown>, tags: S2Object[]): string;
 }
 
 export interface RenderState {
