@@ -49,7 +49,7 @@ test("closed real worker preserves native models and private UserLite across ini
     for(const [source,output] of [["live/render/sandbox.c",sandbox],["tools/compiler-isolation.c",isolation]])
         execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",source!,"-o",output!]);
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     const compiled=path.join(directory,"compiled");cpSync(path.resolve("dist"),compiled,{recursive:true});
     // Fixed driver is transplanted to the installation entry for this test only.
     // The stager follows its exact imports; no test tools or parent SQL enter the closure.
@@ -68,13 +68,10 @@ test("closed real worker preserves native models and private UserLite across ini
     const renderer=new GeneralRenderer(sandbox,runtime,{maxOutputBytes:1048576,maxHeapMiB:128,timeoutMs:10000});
     const user:PublicUserFacts={userid:111,username:"public_name",clusterid:0,status:"V",statusvis:"X",journaltype:"P",
         dversion:1,caps:"0",name:NativeString.hostUtf8Bytes("Public"),identity:null};
-    const snapshot:ActiveStyleSnapshot={styleId:1,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",compiledTime:1,
-        sourceBytes:Buffer.from(native.source,"base64"),activeCompiledBytes:Buffer.from(native.code,"base64")}]};
+    const snapshot:ActiveStyleSnapshot={styleId:1,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",
+        sourceBytes:Buffer.from(native.source,"base64")}]};
     try {
-        for(const missing of [false,true]) {
-            const prepared=await coordinator.prepare({...snapshot,layers:snapshot.layers.map(layer=>({...layer,
-                sourceBytes:missing?null:layer.sourceBytes}))});
-            assert.equal(prepared.program.route,missing?"recovery":"source");
+            const prepared=await coordinator.prepare(snapshot);
             for(const kind of ["recent","entry"] as const) {
                 const events:string[]=[];
                 const publicSession=new GeneralPublicSession({async snapshot(name){events.push("user:"+name);return {requestedName:name,user,fingerprint:"fixed"};},
@@ -83,7 +80,7 @@ test("closed real worker preserves native models and private UserLite across ini
                     compiler.scalarProfile,25);
                 const authority=new GeneralUserAuthority(publicSession,{displayName:()=>NativeString.hostUtf8Bytes("Public & Name"),
                     journalBase:()=>NativeString.hostUtf8Bytes("https://public.example.invalid/base"),tellFriend:false});
-                const frame=await renderer.render((missing?"b":"a").repeat(64),{
+                const frame=await renderer.render("a".repeat(64),{
                     start:{version:1,transfer:coordinator.transfer(prepared),config,kind},
                     async host(operation,parameters,phase){assert.equal(operation,"user-lite");events.push("host:"+phase);
                         return parentLoadUser(parameters,authority);},
@@ -108,7 +105,6 @@ test("closed real worker preserves native models and private UserLite across ini
                     }
                 }finally{await app.close();}
             }
-        }
         if(process.env.S2_SELECTED_FIXTURE==="1") await withSelectedFixture(async({admin,store,g,c,table,request,startup})=>{
             const [systems]=await admin.query(`SELECT userid FROM ${table(g,"user")} WHERE user='system'`);
             const systemId=(systems as {userid:number}[])[0]!.userid;
@@ -176,14 +172,11 @@ test("closed real worker preserves native models and private UserLite across ini
             const app=createLiveApp(config,{serve,serveEntry,async close(){}});
             try {
                 const address=await app.listen({host:"127.0.0.1",port:0});
-                for(const missing of [false,true]) {
-                    if(missing)await admin.query(`DELETE FROM ${table(g,"s2source_inno")} WHERE s2lid=101`);
-                    for(const [kind,url] of [["recent","/users/ordinary6/"],["entry","/users/ordinary6/257.html"]] as const) {
-                        for(const method of ["GET","HEAD"] as const) {
-                            const response=await app.inject({method,url,headers:{host:"localhost:8081"}});
-                            assert.equal(response.statusCode,200);
-                            assert.equal(response.rawPayload.toString("base64"),method==="HEAD"?"":native.outputs[kind].base64);
-                        }
+                for(const [kind,url] of [["recent","/users/ordinary6/"],["entry","/users/ordinary6/257.html"]] as const) {
+                    for(const method of ["GET","HEAD"] as const) {
+                        const response=await app.inject({method,url,headers:{host:"localhost:8081"}});
+                        assert.equal(response.statusCode,200);
+                        assert.equal(response.rawPayload.toString("base64"),method==="HEAD"?"":native.outputs[kind].base64);
                     }
                 }
                 // Node fetch controls Host itself; the native HTTP client sends

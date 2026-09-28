@@ -26,7 +26,6 @@ import type { ApprovedJournal, ApprovedEntry } from "../render/types";
 import { rawBody, plainSubject, Unsupported } from "./content";
 
 import {journalBase} from "../render/journal-url";
-import {readPropertyLayer} from "../domain/property-layer";
 import {approveTags} from "../domain/tags";
 import {approveLinks, navigationUrl, websiteName} from "../domain/links";
 
@@ -272,29 +271,13 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
             author.journaltype!=='P'||!/^[0-9]+$/.test(author.caps))throw new Unsupported();
         return {name:row.name,author:{userid:author.userid,username:author.user,...authorBadge(author,config,capabilities)}};
     });
-    const userLayer=style.layers.find(layer=>layer.type==='user');
-    let customtextProperties;
-    if(userLayer) {
-        const layout=style.layers.find(layer=>layer.type==='layout')!;
-        if(userLayer.ownerid!==u.userid || userLayer.ownerUsername!==u.user ||
-            userLayer.nativeType!=='user' || userLayer.parentId!==layout.s2lid ||
-            !integer(userLayer.compiledTime)||!userLayer.propertyCompiled)throw new Unsupported();
-        customtextProperties=readPropertyLayer(userLayer.propertyCompiled,userLayer.s2lid);
-    }
-    // Both qualified layouts declare exactly these section containers. Native
-    // modules_init retains source-order collisions and assignment-time indices.
-    for(const [key,value] of Object.entries(customtextProperties??{})) {
-        if(/^module_(?:userprofile|links|pagesummary|calendar|tags)_section$/.test(key)&&!["none","one","two"].includes(String(value)))throw new Unsupported();
-    }
-    for(const [key,values] of Object.entries({entry_userpic_style:["","small","smaller"],
-        comment_userpic_style:["","small","smaller"],userpics_position:["left","right","none"],entry_metadata_position:["top","bottom"]})) {
-        if(customtextProperties&&Object.hasOwn(customtextProperties,key)&&!values.includes(String(customtextProperties[key as keyof typeof customtextProperties])))throw new Unsupported();
-    }
-    const inlineStylesheet=!!theme||!!customtextProperties&&Object.keys(customtextProperties).some(key=>
-        ["entry_userpic_style","comment_userpic_style","userpics_position","entry_metadata_position","color_page_background"].includes(key)||["font_base","font_fallback","font_base_size","font_base_units"].includes(key)||/^font_(?:module_heading|module_text|journal_title|journal_subtitle|entry_title|comment_title)(?:_size|_units)?$/.test(key)||/^module_(?:userprofile|links|pagesummary|calendar|tags)_/.test(key));
+    // This retained server cannot compile a journal user layer from S2 source.
+    // Refuse it until the general source-compiled request path is installed.
+    if(style.layers.some(layer=>layer.type==='user'))throw new Unsupported();
+    const inlineStylesheet=!!theme;
     if(inlineStylesheet&&!["none","proxy-css-links-only"].includes(config.cssCleanerHookKind??""))throw new Unsupported();
     const customtextStored={title:p.customtext_title, url:p.customtext_url,content:p.customtext_content};
-    for(const value of [customtextStored.url,customtextProperties?.text_module_customtext_url]) {
+    for(const value of [customtextStored.url]) {
         if(value && value!=='0') {
             if(String(value).includes('"'))throw new Unsupported();
             const raw=String(value);
@@ -416,6 +399,6 @@ export function approveSnapshot(snapshot: RawJournalSnapshot, config: PublicAppC
         controlStripColor: p.control_strip_color === "light" ? "light" : "dark",
         blockRobots: p.opt_blockrobots === "Y", entries, defaultUserpic,
         websiteUrl: navigationUrl(p.url ?? ""), websiteName: websiteName(p.urlname ?? ""),
-        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, themeAuthors, ...(easyread?{layout:"easyread" as const}:{}), theme, themeLayoutId:theme?style.layers.find(layer=>layer.type==='layout')!.s2lid:undefined, inlineStylesheet, customtextProperties,customtextStored,
+        links: approveLinks(snapshot.links), sidebarTags: tags.sidebar, themeAuthors, ...(easyread?{layout:"easyread" as const}:{}), theme, themeLayoutId:theme?style.layers.find(layer=>layer.type==='layout')!.s2lid:undefined, inlineStylesheet,customtextStored,
     };
 }

@@ -111,12 +111,10 @@ test("anonymous Page keeps native args, fallback double-clean order, views and s
     for(const [source,output] of [["tools/compiler-isolation.c",isolation],["live/render/sandbox.c",sandbox]])
         execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",source!,"-o",output!]);
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     {
-        for(const missing of [false,true]) {
             const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,
-                type:"core",compiledTime:1,sourceBytes:missing?null:Buffer.from(native.source,"base64"),
-                activeCompiledBytes:Buffer.from(native.code,"base64")}]});
+                type:"core",sourceBytes:Buffer.from(native.source,"base64")}]});
             const session=new GeneralProgramSession(coordinator.transfer(prepared),config,
                 generalScalarCallbacks({page:()=>pages[0],seesControlStrip:()=>false}), {
                 contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
@@ -130,6 +128,5 @@ test("anonymous Page keeps native args, fallback double-clean order, views and s
             const frame=session.completePage(page,"recent",()=>{throw Error("Positive Page must not request diagnostic");});
             assert.equal(session.context,context);
             assert.equal(Buffer.from(frame.bytes).toString("base64"),native.outputs[0]);
-        }
     }
 });

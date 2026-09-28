@@ -52,7 +52,7 @@ function RecentPage::print() { print label("recent") + $.global_title + ":" + $*
 function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.entry.subject + ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
 `;
 
-test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
+test("real factory prepares Page/Entry after one init and resumes source custom functions",async()=>{
     const native=JSON.parse(execFileSync("perl",["-e",String.raw`use strict;use warnings;no warnings 'once';
         use lib '/workspaces/dreamwidth/cgi-bin','/workspaces/dreamwidth/src/s2';
         BEGIN{require DBI;no warnings 'redefine';*DBI::connect=sub{die 'DB forbidden'};*DBI::connect_cached=sub{die 'DB forbidden'};}
@@ -86,7 +86,7 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
     for(const [input,output] of [["live/render/sandbox.c",sandbox],["tools/compiler-isolation.c",isolation]])
         execFileSync("cc",["-std=c11","-Wall","-Wextra","-Werror","-O2",input!,"-o",output!]);
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     const compiled=path.join(directory,"compiled");cpSync(path.resolve("dist"),compiled,{recursive:true});
     const driver=readFileSync(path.join(compiled,"tools/general-page-worker-child.js"),"utf8")
         .replaceAll('require("../live/render/','require("./')
@@ -100,11 +100,8 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
         descriptor,compiled],{timeout:120000});
     const renderer=new GeneralRenderer(sandbox,verifyGeneralRuntime(descriptor),
         {maxOutputBytes:1048576,maxHeapMiB:128,timeoutMs:10000});
-    for(const missing of [false,true]) {
         const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:111,
-            parentId:0,type:"core",compiledTime:1,sourceBytes:missing?null:Buffer.from(source),
-            activeCompiledBytes:Buffer.from(native.code,"base64")}]});
-        assert.equal(prepared.program.route,missing?"recovery":"source");
+            parentId:0,type:"core",sourceBytes:Buffer.from(source)}]});
         for(const kind of ["recent","entry"] as const) {
             let selected=false;const reads:string[]=[];
             const session=new GeneralPublicSession({async snapshot(name){reads.push(name);assert.equal(selected,true);
@@ -154,6 +151,5 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
             assert.equal(frame.utf8,false);assert.equal(Buffer.from(frame.bytes).toString("base64"),native.outputs[kind]);
             assert.ok(reads.length>=1);assert.equal(await session.finish(async()=>true),true);
         }
-    }
-    console.log("Actual factory source/recovery evidence (cleaned subject, empty event): "+directory);
+    console.log("Actual factory source evidence (cleaned subject, empty event): "+directory);
 });

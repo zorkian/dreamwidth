@@ -78,6 +78,25 @@ export interface ApprovedComments {
     readonly expandAllowed:boolean;readonly expanderAllowed:boolean;
 }
 
+export type CustomtextProperties = Partial<Record<
+    "module_customtext_show" | "module_customtext_order" | "module_customtext_section" |
+    "text_module_customtext" | "text_module_customtext_url" | "text_module_customtext_content",
+    string | number>> & Partial<Record<"color_page_background" | "font_base" | "module_tags_show" | "module_tags_order" |
+    "module_userprofile_show" | "module_userprofile_order" | "module_userprofile_section" |
+    "module_links_show" | "module_links_order" | "module_links_section" |
+    "module_pagesummary_show" | "module_pagesummary_order" | "module_pagesummary_section" |
+    "module_calendar_show" | "module_calendar_order" | "module_calendar_section" |
+    "module_tags_section", string | number>> & Partial<Record<
+    "entry_userpic_style" | "comment_userpic_style" | "userpics_position" | "entry_metadata_position" |
+    "font_fallback" | "font_base_size" | "font_base_units" |
+    "font_module_heading" | "font_module_heading_size" | "font_module_heading_units" |
+    "font_module_text" | "font_module_text_size" | "font_module_text_units" |
+    "font_journal_title" | "font_journal_title_size" | "font_journal_title_units" |
+    "font_journal_subtitle" | "font_journal_subtitle_size" | "font_journal_subtitle_units" |
+    "font_entry_title" | "font_entry_title_size" | "font_entry_title_units" |
+    "font_comment_title" | "font_comment_title_size" | "font_comment_title_units", string>>;
+
+
 export interface ApprovedJournal {
     readonly comments?:ApprovedComments;
     readonly themeAuthors?: readonly {readonly name:string;readonly author:{readonly userid:number;readonly username:string;
@@ -86,7 +105,7 @@ export interface ApprovedJournal {
     readonly theme?: import("./theme-catalog").ThemeName;
     readonly themeLayoutId?: number;
     readonly inlineStylesheet?: boolean;
-    readonly customtextProperties?: import("../domain/property-layer").CustomtextProperties;
+    readonly customtextProperties?: CustomtextProperties;
     readonly customtextStored?: {readonly title:string|null;readonly url:string|null;readonly content:string|null};
     readonly userid: number;
     readonly username: string;

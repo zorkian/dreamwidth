@@ -1,7 +1,7 @@
 # General consumer: parent/session checkpoint
 
 This is an intermediate implementation checkpoint, not a general-serving milestone.
-It combines reviewed program/recovery, scalar/COP, stop-kind, character-profile and
+It combines reviewed source-compiled program, scalar/COP, stop-kind, character-profile and
 initialization-output dependencies. The original-source subject dependency was
 later published under an explicit user review waiver, not independent CLEAR.
 
@@ -71,7 +71,7 @@ Entry from prepared cells. It carries named Page fields, owner name, public
 default Image and website text; it does not carry a bound User or private
 account handle. The worker's default Page path validates the descriptor,
 loads a fresh UserLite through its private host, and constructs the journal
-User with the same bindings used by `equals`. A closed source/recovered style
+User with the same bindings used by `equals`. A closed source-compiled style
 calls journal equality and `get_url` after this path, with native output bytes
 checked independently. The Page input/options in that control are fixed test
 facts; the ordinary parent builder must still issue actual source-derived
@@ -80,7 +80,7 @@ options and the original cleaners before serving real journals.
 The accepted subject content subpath is staged in the closed worker. The Page
 factory routes truthy Recent and direct Entry subjects through that cleaner,
 with admitted Perl character classes, original bytes and ordered eval effects.
-A source/recovered custom style prints a formatted subject in both page types
+A source-compiled custom style prints a formatted subject in both page types
 and matches independently constructed native output. Named public helper
 implementations and request authority remain required for subjects that reach
 those branches; an absent helper is never replaced with identity cleaning.
@@ -96,7 +96,7 @@ warm Time::Local cache is carried into a new request.
 ## Evidence boundary
 
 The maintained tests distinguish actual installed native helpers, actual isolated
-SQL, actual source/recovered Context execution, actual sandbox pipes and injected
+SQL, actual source-compiled Context execution, actual sandbox pipes and injected
 parent orchestration controls. The general stage test uses a synthetic fixed
 entry: it proves closed installation mechanics, not a production general worker.
 Native helper comparisons do not claim full native page parity. Generated profiles,
@@ -112,7 +112,7 @@ The reviewed encoding converter/profile still needs actual selected-source
 binding and final freshness checks.
 The native request style/scheme/substitution paths also require actual consumer
 wiring. Finally, fresh real-worker closure, ordinary main Recent/Entry GET/HEAD,
-custom source and recovered execution, independent native comparison, browser and
+custom source execution, independent native comparison, browser and
 persistent privacy/revocation proof remain mandatory. None of these gaps is a
 permanent journal/style/content exclusion or a completed replacement claim.
 

@@ -1,6 +1,6 @@
 // native-scalar.ts
 //
-// Shared scalar boundaries for source-compiled and recovered S2 programs.
+// Scalar boundaries for source-compiled S2 programs.
 //
 // Authors:
 //      Dreamwidth contributors
