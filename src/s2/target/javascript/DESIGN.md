@@ -94,5 +94,7 @@ cd src/s2/target/javascript
 npm ci && npm run build
 perl tools/export-config.pl > config.json
 npm start -- --config config.json
+
+perl tools/seed-fixtures.pl          # once, in the devcontainer
 npm test
 ```
