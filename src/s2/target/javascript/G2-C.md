@@ -66,6 +66,17 @@ The fixed worker control uses this projector over isolated selected SQL instead
 of reading raw selected source bytes into its page model. The ordinary installed
 page builder and its remaining source operations are still required.
 
+The selected Page descriptor projects a Recent counted window or one exact
+Entry from prepared cells. It carries named Page fields, owner name, public
+default Image and website text; it does not carry a bound User or private
+account handle. The worker's default Page path validates the descriptor,
+loads a fresh UserLite through its private host, and constructs the journal
+User with the same bindings used by `equals`. A closed source/recovered style
+calls journal equality and `get_url` after this path, with native output bytes
+checked independently. The Page input/options in that control are fixed test
+facts; the ordinary parent builder must still issue actual source-derived
+options and the original cleaners before serving real journals.
+
 ## Evidence boundary
 
 The maintained tests distinguish actual installed native helpers, actual isolated
