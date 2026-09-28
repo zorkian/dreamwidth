@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # compile-active.pl
 #
-# Compile source candidates only when they reproduce the authoritative active program.
+# Compile selected S2 source to the JavaScript backend.
 #
 # Authors:
 #      Dreamwidth contributors
@@ -92,29 +92,12 @@ eval {
         die "input" unless $layer->{ownerId} =~ /^\d+$/ && $layer->{ownerId} > 0;
         my $untrusted = $layer->{ownerId} != $request->{systemUserId};
         my $source = decode_base64($layer->{sourceBase64});
-        my $active = decode_base64($layer->{activeBase64});
-        die "input" unless encode_base64($source, '') eq $layer->{sourceBase64}
-            && encode_base64($active, '') eq $layer->{activeBase64};
-        die "input" if length($source) > 16777215 || length($active) > 16777215;
+        die "input" unless encode_base64($source, '') eq $layer->{sourceBase64};
+        die "input" if length($source) > 16777215;
         my $parent = $type eq 'core' ? S2::Checker->new : $checkers{$layer->{parentId}};
         die "dependency" unless $parent;
-        my $native = '';
-        my $native_compiler = S2::Compiler->new({checker => dclone($parent)});
-        eval {
-            $native_compiler->compile_source({type => $type, source => \$source,
-                output => \$native, layerid => $id, untrusted => $untrusted,
-                builtinPackage => 'S2::Builtin::LJ', format => 'perl'});
-        };
-        # A saved source candidate may itself be invalid while older code remains
-        # active. That is another recovery dependency, never an active-code ban.
-        if ($@ || $native ne $active) {
-            $result = {kind => 'recovery', layerId => 0 + $id,
-                reason => 'active-source-correspondence',
-                candidateSha256 => sha256_hex($native), activeSha256 => sha256_hex($active)};
-            last;
-        }
-        # Both checkers see the same raw bytes. General scalar literals serialize
-        # octets as hex, never a Unicode decode/reencode of stored source.
+        # General scalar literals serialize octets as hex, never a Unicode
+        # decode/reencode of the selected source.
         my $text = $source;
         my $js = '';
         my $compiler = S2::Compiler->new({checker => dclone($parent)});
@@ -122,10 +105,10 @@ eval {
         $compiler->compile_source({type => $type, source => \$text, output => \$js,
             layerid => $variable, untrusted => $untrusted,
             builtinPackage => 'S2::Builtin', format => 'javascript', generalHashes => 1, generalScalars => 1});
-        $checkers{$id} = $native_compiler->{checker};
+        $checkers{$id} = $compiler->{checker};
         push @compiled, {id => 0 + $id, variable => $variable, code => $js};
     }
-    $result ||= {kind => 'compiled', layers => \@compiled};
+    $result = {kind => 'compiled', layers => \@compiled};
     }
 };
 # Compiler diagnostics contain paths and original input. Keep them out of the

@@ -1,6 +1,6 @@
 // layer-artifact.ts
 //
-// General source-proven S2 programs and credential-free compiler jobs.
+// Source-compiled S2 programs and credential-free compiler jobs.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -23,22 +23,14 @@ import {ABI_VERSION, Layer, s2} from "../../runtime/s2runtime";
 
 export type {LayerType,ActiveLayerInput,ActiveStyleSnapshot,LayerIdentity,CompiledLayer,ProgramArtifact} from "./program";
 import type {LayerType,LayerIdentity,ActiveStyleSnapshot,ProgramArtifact} from "./program";
-export interface RecoveryDependency {
-    readonly kind:"recovery"; readonly layerId:number;
-    readonly reason:"missing-source"|"active-source-correspondence"|"source-prerequisites";
-}
-export interface DeterministicGap {
-    readonly kind:"gap";readonly deterministic:true;readonly layerId:number;readonly reason:string;
-    readonly compilerDigest:string;readonly recoveryDigest:string;readonly dependenciesDigest:string;
-}
-export type CompilationResult = {readonly kind:"compiled";readonly program:ProgramArtifact}|RecoveryDependency|DeterministicGap;
+export type CompilationResult = {readonly kind:"compiled";readonly program:ProgramArtifact};
 export interface CompilerConfig {
     readonly s2Root:string; readonly perl:string; readonly isolationExecutable:string;
     readonly timeoutMs?:number; readonly maxOutputBytes?:number;
 }
-interface WireLayer extends LayerIdentity {sourceBase64:string|null;activeBase64:string}
+interface WireLayer extends LayerIdentity {sourceBase64:string}
 interface Capture {styleId:number;systemUserId:number;layers:WireLayer[]}
-interface JobResult {kind:string;layerId?:number;reason?:string;layers?:{id:number;variable:string;code:string}[]}
+interface JobResult {kind:string;layers?:{id:number;variable:string;code:string}[]}
 const issued = new WeakSet<object>();
 export const sha256 = (bytes:Uint8Array|string):string => createHash("sha256").update(bytes).digest("hex");
 export class CompilerFailure extends Error {
@@ -50,17 +42,16 @@ function capture(snapshot:ActiveStyleSnapshot):Capture {
     let total=0;
     const layers=snapshot.layers.map(layer=> {
         if(!integer(layer.id,1)||!integer(layer.ownerId,1)||!integer(layer.parentId)||
-            !integer(layer.compiledTime)||!["core","i18nc","layout","i18n","theme","user"].includes(layer.type)) throw new CompilerFailure();
-        const source=layer.sourceBytes===null?null:Buffer.from(layer.sourceBytes);
-        const active=Buffer.from(layer.activeCompiledBytes);
+            !["core","i18nc","layout","i18n","theme","user"].includes(layer.type)) throw new CompilerFailure();
+        if(layer.sourceBytes===null)throw new CompilerFailure();
+        const source=Buffer.from(layer.sourceBytes);
         // MEDIUMBLOB capacity, plus a separate cumulative compiler-job budget.
-        if((source?.length??0)>16777215||active.length>16777215||!active.length) throw new CompilerFailure();
-        total+=(source?.length??0)+active.length;
+        if(source.length>16777215) throw new CompilerFailure();
+        total+=source.length;
         if(total>67108864)throw new CompilerFailure();
         return {id:layer.id,ownerId:layer.ownerId,parentId:layer.parentId,type:layer.type,
-            compiledTime:layer.compiledTime,untrusted:layer.ownerId!==snapshot.systemUserId,
-            sourceSha256:source===null?null:sha256(source),activeSha256:sha256(active),
-            sourceBase64:source===null?null:source.toString("base64"),activeBase64:active.toString("base64")};
+            untrusted:layer.ownerId!==snapshot.systemUserId,
+            sourceSha256:sha256(source),sourceBase64:source.toString("base64")};
     });
     return {styleId:snapshot.styleId,systemUserId:snapshot.systemUserId,layers};
 }
@@ -109,7 +100,7 @@ function freezeProgram(program:ProgramArtifact):ProgramArtifact {
 }
 export function instantiateProgram(program:ProgramArtifact):Layer[] {
     if(!issued.has(program))throw new CompilerFailure();
-    // Only locally compiled/recovered and authenticated programs reach this point.
+    // Only locally compiled and authenticated programs reach this point.
     // Instantiation belongs in the credential-free renderer, not the DB parent.
     return program.layers.map(item=> {
         const layer=new Function("s2",`"use strict";\n${item.code}\nreturn ${item.variable};`)(s2);
@@ -178,13 +169,13 @@ export class ArtifactCompiler {
     private keyFor(input:Capture):string {
         const {layers,...rest}=input;
         return sha256(JSON.stringify({schema:1,abi:ABI_VERSION,compiler:this.digest,...rest,
-            layers:layers.map(({sourceBase64,activeBase64,...identity})=>identity)}));
+            layers:layers.map(({sourceBase64,...identity})=>identity)}));
     }
     async compile(snapshot:ActiveStyleSnapshot, options:CompilerJobOptions={}):Promise<CompilationResult> {
         this.assertDependencies(true);
         const input=capture(snapshot);const key=this.keyFor(input);
-        // Today's source checker prerequisites do not govern persisted active
-        // registration. Missing/changed metadata takes the recovery path.
+        // The selected latest source is the sole program input. Its parents
+        // must form the compiler's declaration order.
         const selected=new Set<number>(); let rank=-1;
         const sourceReady=input.layers.length>0&&input.layers.every((layer,index)=>{
             const current=["core","i18nc","layout","i18n","theme","user"].indexOf(layer.type);
@@ -192,18 +183,11 @@ export class ArtifactCompiler {
                 (index===0?layer.type==="core"&&layer.parentId===0:selected.has(layer.parentId));
             rank=current;selected.add(layer.id);return valid;
         });
-        if(!sourceReady)return {kind:"recovery",layerId:input.layers[0]?.id??0,reason:"source-prerequisites"};
-        const missing=input.layers.find(layer=>layer.sourceBase64===null);
-        if(missing)return {kind:"recovery",layerId:missing.id,reason:"missing-source"};
+        if(!sourceReady)throw new CompilerFailure();
         const result=await this.queue.run(signal=>this.job(input,signal),options);
         this.assertDependencies(true);
-        if(result.kind==="recovery") {
-            if(typeof result.layerId!=="number"||!input.layers.some(layer=>layer.id===result.layerId)||result.reason!=="active-source-correspondence")throw new CompilerFailure();
-            return {kind:"recovery",layerId:result.layerId,reason:result.reason};
-        }
-        if(result.kind==="failed")return {kind:"recovery",layerId:input.layers[0]!.id,reason:"source-prerequisites"};
         if(result.kind!=="compiled"||!Array.isArray(result.layers)||result.layers.length!==input.layers.length)throw new CompilerFailure();
-        const layers=input.layers.map(({sourceBase64,activeBase64,...identity},index)=> {
+        const layers=input.layers.map(({sourceBase64,...identity},index)=> {
                 const emitted=result.layers![index];
             if(!emitted||emitted.id!==identity.id||emitted.variable!==`layer_${index}`||typeof emitted.code!=="string"||!emitted.code)throw new CompilerFailure();
             return {...identity,variable:emitted.variable,code:emitted.code,codeSha256:sha256(emitted.code)};
