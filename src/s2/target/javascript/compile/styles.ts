@@ -14,7 +14,7 @@
 
 import type { SiteConfig } from "../server/config";
 import { type Databases, int, text } from "../data/db";
-import type { User } from "../data/user";
+import { User } from "../data/user";
 
 export const LAYER_ORDER = ["core", "i18nc", "layout", "i18n", "theme", "user"] as const;
 
@@ -26,10 +26,11 @@ export interface LayerRef {
     readonly sourceHash: string;
 }
 
-// Layers in run order. `user` must have its s2_style prop loaded.
-export async function styleLayers(db: Databases, config: SiteConfig, user: User): Promise<LayerRef[]> {
-    const styleid = int(user.props.s2_style);
-    if (styleid) {
+// Layers in run order for a style, or the site default.
+export async function styleLayers(db: Databases, config: SiteConfig, styleid: number): Promise<LayerRef[]> {
+    const owner = styleid ? await db.global("SELECT userid FROM s2styles WHERE styleid = ?", [styleid]) : [];
+    const user = owner[0] ? (await User.byIds(db, [int(owner[0].userid)])).values().next().value : undefined;
+    if (user) {
         const rows = await user.cluster(db, "SELECT type, s2lid FROM s2stylelayers2 WHERE userid = ? AND styleid = ?",
             [user.userid, styleid]);
         const layers = await loadLayers(db, rows.map(row => int(row.s2lid)).filter(Boolean));
@@ -70,9 +71,8 @@ export interface StyleInfo {
 }
 
 // What LJ::S2::Page reports about the style.
-export async function styleInfo(db: Databases, config: SiteConfig, user: User,
+export async function styleInfo(db: Databases, config: SiteConfig, user: User, styleid: number,
     layers: readonly LayerRef[]): Promise<StyleInfo> {
-    const styleid = int(user.props.s2_style);
     const ids = layers.map(layer => layer.id);
     const [styles, compiled, userCompiled, names] = await Promise.all([
         styleid ? db.global("SELECT modtime FROM s2styles WHERE styleid = ?", [styleid]) : [],

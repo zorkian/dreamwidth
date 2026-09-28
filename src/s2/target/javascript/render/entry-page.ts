@@ -14,7 +14,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import { type CommentRow, commentProps, commentRows, commentTexts } from "../data/comment";
-import { Entry, truthy } from "../data/entry";
+import { Entry } from "../data/entry";
 import { User } from "../data/user";
 import { type S2Object, DateTimeUnix, ImageUserpic, ItemRange, UserLite, ehtml, s2 } from "./objects";
 import { type PageContext, Page, entryObjects, journalDefaultPic, loadUserpics, robotMetaTags } from "./pages";
@@ -39,13 +39,11 @@ interface Post extends CommentRow {
     props?: Record<string, string>;
 }
 
-// null when the entry does not exist or the visitor may not see it.
-export async function EntryPage(pc: PageContext, ditemid: number, args: EntryArgs,
+// null when the visitor may not see the entry.
+export async function EntryPage(pc: PageContext, entry: Entry, args: EntryArgs,
     chromeHead: string): Promise<S2Object | null> {
     const { site, journal, db } = pc;
     const config = site.config;
-    const entry = await Entry.byDitemid(db, journal, ditemid);
-    if (!entry) return null;
     await Entry.fill(db, journal, [entry]);
     if (!entry.isPublic()) return null;
 
@@ -65,7 +63,8 @@ export async function EntryPage(pc: PageContext, ditemid: number, args: EntryArg
 
     const permalink = entry.url(site);
     let head = page._head_content;
-    if (truthy(journal.props.opt_blockrobots)) head += robotMetaTags();
+    const entryAdult = entry.props.adult_content_maintainer || entry.props.adult_content || "";
+    if (journal.shouldBlockRobots(config) || config.robotBlockingContent.includes(entryAdult)) head += robotMetaTags();
     head += '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
     const go = (dir: string) => `${config.protocol}://${site.host}/go?dir=${dir}&itemid=${entry.ditemid}&journal=${journal.user}`;
     head += `<link rel="prev" href="${go("prev")}" />\n<link rel="next" href="${go("next")}" />\n`;

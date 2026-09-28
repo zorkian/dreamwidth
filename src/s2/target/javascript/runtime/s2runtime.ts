@@ -167,6 +167,10 @@ export class Context {
         throw new S2Error(`${layer.source}:${line}: undefined method ${type}::${name}`);
     }
 
+    hasFunction(name: string): boolean {
+        return this.functions.has(name);
+    }
+
     runFunction(name: string): void {
         this.getFunction(name)(this);
     }

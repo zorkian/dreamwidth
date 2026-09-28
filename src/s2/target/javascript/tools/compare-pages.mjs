@@ -44,18 +44,19 @@ const sortSiteKeys = text => text
         }
     });
 
+const unorigin = (value, origins) => origins.reduce((text, origin) =>
+    text.replaceAll(origin, "ORIGIN").replaceAll(new URL(origin).host, "HOST"), value)
+    .replace(/LJWidget_\d+/g, "LJWidget_N");
+
 export function normalize(html, origins) {
     const document = new JSDOM(html).window.document;
     const lines = [];
     // Widget ids come from a per-process counter in Perl.
-    const unorigin = value => origins.reduce((text, origin) =>
-        text.replaceAll(origin, "ORIGIN").replaceAll(new URL(origin).host, "HOST"), value)
-        .replace(/LJWidget_\d+/g, "LJWidget_N");
     const walk = (node, depth, verbatim) => {
         const indent = "  ".repeat(depth);
         if (node.nodeType === 3) {
             const text = verbatim ? sortSiteKeys(node.data) : node.data.replace(/\s+/g, " ").trim();
-            if (text) lines.push(indent + JSON.stringify(unorigin(text)));
+            if (text) lines.push(indent + JSON.stringify(unorigin(text, origins)));
             return;
         }
         if (node.nodeType === 8) return;
@@ -67,7 +68,7 @@ export function normalize(html, origins) {
         const attrs = [...node.attributes]
             .map(({ name: key, value }) => {
                 if (key === "value" && VOLATILE.has(name)) value = "*";
-                return `${key}=${JSON.stringify(unorigin(value.replace(/\s+/g, " ").trim()))}`;
+                return `${key}=${JSON.stringify(unorigin(value.replace(/\s+/g, " ").trim(), origins))}`;
             })
             .sort();
         lines.push(indent + [node.tagName.toLowerCase(), ...attrs].join(" "));
@@ -82,15 +83,27 @@ export function normalize(html, origins) {
 
 // Connect to loopback but send the origin's own Host, which both servers
 // use to build journal URLs.
+// A response as compared: status, redirect target and the normalized body,
+// or the body as it is for anything but HTML.
+export function summarize(page, origins) {
+    const html = page.type.startsWith("text/html");
+    const location = page.location ? `location ${unorigin(page.location, origins)}\n` : "";
+    if (!page.body) return `status ${page.status}\n${location}`;
+    return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins) : unorigin(page.body, origins));
+}
+
 export function fetchPage(origin, pagePath) {
     const url = new URL(origin);
     return new Promise((resolve, reject) => {
         http.get({ host: "127.0.0.1", port: url.port || 80, path: pagePath, headers: { host: url.host } },
             response => {
-                let html = "";
+                let body = "";
                 response.setEncoding("utf8");
-                response.on("data", chunk => (html += chunk));
-                response.on("end", () => resolve({ status: response.statusCode, html }));
+                response.on("data", chunk => (body += chunk));
+                response.on("end", () => resolve({
+                    status: response.statusCode, body, type: response.headers["content-type"] ?? "",
+                    location: response.headers.location,
+                }));
             }).on("error", reject);
     });
 }
@@ -109,8 +122,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
         const [perl, js] = await Promise.all([perlOrigin, jsOrigin].map(origin => fetchPage(origin, pagePath)));
         const origins = [perlOrigin, jsOrigin];
         const files = ["perl", "js"].map(side => path.join(directory, side + pagePath.replace(/\W+/g, "_")));
-        writeFileSync(files[0], `status ${perl.status}\n` + normalize(perl.html, origins));
-        writeFileSync(files[1], `status ${js.status}\n` + normalize(js.html, origins));
+        for (const [index, page] of [perl, js].entries()) writeFileSync(files[index], summarize(page, origins));
         const diff = spawnSync("diff", ["-u", ...files], { encoding: "utf8" });
         if (diff.status === 0) {
             console.log(`same ${pagePath}`);
