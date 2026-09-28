@@ -5,8 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server/main.js",
-    "test": "node --test dist/tests/*.test.js",
-    "check": "tsc && node dist/tools/selftest.js && node dist/tools/run.js"
+    "test": "node --test dist/tests/*.test.js"
   },
   "devDependencies": {
     "@types/node": "22.15.30",

@@ -71,16 +71,19 @@ end.
 Tests must catch real regressions. Each one should fail if a reader would see
 a wrong page, private data would leak, or unsafe HTML would get through.
 
-- **Page comparisons.** A small set of fixture journals in the devcontainer,
-  rendered by both Perl and this server, compared as normalized DOM. The set
-  covers the stock layouts, a theme, a user layer, entries with rich HTML,
-  comments, and pagination.
-- **Privacy.** Non-public entries, screened comments and suspended journals
-  never appear.
-- **Cleaner.** Ported from the existing Perl cleaner tests in `t/`, each
-  stating its expected output, and extended as bugs are found.
-- **Compiler.** The existing `src/s2/tests` fixtures run through the JS
-  backend.
+- **Page comparisons** (`tests/pages.test.ts`). Fixture journals from
+  `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
+  normalized DOM. They cover the site default style, a theme, a user layer,
+  entries with rich HTML, comments, and pagination.
+  `tools/compare-pages.mjs` runs the same comparison for any page.
+- **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments
+  and suspended journals never appear.
+- **Render limits** (`tests/pool.test.ts`). A style that never finishes is
+  stopped.
+- **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in
+  `t/`, each stating its expected output, and extended as bugs are found.
+- **Compiler** (`tests/compiler.test.ts`). The programs in `src/s2/tests`,
+  compiled to JavaScript and run, give their expected output.
 
 Tests state their expected output directly. They do not replay recorded Perl
 output, compare internal helpers against Perl, or carry evidence and
@@ -97,4 +100,5 @@ npm start -- --config config.json
 
 perl tools/seed-fixtures.pl          # once, in the devcontainer
 npm test
+(cd ../../../content && npm ci && npm run build && npm test)
 ```

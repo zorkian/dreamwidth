@@ -1,7 +1,7 @@
 // content.ts
 //
-// Clean entry and comment text with @dreamwidth/content, as the page
-// builders call LJ::CleanHTML.
+// Clean entry, comment and subject text with @dreamwidth/content, as the
+// page builders call LJ::CleanHTML.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -12,17 +12,16 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { createEntryCleaner } from "@dreamwidth/content";
-import type { EntryContentContext, EntryContentInput } from "@dreamwidth/content/contracts";
-import type { SiteConfig } from "../server/config";
+import {
+    type CleanHooks, type CleanSite, canonicalUsername, cleanComment, cleanCss, cleanEvent, cleanSubject,
+    cleanSubjectAll, removeLinks, userReferences,
+} from "@dreamwidth/content";
+import type { Databases } from "../data/db";
 import type { Entry } from "../data/entry";
 import { truthy } from "../data/entry";
-import type { Site, User } from "../data/user";
-import { ehtml } from "./objects";
+import { type Site, User } from "../data/user";
+import { ljuserTag } from "./chrome";
 import type { PropertyCleaners } from "./context";
-import { cleanCss } from "./css-cleaner";
-
-type Format = EntryContentInput["format"];
 
 export interface CleanedSubject {
     readonly html: string;
@@ -32,113 +31,84 @@ export interface CleanedSubject {
     readonly text: string;
 }
 
-// The largest limits the cleaner accepts.
-const LIMITS = {
-    maxInputBytes: 65536, maxOutputBytes: 2097152, maxNodes: 4096, maxDepth: 16, maxCssBytes: 65536,
-    maxCssNodes: 4096, maxImageCandidates: 256, maxCuts: 16,
-};
-
 export class ContentCleaner {
-    private readonly cleaner = createEntryCleaner(LIMITS);
+    readonly site: CleanSite;
+    // Accounts named in the text being cleaned, loaded by preload().
+    private readonly users = new Map<string, User>();
+    private readonly hooks: CleanHooks;
 
-    constructor(private readonly site: Site, private readonly journal: User) {}
-
-    close(): void {
-        this.cleaner.close();
+    constructor(private readonly pageSite: Site) {
+        const config = pageSite.config;
+        this.site = {
+            domain: config.domain, domainWeb: config.domainWeb, statPrefix: config.statPrefix,
+            trustedCssHosts: config.trustedCssHosts, cssProxy: config.cssProxy, cssCleaner: config.cssCleaner,
+            siteRoot: config.siteRoot, imgPrefix: config.imgPrefix, isDevServer: config.isDevServer,
+            knownHttpsSites: [], formDomainBanned: [], placeholder: config.images.placeholder!, strings: config.strings,
+        };
+        this.hooks = {
+            user: (name, options) => {
+                const u = this.users.get(canonicalUsername(name));
+                if (!u) return undefined;
+                return options.textonly ? u.user
+                    : ljuserTag(pageSite, u, { noLink: options.noLink, noLjuserClass: options.noLjuserClass });
+            },
+        };
     }
 
-    // LJ::CleanHTML::clean_event. Recent views collapse cuts into links.
-    event(entry: Entry, documentUrl: string, cuts: "recent" | "entry"): string {
-        const url = entry.url(this.site);
-        const result = this.cleaner.clean({
-            body: entry.event, format: entryFormat(entry),
-            context: this.context(documentUrl, url, entry.ditemid, cuts),
-        });
-        return result.kind === "ok" ? result.fragment.html : escaped(entry.event);
-    }
-
-    // The plain subject and body text EntryPage uses for Open Graph tags.
-    metadata(entry: Entry): { subject: string; event: string } {
-        const url = entry.url(this.site);
-        const result = this.cleaner.metadata({
-            subject: entry.subject,
-            entry: { body: entry.event, format: entryFormat(entry), context: this.context(url, url, entry.ditemid, "entry") },
-        });
-        return result.kind === "ok" ? { subject: result.metadata.subjectText, event: result.metadata.eventText }
-            : { subject: this.subject(entry.subject, url).text, event: entry.event.replace(/<[^>]*>/g, "") };
-    }
-
-    comment(body: string, props: Record<string, string>, datepost: string, anonymous: boolean, entryUrl: string): string {
-        const formatting = truthy(props.editor) ? props.editor! : truthy(props.opt_preformatted) ? "html_raw0"
-            : "import_source" in props || datepost < "2019-05" ? "html_casual0" : "html_casual1";
-        if (!["html_raw0", "html_casual0", "html_casual1"].includes(formatting)) return escaped(body);
-        const result = this.cleaner.comment({
-            body, formatting: formatting as "html_raw0" | "html_casual0" | "html_casual1", anonymous,
-            context: this.context(entryUrl, entryUrl, 1, "entry"),
-        });
-        return result.kind === "ok" ? result.html : escaped(body);
-    }
-
-    // LJ::CleanHTML::clean_subject, and the forms formatted_subject uses.
-    subject(source: string, documentUrl: string): CleanedSubject {
-        if (!/[<>]/.test(source)) return { html: source, noLinks: source, text: source };
-        const result = this.cleaner.subject({ source, context: this.context(documentUrl, documentUrl, 1, "entry") });
-        if (result.kind !== "ok") {
-            const text = escaped(source);
-            return { html: text, noLinks: text, text };
+    // Load the accounts the text mentions, so cleaning can render their user tags.
+    async preload(db: Databases, texts: readonly string[]): Promise<void> {
+        const names = new Set<string>();
+        for (const text of texts) {
+            for (const name of userReferences(hooks => cleanEvent(text, {}, this.site, hooks))) {
+                const canonical = canonicalUsername(name);
+                if (canonical && !this.users.has(canonical)) names.add(canonical);
+            }
         }
-        return { html: result.subject.html, noLinks: result.subject.recentHtml, text: result.subject.all };
+        for (const name of names) {
+            const u = await User.byName(db, name);
+            if (u) this.users.set(name, u);
+        }
+    }
+
+    // LJ::Entry::event_html. Recent pages link cuts to the entry.
+    event(entry: Entry, cuts: "recent" | "entry", suspended = false): string {
+        return cleanEvent(entry.event, {
+            editor: entry.props.editor, preformatted: truthy(entry.props.opt_preformatted),
+            isImported: "import_source" in entry.props, logtime: entry.logtime,
+            isSyndicated: entry.journal.journaltype === "Y",
+            cuturl: cuts === "recent" ? entry.url(this.pageSite) : undefined,
+            journal: entry.journal.user, ditemid: entry.ditemid, suspendMsg: suspended,
+        }, this.site, this.hooks);
+    }
+
+    // LJ::Entry::event_text and subject_text, for Open Graph tags.
+    metadata(entry: Entry): { subject: string; event: string } {
+        return {
+            subject: entry.subject ? cleanSubjectAll(entry.subject, this.site) : "",
+            event: entry.event ? cleanEvent(entry.event, { textonly: true }, this.site, this.hooks) : "",
+        };
+    }
+
+    comment(body: string, props: Record<string, string>, datepost: string, anonymous: boolean): string {
+        return cleanComment(body, {
+            editor: props.editor, preformatted: truthy(props.opt_preformatted), isImported: "import_source" in props,
+            datepost, anonymous, nocss: anonymous,
+        }, this.site, this.hooks);
+    }
+
+    // The subject as S2 shows it, and the forms formatted_subject uses.
+    subject(source: string): CleanedSubject {
+        const html = cleanSubject(source, this.site);
+        return { html, noLinks: removeLinks(html, this.site), text: cleanSubjectAll(html, this.site) };
     }
 
     // Property cleaners for LJ::S2::escape_prop_value.
-    propertyCleaners(documentUrl: string): PropertyCleaners {
+    propertyCleaners(): PropertyCleaners {
         return {
-            html: value => {
-                const result = this.cleaner.customtext({ source: value, context: this.context(documentUrl, documentUrl, 1, "entry") });
-                return result.kind === "ok" ? result.html : escaped(value);
-            },
-            simpleHtml: value => this.subject(value, documentUrl).html,
+            html: value => cleanEvent(value, {}, this.site, this.hooks),
+            simpleHtml: value => cleanSubject(value, this.site),
             css: value => cleanCss(value),
             cssAttribute: value => cleanCss(value),
         };
     }
-
-    private context(documentUrl: string, entryUrl: string, entryId: number, cuts: "recent" | "entry"): EntryContentContext {
-        const config: SiteConfig = this.site.config;
-        const placeholder = config.images.placeholder!;
-        return {
-            policy: "dreamwidth-entry-html-raw0-v1", insertionContext: "html-div-flow", documentUrl, entryUrl,
-            journalUsername: this.journal.user, journalId: this.journal.userid, entryId,
-            cuts: cuts === "recent" ? "source-compatible-recent" : "source-compatible-entry",
-            reader: {
-                removeColors: false, removeSizes: false, removeFonts: false, maxImageWidth: null,
-                maxImageHeight: null, placeholderUndefinedImageSize: false, extractImages: false,
-            },
-            imagePlaceholder: {
-                src: config.imgPrefix + placeholder.src, width: placeholder.width, height: placeholder.height,
-                alt: placeholder.alt, title: placeholder.alt,
-            },
-            urls: { siteDomain: config.domain, knownHttpsSites: [], formDomainBanned: [], imageProxy: "not-configured" },
-        };
-    }
-}
-
-// The editor LJ::CleanHTML::clean_event picks.
-function entryFormat(entry: Entry): Format {
-    const props = entry.props;
-    if (!entry.event) return "html_raw0";
-    if (truthy(props.editor)) {
-        if (props.editor === "rte0") return "html_casual1";
-        if (["markdown0", "markdown", "markdown_latest"].includes(props.editor!)) return "markdown0";
-        if (["html_raw0", "html_casual0", "html_casual1"].includes(props.editor!)) return props.editor as Format;
-    }
-    if (/^[\t\n\v\f\r ]*!markdown[\t\n\v\f\r ]*\r?\n/i.test(entry.event)) return "markdown0-magic";
-    if (truthy(props.opt_preformatted)) return "html_raw0";
-    if ("import_source" in props) return "html_casual0";
-    return entry.logtime < "2019-05" ? "html_casual0" : "html_casual1";
-}
-
-// Text the cleaner declines is shown escaped rather than dropped.
-function escaped(text: string): string {
-    return ehtml(text).replaceAll("\n", "<br />");
 }

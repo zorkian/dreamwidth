@@ -1,6 +1,6 @@
 {
   "name": "@dreamwidth/content",
-  "version": "0.0.0-slice4",
+  "version": "1.0.0",
   "private": true,
   "type": "commonjs",
   "main": "./dist/index.js",
@@ -9,44 +9,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js"
-    },
-    "./contracts": {
-      "types": "./dist/contracts.d.ts",
-      "require": "./dist/contracts.js"
-    },
-    "./native-entities": {
-      "types": "./dist/native-entities.d.ts",
-      "require": "./dist/native-entities.js"
-    },
-    "./page-output": {
-      "types": "./dist/page-output.d.ts",
-      "require": "./dist/page-output.js"
-    },
-    "./general-contexts": {
-      "types": "./dist/general-contexts.d.ts",
-      "require": "./dist/general-contexts.js"
-    },
-    "./general-subject": {
-      "types": "./dist/general-subject.d.ts",
-      "require": "./dist/general-subject.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "prepare:corpus": "node tools/prepare-corpus.mjs"
+    "test": "node --test dist/tests/*.test.js"
   },
   "dependencies": {
-    "css-tree": "3.2.1",
-    "dompurify": "3.4.16",
+    "entities": "6.0.1",
     "htmlparser2": "10.0.0",
-    "jsdom": "30.1.1",
     "markdown-it": "15.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
-    "@types/css-tree": "3.2.0",
-    "@types/jsdom": "30.0.0",
     "@types/node": "24.13.6",
     "typescript": "5.8.3"
   }

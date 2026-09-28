@@ -80,19 +80,7 @@ export function createChrome(request: ChromeRequest): Chrome & {
     // LJ::ljuser
     const ljuser = (userid: number, linkColor: string) => {
         const u = request.users.get(userid);
-        if (!u) return "";
-        const staff = Number(u.getCap(config, "staff_headicon")) > 0;
-        const [icon, size, alt] = u.journaltype === "C"
-            ? staff ? ["comm_staff.png", 16, "site community"] : ["silk/identity/community.png", 16, "community"]
-            : u.journaltype === "Y" ? ["silk/identity/feed.png", 16, "syndicated"]
-                : staff ? ["silk/identity/user_staff.png", 17, "staff"] : ["silk/identity/user.png", 17, "personal"];
-        const deleted = u.isVisible() ? "" : " text-decoration: line-through;";
-        const style = /^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/.test(linkColor) ? ` style='color: ${linkColor};'` : "";
-        const base = u.journalBase(site);
-        return `<span lj:user='${u.user}' style='white-space: nowrap;${deleted}' class='ljuser'>` +
-            `<a href='${base}/profile'><img src='${config.imgPrefix}/${icon}' alt='[${alt} profile] ' ` +
-            `width='${size}' height='${size}' style='vertical-align: text-bottom; border: 0; padding-right: 1px;' /></a>` +
-            `<a href='${base}/'${style}><b>${u.user}</b></a></span>`;
+        return u ? ljuserTag(site, u, { linkColor }) : "";
     };
 
     const label = (id: string, css: string, text: string) =>
@@ -222,6 +210,33 @@ jQuery(function(jQ){
             return `<div class='ljtags'>${String(props._text_tags ?? "").replace("#", list)}</div>`;
         },
     };
+}
+
+export interface UserTagOptions {
+    readonly linkColor?: string;
+    readonly noLink?: boolean;
+    readonly noLjuserClass?: boolean;
+}
+
+// LJ::ljuser
+export function ljuserTag(site: Site, u: User, options: UserTagOptions = {}): string {
+    const config = site.config;
+    const staff = Number(u.getCap(config, "staff_headicon")) > 0;
+    const [icon, size, alt] = u.journaltype === "C"
+        ? staff ? ["comm_staff.png", 16, "site community"] : ["silk/identity/community.png", 16, "community"]
+        : u.journaltype === "Y" ? ["silk/identity/feed.png", 16, "syndicated"]
+            : staff ? ["silk/identity/user_staff.png", 17, "staff"] : ["silk/identity/user.png", 17, "personal"];
+    const deleted = u.isVisible() ? "" : " text-decoration: line-through;";
+    const style = /^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/.test(options.linkColor ?? "")
+        ? ` style='color: ${options.linkColor};'` : "";
+    const base = u.journalBase(site);
+    const img = `<img src='${config.imgPrefix}/${icon}' alt='[${alt} profile] ' width='${size}' height='${size}' ` +
+        "style='vertical-align: text-bottom; border: 0; padding-right: 1px;' />";
+    const attrs = options.noLjuserClass ? "" : ` lj:user='${u.user}'`;
+    const cls = options.noLjuserClass ? "" : " class='ljuser'";
+    return `<span${attrs} style='white-space: nowrap;${deleted}'${cls}>` +
+        (options.noLink ? `${img}<b>${u.user}</b>` : `<a href='${base}/profile'>${img}</a><a href='${base}/'${style}><b>${u.user}</b></a>`) +
+        "</span>";
 }
 
 interface BarLink {
