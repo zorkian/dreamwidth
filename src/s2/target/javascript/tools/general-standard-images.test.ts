@@ -79,7 +79,7 @@ test("real private source/recovered image helpers reset at print and retain prep
     const compiler=new ArtifactCompiler({s2Root:path.resolve("../.."),perl:"/usr/bin/perl",isolationExecutable:isolation});
     const language=new MysqlPublicTranslations(fixture.startup.database,startup.placeholder,compiler.scalarProfile);
     await fixture.admin.query(`INSERT INTO ${fixture.table(fixture.g,"ml_langs")} (lnid,lncode,lnname,parenttype,parentlnid) VALUES (1,'en','English','diff',0)`);
-    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"),{sandbox});
+    const coordinator=new ProgramCoordinator(compiler,path.join(directory,"cache"));
     const compiled=path.join(directory,"compiled");cpSync(path.resolve("dist"),compiled,{recursive:true});
     const driver=readFileSync(path.join(compiled,"tools/general-model-worker-child.js"),"utf8")
         .replaceAll('require("../live/render/','require("./').replaceAll('require("../live/domain/','require("../domain/')
@@ -89,15 +89,15 @@ test("real private source/recovered image helpers reset at print and retain prep
     execFileSync(process.execPath,["--input-type=module","-e",
         "import {stageGeneralRuntime} from '../../../content/tools/stage-runtime.mjs';stageGeneralRuntime(process.argv[1],{s2Dist:process.argv[2]});",descriptor,compiled],{timeout:120000});
     const renderer=new GeneralRenderer(sandbox,verifyGeneralRuntime(descriptor),{maxOutputBytes:1048576,maxHeapMiB:128,timeoutMs:10000});
-    try {for(const missing of [false,true]) {
-        const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",compiledTime:1,
-            sourceBytes:missing?null:Buffer.from(native.source,"base64"),activeCompiledBytes:Buffer.from(native.code,"base64")}]});
+    try {
+        const prepared=await coordinator.prepare({styleId:0,systemUserId:1,layers:[{id:101,ownerId:1,parentId:0,type:"core",
+            sourceBytes:Buffer.from(native.source,"base64")}]});
         const unused={async snapshot():Promise<never>{throw Error("Unused public provider");},async revalidate(){return true;}};
         const publicSession=new GeneralPublicSession(unused,language,compiler.scalarProfile,25,undefined,
             installedImageLanguageContext(startup.nativeLanguageContext));
         const authority=new GeneralUserAuthority(publicSession,{displayName:()=>pv(""),journalBase:()=>pv(""),tellFriend:false});
         const events:string[]=[];
-        const frame=await renderer.render((missing?"b":"a").repeat(64),{start:{version:1,transfer:coordinator.transfer(prepared),config,kind:"recent"},
+        const frame=await renderer.render("a".repeat(64),{start:{version:1,transfer:coordinator.transfer(prepared),config,kind:"recent"},
             async host(operation,parameters,phase){
                 if(operation==="standard-images") {events.push(phase);return parentInstalledStandardImages(parameters,source,publicSession);}
                 if(operation==="user-lite")return parentLoadUser(parameters,authority);
@@ -107,7 +107,7 @@ test("real private source/recovered image helpers reset at print and retain prep
         assert.equal(Buffer.from(frame.bytes).toString("base64"),native.output);
         assert.deepEqual(events,["initialize","select","render"]);
         assert.equal(await publicSession.finish(async()=>true),true);
-    }}finally{renderer.close();await language.close();}
+    }finally{renderer.close();await language.close();}
 },true));
 
 test("private native helper errors preserve positive origin and infrastructure stays terminal",async()=>{

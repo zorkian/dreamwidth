@@ -32,7 +32,7 @@ function native():{snapshot:ActiveStyleSnapshot;output:string;safe:string[];enum
     const result=JSON.parse(execFileSync("/usr/bin/perl",[path.join(tools,"active-native.pl")],{env,encoding:"utf8"}));
     result.snapshot.layers=result.snapshot.layers.map((layer:any)=> {
         const {sourceBase64,activeBase64,...identity}=layer;
-        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64"),activeCompiledBytes:Buffer.from(activeBase64,"base64")};
+        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64")};
     });
     return result;
 }
@@ -99,8 +99,7 @@ test("general scalars instantiate core2 and all 58 stock layouts, execute stock 
     }
     const adapt=(snapshot:any)=>({...snapshot,layers:snapshot.layers.map((layer:any)=> {
         const {sourceBase64,activeBase64,...identity}=layer;
-        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64"),
-            activeCompiledBytes:Buffer.from(activeBase64,"base64")};
+        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64")};
     })});
     const producer=compiler(launcher);
     const stock=await producer.compile(adapt(oracle.snapshot));
@@ -150,18 +149,23 @@ test("general scalars instantiate core2 and all 58 stock layouts, execute stock 
     assert.equal(output.bytes().toString("base64"),oracle.longOutputBase64);
 }));
 
-test("source/active mismatch and ownership never execute wrong version",()=>fixture(async(_directory,launcher)=> {
+test("latest source governs, missing source fails, and untrusted source stays isolated",()=>fixture(async(_directory,launcher)=> {
     const oracle=native();const producer=compiler(launcher);
     const changed={...oracle.snapshot,layers:oracle.snapshot.layers.map(layer=>layer.type==="user"?
         {...layer,sourceBytes:Buffer.from(Buffer.from(layer.sourceBytes!).toString().replace("user:","new:"))}:layer)};
-    assert.deepEqual(await producer.compile(changed),{kind:"recovery",layerId:103,reason:"active-source-correspondence"});
+    const current=await producer.compile(changed);
+    assert.equal(current.kind,"compiled");
+    const original=await producer.compile(oracle.snapshot);
+    assert.notEqual(current.program.layers[2]!.sourceSha256,original.program.layers[2]!.sourceSha256);
+    assert.notEqual(current.program.layers[2]!.code,original.program.layers[2]!.code);
     const missing={...oracle.snapshot,layers:oracle.snapshot.layers.map(layer=>layer.type==="user"?{...layer,sourceBytes:null}:layer)};
-    assert.deepEqual(await producer.compile(missing),{kind:"recovery",layerId:103,reason:"missing-source"});
+    await assert.rejects(producer.compile(missing),CompilerFailure);
     const trusted={...oracle.snapshot,layers:oracle.snapshot.layers.map(layer=>layer.type==="layout"?{...layer,ownerId:11}:layer)};
-    assert.deepEqual(await producer.compile(trusted),{kind:"recovery",layerId:102,reason:"active-source-correspondence"});
+    const changedTrust=await producer.compile(trusted);
+    assert.equal(changedTrust.program.layers[1]!.untrusted,false);
     const attack={...oracle.snapshot,layers:oracle.snapshot.layers.map(layer=>layer.type==="user"?
         {...layer,sourceBytes:Buffer.from('BEGIN { system("touch /tmp/S2_G1_SIDE_EFFECT"); }')}:layer)};
-    assert.deepEqual(await producer.compile(attack),{kind:"recovery",layerId:103,reason:"active-source-correspondence"});
+    await assert.rejects(producer.compile(attack),CompilerFailure);
 }));
 
 test("cache coalesces, authenticates producer output and invalidates every dependency",()=>fixture(async(directory,launcher)=> {
@@ -179,9 +183,8 @@ test("cache coalesces, authenticates producer output and invalidates every depen
     const key=producer.key(snapshot);
     for(const changed of [
         {...snapshot,styleId:78},
-        {...snapshot,layers:snapshot.layers.map(layer=>({...layer,compiledTime:2}))},
+        {...snapshot,layers:snapshot.layers.map(layer=>layer.id===103?{...layer,sourceBytes:Buffer.concat([Buffer.from(layer.sourceBytes!),Buffer.from("\n# source edit")])}:layer)},
         {...snapshot,layers:snapshot.layers.map(layer=>layer.id===103?{...layer,ownerId:11}:layer)},
-        {...snapshot,layers:snapshot.layers.map(layer=>layer.id===103?{...layer,activeCompiledBytes:Buffer.concat([Buffer.from(layer.activeCompiledBytes),Buffer.from("# change")])}:layer)},
         {...snapshot,layers:snapshot.layers.map(layer=>layer.id===103?{...layer,parentId:101}:layer)},
     ])assert.notEqual(producer.key(changed),key);
     const artifact=path.join(cacheRoot,key+".json");
@@ -227,7 +230,7 @@ test("source and shared sink preserve independent native raw octets and wide ope
     assert.equal(oracle.outputUtf8,false);
     const snapshot={...oracle.snapshot,layers:oracle.snapshot.layers.map((layer:any)=>{
         const {sourceBase64,activeBase64,...identity}=layer;
-        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64"),activeCompiledBytes:Buffer.from(activeBase64,"base64")};
+        return {...identity,sourceBytes:Buffer.from(sourceBase64,"base64")};
     })};
     const result=await compiler(launcher).compile(snapshot);
     assert.equal(result.kind,"compiled");if(result.kind!=="compiled")throw Error("compile required");
