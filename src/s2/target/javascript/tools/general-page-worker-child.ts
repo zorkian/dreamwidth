@@ -18,40 +18,12 @@ import {generalWorkerFactory} from "../live/render/general-worker-factory";
 import {NativeString,scalarPV} from "../runtime/native-scalar";
 import {escapeGeneralPlainProperty} from "@dreamwidth/content/general-contexts";
 import {generalCommentInfo,generalImage,generalNull,type GeneralModel} from "../live/domain/general-model-primitives";
-import type {GeneralPageInput} from "../live/domain/general-page-model";
-import type {GeneralEntryPageEntryInput} from "../live/domain/general-entry-page-source";
-import type {GeneralEntrySourceInput} from "../live/domain/general-entry-from-source";
 import {generalMakeLink} from "../live/domain/general-navigation-url";
 import type {GeneralWorkerPublicBindings} from "../live/render/general-worker-factory";
 
 const pv=NativeString.hostUtf8Bytes,channel=new GeneralWorkerChannel(process.env.S2_PRIVATE_JOB!);
-let username:NativeString;
+const username=pv("public_name");
 const noContent=()=>{throw Error("Declared empty-content fixture reached an original cleaner");};
-function page(value:unknown,bindings:GeneralWorkerPublicBindings):GeneralPageInput {
-    if(!value||typeof value!=="object"||Object.keys(value).length!==3||
-        !NativeString.is((value as Record<string,unknown>).username)||
-        !NativeString.is((value as Record<string,unknown>).title)||
-        !(value as Record<string,unknown>).defaultPicture||
-        ((value as Record<string,unknown>).defaultPicture as GeneralModel)[".type"]!=="Image")
-        throw Error("Invalid fixed source descriptor");
-    const row=value as {username:NativeString;title:NativeString;defaultPicture:GeneralModel};username=row.username;
-    const journal=bindings.prepareUser(bindings.loadUser(username) as GeneralModel,row.defaultPicture,undefined,undefined);
-    return {styleId:0,styleModtime:0,baseUrl:pv("/journal"),journal,journalType:pv("P"),
-        ownerName:row.title,journalTitle:undefined,journalSubtitle:undefined,layoutName:undefined,
-        themeName:undefined,layoutUrl:pv(""),getargs:[],viewingStyleOptions:undefined,viewUrls:[],links:[],
-        customtext:{title:undefined,url:undefined,content:undefined},
-        customtextDefaults:{title:pv("stale caller default"),url:undefined,content:undefined},showControlStrip:0,
-        isCanary:0,noMobileCookie:0,sessionMessages:undefined,headContent:pv(""),canUseNetwork:0,activeEntries:[]};
-}
-function entry():GeneralEntrySourceInput {
-    return {journalId:111,posterId:111,forceMoodtheme:undefined,permalinkUrl:pv("/261.html"),
-        dateparts:pv("2026 09 27 00 00 00 00"),systemDateparts:pv("2026 09 27 00 00 00 00"),
-        security:pv("public"),allowmask:0,adultContentLevel:pv(""),adminPost:0,
-        content:{subject:undefined,event:undefined,journalName:username,ditemid:261,jitemid:1,
-            editor:undefined,preformatted:0,importSourceDefined:false,isSyndicated:0,
-            logtimeMysql:pv("2026-09-27 00:00:00"),suspendMessage:0,noEntryBody:0,noHtml:0,
-            cutUrl:pv("/261.html"),cutDisable:0}};
-}
 function entryOperations(bindings:GeneralWorkerPublicBindings) {
     return {features:{memories:false,tellafriend:false,esn:false},
         user:()=>bindings.loadUser(username) as GeneralModel,
@@ -78,11 +50,6 @@ executeGeneralWorker(channel,generalWorkerFactory(channel,{
     output(){return {contentType:"text/html",limits:{maxInputBytes:1048576,maxOutputBytes:1048576,timeoutMs:10000},
         stylesheet:{domain:"example.org",webDomain:"www.example.org",statPrefix:"https://static.example.org",
             trustedHosts:{},cssCleanerEnabled:true,cssProxy:null},transformCss:noContent,expandEmbed:noContent};},
-    recentInput(value,bindings){return {page:page(value,bindings),selection:{skip:0,itemshow:3,maxskip:97,showStickies:false,
-        stickyEntries:[],window:[{entry:entry(),countedSticky:false,datePrefix:pv("2026 09 27")}],
-        hasLookahead:false},navigation:{filterActive:false,filterName:pv(""),filterTags:undefined,
-            selectionHead:pv(""),feedTagQuery:pv(""),linkAttributes:[]}};},
-    entryInput(value,bindings){return {page:page(value,bindings),entry:{...entry(),mode:undefined} as GeneralEntryPageEntryInput,thread:undefined};},
     recentOperations(_session,_start,bindings){return {
         page:{clockSeconds:()=>0,escapeProperty},
         entry:()=>entryOperations(bindings),recent:{standardImage:kind=>generalImage(pv("/declared/"+kind),20,18,pv("")),
