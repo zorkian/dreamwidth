@@ -35,6 +35,7 @@ const generalModelFiles = new Set([
     "general-page-assembly", "general-page-model", "general-model-date", "general-model-links", "general-model-user",
     "general-entry-from-source", "general-entry-page-source", "general-entry-content",
     "general-entry-model", "general-recent-from-source",
+    "general-native-calendar",
 ].map(name => "app/dist/live/domain/" + name + ".js"));
 function digest(path: string): string {
     return createHash("sha256").update(readFileSync(path)).digest("hex");
