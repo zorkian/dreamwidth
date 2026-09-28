@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Ordinary module placement
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private anonymous Recent/Entry viewer adds thirteen compiled user literals:
 show/order/section for `userprofile`, `links`, `pagesummary`, `calendar`, and
 `module_tags_section`. Existing tags show/order and the ten earlier literals

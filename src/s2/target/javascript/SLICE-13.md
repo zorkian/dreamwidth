@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Visible customtext
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private anonymous Recent/Entry viewer supports one journal-owned user layer
 on the unchanged core2/core2base layout. It supports these six properties together:
 
@@ -134,11 +139,15 @@ then run the bounded tests:
 ```sh
 cd "$LJHOME/src/s2/target/javascript"
 mkdir -p /tmp/customtext-check
-perl tools/live-compile.pl /tmp/customtext-check/stock.json
+perl tools/live-compile.pl --themes /tmp/customtext-check/stock.json
 /opt/dw-node24/bin/node ../../../content/tools/stage-runtime.mjs /tmp/customtext-check/stock.json
 S2_LIVE_TEST_ARTIFACT=/tmp/customtext-check/stock.json S2_SELECTED_FIXTURE=1 \
-  /opt/dw-node24/bin/node --test dist/tools/customtext.test.js dist/tools/customtext-http.test.js
+  /opt/dw-node24/bin/node --test dist/tools/customtext.test.js dist/live/tests/styles-http.test.js
 ```
+
+The current HTTP test checks stock theme output and the temporary user-layer
+refusal. Earlier user-layer success results below are historical evidence, not
+current serving acceptance.
 
 The native helper compiles trusted synthetic layers offline, actually loads them,
 and records literal/duplicate/escaping, plain/HTML/twice-cleaned values, false

@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Context typography
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private Recent/Entry viewer adds eighteen string literals: family, size and
 units for `font_module_heading`, `font_module_text`, `font_journal_title`,
 `font_journal_subtitle`, `font_entry_title` and `font_comment_title`. Each family

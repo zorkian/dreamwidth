@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Base typography
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private Recent/Entry viewer additionally admits exactly `font_fallback`,
 `font_base_size` and `font_base_units` as string literals in the existing fully
 consumed property-only compiled wrapper. The prior41 literals remain supported.

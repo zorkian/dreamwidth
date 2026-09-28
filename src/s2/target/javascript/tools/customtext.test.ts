@@ -21,23 +21,14 @@ import {validateArtifact} from "../live/render/artifact";
 import {approveSnapshot} from "../live/policy/cohort";
 import type {RenderInput,RenderContentPreparation} from "../live/render/types";
 import {resolve} from "node:path";
-import {readPropertyLayer} from "../live/domain/property-layer";
 import {createEntryCleaner} from "@dreamwidth/content";
 import {config,capabilities,snapshot,now} from "../live/tests/fixtures";
 
-test('canonical native wrapper data and original-source customtext',()=>{
+test('native customtext context and stock section placement',()=>{
     const native=spawnSync('perl',[resolve(__dirname,'../../tools/customtext-native.pl')],{
         encoding:'utf8',timeout:15000,env:{...process.env,PERL_HASH_SEED:'0',PERL_PERTURB_KEYS:'0'}});
     assert.equal(native.status,0,native.stderr);
     const rows=JSON.parse(native.stdout);
-    for(const row of rows.filter((row:any)=>row.kind==='wrapper')) {
-        assert.deepEqual({...readPropertyLayer(row.compiled,987654)},row.sets);
-        for(const bad of [row.compiled+'1;\n',row.compiled.replace('register_layer(987654)','register_layer(2)'),
-            row.compiled.replace('"module_customtext_order",13','"module_customtext_order",1 + 2'),
-            row.compiled.replace('"module_customtext_order"','"unknown"'),row.compiled.slice(0,-1)]) {
-            assert.throws(()=>readPropertyLayer(bad,987654));
-        }
-    }
     const artifact=validateArtifact(JSON.parse(readFileSync(process.env.S2_LIVE_TEST_ARTIFACT||'artifacts/live/stock.json','utf8')));
     const probe={...artifact,layers:[{...artifact.layers[0]!,code:artifact.layers[0]!.code+
         '\nlayer_0.registerFunction(["RecentPage::print()"], function(){return function(ctx){ctx.print("<html><body>"+JSON.stringify(ctx.prop._module_sections)+"</body></html>");};});'},artifact.layers[1]!]};
