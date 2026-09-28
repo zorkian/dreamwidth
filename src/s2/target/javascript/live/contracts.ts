@@ -222,6 +222,8 @@ export interface RawCommentHeader {
     readonly posterid:number;
     readonly state:string;
     readonly datepost:string;
+    /** Native get_talk_data's UNIX_TIMESTAMP scalar; issued only on the byte-view path. */
+    readonly datepostUnix?:string|null;
 }
 export interface RawCommentAuthor {
     readonly userid:number; readonly user:string; readonly name:string;

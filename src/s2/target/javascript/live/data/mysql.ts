@@ -1140,12 +1140,21 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
     private async loadComments(ownerId:number,clusterId:number,nodeid:number,request:RawPageRequest,caps:string,byteView=false):Promise<{data:RawComments;fingerprint:string;sources:readonly [string, Uint8Array | undefined][]}|undefined> {
         if(request.page.kind!=='entry')unsupported();
         const readHeaders=async(connection:Connection):Promise<RawCommentHeader[]>=>{
-            const rows=(await sql<Row>`SELECT jtalkid,parenttalkid,posterid,state,datepost
+            const rows=(await sql<Row>`SELECT jtalkid,parenttalkid,posterid,state,datepost,
+                UNIX_TIMESTAMP(datepost) AS datepost_unix
                 FROM talk2 WHERE journalid=${ownerId} AND nodetype='L' AND nodeid=${nodeid}
                 ORDER BY jtalkid LIMIT 10001`.execute(connection)).rows;
             if(rows.length>10000)unsupported();
-            return rows.map(row=>({jtalkid:number(row.jtalkid,1,4294967295),parenttalkid:number(row.parenttalkid,0,4294967295),
-                posterid:number(row.posterid),state:requiredString(row.state),datepost:civilTime(row.datepost)}));
+            return rows.map(row=>{
+                const unix=row.datepost_unix;
+                const unixText=unix===null?null:typeof unix==='bigint'?String(unix):
+                    typeof unix==='number'&&Number.isSafeInteger(unix)?String(unix):
+                    typeof unix==='string'&&/^-?\d{1,20}$/.test(unix)?unix:unsupported();
+                return {jtalkid:number(row.jtalkid,1,4294967295),
+                    parenttalkid:number(row.parenttalkid,0,4294967295),posterid:number(row.posterid),
+                    state:requiredString(row.state),datepost:civilTime(row.datepost),
+                    ...(byteView?{datepostUnix:unixText}:{})};
+            });
         };
         const headers=await this.databases.snapshot(clusterId,['talk2'],readHeaders);
         if(!headers.length)return undefined;
@@ -1238,7 +1247,9 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 const id=number(row.jtalkid,1),props=values.get(id)!;
                 if(!byteView&&props.unknown8bit&&props.unknown8bit!=='0')unsupported();
                 const subject=decodedColumn(row,'subject','comment:'+id+':subject',raw,8192,true)??'';
-                const body=full.includes(id)?decodedColumn(row,'body','comment:'+id+':body',raw,65536,false):null;
+                // Native sets _loaded before assigning the nullable talktext
+                // body. The general byte-view retains NULL as an undef cell.
+                const body=full.includes(id)?decodedColumn(row,'body','comment:'+id+':body',raw,65536,byteView):null;
                 total+=Buffer.byteLength(subject)+Buffer.byteLength(body??'');if(total>2097152)unsupported();
                 return {jtalkid:id,subject,body,props:Object.freeze(props)};
             });

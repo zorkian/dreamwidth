@@ -16,8 +16,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {execFileSync} from "node:child_process";
 import {Kysely} from "kysely";
+import type mysql from "mysql2/promise";
 import {MysqlPublicMaintainers} from "../live/data/public-maintainers";
 import {GeneralSelectedText} from "../live/domain/general-selected-text";
+import {generalSelectedComments} from "../live/domain/general-comment-projection";
 import {generalCommentFromSource,type GeneralSuspendedCommentInput,
     type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
 import type {GeneralPublicSession} from "../live/domain/general-public-session";
@@ -88,10 +90,18 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     await assert.rejects(f.store.loadRawSnapshot(request));
     const issued=await f.store.loadNativeSelectedSnapshot(request);assert.ok(issued?.facts.comments);
     assert.equal(issued.facts.comments.headers.find(row=>row.jtalkid===77)?.posterid,900999);
+    const [nativeTimes]=await f.admin.query<mysql.RowDataPacket[]>(
+        `SELECT UNIX_TIMESTAMP(datepost) AS datepost_unix FROM ${talks}
+            WHERE journalid=900001 AND jtalkid=77`);
+    assert.equal(issued.facts.comments.headers.find(row=>row.jtalkid===77)?.datepostUnix,
+        String(nativeTimes[0]!.datepost_unix));
     assert.equal(issued.facts.comments.authors.some(row=>row.userid===900999),false);
     assert.equal(issued.facts.comments.texts.find(row=>row.jtalkid===77)?.body,"VISIBLE_MISSING_AUTHOR");
     const missing=await GeneralSelectedText.prepare(issued,noEncoding);
-    const missingFields=missing.commentPublicFields(issued.facts.comments.texts.find(row=>row.jtalkid===77)!);
+    const sourceConfig={commentSettings:f.startup.commentSettings,capabilities:f.startup.capabilities};
+    const missingTree=generalSelectedComments(issued,sourceConfig,missing);
+    assert.deepEqual(missingTree?.roots.map(row=>row.id),[77]);
+    const missingFields=missingTree!.roots[0]!.fields!;
     assert.equal(missingFields.posterLoaded,false);assert.equal(missingFields.posterId,900999);
     assert.equal(missingFields.body?.bytes().toString(),'VISIBLE_MISSING_AUTHOR');
     assert.equal(await f.store.revalidateNativeSelectedFingerprint(issued),true);
@@ -192,7 +202,10 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(selected.comment(selectedComment).subject,undefined);
     assert.equal(scalarTruthy(selected.commentAdminPost(selectedComment)),false);
     assert.equal(nativeCommentOfficial(f.g,900999),0);
-    const fields=selected.commentPublicFields(selectedComment);
+    const selectedTree=generalSelectedComments(globalZone,sourceConfig,selected);
+    assert.deepEqual(selectedTree?.roots.map(row=>row.id),[77]);
+    assert.equal(selectedTree?.roots[0]?.datepostUnix,String(nativeTimes[0]!.datepost_unix));
+    const fields=selectedTree!.roots[0]!.fields!;
     assert.equal(fields.loaded,true);assert.equal(fields.posterSuspended,true);
     assert.equal(fields.subject,undefined);assert.equal(fields.body,undefined);
     assert.equal(fields.pictureKeyword?.bytes().toString(),'changed-keyword');
@@ -272,5 +285,21 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         assert.equal(legacyComment.props.picture_keyword,'legacy-should-not-win');
         const legacySelected=await GeneralSelectedText.prepare(legacy,noEncoding,authority);
         assert.equal(legacySelected.commentPublicFields(legacyComment).pictureKeyword,undefined);
+        // Talk marks selected full membership before assigning its nullable
+        // talktext body; `_loaded` therefore remains true for a NULL body.
+        await f.admin.query(`INSERT INTO ${talks}
+            (journalid,jtalkid,nodetype,nodeid,parenttalkid,posterid,datepost,state)
+            VALUES (900001,80,'L',300,0,0,'2026-09-26 01:01:00','A')`);
+        await f.admin.query(`INSERT INTO ${texts}(journalid,jtalkid,subject,body)
+            VALUES (900001,80,'Nullable full body',NULL)`);
+        assert.equal(await f.store.revalidateNativeSelectedFingerprint(legacy),false);
+        const nullable=await f.store.loadNativeSelectedSnapshot(request);assert.ok(nullable?.facts.comments);
+        const nullableSelected=await GeneralSelectedText.prepare(nullable,noEncoding,authority);
+        const tree=generalSelectedComments(nullable,sourceConfig,nullableSelected);
+        assert.ok(tree);
+        assert.deepEqual(tree?.roots.map(row=>row.id),[77,80]);
+        assert.equal(tree.roots[1]?.full,true);
+        assert.equal(tree.roots[1]?.fields?.loaded,true);
+        assert.equal(tree.roots[1]?.fields?.body,undefined);
     } finally {await maintainers.close();}
 },false,false,false,true));
