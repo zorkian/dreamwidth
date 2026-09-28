@@ -16,6 +16,7 @@ import type { Compiler } from "../compile/compiler";
 import { styleInfo, styleLayers } from "../compile/styles";
 import type { Databases } from "../data/db";
 import { User } from "../data/user";
+import type { EntryArgs } from "../render/entry-page";
 import type { RenderRequest, RenderResult } from "../render/render";
 import type { SiteConfig } from "./config";
 
@@ -25,21 +26,25 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
     const app = Fastify({ logger: false });
 
     const serve = async (host: string, url: string, username: string, view: "recent" | "entry",
-        ditemid?: number, skip?: number): Promise<RenderResult> => {
+        ditemid?: number, skip?: number, entryArgs?: EntryArgs): Promise<RenderResult> => {
         const journal = await User.byName(db, username.toLowerCase().replaceAll("-", "_"));
         if (!journal || !journal.isVisible()) return { status: 404, html: "Journal not found\n" };
         await journal.loadProps(db, ["s2_style"]);
         const layers = await styleLayers(db, config, journal);
         const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, layers)]);
-        return render({ username: journal.user, view, ditemid, skip, requestPath: url, host, layers: compiled, style });
+        return render({ username: journal.user, view, ditemid, skip, entryArgs, requestPath: url, host, layers: compiled, style });
     };
 
     const handler = (view: "recent" | "entry") => async (request: any, reply: any) => {
         const { user, ditemid } = request.params as { user: string; ditemid?: string };
         const query = request.query as Record<string, string>;
         const skip = query.skip !== undefined ? Math.max(0, Math.trunc(Number(query.skip)) || 0) : undefined;
+        const number = (value?: string) => value !== undefined && /^\d+$/.test(value) ? Number(value) : undefined;
+        const entryArgs: EntryArgs = {
+            thread: number(query.thread), page: number(query.page), view: query.view, mode: query.mode,
+        };
         const result = await serve(request.headers.host ?? "localhost", request.url, user, view,
-            ditemid ? Number(ditemid) : undefined, skip);
+            ditemid ? Number(ditemid) : undefined, skip, entryArgs);
         return reply.code(result.status).type("text/html; charset=utf-8").send(result.html);
     };
 
