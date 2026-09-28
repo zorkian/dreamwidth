@@ -86,6 +86,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     [f.talkProp('imported_from'),f.talkProp('imported_from')]);
     const request=f.request("ordinary6",{kind:"entry",ditemid:300*256+1});
     const noEncoding={async item(){throw Error('Unreached charset conversion');}} as unknown as GeneralTextEncoding;
+    const navigation={permalink:NativeString.hostUtf8Bytes('/300.html'),styleArgument:undefined};
     // The existing retained API remains on its prior strict branch.
     await assert.rejects(f.store.loadRawSnapshot(request));
     const issued=await f.store.loadNativeSelectedSnapshot(request);assert.ok(issued?.facts.comments);
@@ -99,7 +100,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(issued.facts.comments.texts.find(row=>row.jtalkid===77)?.body,"VISIBLE_MISSING_AUTHOR");
     const missing=await GeneralSelectedText.prepare(issued,noEncoding);
     const sourceConfig={commentSettings:f.startup.commentSettings,capabilities:f.startup.capabilities};
-    const missingTree=generalSelectedComments(issued,sourceConfig,missing);
+    const missingTree=generalSelectedComments(issued,sourceConfig,missing,navigation);
     assert.deepEqual(missingTree?.roots.map(row=>row.id),[77]);
     const missingFields=missingTree!.roots[0]!.fields!;
     assert.equal(missingFields.posterLoaded,false);assert.equal(missingFields.posterId,900999);
@@ -202,7 +203,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(selected.comment(selectedComment).subject,undefined);
     assert.equal(scalarTruthy(selected.commentAdminPost(selectedComment)),false);
     assert.equal(nativeCommentOfficial(f.g,900999),0);
-    const selectedTree=generalSelectedComments(globalZone,sourceConfig,selected);
+    const selectedTree=generalSelectedComments(globalZone,sourceConfig,selected,navigation);
     assert.deepEqual(selectedTree?.roots.map(row=>row.id),[77]);
     assert.equal(selectedTree?.roots[0]?.datepostUnix,String(nativeTimes[0]!.datepost_unix));
     const fields=selectedTree!.roots[0]!.fields!;
@@ -213,11 +214,12 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     const ctx=new Context([],()=>{throw Error('Unreached S2 print');});
     ctx.prop._userpics_position=NativeString.hostUtf8Bytes('none');
     const fixed=NativeString.hostUtf8Bytes;
+    const urls=selectedTree!.roots[0]!.urls;
     const input:GeneralSuspendedCommentInput={kind:'suspended-loaded',...fields,
         talkid:77*256+1,ditemid:300*256+1,depth:1,journal:{'.type':'UserLite'},
-        datepostUnix:1015,entryLogtimeUnix:1000,permalinkUrl:fixed('/entry?thread=19713'),
-        replyUrl:fixed('/entry?replyto=19713'),parentUrl:undefined,threadrootUrl:undefined,
-        expandUrl:fixed('/entry?thread=19713'),jsExpandUrl:fixed('/entry?thread=19713&destination_thread=0'),
+        datepostUnix:selectedTree!.roots[0]!.datepostUnix,entryLogtimeUnix:1000,
+        permalinkUrl:urls.permalink,replyUrl:urls.reply,parentUrl:urls.parent,threadrootUrl:undefined,
+        expandUrl:urls.expand,jsExpandUrl:urls.jsExpand,
         hasChildren:false,showableChildren:0,hideChildren:0,hiddenChild:0,echi:undefined,
         lastTalkid:0,lastJournalId:0};
     const modelOperations:GeneralCommentSourceOperations={
@@ -233,6 +235,8 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         esnEnabled(){return 0;},editCommentsEnabled(){return 0;}};
     const model=generalCommentFromSource(ctx,input,modelOperations);
     assert.equal(model._fromsuspended,1);assert.equal(model._full,0);
+    assert.equal(model._permalink_url,urls.permalink);
+    assert.equal(model._reply_url,urls.reply);
     assert.equal(model._poster,undefined);assert.equal(scalarPV(model._text).bytes().toString(),'');
     assert.equal((model._time_poster as {readonly _zone:string})._zone,'Europe/London');
     assert.equal(scalarPV(runtime.memberSlot(model._metadata,fixed('picture_keyword'),'hash').get())
@@ -295,7 +299,7 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         assert.equal(await f.store.revalidateNativeSelectedFingerprint(legacy),false);
         const nullable=await f.store.loadNativeSelectedSnapshot(request);assert.ok(nullable?.facts.comments);
         const nullableSelected=await GeneralSelectedText.prepare(nullable,noEncoding,authority);
-        const tree=generalSelectedComments(nullable,sourceConfig,nullableSelected);
+        const tree=generalSelectedComments(nullable,sourceConfig,nullableSelected,navigation);
         assert.ok(tree);
         assert.deepEqual(tree?.roots.map(row=>row.id),[77,80]);
         assert.equal(tree.roots[1]?.full,true);

@@ -229,5 +229,15 @@ native Talk marks it. The byte-view path retains that NULL source cell; the
 legacy finite loader's prior body rule is unchanged. The isolated schema proof
 feeds the approved suspended record from this tree into the same Context and
 checks native timestamp, nullable full membership and property-mutation reread.
-Source-derived URL, date/timezone, edit, author and original-cleaner providers,
+Source-derived Entry URL/style, date/timezone, edit, author and original-cleaner providers,
 plus final worker/HTTP binding, remain required before ordinary serving.
+
+The same selected parent tree now derives Comment permalink, reply, parent and
+expand URLs from an approved Entry URL, its actual anum and the admitted thread
+query. Native `talkargs` filters false arguments, chooses its separator from the
+input URL and preserves defined `destination_thread=0`; EntryPage's literal
+permalink append is deliberately separate. A bounded native helper comparison
+and the guarded SQL/real Context model proof cover this joined URL path. The
+parent still must supply the actual source-qualified Entry URL/style argument
+and remaining edit/threadroot/timezone/original-cleaner operations in the
+installed worker; test fixture URLs are explicitly declared test context.
