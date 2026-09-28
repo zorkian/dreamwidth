@@ -32,6 +32,7 @@ import {generalEscapeUrl} from "../domain/general-navigation-url";
 import {generalRecentPageFromSource,generalEntryPageFromSource,
     type GeneralRecentPageSourceInput,type GeneralRecentPageOperations,
     type GeneralEntryPageSourceInput,type GeneralEntryPageOperations} from "../domain/general-page-assembly";
+import {generalApprovedRecentInput,generalApprovedEntryInput} from "./general-approved-page-client";
 
 export interface GeneralWorkerPublicBindings {
     readonly users:GeneralUserBindings;
@@ -49,9 +50,10 @@ export interface GeneralWorkerFactoryServices {
     readonly dates:GeneralDateOperations;
     seesControlStrip(start:GeneralWorkerStart):unknown;
     /** Validate named authorized source descriptors, never cast an arbitrary resume graph. */
-    recentInput(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
+    /** Fixed fixture adapters may override the installed approved descriptor path. */
+    recentInput?(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
         start:GeneralWorkerStart):GeneralRecentPageSourceInput;
-    entryInput(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
+    entryInput?(value:unknown,bindings:GeneralWorkerPublicBindings,session:GeneralProgramSession,
         start:GeneralWorkerStart):GeneralEntryPageSourceInput;
     recentOperations(session:GeneralProgramSession,start:GeneralWorkerStart,
         bindings:GeneralWorkerPublicBindings):GeneralRecentPageOperations;
@@ -89,7 +91,8 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
                 url:session.context.prop._text_module_customtext_url,
                 content:session.context.prop._text_module_customtext_content};
             if(start.kind==="recent") {
-                const input=services.recentInput(approved,bindings,session,start);
+                const input=services.recentInput?services.recentInput(approved,bindings,session,start):
+                    generalApprovedRecentInput(approved,bindings);
                 const operations=services.recentOperations(session,start,bindings);
                 return generalRecentPageFromSource(session.context,
                     {...input,page:{...input.page,customtextDefaults}},{...operations,
@@ -104,7 +107,8 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
                             }};
                         }});
             }
-            const input=services.entryInput(approved,bindings,session,start);
+            const input=services.entryInput?services.entryInput(approved,bindings,session,start):
+                generalApprovedEntryInput(approved,bindings);
             return generalEntryPageFromSource(session.context,{...input,page:{...input.page,customtextDefaults}},{
                 ...services.entryOperations(session,start,bindings),navigation});
         },

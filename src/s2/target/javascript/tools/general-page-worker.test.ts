@@ -39,6 +39,7 @@ function builtin UserLite(string name):UserLite;
 function builtin get_url(UserLite user, string view):string;
 class Image { var int width; var string url; }
 class User extends UserLite { var Image default_pic; }
+function builtin get_url(User user, string view):string;
 class Entry { var UserLite poster; var string subject; var Image userpic; }
 class Date { var int year; var int month; var int day; function builtin day_of_week():int; }
 class RecentPage { var string global_title; var string customtext_title; var User journal; var Entry[] entries; function print(); }
@@ -47,8 +48,8 @@ function civil_day():Date { var Date d=new Date; $d.year=2026; $d.month=9; $d.da
 function label(string name):string { return "[" + $name + "]"; }
 function prop_init() { $*initialized++; $*num_items_recent = 3; $*text_module_customtext = "Initialized"; print "suppressed"; }
 function modules_init() {}
-function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.entries[0].poster, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entries[0].userpic.width=7; if (isnull $.entries[0].userpic) { print ":null"; } else { print ":object"; } }
-function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.entry.poster, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
+function RecentPage::print() { print label("recent") + $.global_title + ":" + $*initialized + ":" + $.entries[0].poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entries[0].poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entries[0].userpic.width=7; if (isnull $.entries[0].userpic) { print ":null"; } else { print ":object"; } }
+function EntryPage::print() { print label("entry") + $.global_title + ":" + $*initialized + ":" + $.entry.poster.user + ":" + get_url($.journal, "recent"); if ($.journal->equals($.entry.poster)) { print ":same"; } print ":" + $.customtext_title; print ":" + $.journal.default_pic.width + ":" + $.journal.default_pic.url; var Date d=civil_day(); print ":" + $d->day_of_week(); $.entry.userpic.width=7; if (isnull $.entry.userpic) { print ":null"; } else { print ":object"; } }
 `;
 
 test("real factory prepares Page/Entry after one init and resumes source/recovered custom functions",async()=>{
@@ -115,11 +116,33 @@ test("real factory prepares Page/Entry after one init and resumes source/recover
             const frame=await renderer.render("b".repeat(64),{
                 start:{version:1,transfer:coordinator.transfer(prepared),config,kind},
                 async select(count){assert.equal(count,3);assert.equal(selected,false);selected=true;
+                    const pv=NativeString.hostUtf8Bytes;
                     const root=prepareGeneralUserpicRoot({base64:Buffer.from("https://pics.example.invalid").toString("base64"),utf8:false});
                     const defaultPicture=generalUserpicImage({userid:111,picid:17,root:root.value,
-                        username:NativeString.hostUtf8Bytes("public_name"),width:13,height:15,description:undefined,keyword:undefined});
-                    return {kind,page:encodeGeneralModel({title:NativeString.hostUtf8Bytes("Title"),
-                        username:NativeString.hostUtf8Bytes("public_name"),defaultPicture})};},
+                        username:pv("public_name"),width:13,height:15,description:undefined,keyword:undefined});
+                    const page={fields:{styleId:0,styleModtime:0,baseUrl:pv("/journal"),journalType:pv("P"),
+                        ownerName:pv("Title"),journalTitle:undefined,journalSubtitle:undefined,
+                        layoutName:undefined,themeName:undefined,layoutUrl:pv(""),getargs:[],
+                        viewingStyleOptions:undefined,viewUrls:[],links:[],
+                        customtext:{title:undefined,url:undefined,content:undefined},
+                        customtextDefaults:{title:pv("stale caller default"),url:undefined,content:undefined},
+                        showControlStrip:0,isCanary:0,noMobileCookie:0,sessionMessages:undefined,
+                        headContent:pv(""),canUseNetwork:0,activeEntries:[]},
+                        journalName:pv("public_name"),defaultPicture,websiteUrl:undefined,websiteName:undefined};
+                    const entry={journalId:111,posterId:111,forceMoodtheme:undefined,permalinkUrl:pv("/261.html"),
+                        dateparts:pv("2026 09 27 00 00 00 00"),systemDateparts:pv("2026 09 27 00 00 00 00"),
+                        security:pv("public"),allowmask:0,adultContentLevel:pv(""),adminPost:0,
+                        content:{subject:undefined,event:undefined,journalName:pv("public_name"),ditemid:261,
+                            jitemid:1,editor:undefined,preformatted:0,importSourceDefined:false,isSyndicated:0,
+                            logtimeMysql:pv("2026-09-27 00:00:00"),suspendMessage:0,noEntryBody:0,noHtml:0,
+                            cutUrl:pv("/261.html"),cutDisable:0}};
+                    const approved=kind==="recent"?{kind,page:{page,selection:{skip:0,itemshow:3,maxskip:97,
+                        showStickies:false,stickyEntries:[],window:[{entry,countedSticky:false,
+                            datePrefix:pv("2026 09 27")}],hasLookahead:false},
+                        navigation:{filterActive:false,filterName:pv(""),filterTags:undefined,
+                            selectionHead:pv(""),feedTagQuery:pv(""),linkAttributes:[]}}}:
+                        {kind,page:{page,entry:{...entry,mode:undefined},thread:undefined}};
+                    return {kind,page:encodeGeneralModel(approved)};},
                 async host(operation,parameters){
                     if(operation==="user-lite")return parentLoadUser(parameters,users);
                     assert.equal(operation,"user-url");return parentUserUrl(parameters,users);
