@@ -33,14 +33,43 @@ for my $id ( keys %LJ::DBINFO ) {
     };
 }
 
+# LJ::Img's standard images, with alt text translated as Image_std does.
+my %images;
+for my $name ( keys %LJ::Img::img ) {
+    my $img = $LJ::Img::img{$name};
+    $images{$name} = {
+        src    => $img->{src},
+        width  => $img->{width} + 0,
+        height => $img->{height} + 0,
+        alt    => $img->{alt} ? LJ::Lang::ml( $img->{alt} ) : '',
+    };
+}
+
+# Site text the journal pages use, in the default language.
+my %strings;
+my $dbr = LJ::get_db_reader();
+for my $prefix (qw( userlinkbar. talk.curname_ s2theme. )) {
+    my $keys = $dbr->selectcol_arrayref(
+        "SELECT itcode FROM ml_items WHERE dmid = 1 AND itcode LIKE ?",
+        undef, "$prefix%" );
+    $strings{$_} = LJ::Lang::ml($_) for @$keys;
+}
+$strings{$_} = LJ::Lang::ml($_)
+    for map { "widget.cuttag.$_" } qw( collapsed expanded collapseAll expandAll );
+
 print JSON->new->canonical->pretty->encode(
     {
         databases          => \%databases,
         clusterPairActive  => \%LJ::CLUSTER_PAIR_ACTIVE,
         defaultStyle       => $LJ::DEFAULT_STYLE,
+        home               => $LJ::HOME,
         siteRoot           => $LJ::SITEROOT,
         protocol           => $LJ::PROTOCOL,
         domain             => $LJ::DOMAIN,
+        domainWeb          => $LJ::DOMAIN_WEB,
+        trustedCssHosts    => [ sort keys %LJ::TRUSTED_CSS_HOST ],
+        cssProxy           => $LJ::CSSPROXY,
+        cssCleaner         => LJ::is_enabled('css_cleaner') ? JSON::true : JSON::false,
         subdomainRules     => $LJ::SUBDOMAIN_RULES,
         isDevServer        => $LJ::IS_DEV_SERVER ? JSON::true : JSON::false,
         siteName           => $LJ::SITENAME,
@@ -52,5 +81,9 @@ print JSON->new->canonical->pretty->encode(
         userpicRoot        => $LJ::USERPIC_ROOT,
         palImgRoot         => $LJ::PALIMGROOT,
         maxScrollback      => $LJ::MAX_SCROLLBACK_LASTN + 0,
+        images             => \%images,
+        strings            => \%strings,
+        capBits            => \%LJ::CAP,
+        capDefaults        => \%LJ::CAP_DEF,
     }
 );
