@@ -49,7 +49,7 @@ export async function EntryPage(pc: PageContext, ditemid: number, args: EntryArg
     await Entry.fill(db, journal, [entry]);
     if (!entry.isPublic()) return null;
 
-    const [s2entry] = await entryObjects(pc, [entry], entry.url(site), "entry");
+    const [s2entry] = await entryObjects(pc, [entry], "entry");
     const poster = pc.users.get(entry.posterid);
     if (poster?.statusvis === "S") return null;
     s2entry!._comments._show_postlink &&= args.mode !== "reply" ? 1 : 0;
@@ -168,6 +168,7 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
         post.body = texts.get(id)?.body ?? "";
         post.props = props.get(id) ?? {};
     }
+    await pc.content.preload(db, toLoad.map(id => posts.get(id)!.body ?? ""));
     for (const id of subjects) {
         const post = posts.get(id)!;
         if (post.show) post.subject = subjectTexts.get(id)?.subject ?? "";
@@ -207,7 +208,7 @@ function convertComments(pc: PageContext, entry: Entry, posts: Post[], depth: nu
         }
 
         const text = post.loaded
-            ? pc.content.comment(post.body ?? "", props, post.datepost, !poster || poster.journaltype === "I", permalink)
+            ? pc.content.comment(post.body ?? "", props, post.datepost, !poster || poster.journaltype === "I")
             : "";
         const comment = s2("Comment", { $hide_children: post.hideChildren ? 1 : 0,
             $js_expand_url: `${permalink}?thread=${dtalkid}&destination_thread=${viewingThread}${anchor}`,

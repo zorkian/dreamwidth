@@ -40,7 +40,9 @@ export interface S2Context {
 export function instantiate(compiled: readonly CompiledLayer[]): Layer[] {
     return compiled.map(layer => {
         const instance = new Function("s2", `"use strict";\n${layer.code}\nreturn ${layer.variable};`)(runtime) as Layer;
-        instance.source = `${layer.type} layer ${layer.id}`;
+        // S2::layer_name
+        const name = instance.info.name;
+        instance.source = name && name !== "0" ? `'${name}' (#${layer.id})` : `layer #${layer.id}`;
         return instance;
     });
 }

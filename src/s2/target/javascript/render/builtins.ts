@@ -14,7 +14,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import type { BuiltinFunction, Context } from "../runtime/s2runtime";
-import { cleanCss } from "./css-cleaner";
+import { cleanCss } from "@dreamwidth/content";
 import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2 } from "./objects";
 import type { RenderState } from "./state";
 
@@ -96,49 +96,6 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
             const path = asLink ? datePath(time, part) : undefined;
             return path ? `<a href="${path}">${value}</a>` : value;
         }).join("");
-    };
-
-    // Color helpers, from S2::Builtin::LJ and S2::Color.
-    const colorString = (c: S2Object) => {
-        c._as_string = "#" + [c._r, c._g, c._b].map(v => Number(v).toString(16).padStart(2, "0")).join("");
-    };
-    const color = (r: number, g: number, b: number): S2Object => {
-        const c = s2("Color", { r, g, b });
-        colorString(c);
-        return c;
-    };
-    const updateHsl = (c: S2Object) => {
-        if (c.$hslset) return;
-        c.$hslset = true;
-        const [h, s, l] = rgbToHsl(c._r, c._g, c._b);
-        [c.$h, c.$s, c.$l] = [h, s, l].map(v => Math.trunc(v * 255 + 0.5));
-    };
-    const updateRgb = (c: S2Object) => {
-        [c._r, c._g, c._b] = hslToRgb(c.$h / 255, c.$s / 255, c.$l / 255);
-        colorString(c);
-    };
-    const channel = (key: "_r" | "_g" | "_b") => (_ctx: Context, c: S2Object, value?: number) => {
-        if (value !== undefined) {
-            c[key] = mod256(value);
-            delete c.$hslset;
-            colorString(c);
-        }
-        return c[key];
-    };
-    const hslChannel = (key: "$h" | "$s" | "$l") => (_ctx: Context, c: S2Object, value?: number) => {
-        updateHsl(c);
-        if (value !== undefined) {
-            c[key] = mod256(value);
-            updateRgb(c);
-        }
-        return c[key];
-    };
-    const shade = (sign: 1 | -1) => (_ctx: Context, c: S2Object, amount?: number) => {
-        updateHsl(c);
-        const lightness = c.$l + sign * (amount ?? 30);
-        const next = s2("Color", { $hslset: true, $h: c.$h, $s: c.$s, $l: Math.max(0, Math.min(255, lightness)) });
-        updateRgb(next);
-        return next;
     };
 
     // EntryLite::formatted_subject
@@ -412,24 +369,7 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _string__css_keyword_list: (_ctx, text, allowed) => String(text).trim().split(/\s+/)
             .map(word => cssKeyword(word, allowed ? new Set(allowed) : undefined)).filter(Boolean).join(" "),
 
-        // Colors
-        _Color__clone: (_ctx, c) => ({ ...c }),
-        _Color__set_hsl: (_ctx, c, h, s, l) => {
-            [c.$h, c.$s, c.$l, c.$hslset] = [mod256(h), mod256(s), mod256(l), true];
-            updateRgb(c);
-        },
-        _Color__red: channel("_r"), _Color__green: channel("_g"), _Color__blue: channel("_b"),
-        _Color__hue: hslChannel("$h"), _Color__saturation: hslChannel("$s"), _Color__lightness: hslChannel("$l"),
-        _Color__inverse: (_ctx, c) => color(255 - c._r, 255 - c._g, 255 - c._b),
-        _Color__average: (_ctx, c, other) => color(...([["_r"], ["_g"], ["_b"]] as const)
-            .map(([key]) => Math.trunc((c[key] + other[key]) / 2 + 0.5)) as [number, number, number]),
-        _Color__blend: (_ctx, c, other, value) => {
-            const m = Number(value) / 100;
-            return color(...(["_r", "_g", "_b"] as const)
-                .map(key => Math.trunc(c[key] - (c[key] - other[key]) * m + 0.5)) as [number, number, number]);
-        },
-        _Color__lighter: shade(1),
-        _Color__darker: shade(-1),
+        ...colorBuiltins(),
         _PalItem: (_ctx, index, c) => c && c[".type"] === "Color" && index >= 0 && index <= 255
             ? s2("PalItem", { color: c, index: Number(index) }) : undefined,
         _palimg_modify: (_ctx, filename, items) => {
@@ -556,6 +496,71 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         pout(ctx, js + "} </script>\n");
     }
 
+    return functions as Record<string, BuiltinFunction>;
+}
+
+// Color methods, from S2::Builtin::LJ and S2::Color.
+export function colorBuiltins(): Record<string, BuiltinFunction> {
+    const colorString = (c: S2Object) => {
+        c._as_string = "#" + [c._r, c._g, c._b].map(v => Number(v).toString(16).padStart(2, "0")).join("");
+    };
+    const color = (r: number, g: number, b: number): S2Object => {
+        const c = s2("Color", { r, g, b });
+        colorString(c);
+        return c;
+    };
+    const updateHsl = (c: S2Object) => {
+        if (c.$hslset) return;
+        c.$hslset = true;
+        const [h, s, l] = rgbToHsl(c._r, c._g, c._b);
+        [c.$h, c.$s, c.$l] = [h, s, l].map(v => Math.trunc(v * 255 + 0.5));
+    };
+    const updateRgb = (c: S2Object) => {
+        [c._r, c._g, c._b] = hslToRgb(c.$h / 255, c.$s / 255, c.$l / 255);
+        colorString(c);
+    };
+    const channel = (key: "_r" | "_g" | "_b") => (_ctx: Context, c: S2Object, value?: number) => {
+        if (value !== undefined) {
+            c[key] = mod256(value);
+            delete c.$hslset;
+            colorString(c);
+        }
+        return c[key];
+    };
+    const hslChannel = (key: "$h" | "$s" | "$l") => (_ctx: Context, c: S2Object, value?: number) => {
+        updateHsl(c);
+        if (value !== undefined) {
+            c[key] = mod256(value);
+            updateRgb(c);
+        }
+        return c[key];
+    };
+    const shade = (sign: 1 | -1) => (_ctx: Context, c: S2Object, amount?: number) => {
+        updateHsl(c);
+        const lightness = c.$l + sign * (amount ?? 30);
+        const next = s2("Color", { $hslset: true, $h: c.$h, $s: c.$s, $l: Math.max(0, Math.min(255, lightness)) });
+        updateRgb(next);
+        return next;
+    };
+    const functions: Record<string, Builtin> = {
+        _Color__clone: (_ctx, c) => ({ ...c }),
+        _Color__set_hsl: (_ctx, c, h, s, l) => {
+            [c.$h, c.$s, c.$l, c.$hslset] = [mod256(h), mod256(s), mod256(l), true];
+            updateRgb(c);
+        },
+        _Color__red: channel("_r"), _Color__green: channel("_g"), _Color__blue: channel("_b"),
+        _Color__hue: hslChannel("$h"), _Color__saturation: hslChannel("$s"), _Color__lightness: hslChannel("$l"),
+        _Color__inverse: (_ctx, c) => color(255 - c._r, 255 - c._g, 255 - c._b),
+        _Color__average: (_ctx, c, other) => color(...(["_r", "_g", "_b"] as const)
+            .map(key => Math.trunc((c[key] + other[key]) / 2 + 0.5)) as [number, number, number]),
+        _Color__blend: (_ctx, c, other, value) => {
+            const m = Number(value) / 100;
+            return color(...(["_r", "_g", "_b"] as const)
+                .map(key => Math.trunc(c[key] - (c[key] - other[key]) * m + 0.5)) as [number, number, number]);
+        },
+        _Color__lighter: shade(1),
+        _Color__darker: shade(-1),
+    };
     return functions as Record<string, BuiltinFunction>;
 }
 

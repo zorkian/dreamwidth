@@ -16,7 +16,7 @@
 import type { SiteConfig } from "../server/config";
 import type { Site, User } from "../data/user";
 import type { S2Object } from "./objects";
-import type { PageOutput } from "./output-cleaner";
+import type { PageOutput } from "./page-output";
 
 export interface Chrome {
     controlStrip(): string;

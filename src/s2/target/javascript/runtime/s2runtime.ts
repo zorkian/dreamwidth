@@ -122,16 +122,15 @@ export class Context {
         return false;
     }
 
-    downcastObject(value: unknown, type: string, layer: Layer, line: number): unknown {
-        if (runtime.isDefined(value) && !this.objectIsa(value, type)) {
-            throw new S2Error(`${layer.source}:${line}: cannot cast object to ${type}`);
-        }
-        return value;
+    // S2::downcast_object: an object of another class casts to null.
+    downcastObject(value: unknown, type: string, _layer: Layer, _line: number): unknown {
+        return runtime.isDefined(value) && !this.objectIsa(value, type) ? undefined : value;
     }
 
-    toString(value: unknown): string {
+    // An object interpolated into a string, through its as_string() or toString() method.
+    toString(value: unknown, method = "as_string()"): string {
         if (!runtime.isDefined(value)) return "";
-        return String(this.getMethod(value, "as_string()", { source: "<interpolation>" } as Layer, 0)(this, value));
+        return String(this.getMethod(value, method, { source: "<interpolation>" } as Layer, 0)(this, value) ?? "");
     }
 
     getFunction(name: string): S2Function {
@@ -140,8 +139,12 @@ export class Context {
         return (context, ...args) => this.call(implementation, context, args);
     }
 
-    getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false, dispatchClass?: string): S2Function {
-        if (!isObject(value) || !runtime.isDefined(value)) throw new S2Error(`${layer.source}:${line}: method ${name} called on null object`);
+    // `staticClass` is the class the compiler resolved the call against.
+    getMethod(value: unknown, name: string, layer: Layer, line: number, superCall = false, staticClass?: string): S2Function {
+        if (!isObject(value) || !runtime.isDefined(value)) {
+            throw new S2Error(`Method called on null ${staticClass ?? ""} object at ${layer.source} line ${line}`);
+        }
+        const dispatchClass = superCall ? staticClass : undefined;
         const type = value[".type"] as string;
         let current: string | undefined = superCall
             ? dispatchClass ?? this.classes.get(this.methodClasses.at(-1) ?? type)
