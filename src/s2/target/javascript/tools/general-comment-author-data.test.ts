@@ -23,6 +23,7 @@ import {generalSelectedComments} from "../live/domain/general-comment-projection
 import {generalCommentFromSource,type GeneralSuspendedCommentInput,
     generalCommentTreeFromSource,type GeneralCommentSourceOperations} from "../live/domain/general-comment-from-source";
 import {generalCommentRecords} from "../live/domain/general-comment-records";
+import {generalCommentEdit} from "../live/domain/general-comment-edit";
 import type {GeneralPublicSession} from "../live/domain/general-public-session";
 import type {GeneralTextEncoding} from "../live/domain/general-text-encoding";
 import {NativeString,scalarPV,scalarTruthy} from "../runtime/native-scalar";
@@ -266,8 +267,9 @@ test("general byte-view retains absent poster fallback and revokes it on public 
         posterTime:value=>({'.type':'DateTime',_value:value,_zone:globalZone.facts.comments!
             .authors.find(row=>row.userid===900999)!.timezone}),
         poster(){throw Error('Suspended author presentation is redacted');},
-        edit(){return {edited:1,url:fixed('/edit'),reason:selected.comment(selectedComment).props.edit_reason,
-            time:1020,threadrootUrl:fixed('/root')};},
+        edit(){return generalCommentEdit(selectedTree!.roots[0]!,{
+            permalink:navigation.permalink,siteRoot:fixed('/app'),
+            journalName:fixed('ordinary6'),styleArgument:undefined});},
         subjectImage(){throw Error('Suspended icon is redacted');},
         picture(){throw Error('Suspended image is redacted');},
         esnEnabled(){return 0;},editCommentsEnabled(){return 0;}};
@@ -283,6 +285,8 @@ test("general byte-view retains absent poster fallback and revokes it on public 
     assert.equal(model._fromsuspended,1);assert.equal(model._full,0);
     assert.equal(model._permalink_url,urls.permalink);
     assert.equal(model._reply_url,urls.reply);
+    assert.equal(scalarPV(model._edit_url).bytes().toString(),'/300.html?edit='+urls.talkId);
+    assert.equal(scalarPV(model._editreason).bytes().toString(),'Changed &amp;&lt;');
     assert.equal(model._poster,undefined);assert.equal(scalarPV(model._text).bytes().toString(),'');
     assert.equal((model._time_poster as {readonly _zone:string})._zone,'Europe/London');
     assert.equal(scalarPV(runtime.memberSlot(model._metadata,fixed('picture_keyword'),'hash').get())

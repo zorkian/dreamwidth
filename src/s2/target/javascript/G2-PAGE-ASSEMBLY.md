@@ -254,3 +254,14 @@ the no-author-presentation rule for the suspended record and actual Context
 construction. Calendar creation/reuse is still a separate user decision; the
 test's logtime value is declared fixture input. Real cleaner, edit, timezone,
 head and installed worker/HTTP providers remain required.
+
+Loaded selected Comment edit metadata now uses the original stored edit time
+truthiness, raw edit reason, the approved Entry URL and the same native
+`link_thread_arg` as reply links. A child thread-root link uses the approved
+site root and canonical journal user in the finite existing `/go` shape. Source
+`LJ::Comment::edit_url`, `threadroot_url` and `LJ::Talk::talkargs` are compared
+with an independent native helper, including an Entry URL already containing a
+query. The guarded SQL suspended Comment is then passed through that source
+edit provider in the same Context. Public site root/journal/style binding in
+the installed worker and original Comment cleaning remain separate required
+steps; no child chooses its own redirect target.
