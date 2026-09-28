@@ -68,7 +68,7 @@ else {
 my @global = qw(user useridmap userprop userproplist s2styles s2layers
     s2compiled s2source_inno logproplist secrets sysban moods moodthemes moodthemedata
     reluser wt_edges);
-my @cluster = qw(userbio userproplite2 userpropblob s2stylelayers2 s2compiled2 log2 logtext2 logprop2
+my @cluster = qw(userbio userproplite2 userpropblob s2stylelayers2 log2 logtext2 logprop2
     usertags userkeywords logtags logtagsrecent logkwsum links userpic2 userpicmap2 userpicmap3 talk2);
 my @tables = (
     (map { "dw_global.$_" } @global),
@@ -87,6 +87,17 @@ for my $table (@tables) {
     my ($schema, $name) = split /\./, $table;
     eval { $root->do("GRANT SELECT ON $tick$schema$tick.$tick$name$tick TO $principal"); };
     die "Cannot grant scoped SELECT\n" if $@;
+}
+# Older local serving accounts had this grant for the removed compiled-layer
+# reader. Revoke only that owned table grant before verifying the exact set.
+my ($obsolete) = $root->selectrow_array(
+    'SELECT COUNT(*) FROM information_schema.TABLE_PRIVILEGES WHERE GRANTEE=?'
+        . ' AND TABLE_SCHEMA=? AND TABLE_NAME=? AND PRIVILEGE_TYPE=?',
+    undef, $principal, 'dw_cluster01', 's2compiled2', 'SELECT',
+);
+if ($obsolete) {
+    $root->do("REVOKE SELECT ON `dw_cluster01`.`s2compiled2` FROM $principal")
+        or die "Cannot revoke obsolete compiled-layer grant\n";
 }
 my $privileges = $root->selectall_arrayref(
     'SELECT TABLE_SCHEMA, TABLE_NAME, PRIVILEGE_TYPE FROM information_schema.TABLE_PRIVILEGES

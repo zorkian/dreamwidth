@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # Stock themes and ordinary overrides
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private anonymous Recent/Entry viewer supports the pinned Tabula Rasa
 **Dazzle** and **Kelis** themes. It also supports four owned user-layer literals:
 `color_page_background` (Color), `font_base` (string), `module_tags_show` (bool),

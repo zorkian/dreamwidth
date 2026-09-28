@@ -21,7 +21,6 @@
 //
 
 import {THEMES,EASYREAD} from "../render/theme-catalog";
-import {gunzipSync} from "node:zlib";
 import { createHash } from "node:crypto";
 import { sql } from "kysely";
 import { PrimaryDatabases, type ReadConnection, type SqlRow } from "./primary";
@@ -465,7 +464,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         const visibleRows = visibility && authorFacts ? [...stickyRows,...visibility.window.rows.filter(row =>
             visible(row) && !visibility.activeIds.includes(String(number(row.jitemid,1)*256+number(row.anum,0,255))))] : undefined;
         if (byteView && frozenRequest.page.kind==="entry" && !visibleRows?.length) return null;
-        const selected = await this.databases.snapshot(clusterId, before.style?.layers.some(layer=>layer.type==="user") ? [...clusterTables,"s2compiled2"] : clusterTables, async connection => {
+        const selected = await this.databases.snapshot(clusterId, clusterTables, async connection => {
             const current = await this.clusterSettings(connection, ownerId, before.facts, includeStyle);
             if (digest(current) !== digest(plan)) unsupported();
             const window = await this.loadWindow(connection, ownerId, frozenRequest);
@@ -493,27 +492,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             const userpics = await this.loadUserpics(connection, ownerId, number(before.facts.owner.dversion), raw);
             const links = await this.loadLinks(connection, ownerId, raw);
             const tags = await this.loadTags(connection,ownerId,loaded.entries.map(entry=>entry.jitemid),raw);
-            const userLayer = before.style?.layers.find(layer=>layer.type==='user');
-            let compiled: {text:string;time:number}|null=null;
-            if(userLayer) {
-                // Only a selected owner user layer adds this engine dependency.
-                const rows=(await sql<Row>`SELECT comptime,
-                    CASE WHEN OCTET_LENGTH(compdata)<=65536 THEN HEX(compdata) ELSE NULL END AS code_hex
-                    FROM s2compiled2 WHERE userid=${ownerId} AND s2lid=${userLayer.s2lid} LIMIT 2`.execute(connection)).rows;
-                if(rows.length!==1)unsupported();
-                const hex=requiredString(rows[0]!.code_hex);
-                if(!/^(?:[A-F0-9]{2})*$/.test(hex)||hex.length>131072)unsupported();
-                const original=Buffer.from(hex,'hex');
-                let decoded=original;
-                try {if(original[0]===31&&original[1]===139)decoded=gunzipSync(original,{maxOutputLength:65537});}
-                catch {unsupported();}
-                if(decoded.length>65536)unsupported();
-                let text:string;
-                try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(decoded);}catch{unsupported();}
-                raw.push(['userlayer:'+userLayer.s2lid,hex,decoded.toString('hex').toUpperCase()]);
-                compiled={text:text!,time:number(rows[0]!.comptime)};
-            }
-            return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, compiled, raw};
+            return {...loaded, selection: window.selection, calendar, features, userpics, links, tags, raw};
         });
         if (!selected) return null;
         // EntryPage.pm loads no comments when CommentInfo.enabled is false.
@@ -565,8 +544,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
             if(digest(themeAuthors)!==digest(before.themeAuthors))unsupported();
             return {owner, style, posters, moods, raw,themeAuthors};
         });
-        const effectiveStyle = after.style && selected.compiled ? {...after.style,layers:after.style.layers.map(layer=>
-            layer.type==='user'?{...layer,compiledTime:selected.compiled!.time,propertyCompiled:selected.compiled!.text}:layer)} : after.style;
+        const effectiveStyle = after.style;
         const rawFields = [...after.raw, ...selected.raw,...pictureRaw];
         if (rawFields.reduce((sum, field) => sum + (field[1].length + field[2].length) / 2, 0) > 2097152) unsupported();
         const sourceFacts = [comments?.fingerprint,before.facts.mapping, before.facts.propertyNames, before.facts.logNames,
@@ -672,6 +650,9 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
         }
         if (!layerIds.length) return null;
         if (layerIds.length > 8 || new Set(layerIds.map(layer => layer.type)).size !== layerIds.length) unsupported();
+        // A selected user layer requires S2 source compilation, which this
+        // retained stock server does not perform. Stop before entry/text reads.
+        if (layerIds.some(layer => layer.type === "user")) unsupported();
         const ids = [...new Set(layerIds.map(layer => layer.s2lid))];
         const definitions = (await sql<Row>`SELECT source.s2lid,source.userid AS ownerid,
             layer_owner.user AS owner_username, source.b2lid AS parent_id,
@@ -695,7 +676,7 @@ export class MysqlLiveStore implements RawRecentRepository, SelectedDataReposito
                 const definition = byId.get(layer.s2lid)!;
                 return {type: layer.type, s2lid: layer.s2lid, ownerid: number(definition.ownerid, 1),
                     ownerUsername: requiredString(definition.owner_username),
-                    compiledTime: layer.type === "user" ? 0 : number(definition.compiled_time),
+                    compiledTime: number(definition.compiled_time),
                     ...(['user','theme'].includes(layer.type)||(layer.type==='layout'&&
                         requiredString(definition.source_hash).toLowerCase()===EASYREAD.sourceHash) ? {parentId:number(definition.parent_id),
                         nativeType:requiredString(definition.native_type)} : {}),

@@ -15,6 +15,11 @@ the same terms as Perl itself. For a copy of the license, please reference
 
 # EasyRead with Aqua
 
+Historical qualification only: after the source-only cleanup, the retained
+old server refuses selected journal user layers. Their settings are S2
+source; the approved general server must compile that source and is not yet
+wired to startup. No stored generated Perl reader remains in serving.
+
 The private anonymous Recent/Entry viewer adds exactly the stock **EasyRead**
 layout with **Aqua**. EasyRead without Aqua, cross-layout themes, other layouts
 and general executable custom layers refuse. Existing Tabula Rasa, Dazzle/Kelis
