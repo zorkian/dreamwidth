@@ -168,10 +168,14 @@ export class Entry {
     }
 
     static async byDitemid(db: Databases, journal: User, ditemid: number): Promise<Entry | null> {
-        const rows = await journal.cluster(db, `SELECT ${COLUMNS} FROM log2 WHERE journalid = ? AND jitemid = ?`,
-            [journal.userid, Math.floor(ditemid / 256)]);
-        const entry = rows[0] ? new Entry(journal, rows[0]) : null;
+        const entry = await Entry.byJitemid(db, journal, Math.floor(ditemid / 256));
         return entry && entry.anum === ditemid % 256 ? entry : null;
+    }
+
+    static async byJitemid(db: Databases, journal: User, jitemid: number): Promise<Entry | null> {
+        const rows = await journal.cluster(db, `SELECT ${COLUMNS} FROM log2 WHERE journalid = ? AND jitemid = ?`,
+            [journal.userid, jitemid]);
+        return rows[0] ? new Entry(journal, rows[0]) : null;
     }
 
     // An entry by its URL slug, if posted on `date` (YYYY/MM/DD).
@@ -221,6 +225,15 @@ function logpropList(db: Databases): Promise<Map<number, string>> {
     return names;
 }
 
+// DW::Logic::LogItems::active_entries: the jitemids of the ten entries with
+// the newest visible comments.
+export async function activeEntries(db: Databases, journal: User): Promise<number[]> {
+    const rows = await journal.cluster(db,
+        `SELECT nodeid FROM talk2 WHERE journalid = ? AND state NOT IN ('D', 'S')
+         GROUP BY nodeid ORDER BY MAX(jtalkid) DESC LIMIT 10`, [journal.userid]);
+    return rows.map(row => int(row.nodeid));
+}
+
 // LJ::User::get_daycounts for a logged-out viewer: [year, month, day, count]
 // for each day with public entries, in date order.
 export async function dayCounts(db: Databases, journal: User): Promise<[number, number, number, number][]> {
@@ -230,7 +243,7 @@ export async function dayCounts(db: Databases, journal: User): Promise<[number, 
     return rows.map(row => [int(row.year), int(row.month), int(row.day), int(row.n)]);
 }
 
-// Perl truthiness of a stored string.
-export function truthy(value: string | undefined): boolean {
-    return value !== undefined && value !== "" && value !== "0";
+// Perl truthiness, for stored strings and S2 property values.
+export function truthy(value: unknown): boolean {
+    return value !== undefined && value !== null && value !== false && value !== "" && value !== "0" && value !== 0;
 }
