@@ -24,7 +24,7 @@
 import type {NativeSelectedSnapshot,RawEntry,RawCommentText,RawUserpics} from "../contracts";
 import {NativeString,hashKeyBytes} from "../../runtime/native-string";
 import {scalarTruthy,scalarNumber,NativeNumber} from "../../runtime/native-scalar";
-import {exactHostInteger} from "../../runtime/native-number";
+import {arithmetic,divide,exactHostInteger} from "../../runtime/native-number";
 import type {GeneralEntryContentInput} from "./general-entry-content";
 import type {GeneralEntrySourceInput} from "./general-entry-from-source";
 import type {GeneralEntryPageEntryInput} from "./general-entry-page-source";
@@ -33,6 +33,7 @@ import type {GeneralModel} from "./general-model-primitives";
 import {generalMysqlDateParts} from "./general-model-date";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
 import type {GeneralPublicSession} from "./general-public-session";
+import type {GeneralSelectedComment} from "./general-comment-projection";
 
 /** This source bag remains parent-only; only named approved values may be projected. */
 export class GeneralSelectedText {
@@ -227,6 +228,77 @@ export class GeneralSelectedText {
         const id=this.pictureId(entry.posterid,keyword);
         return Object.freeze({image:this.resolvedPictureImage(entry.posterid,id,root,keyword),keyword});
     }
+    /** Talk::load_comments resolves only this shown poster's selected picture. */
+    commentPicture(node:GeneralSelectedComment,root:NativeString,
+        style:"full"|"small"|"smaller"):{readonly hasPicture:boolean;readonly image:GeneralModel|undefined} {
+        const comments=this.snapshot.facts.comments;
+        if(!comments||!comments.headers.some(header=>header.jtalkid===node.id&&
+            header.posterid===node.posterId)||!node.show||!['A','F'].includes(node.state))
+            throw Error("Unselected Comment picture");
+        // Talk resolves picid/pickw only for @posts_to_load. Collapsed
+        // subject-only and ignored records never enter that loop.
+        if(!node.full)return Object.freeze({hasPicture:false,image:undefined});
+        const author=comments.authors.find(row=>row.userid===node.posterId);
+        if(!author||author.statusvis==="S")return Object.freeze({hasPicture:false,image:undefined});
+        const source=comments.texts.find(row=>row.jtalkid===node.id);
+        const props=source?this.comment(source).props:Object.create(null) as Record<string,NativeString|undefined>;
+        const pictures=author.pictures;
+        const usable=new Map(pictures.pictures.filter(row=>row.state!=="X"&&row.state!=="S")
+            .map(row=>[String(row.picid),row.picid]));
+        const key=(value:NativeString)=>{const native=hashKeyBytes(value);
+            return (native.utf8?"utf8:":"bytes:")+native.bytes.toString("hex");};
+        const valid=(index:number)=>{const row=pictures.mappings[index]!;
+            const name=this.source(`picture-map:${author.userid}:${index}`);
+            return name===undefined||name.bytes().length>0&&
+                !/[\r\n\0]/.test(name.bytes().toString("latin1"));};
+        let picid:number|NativeString=author.defaultpicid;
+        if(author.clusterid&&author.dversion>=9&&scalarTruthy(props.picture_mapid)) {
+            const native=hashKeyBytes(props.picture_mapid!);
+            let current=native.utf8?"":native.bytes.toString("latin1");
+            const mappings=new Map<string,(typeof pictures.mappings)[number]>();
+            pictures.mappings.forEach((row,index)=>{if(valid(index))mappings.set(String(row.mapid??""),row);});
+            const seen=new Set([current]);
+            while(mappings.get(current)?.redirectMapid) {
+                current=String(mappings.get(current)!.redirectMapid);
+                if(seen.has(current)){current="0";break;}
+                seen.add(current);
+            }
+            const selected=mappings.get(current)?.picid;
+            if(selected&&usable.has(String(selected)))picid=selected;
+        } else if(author.clusterid&&author.dversion<9&&node.fields?.pictureKeyword!==undefined) {
+            const keyword=node.fields.pictureKeyword;
+            const keywords=new Map<string,number>();
+            pictures.mappings.forEach((row,index)=>{
+                const name=this.source(`picture-map:${author.userid}:${index}`);
+                if(valid(index)&&name&&row.picid&&usable.has(String(row.picid)))
+                    keywords.set(key(name),row.picid);
+            });
+            const matched=keywords.get(key(keyword));
+            if(matched)picid=matched;
+            else {
+                const capture=/^pic#([0-9]+)\n?(?![\s\S])/.exec(keyword.bytes().toString("latin1"));
+                if(capture&&usable.has(capture[1]!))
+                    picid=keyword.flagged()?NativeString.flagged(Buffer.from(capture[1]!,"ascii")):
+                        NativeString.bytes(Buffer.from(capture[1]!,"ascii"));
+            }
+        }
+        const numeric=exactHostInteger(scalarNumber(picid),0,4294967295);
+        // load_userpics checks actual userpic2 rows, including a direct
+        // default X/S row. A resolved ID without that row emits no Image.
+        const row=author.clusterid?pictures.pictures.find(picture=>picture.picid===numeric):undefined;
+        if(!row)return Object.freeze({hasPicture:false,image:undefined});
+        const width=NativeNumber.integer(BigInt(row.width)),height=NativeNumber.integer(BigInt(row.height));
+        const scale=(value:NativeNumber)=>style==="full"?value:divide(
+            style==="small"?arithmetic("*",value,NativeNumber.integer(3n)):value,
+            NativeNumber.integer(style==="small"?4n:2n));
+        const image=generalUserpicImage({userid:author.userid,picid,root,
+            username:NativeString.bytes(Buffer.from(author.user,"latin1")),
+            width:scale(width),height:scale(height),
+            description:author.statusvis==="X"?undefined:
+                this.source(`picture:${author.userid}:${numeric}`)?.clone(),
+            keyword:node.fields?.pictureKeyword});
+        return Object.freeze({hasPicture:true,image});
+    }
     /** Selected owner/poster source only, never a raw account lookup from the worker. */
     pictureFields(userid:number,picId:number):{readonly userid:number;readonly picid:number;
         readonly width:number|undefined;readonly height:number|undefined;
@@ -358,7 +430,7 @@ export class GeneralSelectedText {
         const props=converted.props;
         const pictureKeyword=author&&author.dversion>=9?
             scalarTruthy(props.picture_mapid)?this.mapKeyword(author.userid,author.pictures,props.picture_mapid!):
-                undefined:props.picture_keyword;
+                undefined:scalarTruthy(props.picture_keyword)?props.picture_keyword:undefined;
         return Object.freeze({state:header.state as 'A'|'F'|'S'|'D',show:header.state==='A'||header.state==='F',
             posterId:header.posterid,posterLoaded:!!author,posterSuspended:author?.statusvis==='S',
             loaded:comment.body!==null||this.metadataOnlyComments.has(comment),
