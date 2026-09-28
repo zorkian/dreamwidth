@@ -42,6 +42,7 @@ export class GeneralSelectedText {
     private readonly official=new WeakMap<RawEntry,boolean>();
     private readonly officialComments=new WeakMap<RawCommentText,boolean>();
     private readonly metadataOnlyComments=new WeakSet<RawCommentText>();
+    private readonly commentAnonymity=new Map<number,boolean>();
     private constructor(private readonly snapshot:NativeSelectedSnapshot) {
         if(snapshot.encoding!=="dbi-byte-view")throw Error("Invalid selected source encoding");
         for(const cell of snapshot.sources) {
@@ -107,7 +108,24 @@ export class GeneralSelectedText {
             }
             prepared.officialComments.set(comment,official);
         }
+        for(const author of snapshot.facts.comments?.authors??[]) {
+            // Hidden-only posters are not loaded; S posters have their subject
+            // and text redacted, so no relationship read may authorize them.
+            if(author.statusvis==="S")continue;
+            if(author.journaltype==="I") {
+                if(!authority)throw Error("Comment identity authority is not installed");
+                prepared.commentAnonymity.set(author.userid,await authority.commentAnonymous(
+                    snapshot.facts.owner.userid,author.userid,snapshot.facts.owner.journaltype,author.user));
+            } else prepared.commentAnonymity.set(author.userid,false);
+        }
         return prepared;
+    }
+    /** Missing poster is anonymous; identities require the issued relation witness. */
+    commentAnonymous(posterId:number):boolean {
+        if(!posterId||!this.snapshot.facts.comments?.authors.some(row=>row.userid===posterId))return true;
+        const answer=this.commentAnonymity.get(posterId);
+        if(answer===undefined)throw Error("Unapproved Comment poster cleaner mode");
+        return answer;
     }
     /** Native load_linkobj stably sorts numeric ordernum after SQL receipt. */
     publicLinks():readonly {readonly title:NativeString|undefined;readonly url:NativeString|undefined;

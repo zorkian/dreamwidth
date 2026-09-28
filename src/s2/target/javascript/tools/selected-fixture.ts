@@ -43,14 +43,16 @@ const clusterTables = ["userproplite2","userpropblob","s2stylelayers2","s2compil
 const publicLanguageTables = ["ml_langs","ml_items","ml_latest","ml_text"];
 
 export async function withSelectedFixture(run: (fixture: SelectedFixture) => Promise<void>,
-    publicLanguage = false, publicUsers = false, publicEncodings = false, publicMaintainers = false): Promise<void> {
+    publicLanguage = false, publicUsers = false, publicEncodings = false, publicMaintainers = false,
+    publicCommentAuthors = false): Promise<void> {
     assert.equal(process.env.LJHOME,"/workspaces/dreamwidth");
     const prefix = "s6_selected_" + randomBytes(8).toString("hex");
     const schemas = [prefix+"_g",prefix+"_seven",prefix+"_nineteen"];
     const created: string[] = [];
-    const selectedGlobalTables = [...globalTables, ...(publicLanguage ? publicLanguageTables : []),
+    const selectedGlobalTables = [...new Set([...globalTables, ...(publicLanguage ? publicLanguageTables : []),
         ...(publicUsers ? ["identitymap"] : []), ...(publicEncodings ? ["codes"] : []),
-        ...(publicMaintainers ? ["reluser"] : [])];
+        ...(publicMaintainers||publicCommentAuthors ? ["reluser"] : []),
+        ...(publicCommentAuthors ? ["wt_edges"] : [])])];
     const admin = await mysql.createConnection({socketPath:"/var/run/mysqld/mysqld.sock",user:"root"});
     let store: MysqlLiveStore | undefined;
     const table = (schema: string,name: string) => {
