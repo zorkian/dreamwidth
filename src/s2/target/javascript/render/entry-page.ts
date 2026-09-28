@@ -21,6 +21,7 @@ import {
 import {
     type PageContext, Page, entryObjects, journalDefaultPic, loadUserpics, robotMetaTags,
 } from "./pages";
+import { journalScripts, trackingPopup } from "./resources";
 import { Entry, truthy } from "../data/entry";
 
 
@@ -39,7 +40,7 @@ interface Post extends CommentRow {
 }
 
 // null when the visitor may not see the entry.
-export async function EntryPage(pc: PageContext, entry: Entry, chromeHead: string): Promise<S2Object | null> {
+export async function EntryPage(pc: PageContext, entry: Entry): Promise<S2Object | null> {
     const { site, journal, db, args } = pc;
     const config = site.config;
     await Entry.fill(db, journal, [entry]);
@@ -70,6 +71,7 @@ export async function EntryPage(pc: PageContext, entry: Entry, chromeHead: strin
     head += `<link rel="prev" href="${go("prev")}" />\n<link rel="next" href="${go("next")}" />\n`;
     head += `<link rel="canonical" href="${permalink}${thread ? `?thread=${thread}#cmt${thread}` : ""}" />\n`;
 
+    journalScripts(pc.resources);
     const comments = await loadComments(pc, entry, thread);
     const flat = /\bflat\b/.test(args.view ?? ""), topOnly = /\btop-only\b/.test(args.view ?? "");
     // The thread to return to after replying; the thread expander names it.
@@ -80,10 +82,16 @@ export async function EntryPage(pc: PageContext, entry: Entry, chromeHead: strin
         style: styleArgs(args), returnThread, destination: args.destination_thread ?? String(thread),
     });
     head += commentInfoScript(journal.user, page._comments);
+    pc.resources.need({ group: "all" }, "js/jquery/jquery.ui.core.js", "js/jquery/jquery.ui.tooltip.js",
+        "js/jquery.ajaxtip.js", "js/jquery/jquery.ui.button.js", "js/jquery/jquery.ui.dialog.js",
+        "js/jquery.commentmanage.js", "js/jquery/jquery.ui.position.js", "stc/jquery/jquery.ui.core.css",
+        "stc/jquery/jquery.ui.tooltip.css", "stc/jquery/jquery.ui.button.css", "stc/jquery/jquery.ui.dialog.css",
+        "stc/jquery.commentmanage.css");
+    trackingPopup(pc.resources, config);
 
     // Open Graph data leads the head for public entries.
     head = openGraph(pc, entry, s2entry!, permalink) + head;
-    page._head_content = head + chromeHead;
+    page._head_content = head;
 
     page._comment_nav = s2("CommentNav", {
         view_mode: flat ? "flat" : topOnly ? "top-only" : "threaded", url: styleUrl(args, permalink),

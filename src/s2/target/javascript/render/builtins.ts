@@ -16,6 +16,7 @@
 import type { BuiltinFunction, Context } from "../runtime/s2runtime";
 import { cleanCss } from "@dreamwidth/content";
 import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2, styleUrl } from "./objects";
+import { tagsText } from "./pages";
 import type { RenderState } from "./state";
 
 type Builtin = (ctx: Context, ...args: any[]) => unknown;
@@ -422,8 +423,8 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _Entry__get_plain_subject: (_ctx, item) => item.$subject_all ?? item._subject,
         _Comment__get_plain_subject: (_ctx, item) => item.$subject_all ?? item._subject,
         _Entry__plain_subject: (_ctx, item) => item.$subject_all ?? item._subject,
-        _EntryLite__get_tags_text: (ctx, item) => state.chrome.tagsText(props(ctx), item._tags ?? []),
-        _Entry__get_tags_text: (ctx, item) => state.chrome.tagsText(props(ctx), item._tags ?? []),
+        _EntryLite__get_tags_text: (ctx, item) => tagsText(props(ctx), item._tags ?? []),
+        _Entry__get_tags_text: (ctx, item) => tagsText(props(ctx), item._tags ?? []),
         _EntryLite__print_reply_link: printReplyLink,
         _Entry__print_reply_link: printReplyLink,
         _EntryPage__print_reply_link: printReplyLink,

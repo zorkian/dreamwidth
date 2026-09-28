@@ -67,6 +67,7 @@ print JSON->new->canonical->pretty->encode(
         protocol           => $LJ::PROTOCOL,
         domain             => $LJ::DOMAIN,
         domainWeb          => $LJ::DOMAIN_WEB,
+        userDomain         => $LJ::USER_DOMAIN,
         trustedCssHosts    => [ sort keys %LJ::TRUSTED_CSS_HOST ],
         cssProxy           => $LJ::CSSPROXY,
         cssCleaner         => LJ::is_enabled('css_cleaner') ? JSON::true : JSON::false,
@@ -89,7 +90,7 @@ print JSON->new->canonical->pretty->encode(
         strings            => \%strings,
         capBits            => \%LJ::CAP,
         capDefaults        => \%LJ::CAP_DEF,
-        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter ) },
+        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll ) },
         robotBlockingContent => LJ::is_enabled('adult_content')
         ? [ sort grep { $LJ::CONTENT_FLAGS{$_}{block_robots} } keys %LJ::CONTENT_FLAGS ]
         : [],

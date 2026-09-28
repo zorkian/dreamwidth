@@ -15,7 +15,7 @@
 import type { Context } from "../runtime/s2runtime";
 import type { StyleInfo } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
-import { Entry, truthy } from "../data/entry";
+import { Entry, dayCounts, truthy } from "../data/entry";
 import { Moods } from "../data/moods";
 import { type UserTag, publicTags } from "../data/tags";
 import { canonicalUsername } from "@dreamwidth/content";
@@ -23,6 +23,7 @@ import { type Site, User } from "../data/user";
 import { Userpics } from "../data/userpic";
 import type { ContentCleaner } from "./content";
 import type { JournalFilter } from "./render";
+import { type Resources, journalScripts, trackingPopup } from "./resources";
 import { escapeValue, type PropertyCleaners } from "./context";
 import {
     type S2Object, DateTimeParts, styleArgs, styleUrl, talkargs, DateTimeUnix, Image, ImageStd, ImageUserpic, Link, S2Date, Tag, UserLite,
@@ -30,6 +31,7 @@ import {
 } from "./objects";
 
 export interface PageContext {
+    readonly resources: Resources;
     // The query arguments, whose viewing style links carry along.
     readonly args: Readonly<Record<string, string>>;
     readonly db: Databases;
@@ -114,8 +116,8 @@ export function showControlStrip(journal: User): boolean {
 }
 
 // LJ::S2::RecentPage
-export async function RecentPage(pc: PageContext, args: Readonly<Record<string, string>>, filter: JournalFilter,
-    chromeHead: string): Promise<S2Object> {
+export async function RecentPage(pc: PageContext, args: Readonly<Record<string, string>>,
+    filter: JournalFilter): Promise<S2Object> {
     const { site, journal, db } = pc;
     const config = site.config;
     const base = journal.journalBase(site);
@@ -162,14 +164,9 @@ export async function RecentPage(pc: PageContext, args: Readonly<Record<string, 
     page._data_links_order = ["rss", "atom"];
     if (journal.shouldBlockRobots(config) || truthy(args.skip)) head += robotMetaTags();
     if (journal.props.icbm) head += `<meta name="ICBM" content="${journal.props.icbm}" />\n`;
-    head += `
-  <script type='text/javascript'>
-  expanded = '${site.config.strings["widget.cuttag.expanded"] ?? ""}';
-  collapsed = '${site.config.strings["widget.cuttag.collapsed"] ?? ""}';
-  collapseAll = '${site.config.strings["widget.cuttag.collapseAll"] ?? ""}';
-  expandAll = '${site.config.strings["widget.cuttag.expandAll"] ?? ""}';
-  </script>
-    `;
+    trackingPopup(pc.resources, config);
+    journalScripts(pc.resources, { lastn: true });
+    head += cutTagScript(pc);
 
     const entries = await entryObjects(pc, [...stickies, ...items.filter(entry => !stickySet.has(entry.ditemid))],
         "recent");
@@ -225,7 +222,7 @@ export async function RecentPage(pc: PageContext, args: Readonly<Record<string, 
         head += `<link rel="prev" href="${nav._backward_url ?? ""}" />\n`;
     }
     page._nav = nav;
-    page._head_content = head + chromeHead;
+    page._head_content = head;
     return page;
 }
 
@@ -261,9 +258,30 @@ export async function loadUserpics(pc: PageContext, userids: readonly number[]):
     }
 }
 
+// The cut tag labels recent and day pages give their scripts.
+export function cutTagScript(pc: PageContext): string {
+    const string = (key: string) => pc.site.config.strings[`widget.cuttag.${key}`] ?? "";
+    return `
+  <script type='text/javascript'>
+  expanded = '${string("expanded")}';
+  collapsed = '${string("collapsed")}';
+  collapseAll = '${string("collapseAll")}';
+  expandAll = '${string("expandAll")}';
+  </script>
+    `;
+}
+
+// LJ::S2::get_tags_text
+export function tagsText(props: Record<string, unknown>, tags: readonly S2Object[]): string {
+    if (!tags.length) return "";
+    const list = tags.map(tag => `<a rel='tag' href='${tag._url}'>${tag._name}</a>`).join(", ");
+    return `<div class='ljtags'>${String(props._text_tags ?? "").replace("#", list)}</div>`;
+}
+
 // Entry_from_entryobj for each entry, loading posters, icons and moods together.
+// Recent pages link cuts to the entry; month pages show no entry text.
 export async function entryObjects(pc: PageContext, entries: readonly Entry[],
-    cuts: "recent" | "entry"): Promise<S2Object[]> {
+    view: "recent" | "entry" | "month"): Promise<S2Object[]> {
     const { site, journal, db } = pc;
     const config = site.config;
     const p = props(pc);
@@ -326,7 +344,9 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"],
             metadata: {},
             subject: subject.html,
-            text: pc.content.event(entry, cuts === "recent" ? styled : undefined),
+            text: view === "month" ? ""
+                : pc.content.event(entry, view === "recent" ? styled : undefined) +
+                    (truthy(String(p._tags_aware ?? "")) ? "" : tagsText(p, tags)),
             journal: UserLite(site, journal), poster: UserLite(site, poster),
             new_day: 0, end_day: 0, comments, userpic, permalink_url: url, itemid: entry.ditemid, tags,
             timeformat24: 0, admin_post: 0, dom_id: `entry-${journal.user}-${entry.ditemid}`,
@@ -373,39 +393,46 @@ function currents(pc: PageContext, entry: Entry, moods: Moods, themeid: number, 
     return result;
 }
 
-// LJ::S2::YearMonth for Page::get_latest_month
-export async function latestMonth(pc: PageContext): Promise<S2Object> {
-    const { journal, site } = pc;
-    const base = journal.journalBase(site);
-    const rows = await journal.cluster(pc.db,
-        "SELECT year, month, day, COUNT(*) AS n FROM log2 WHERE journalid = ? AND security = 'public' GROUP BY 1, 2, 3",
-        [journal.userid]);
-    const counts = new Map<string, number>();
-    const months = new Set<number>();
-    for (const row of rows) {
-        counts.set(`${int(row.year)}-${int(row.month)}-${int(row.day)}`, int(row.n));
-        months.add(int(row.year) * 12 + int(row.month));
+// Day counts by year, month and day, as get_journal_day_counts arranges them.
+export type DayCounts = Map<number, Map<number, Map<number, number>>>;
+
+export async function journalDayCounts(pc: PageContext): Promise<DayCounts> {
+    const counts: DayCounts = new Map();
+    for (const [year, month, day, count] of await dayCounts(pc.db, pc.journal)) {
+        if (!counts.has(year)) counts.set(year, new Map());
+        if (!counts.get(year)!.has(month)) counts.get(year)!.set(month, new Map());
+        counts.get(year)!.get(month)!.set(day, count);
     }
+    return counts;
+}
+
+// Page::get_latest_month: the last month with entries, not after this one.
+export function latestMonth(pc: PageContext, counts: DayCounts): S2Object {
     const now = new globalThis.Date(pc.nowSeconds * 1000);
     const [curYear, curMonth] = [now.getUTCFullYear(), now.getUTCMonth() + 1];
     let [year, month] = [curYear, curMonth];
-    const years = [...new Set([...months].map(value => Math.floor((value - 1) / 12)))].filter(y => y <= curYear).sort((a, b) => a - b);
+    const years = [...counts.keys()].filter(y => y <= curYear).sort((a, b) => a - b);
     if (years.length) {
         year = years.at(-1)!;
-        const inYear = [...months].filter(value => Math.floor((value - 1) / 12) === year)
-            .map(value => value - year * 12).filter(m => year < curYear || m <= curMonth).sort((a, b) => a - b);
-        month = inYear.at(-1) ?? month;
+        // Perl leaves the month undefined when the year has none this early.
+        month = [...counts.get(year)!.keys()].filter(m => year < curYear || m <= curMonth)
+            .sort((a, b) => a - b).at(-1) ?? 0;
     }
+    return YearMonth(pc, counts, year, month);
+}
 
+// LJ::S2::YearMonth
+export function YearMonth(pc: PageContext, counts: DayCounts, year: number, month: number): S2Object {
+    const base = pc.journal.journalBase(pc.site);
     const monday = props(pc)._reg_firstdayofweek === "monday";
     const pad = (n: number) => String(n).padStart(2, "0");
-    const hasEntries = [...counts.keys()].some(key => key.startsWith(`${year}-${month}-`));
+    const days = counts.get(year)?.get(month);
     const weeks: S2Object[] = [];
     let week: S2Object | undefined;
-    const days = new globalThis.Date(Date.UTC(year, month, 0)).getUTCDate();
+    const length = month ? new globalThis.Date(Date.UTC(year, month, 0)).getUTCDate() : 0;
     let dayOfWeek = new globalThis.Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-    for (let day = 1; day <= days; day++) {
-        const count = counts.get(`${year}-${month}-${day}`) ?? 0;
+    for (let day = 1; day <= length; day++) {
+        const count = days?.get(day) ?? 0;
         const d = s2("YearDay", { day, date: S2Date(year, month, day, dayOfWeek + 1), num_entries: count });
         if (count) d._url = `${base}/${year}/${pad(month)}/${pad(day)}/`;
         if (!week) {
@@ -424,10 +451,21 @@ export async function latestMonth(pc: PageContext): Promise<S2Object> {
         week._post_empty = 7 - week._pre_empty - week._days.length;
         weeks.push(week);
     }
-    const result = s2("YearMonth", { year, month, weeks, url: `${base}/${year}/${pad(month)}/`, has_entries: hasEntries ? 1 : 0 });
-    const current = year * 12 + month;
-    const before = [...months].filter(value => value < current).sort((a, b) => b - a)[0];
-    const after = [...months].filter(value => value > current).sort((a, b) => a - b)[0];
+    const result = s2("YearMonth", {
+        month, year, weeks, url: `${base}/${year}/${pad(month)}/`, has_entries: days ? 1 : 0,
+    });
+
+    // As in Perl, only months numbered before (or after) this one are
+    // considered in other years too.
+    const now = year * 12 + month;
+    let before: number | undefined, after: number | undefined;
+    for (const [y, months] of counts) {
+        for (const m of months.keys()) {
+            const value = y * 12 + m;
+            if (y <= year && m < month && value < now && (!before || value > before)) before = value;
+            if (y >= year && m > month && value > now && (!after || value < after)) after = value;
+        }
+    }
     for (const [key, value] of [["prev", before], ["next", after]] as const) {
         if (value === undefined) continue;
         const [y, m] = [Math.floor((value - 1) / 12), ((value - 1) % 12) + 1];

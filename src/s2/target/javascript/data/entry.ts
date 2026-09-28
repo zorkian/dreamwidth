@@ -150,6 +150,23 @@ export class Entry {
         return entries;
     }
 
+    // Public entries posted on one day, as DayPage loads them.
+    static async onDay(db: Databases, journal: User, year: number, month: number, day: number): Promise<Entry[]> {
+        const rows = await journal.cluster(db,
+            `SELECT ${COLUMNS} FROM log2 WHERE journalid = ? AND year = ? AND month = ? AND day = ?
+             AND security = 'public' ORDER BY eventtime, logtime LIMIT 2000`, [journal.userid, year, month, day]);
+        return rows.map(row => new Entry(journal, row));
+    }
+
+    // Public entries posted in one month, as MonthPage loads them, by event time.
+    static async inMonth(db: Databases, journal: User, year: number, month: number): Promise<Entry[]> {
+        const rows = await journal.cluster(db,
+            `SELECT ${COLUMNS} FROM log2 WHERE journalid = ? AND year = ? AND month = ?
+             AND security = 'public' LIMIT 2000`, [journal.userid, year, month]);
+        return rows.map(row => new Entry(journal, row))
+            .sort((a, b) => a.alldatepart < b.alldatepart ? -1 : a.alldatepart > b.alldatepart ? 1 : 0);
+    }
+
     static async byDitemid(db: Databases, journal: User, ditemid: number): Promise<Entry | null> {
         const rows = await journal.cluster(db, `SELECT ${COLUMNS} FROM log2 WHERE journalid = ? AND jitemid = ?`,
             [journal.userid, Math.floor(ditemid / 256)]);
@@ -202,6 +219,15 @@ function logpropList(db: Databases): Promise<Map<number, string>> {
         logpropNames.set(db, names);
     }
     return names;
+}
+
+// LJ::User::get_daycounts for a logged-out viewer: [year, month, day, count]
+// for each day with public entries, in date order.
+export async function dayCounts(db: Databases, journal: User): Promise<[number, number, number, number][]> {
+    const rows = await journal.cluster(db,
+        `SELECT year, month, day, COUNT(*) AS n FROM log2 WHERE journalid = ? AND security = 'public'
+         GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`, [journal.userid]);
+    return rows.map(row => [int(row.year), int(row.month), int(row.day), int(row.n)]);
 }
 
 // Perl truthiness of a stored string.

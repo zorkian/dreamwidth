@@ -75,7 +75,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
 - **Page comparisons** (`tests/pages.test.ts`). Fixture journals from
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
-  entries with rich HTML, comments, and pagination.
+  entries with rich HTML, comments, pagination, filters, the archive views
+  and stylesheets.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments
   and suspended journals never appear.

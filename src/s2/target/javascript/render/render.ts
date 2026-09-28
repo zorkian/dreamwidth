@@ -19,12 +19,17 @@ import { Entry } from "../data/entry";
 import { type Site, User } from "../data/user";
 import { createBuiltins } from "./builtins";
 import { createChrome } from "./chrome";
+import { journalResources, siteSettings, standardResources } from "./resources";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
 import { PageOutput } from "./page-output";
 import { EntryPage } from "./entry-page";
-import { JOURNAL_PROPS, type PageContext, RecentPage, latestMonth, showControlStrip, visibleTags } from "./pages";
+import { DayPage, MonthPage, YearPage } from "./archive-pages";
+import {
+    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, journalDayCounts, latestMonth, showControlStrip,
+    visibleTags,
+} from "./pages";
 import type { RenderState } from "./state";
 
 export interface RenderRequest {
@@ -75,10 +80,12 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const users = new Map<number, User>([[journal.userid, journal]]);
     const output = new PageOutput(site.config, MAX_OUTPUT, !stylesheet);
     const control = showControlStrip(journal);
+    const resources = standardResources(site.config);
     const chrome = createChrome({
-        site, journal, view: request.view, requestPath: request.requestPath, args: request.args, showControlStrip: control, users,
+        site, journal, view: request.view, requestPath: request.requestPath, args: request.args, showControlStrip: control,
+        users, resources,
     });
-    let page: S2Object | undefined;
+    let page: S2Object | { errors: string[] } | undefined;
     let month: S2Object | undefined;
     let tags: S2Object[] = [];
     const state: RenderState = {
@@ -104,7 +111,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const cleaners = content.propertyCleaners();
     const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
     const pc: PageContext = {
-        args: request.args, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
+        args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
@@ -125,24 +132,41 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         return { status: 200, body: output.finish(), contentType: "text/css" };
     }
 
-    [month, tags] = await Promise.all([latestMonth(pc), visibleTags(pc)]);
+    let counts: DayCounts;
+    [counts, tags] = await Promise.all([journalDayCounts(pc), visibleTags(pc)]);
+    month = latestMonth(pc, counts);
     await preloadNamedUsers(db, request.layers, users);
 
-    const head = chrome.resourceHead();
     const args = request.args;
     switch (request.view || "lastn") {
         case "lastn":
-            if (!request.pathextra) page = await RecentPage(pc, args, request.filter, head);
+            if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
+            break;
+        case "archive":
+            page = await YearPage(pc, counts, request.pathextra);
+            break;
+        case "month":
+            page = await MonthPage(pc, counts, request.pathextra);
+            break;
+        case "day":
+            page = await DayPage(pc, counts, request.pathextra);
             break;
         case "entry": {
             const entry = request.slug
                 ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
                 : await Entry.byDitemid(db, journal, request.ditemid!);
-            page = entry ? await EntryPage(pc, entry, head) ?? undefined : undefined;
+            page = entry ? await EntryPage(pc, entry) ?? undefined : undefined;
             break;
         }
     }
     if (!page) return { status: 404, body: "" };
+    if ("errors" in page) {
+        // Perl's map takes in the closing tag too.
+        const items = [...page.errors as string[], "</ul>"].map(error => `<li>${error}</li>`).join("");
+        return { status: 200, body: `Errors occurred processing this page:<ul>${items}` };
+    }
+    journalResources(resources, journal, control);
+    page._head_content += siteSettings(site, journal) + resources.includes("stylesheets");
     s2.printing = true;
     try {
         s2.ctx.runMethod(page, "print()");
