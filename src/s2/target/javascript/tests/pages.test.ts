@@ -63,6 +63,12 @@ test("an entry page without comments", async () => {
     await compare(`/~s2fix_default/${await journals.ditemid("s2fix_default", "Entry 3:")}.html`);
 });
 
+test("archive pages for a year, a month and a day", async () => {
+    for (const path of ["/~s2fix_archive/2025/", "/~s2fix_archive/2025/03/", "/~s2fix_archive/2025/03/10/"]) {
+        await compare(path);
+    }
+});
+
 test("stylesheets, cleaned as CSS", async () => {
     await compare("/~s2fix_theme/res/14/stylesheet");
     await compare("/~s2fix_custom/res/16/stylesheet");

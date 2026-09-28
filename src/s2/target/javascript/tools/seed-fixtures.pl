@@ -62,6 +62,19 @@ LJ::Customize->apply_theme( $custom, LJ::S2Theme->load_by_uniq('practicality/ali
 user_layer( $custom, $USER_LAYER );
 comments( $custom, $commenter, entries( $custom, 4 ) );
 
+# Entries spread over years and months, for the archive views.
+my $archive = journal('s2fix_archive');
+LJ::Customize->apply_theme( $archive, LJ::S2Theme->load_by_uniq('abstractia/aurora') )
+    if new_journal($archive);
+unless ( entry_count($archive) ) {
+    my $n = 0;
+    for my $date ( [ 2024, 11, 5 ], [ 2025, 3, 10 ], [ 2025, 3, 10 ], [ 2025, 12, 20 ], [ 2026, 2, 14 ] ) {
+        $n++;
+        post( $archive, $n, subject => "Dated entry $n", event => body($n), security => 'public',
+            year => $date->[0], mon => $date->[1], day => $date->[2], hour => 8 + $n );
+    }
+}
+
 # A user layer that never finishes printing, for render time limits.
 my $loop = journal('s2fix_loop');
 entries( $loop, 1 );

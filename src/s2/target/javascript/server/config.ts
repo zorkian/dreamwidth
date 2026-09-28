@@ -32,6 +32,7 @@ export interface SiteConfig {
     readonly protocol: string;
     readonly domain: string;
     readonly domainWeb: string;
+    readonly userDomain: string;
     readonly trustedCssHosts: readonly string[];
     readonly cssProxy: string | null;
     readonly cssCleaner: boolean;
@@ -55,7 +56,8 @@ export interface SiteConfig {
     readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
     readonly capDefaults: Readonly<Record<string, unknown>>;
     // The LJ::is_enabled features journal views check.
-    readonly enabled: Readonly<Record<"tags" | "security_filter", boolean>>;
+    readonly enabled: Readonly<Record<
+        "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll", boolean>>;
     // Adult content levels whose journals and entries ask robots to stay away.
     readonly robotBlockingContent: readonly string[];
 }
