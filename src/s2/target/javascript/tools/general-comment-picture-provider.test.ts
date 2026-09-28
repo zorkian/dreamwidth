@@ -29,13 +29,17 @@ require '/workspaces/dreamwidth/cgi-bin/ljlib.pl';require LJ::User::Icons;
 my $u=bless {userid=>900999,defaultpicid=>951,dversion=>10,clusterid=>7},'LJ::User';
 no warnings 'redefine';
 local *LJ::User::get_userpic_info=sub{{pic=>{951=>{picid=>951},952=>{picid=>952}},
- kw=>{mapped=>{picid=>952}},mapid=>{5=>{picid=>952}},map_redir=>{6=>5},mapkw=>{5=>'mapped'}}};
+ kw=>{mapped=>{picid=>952},'0'=>{picid=>952}},
+ mapid=>{5=>{picid=>952}},map_redir=>{6=>5},mapkw=>{5=>'mapped'}}};
 my $chosen=$u->get_picid_from_mapid(6);
 my $keyword=$u->get_keyword_from_mapid(6);
 my $legacy=$u->get_picid_from_keyword('mapped');
+my @false;
+for my $stored ('','0') { my $kw; $kw=$stored if $stored;
+ push @false, [$kw,$u->get_picid_from_keyword($kw)]; }
 local *LJ::User::get_userpic_info=sub{{pic=>{951=>{picid=>951}},
  mapid=>{},map_redir=>{6=>5},mapkw=>{5=>'mapped'}}};
-print encode_json([$chosen,$keyword,$legacy,$u->get_picid_from_mapid(6)]);`;
+print encode_json([$chosen,$keyword,$legacy,\@false,$u->get_picid_from_mapid(6)]);`;
     return JSON.parse(execFileSync("perl",["-e",source],
         {encoding:"utf8",timeout:10000,maxBuffer:32768}));
 }
@@ -74,7 +78,7 @@ test("selected Comment picture follows map redirect, row presence and fractional
         assert.ok(tree);return {issued,prepared,node:tree.roots[0]!};
     };
     let current=await selected();
-    assert.deepEqual(nativeMapChoice(),[952,"mapped",952,951]);
+    assert.deepEqual(nativeMapChoice(),[952,"mapped",952,[[null,951],[null,951]],951]);
     assert.equal(current.node.fields?.pictureKeyword?.bytes().toString(),"mapped");
     const root=pv("https://userpic.example.invalid");
     const full=current.prepared.commentPicture(current.node,root,"full");
@@ -95,6 +99,22 @@ test("selected Comment picture follows map redirect, row presence and fractional
     current=await selected();
     assert.equal(scalarPV(current.prepared.commentPicture(current.node,root,"full").image?._url)
         .bytes().toString(),"https://userpic.example.invalid/952/900999");
+    await f.admin.query(`INSERT INTO ${f.table(f.c,"userkeywords")}(userid,kwid,keyword)
+        VALUES (900999,2,'0')`);
+    await f.admin.query(`INSERT INTO ${f.table(f.c,"userpicmap2")}(userid,kwid,picid)
+        VALUES (900999,2,952)`);
+    for(const falseValue of ["","0"]) {
+        await f.admin.query(`UPDATE ${f.table(f.c,"talkprop2")} SET value=?
+            WHERE journalid=900001 AND jtalkid=77 AND tpropid=?`,
+        [falseValue,f.talkProp("picture_keyword")]);
+        current=await selected();
+        assert.equal(current.node.fields?.pictureKeyword,undefined);
+        const nativeDefault=current.prepared.commentPicture(current.node,root,"full");
+        assert.equal(scalarPV(nativeDefault.image?._url).bytes().toString(),
+            "https://userpic.example.invalid/951/900999");
+        assert.equal(scalarPV(nativeDefault.image?._alttext).bytes().toString(),
+            "pictureauthor: Default (Default)");
+    }
     await f.admin.query(`UPDATE ${f.table(f.g,"user")} SET dversion=10 WHERE userid=900999`);
     current=await selected();
     await f.admin.query(`DELETE FROM ${f.table(f.c,"userpic2")}
@@ -104,6 +124,20 @@ test("selected Comment picture follows map redirect, row presence and fractional
     assert.equal(current.prepared.commentPicture(current.node,root,"full").image?._url!==undefined,true);
     assert.equal(scalarPV(current.prepared.commentPicture(current.node,root,"full").image?._url)
         .bytes().toString(),"https://userpic.example.invalid/951/900999");
+    const replies=Array.from({length:50},(_,index)=>78+index);
+    await f.admin.query(`INSERT INTO ${f.table(f.c,"talk2")}
+        (journalid,jtalkid,nodetype,nodeid,parenttalkid,posterid,datepost,state) VALUES `+
+        replies.map(id=>`(900001,${id},'L',300,77,900999,'2026-09-26 01:00:00','A')`).join(','));
+    await f.admin.query(`INSERT INTO ${f.table(f.c,"talktext2")}
+        (journalid,jtalkid,subject,body) VALUES `+
+        replies.map(id=>`(900001,${id},'Public reply','Public body')`).join(','));
+    const selectedReplies=await selected();
+    const subjectOnly=selectedReplies.node.children.find(node=>node.subjectOnly);
+    assert.ok(subjectOnly,"Selected window must include a collapsed subject-only reply");
+    assert.equal(subjectOnly.full,false);
+    assert.deepEqual(selectedReplies.prepared.commentPicture(subjectOnly,root,"full"),
+        {hasPicture:false,image:undefined});
+    assert.equal(selectedReplies.prepared.commentPicture(selectedReplies.node,root,"full").hasPicture,true);
     await f.admin.query(`DELETE FROM ${f.table(f.c,"userpic2")}
         WHERE userid=900999 AND picid=951`);
     current=await selected();
