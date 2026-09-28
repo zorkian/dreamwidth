@@ -14,20 +14,19 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import { type CommentRow, commentProps, commentRows, commentTexts } from "../data/comment";
-import { Entry } from "../data/entry";
 import { User } from "../data/user";
-import { type S2Object, DateTimeUnix, ImageUserpic, ItemRange, UserLite, ehtml, s2 } from "./objects";
-import { type PageContext, Page, entryObjects, journalDefaultPic, loadUserpics, robotMetaTags } from "./pages";
+import {
+    type S2Object, DateTimeUnix, ImageUserpic, ItemRange, UserLite, ehtml, s2, styleArgs, styleUrl, talkargs,
+} from "./objects";
+import {
+    type PageContext, Page, entryObjects, journalDefaultPic, loadUserpics, robotMetaTags,
+} from "./pages";
+import { Entry, truthy } from "../data/entry";
 
-export interface EntryArgs {
-    readonly thread?: number;
-    readonly page?: number;
-    readonly view?: string;
-    readonly mode?: string;
-    readonly expandAll?: boolean;
-}
 
 interface Post extends CommentRow {
+    // The real parent, in flat view where parenttalkid is 0.
+    parentActual?: number;
     show: boolean;
     loaded?: boolean;
     showableChildren?: number;
@@ -40,9 +39,8 @@ interface Post extends CommentRow {
 }
 
 // null when the visitor may not see the entry.
-export async function EntryPage(pc: PageContext, entry: Entry, args: EntryArgs,
-    chromeHead: string): Promise<S2Object | null> {
-    const { site, journal, db } = pc;
+export async function EntryPage(pc: PageContext, entry: Entry, chromeHead: string): Promise<S2Object | null> {
+    const { site, journal, db, args } = pc;
     const config = site.config;
     await Entry.fill(db, journal, [entry]);
     if (!entry.isPublic()) return null;
@@ -57,22 +55,30 @@ export async function EntryPage(pc: PageContext, entry: Entry, args: EntryArgs,
     page[".type"] = "EntryPage";
     page._entry = s2entry;
     page._multiform_on = 0;
-    page._viewing_thread = args.thread ? 1 : 0;
-    page._viewing_thread_id = args.thread ?? 0;
-    page.$viewing_thread_id = args.thread ?? 0;
+    const thread = perlInt(args.thread);
+    page._viewing_thread = truthy(args.thread) ? 1 : 0;
+    page._viewing_thread_id = thread;
+    page.$viewing_thread_id = thread;
 
     const permalink = entry.url(site);
     let head = page._head_content;
     const entryAdult = entry.props.adult_content_maintainer || entry.props.adult_content || "";
     if (journal.shouldBlockRobots(config) || config.robotBlockingContent.includes(entryAdult)) head += robotMetaTags();
     head += '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
-    const go = (dir: string) => `${config.protocol}://${site.host}/go?dir=${dir}&itemid=${entry.ditemid}&journal=${journal.user}`;
+    const go = (dir: string) => styleUrl(args, `${config.protocol}://${site.host}/go`,
+        { dir, itemid: entry.ditemid, journal: journal.user });
     head += `<link rel="prev" href="${go("prev")}" />\n<link rel="next" href="${go("next")}" />\n`;
-    head += `<link rel="canonical" href="${permalink}${args.thread ? `?thread=${args.thread}#cmt${args.thread}` : ""}" />\n`;
+    head += `<link rel="canonical" href="${permalink}${thread ? `?thread=${thread}#cmt${thread}` : ""}" />\n`;
 
-    const comments = await loadComments(pc, entry, args);
+    const comments = await loadComments(pc, entry, thread);
     const flat = /\bflat\b/.test(args.view ?? ""), topOnly = /\btop-only\b/.test(args.view ?? "");
-    page._comments = convertComments(pc, entry, comments.roots, 1, permalink, page._viewing_thread_id);
+    // The thread to return to after replying; the thread expander names it.
+    const returnThread = args.destination_thread !== undefined
+        ? (truthy(args.destination_thread) ? `thread=${args.destination_thread}` : "")
+        : truthy(args.thread) ? `thread=${args.thread}` : "";
+    page._comments = convertComments(pc, entry, comments.roots, 1, permalink, {
+        style: styleArgs(args), returnThread, destination: args.destination_thread ?? String(thread),
+    });
     head += commentInfoScript(journal.user, page._comments);
 
     // Open Graph data leads the head for public entries.
@@ -80,7 +86,7 @@ export async function EntryPage(pc: PageContext, entry: Entry, args: EntryArgs,
     page._head_content = head + chromeHead;
 
     page._comment_nav = s2("CommentNav", {
-        view_mode: flat ? "flat" : topOnly ? "top-only" : "threaded", url: permalink,
+        view_mode: flat ? "flat" : topOnly ? "top-only" : "threaded", url: styleUrl(args, permalink),
         current_page: comments.page, show_expand_all: 0,
     });
     const style = flat ? "view=flat&" : topOnly ? "view=top-only&" : "";
@@ -88,13 +94,13 @@ export async function EntryPage(pc: PageContext, entry: Entry, args: EntryArgs,
         all_subitems_displayed: comments.pages === 1 ? 1 : 0, current: comments.page,
         from_subitem: comments.first, num_subitems_displayed: comments.roots.length, to_subitem: comments.last,
         total: comments.pages, total_subitems: comments.items,
-    }, n => `${permalink}?${style}page=${Math.trunc(n)}`);
+    }, n => `${permalink}?${style}page=${Math.trunc(n)}${styleArgs(args) ? `&${styleArgs(args)}` : ""}`);
     return page;
 }
 
 // LJ::Talk::load_comments for an anonymous viewer.
-async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
-    const { db, journal, site } = pc;
+async function loadComments(pc: PageContext, entry: Entry, viewingThread: number) {
+    const { db, journal, site, args } = pc;
     const config = site.config;
     const empty = { roots: [] as Post[], page: 1, pages: 1, items: 0, first: undefined, last: undefined };
     if (!(journal.optShowtalklinks === "Y" && !entry.commentsDisabled())) return empty;
@@ -110,7 +116,10 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
 
     let count = 0;
     for (const post of [...posts.values()].sort((a, b) => b.talkid - a.talkid)) {
-        if (flat) post.parenttalkid = 0;
+        if (flat) {
+            post.parentActual = post.parenttalkid;
+            post.parenttalkid = 0;
+        }
         post.show = post.state !== "D" && post.state !== "S";
         count += post.show ? 1 : 0;
         if (post.parenttalkid && !posts.has(post.parenttalkid)) post.parenttalkid = 0;
@@ -123,7 +132,7 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
         }
     }
 
-    let thread = args.thread ? args.thread >> 8 : 0;
+    let thread = viewingThread >> 8;
     if (!posts.has(thread)) thread = 0;
     if (!thread && !children.get(0)) return empty;
 
@@ -131,7 +140,7 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
     if (count < config.talkThreadPoint) pageSize = config.talkThreadPoint;
     const allTop = thread ? [thread] : children.get(0)!;
     const pages = Math.max(1, Math.ceil(allTop.length / pageSize));
-    const page = Math.max(1, Math.min(pages, Math.trunc(args.page ?? 0) || 1));
+    const page = Math.max(1, Math.min(pages, perlInt(args.page) || 1));
     const first = pageSize * (page - 1) + 1;
     const last = page === pages ? allTop.length : pageSize * page;
     const top = allTop.slice(first - 1, last);
@@ -144,7 +153,7 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
     while (check.length) {
         const id = check.shift()!;
         for (const child of children.get(id) ?? []) {
-            if (!topOnly && (toLoad.length < pageSize || expand.has(id) || args.expandAll)) {
+            if (!topOnly && (toLoad.length < pageSize || expand.has(id))) {
                 toLoad.push(child);
                 expand.delete(id);
             } else {
@@ -180,8 +189,11 @@ async function loadComments(pc: PageContext, entry: Entry, args: EntryArgs) {
 }
 
 // The comment conversion in LJ::S2::EntryPage.
+// `style` is the viewing style arguments, `returnThread` the thread argument
+// reply links carry, and `destination` the thread the expander loads into.
 function convertComments(pc: PageContext, entry: Entry, posts: Post[], depth: number, permalink: string,
-    viewingThread: number): S2Object[] {
+    links: { style: string; returnThread: string; destination: string }): S2Object[] {
+    const { style, returnThread, destination } = links;
     const { site, journal } = pc;
     const config = site.config;
     const p = pc.ctx.prop as Record<string, any>;
@@ -191,6 +203,7 @@ function convertComments(pc: PageContext, entry: Entry, posts: Post[], depth: nu
         const time = DateTimeUnix(post.datepostUnix);
         const anchor = `#cmt${dtalkid}`;
         const props = post.props ?? {};
+        const parent = post.parenttalkid || post.parentActual || 0;
 
         let userpic: S2Object | undefined;
         const keyword = poster && poster.dversion >= 9
@@ -210,28 +223,30 @@ function convertComments(pc: PageContext, entry: Entry, posts: Post[], depth: nu
             ? pc.content.comment(post.body ?? "", props, post.datepost, !poster || poster.journaltype === "I")
             : "";
         const comment = s2("Comment", { $hide_children: post.hideChildren ? 1 : 0,
-            $js_expand_url: `${permalink}?thread=${dtalkid}&destination_thread=${viewingThread}${anchor}`,
+            $js_expand_url: talkargs(permalink, `thread=${dtalkid}`, `destination_thread=${destination}`, style) + anchor,
             journal: UserLite(site, journal),
             metadata: { picture_keyword: keyword },
             permalink_url: `${permalink}?thread=${dtalkid}${anchor}`,
-            reply_url: `${permalink}?replyto=${dtalkid}`,
+            reply_url: talkargs(permalink, `replyto=${dtalkid}`, style, returnThread),
             poster: poster ? UserLite(site, poster) : undefined,
             replies: [], subject: ehtml(post.subject ?? ""), talkid: dtalkid, ditemid: entry.ditemid, text,
             userpic, time, system_time: time, tags: [], full: post.loaded ? 1 : 0, depth,
-            parent_url: post.parenttalkid
-                ? `${permalink}?thread=${(post.parenttalkid << 8) + entry.anum}#cmt${(post.parenttalkid << 8) + entry.anum}` : undefined,
-            threadroot_url: post.loaded && post.parenttalkid
-                ? `${config.siteRoot}/go?redir_type=threadroot&journal=${journal.user}&talkid=${dtalkid}` : undefined,
+            parent_url: parent
+                ? talkargs(permalink, `thread=${(parent << 8) + entry.anum}`, style) + `#cmt${(parent << 8) + entry.anum}`
+                : undefined,
+            threadroot_url: post.loaded && parent
+                ? `${config.siteRoot}/go?redir_type=threadroot&journal=${journal.user}&talkid=${dtalkid}${style ? `&${style}` : ""}`
+                : undefined,
             screened: post.state === "S" ? 1 : 0, screened_noshow: 0, frozen: post.state === "F" ? 1 : 0,
             deleted: 0, fromsuspended: 0, link_keyseq: ["delete_comment"],
             anchor: `cmt${dtalkid}`, dom_id: `cmt${dtalkid}`, comment_posted: "",
-            edited: props.edit_time ? 1 : 0, edit_url: `${permalink}?edit=${dtalkid}`,
+            edited: props.edit_time ? 1 : 0, edit_url: talkargs(`${permalink}?edit=${dtalkid}`, style, returnThread),
             edittime: props.edit_time ? DateTimeUnix(Number(props.edit_time)) : undefined,
             editreason: props.edit_time ? ehtml(props.edit_reason) : undefined,
             time_poster: undefined, seconds_since_entry: post.datepostUnix - Math.floor(Date.parse(entry.logtime + "Z") / 1000),
             timeformat24: 0, showable_children: post.showableChildren, hide_children: post.hideChildren ? 1 : 0,
             hidden_child: post.hiddenChild ? 1 : 0, admin_post: 0,
-            expand_url: `${permalink}?thread=${dtalkid}${anchor}`,
+            expand_url: talkargs(permalink, `thread=${dtalkid}`, style) + anchor,
         });
         const hide = (reason: "fromsuspended" | "deleted" | "screened") => {
             comment[`_${reason}`] = 1;
@@ -245,7 +260,7 @@ function convertComments(pc: PageContext, entry: Entry, posts: Post[], depth: nu
         comment._link_keyseq.unshift("edit_comment");
         if (post.children.length) comment._thread_url = comment._expand_url;
         if (props.imported_from) comment._metadata.imported_from = props.imported_from;
-        comment._replies = convertComments(pc, entry, post.children, depth + 1, permalink, viewingThread);
+        comment._replies = convertComments(pc, entry, post.children, depth + 1, permalink, links);
         return comment;
     });
 }
@@ -286,4 +301,9 @@ function openGraph(pc: PageContext, entry: Entry, s2entry: S2Object, permalink: 
     if (poster) og += `<meta property="article:author" content="${ehtml(poster.journalBase(site) + "/profile")}"/>\n`;
     for (const tag of entry.tags) og += `<meta property="article:tag" content="${ehtml(tag.name)}"/>\n`;
     return og;
+}
+
+// A query argument as Perl's numeric context reads it.
+function perlInt(value: string | undefined): number {
+    return Math.trunc(parseFloat(value ?? "")) || 0;
 }

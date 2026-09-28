@@ -25,11 +25,13 @@ import type { ContentCleaner } from "./content";
 import type { JournalFilter } from "./render";
 import { escapeValue, type PropertyCleaners } from "./context";
 import {
-    type S2Object, DateTimeParts, DateTimeUnix, Image, ImageStd, ImageUserpic, Link, S2Date, Tag, UserLite,
+    type S2Object, DateTimeParts, styleArgs, styleUrl, talkargs, DateTimeUnix, Image, ImageStd, ImageUserpic, Link, S2Date, Tag, UserLite,
     UserObject, ehtml, eurl, nullObject, s2,
 } from "./objects";
 
 export interface PageContext {
+    // The query arguments, whose viewing style links carry along.
+    readonly args: Readonly<Record<string, string>>;
     readonly db: Databases;
     readonly site: Site;
     readonly journal: User;
@@ -81,8 +83,9 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object,
         time: DateTimeUnix(pc.nowSeconds), local_time: DateTimeUnix(pc.nowSeconds),
         base_url: base, stylesheet_url: `${base}/res/${style.styleid}/stylesheet?${style.modtime}`,
         view_url: {
-            recent: `${origin}/`, userinfo: `${base}/profile`, archive: `${origin}/archive`, read: `${origin}/read`,
-            network: `${origin}/network`, tags: `${origin}/tag/`, memories: `${config.siteRoot}/tools/memories?user=${journal.user}`,
+            recent: styleUrl(pc.args, `${origin}/`), userinfo: `${base}/profile`, archive: styleUrl(pc.args, `${origin}/archive`),
+            read: styleUrl(pc.args, `${origin}/read`), network: styleUrl(pc.args, `${origin}/network`),
+            tags: styleUrl(pc.args, `${origin}/tag/`), memories: `${config.siteRoot}/tools/memories?user=${journal.user}`,
         },
         linklist,
         customtext_title: escapeValue(customTitle, "plain", pc.cleaners),
@@ -278,6 +281,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
     return entries.map(entry => {
         const poster = pc.users.get(entry.posterid) ?? journal;
         const url = entry.url(site);
+        const styled = styleUrl(pc.args, url);
         const subject = pc.content.subject(entry.subject);
 
         let userpic: S2Object = nullObject("Image");
@@ -306,8 +310,10 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
         const enabled = journal.optShowtalklinks === "Y" && !entry.commentsDisabled() ? 1 : 0;
         const replies = enabled ? entry.replyCount() : 0;
         const maxComments = Number(journal.getCap(config, "maxcomments") ?? 0);
+        const style = styleArgs(pc.args);
         const comments = s2("CommentInfo", {
-            read_url: url, post_url: `${url}?mode=reply`, permalink_url: url, count: replies,
+            read_url: talkargs(url, style), post_url: talkargs(url, "mode=reply", style),
+            permalink_url: talkargs(url, style), count: replies,
             maxcomments: replies >= maxComments ? 1 : 0, enabled,
             comments_disabled_maintainer: truthy(entry.props.opt_nocomments_maintainer) &&
                 !truthy(entry.props.opt_nocomments) ? 1 : 0,
@@ -320,7 +326,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"],
             metadata: {},
             subject: subject.html,
-            text: pc.content.event(entry, cuts),
+            text: pc.content.event(entry, cuts === "recent" ? styled : undefined),
             journal: UserLite(site, journal), poster: UserLite(site, poster),
             new_day: 0, end_day: 0, comments, userpic, permalink_url: url, itemid: entry.ditemid, tags,
             timeformat24: 0, admin_post: 0, dom_id: `entry-${journal.user}-${entry.ditemid}`,
