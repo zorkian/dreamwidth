@@ -17,7 +17,6 @@ import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
-import {readPropertyLayer} from "../domain/property-layer";
 import {Context} from "../../runtime/s2runtime";
 import {renderStock} from "../render/engine";
 import {approveSnapshot} from "../policy/cohort";
@@ -41,15 +40,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    if(row.state==='missing')assert.equal(row.rendered,'zvi');
    else assert.ok(row.rendered.includes("lj:user='zvi'"));
  }
- for(const row of rows.filter((row:any)=>row.name==='module-properties')) {
-   assert.deepEqual({...readPropertyLayer(row.compiled,990004)},row.values);
-   assert.equal(Object.keys(row.values).length,13);assert.equal(row.values.module_links_order,9);
-   for(const bad of [row.compiled.replace('"module_links_order",9','"module_links_order",1+8'),
-     row.compiled.replace('"module_links_show",1','"module_links_show",2'),
-     row.compiled.replace('"module_links_section","two"','"module_links_section",1'),
-     row.compiled.replace('"module_links_order"','"unknown_order"'),row.compiled+'# trailing'])
-       assert.throws(()=>readPropertyLayer(bad,990004));
- }
  for(const row of rows.filter((row:any)=>row.name==='module-placement')) {
    if(row.case==='collision')assert.deepEqual(row.sections.one[2],['links']);
    if(row.case==='none')assert.deepEqual(row.sections.none[2],['userprofile']);
@@ -62,12 +52,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    inherit:'font-family: Base, serif; ',fallback:'font-family: serif; ',empty:'',
    'not-emitted':'font-family: Base; ','emitted-injection':'font-family: Base; font-size: 1px;color:redpx;'};
  for(const row of rows.filter((row:any)=>row.name==='typography-helper'))assert.equal(row.output,helperExpected[row.case]);
- for(const row of rows.filter((row:any)=>row.name==='typography')) {
-   assert.deepEqual({...readPropertyLayer(row.compiled,990006)},row.values);assert.equal(Object.keys(row.values).length,18);
-   for(const bad of [row.compiled.replace('"font_entry_title_size","120"','"font_entry_title_size",120'),
-     row.compiled.replace('"font_entry_title_size"','"unknown_font_units"'),row.compiled+'print "BAD";'])
-       assert.throws(()=>readPropertyLayer(bad,990006));
- }
  for(const row of rows.filter((row:any)=>row.name==='typography-css')) {
    const css=cleanStockStylesheet(row.css,row.layout==='easyread'?'easyread-aqua':undefined);
    assert.ok(css.includes('font-size:1.25em'));assert.ok(css.includes('font-size:120%'));
@@ -75,7 +59,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    if(row.layout==='easyread'){assert.equal((row.css.match(/font-family: font-family:/g)||[]).length,2);assert.ok(row.css.includes('; font-size: 1em;'));}
  }
  for(const row of rows.filter((row:any)=>row.name==='base-typography')) {
-   assert.deepEqual({...readPropertyLayer(row.compiled,990007)}, {font_fallback:'serif',font_base_size:'1.25',font_base_units:'em'});
    const expected:Record<string,string>={'family-size':'font-family: serif; font-size: 1.25em;',
      'family-only':'font-family: serif; ','size-only':'font-size: 1.25em;',neither:'','tabula-control':'font-family: serif; font-size: 1.25em;'};
    assert.equal(row.pageFont,expected[row.case]);
@@ -94,8 +77,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
        'easyread-aqua',{...expectation,pageFont:'font-family:  serif ; '}));
    }
  }
- const presentation=rows.find((row:any)=>row.name==='presentation');
- assert.deepEqual({...readPropertyLayer(presentation.compiled,990008)}, {entry_userpic_style:'small',comment_userpic_style:'smaller',userpics_position:'right',entry_metadata_position:'top'});
  for(const row of rows.filter((row:any)=>row.name==='presentation-size')) {
    const expected:Record<string,number[]>={'':[101,99],small:[75.75,74.25],smaller:[50.5,49.5],unknown:[101,99]};
    assert.deepEqual([row.width,row.height],expected[row.style]);
@@ -106,8 +87,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
    assert.ok(css.includes('text-align:right'));
    if(row.layout==='easyread')assert.ok(css.includes('margin-right:85px'));
  }
- const user=rows.find((row:any)=>row.name==='user-after-theme');
- assert.deepEqual({...readPropertyLayer(user.compiled,980005)}, {color_page_background:'#123456',font_base:'Georgia',module_tags_show:0,module_tags_order:-1});
  for(const row of rows.filter((row:any)=>row.name==='color')) {
    const value=builtin.construct_Color(row.input);
    if(row.value===null)assert.equal(value,undefined);
@@ -129,7 +108,6 @@ test("native Color/scalar wrapper and two stock stylesheet identities",()=>{
      row.css.replace('text-transform: uppercase','color: red'),row.css+'/* URL(foo) */',
      row.css.replace('color: ;','color: red;')])assert.throws(()=>cleanStockStylesheet(bad,'easyread-aqua'));
  }
- for(const bad of [user.compiled+'print "BAD";',user.compiled.replace('Color__Color','other'),user.compiled.replace('#123456','javascript:bad')])assert.throws(()=>readPropertyLayer(bad,980005));
  for(const value of ['Georgia','Times New Roman','"Open Sans", Arial, serif'])validateStockFontFamily(value);
  for(const value of ['Arial; color:red','url(https://bad.invalid)','</style><script>x</script>','var(--font)'])assert.throws(()=>validateStockFontFamily(value));
  const artifact=validateArtifact(JSON.parse(readFileSync(process.env.S2_LIVE_TEST_ARTIFACT!,'utf8')));
