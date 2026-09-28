@@ -1,6 +1,7 @@
 // app.ts
 //
-// HTTP routes for journal pages.
+// HTTP routes for journal pages, following DW::Controller::Journal::render
+// and LJ::User::make_journal up to the point S2 takes over.
 //
 // Authors:
 //      Dreamwidth contributors
@@ -14,43 +15,79 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
 import { styleInfo, styleLayers } from "../compile/styles";
-import type { Databases } from "../data/db";
+import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
-import type { EntryArgs } from "../render/entry-page";
 import type { RenderRequest, RenderResult } from "../render/render";
 import type { SiteConfig } from "./config";
+import { determineView } from "./views";
 
 export type Renderer = (request: RenderRequest) => Promise<RenderResult>;
 
+// Views rendered by running the S2 style.
+const S2_VIEWS = new Set(["lastn", "archive", "month", "day", "read", "network", "tag", "icons", "entry", "reply", "res"]);
+
+const notFound: RenderResult = { status: 404, body: "Not found\n" };
+// DW::Request::Plack sends every redirect as a 303.
+const redirect = (location: string): RenderResult => ({ status: 303, body: "", location });
+
+// Resolve a journal URL to what a render worker needs, or to a response
+// that needs no rendering.
+export async function prepare(config: SiteConfig, db: Databases, compiler: Compiler, url: string,
+    host: string): Promise<RenderRequest | RenderResult> {
+    const parsed = new URL(url, "http://journal");
+    const match = /^\/(?:~|users\/)([\w-]+)(\/.*)?$/.exec(parsed.pathname);
+    if (!match) return notFound;
+    const journal = await User.byName(db, match[1]!.toLowerCase().replaceAll("-", "_"));
+    if (!journal) return notFound;
+    await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
+
+    const site = { config, host };
+    const base = journal.journalBase(site);
+    const args = Object.fromEntries(parsed.searchParams);
+    const view = determineView(match[2] ?? "/", parsed.search, args, base);
+    if (!view) return notFound;
+    if ("redirect" in view) return redirect(view.redirect);
+
+    const mode = view.mode;
+    if (mode === "info") return redirect(`${base}/profile${args.mode === "full" ? "?mode=full" : ""}`);
+    if (mode === "update") return redirect(`${config.siteRoot}/entry/${journal.user}/new`);
+    if (mode === "robots_txt") {
+        const body = `User-Agent: *\n${journal.shouldBlockRobots(config) ? "Disallow: /\n" : ""}`;
+        return { status: 200, body, contentType: "text/plain" };
+    }
+    if (mode && !S2_VIEWS.has(mode)) return notFound;
+
+    // Stylesheets name their style, and are served for suspended journals.
+    let styleid = int(journal.props.s2_style);
+    if (mode === "res") {
+        const res = /^\/(\d+)\/stylesheet$/.exec(view.pathextra ?? "");
+        if (!res) return notFound;
+        styleid = Number(res[1]);
+    } else if (!journal.isVisible()) {
+        return notFound;
+    }
+    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return notFound;
+
+    const layers = await styleLayers(db, config, styleid);
+    const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
+    return {
+        username: journal.user, view: mode, pathextra: view.pathextra, ditemid: view.ditemid,
+        slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
+        args, requestPath: url, host, layers: compiled, style,
+    };
+}
+
 export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer): FastifyInstance {
     const app = Fastify({ logger: false });
-
-    const serve = async (host: string, url: string, username: string, view: "recent" | "entry",
-        ditemid?: number, skip?: number, entryArgs?: EntryArgs): Promise<RenderResult> => {
-        const journal = await User.byName(db, username.toLowerCase().replaceAll("-", "_"));
-        if (!journal || !journal.isVisible()) return { status: 404, html: "Journal not found\n" };
-        await journal.loadProps(db, ["s2_style"]);
-        const layers = await styleLayers(db, config, journal);
-        const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, layers)]);
-        return render({ username: journal.user, view, ditemid, skip, entryArgs, requestPath: url, host, layers: compiled, style });
+    const handler = async (request: any, reply: any) => {
+        const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost");
+        const result = "layers" in prepared ? await render(prepared) : prepared;
+        if (result.location) reply.header("location", result.location);
+        return reply.code(result.status).type(`${result.contentType ?? "text/html"}; charset=utf-8`).send(result.body);
     };
-
-    const handler = (view: "recent" | "entry") => async (request: any, reply: any) => {
-        const { user, ditemid } = request.params as { user: string; ditemid?: string };
-        const query = request.query as Record<string, string>;
-        const skip = query.skip !== undefined ? Math.max(0, Math.trunc(Number(query.skip)) || 0) : undefined;
-        const number = (value?: string) => value !== undefined && /^\d+$/.test(value) ? Number(value) : undefined;
-        const entryArgs: EntryArgs = {
-            thread: number(query.thread), page: number(query.page), view: query.view, mode: query.mode,
-        };
-        const result = await serve(request.headers.host ?? "localhost", request.url, user, view,
-            ditemid ? Number(ditemid) : undefined, skip, entryArgs);
-        return reply.code(result.status).type("text/html; charset=utf-8").send(result.html);
-    };
-
     for (const prefix of ["/~:user", "/users/:user"]) {
-        app.get(`${prefix}/`, handler("recent"));
-        app.get(`${prefix}/:ditemid(^\\d+).html`, handler("entry"));
+        app.get(prefix, handler);
+        app.get(`${prefix}/*`, handler);
     }
     return app;
 }

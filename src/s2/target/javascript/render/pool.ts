@@ -53,14 +53,14 @@ export class RenderPool {
                 worker.removeAllListeners("message");
                 void worker.terminate();
                 this.idle.push(this.spawn());
-                job.resolve({ status: 503, html: "This page took too long to render.\n" });
+                job.resolve({ status: 503, body: "This page took too long to render.\n" });
                 this.next();
             }, this.timeoutMs);
             worker.once("message", (message: { result?: RenderResult; error?: string }) => {
                 clearTimeout(timer);
                 this.idle.push(worker);
                 if (message.error) console.error(message.error);
-                job.resolve(message.result ?? { status: 500, html: "This page could not be rendered.\n" });
+                job.resolve(message.result ?? { status: 500, body: "This page could not be rendered.\n" });
                 this.next();
             });
             worker.postMessage(job.request);

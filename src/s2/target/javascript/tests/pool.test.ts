@@ -25,13 +25,13 @@ test("a render past the time limit is stopped", async () => {
     const pool = new RenderPool(journals.config, 1, 2000);
     try {
         const started = Date.now();
-        const looping = await pool.render(await journals.request("s2fix_loop", "recent"));
+        const looping = await pool.render(await journals.request("/~s2fix_loop/"));
         assert.equal(looping.status, 503);
         assert.ok(Date.now() - started < 3500);
 
-        const next = await pool.render(await journals.request("s2fix_default", "recent"));
+        const next = await pool.render(await journals.request("/~s2fix_default/"));
         assert.equal(next.status, 200);
-        assert.match(next.html, /Entry 3/);
+        assert.match(next.body, /Entry 3/);
     } finally {
         await pool.close();
     }

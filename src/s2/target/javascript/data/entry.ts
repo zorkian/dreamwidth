@@ -120,6 +120,14 @@ export class Entry {
         return entry && entry.anum === ditemid % 256 ? entry : null;
     }
 
+    // An entry by its URL slug, if posted on `date` (YYYY/MM/DD).
+    static async bySlug(db: Databases, journal: User, slug: string, date: string): Promise<Entry | null> {
+        const rows = await journal.cluster(db, `SELECT ${COLUMNS} FROM log2 JOIN logslugs USING (journalid, jitemid)
+            WHERE journalid = ? AND slug = ?`, [journal.userid, slug]);
+        const entry = rows[0] ? new Entry(journal, rows[0]) : null;
+        return entry && entry.eventtime.slice(0, 10).replaceAll("-", "/") === date ? entry : null;
+    }
+
     // Load text, props, tags and slugs for entries of one journal.
     static async fill(db: Databases, journal: User, entries: readonly Entry[]): Promise<void> {
         if (!entries.length) return;

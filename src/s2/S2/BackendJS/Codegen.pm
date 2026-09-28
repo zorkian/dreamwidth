@@ -124,6 +124,7 @@ sub asJS {
     my ($this, $bp, $o) = @_;
 
     $this->{'lhs'}{'var'}{'varReturnType'} = undef;
+    local $this->{'lhs'}{'var'}{'lvalue'} = 1 if $this->{'lhs'}{'var'};
     $this->{'lhs'}->asJS($bp, $o);
 
     my $need_notags = $bp->untrusted() && 
@@ -170,6 +171,7 @@ package S2::NodeDeleteStmt;
 sub asJS {
     my ($this, $bp, $o) = @_;
     $o->tabwrite("");
+    local $this->{'var'}{'lvalue'} = 1;
     $this->{'var'}->asJS($bp, $o);
     $o->writeln(" = null;");
 }
@@ -212,6 +214,7 @@ sub asJS {
     if ($this->{'vardecl'}) {
         $o->write("let " . $bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
     } else {
+        local $this->{'varref'}{'lvalue'} = 1;
         $this->{'varref'}->asJS($bp, $o);
     }
     $o->write(" of ");
@@ -266,6 +269,7 @@ package S2::NodePushStmt;
 sub asJS {
     my ($this, $bp, $o) = @_;
     $o->tabwrite("");
+    local $this->{lhs}{var}{lvalue} = 1 if $this->{lhs}{var};
     $this->{lhs}->asJS($bp, $o);
     $o->write($this->{expr}{_is_array} ? ".push(..." : ".push(");
     $this->{expr}->asJS($bp, $o);
@@ -400,6 +404,7 @@ sub asJS {
     die "Increment target is not a variable reference"
         unless $this->{'expr'}{'var'};
     local $this->{'expr'}{'var'}{'varReturnType'} = undef;
+    local $this->{'expr'}{'var'}{'lvalue'} = 1;
     
     my $plus = $this->{'op'}->getPunct() eq $S2::TokenPunct::INCR->getPunct();
     
@@ -899,6 +904,10 @@ sub asJS {
     my ($this, $bp, $o) = @_;
     my $first = 1;
 
+    # Perl reads a member or element of undef as undef.
+    my $dot = $this->{'lvalue'} ? "." : "?.";
+    $o->write("((") if $this->{'useAsString'};
+
     if ($this->{varReturnType}) {
         if ($this->{varReturnType} && $this->{varReturnType}->equals($S2::Type::STRING)) {
             # Need to wrap a preparation function around to
@@ -921,8 +930,10 @@ sub asJS {
     }
 
     foreach my $lev (@{$this->{'levels'}}) {
-        if (! $first || $this->{'type'} == $OBJECT) {
+        if ($this->{'type'} == $PROPERTY && $first == 0 && $lev == $this->{'levels'}[0]) {
             $o->write(".".$bp->decorateIdent($lev->{'var'}));
+        } elsif (! $first || $this->{'type'} == $OBJECT) {
+            $o->write($dot.$bp->decorateIdent($lev->{'var'}));
         } else {
             my $v = $lev->{'var'};
             if ($first && $this->{'type'} == $LOCAL &&
@@ -938,7 +949,7 @@ sub asJS {
         }
 
         foreach my $d (@{$lev->{'derefs'}}) {
-            $o->write("["); # [ or {
+            $o->write($this->{'lvalue'} ? "[" : "?.[");
             $d->{'expr'}->asJS($bp, $o);
             $o->write("]");
         }
@@ -959,7 +970,7 @@ sub asJS {
     }
 
     if ($this->{'useAsString'}) {
-        $o->write("._as_string");
+        $o->write(")?._as_string ?? \"\")");
     }
 }
 

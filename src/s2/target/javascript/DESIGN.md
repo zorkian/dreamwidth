@@ -26,8 +26,9 @@ layers. There is no allowlist of supported styles.
 
 ## How a request is served
 
-1. **Route.** Map the URL to a journal and a view (recent, entry, and further
-   views as they are added). Unknown URLs get 404.
+1. **Route.** Map the URL to a journal and a view as
+   `DW::Controller::Journal::determine_view` does, including its redirects.
+   Unknown URLs get 404.
 2. **Load.** Look up the journal and the data the view needs from MySQL, using
    Dreamwidth's cluster configuration to find the right database.
 3. **Authorize.** Drop anything an anonymous visitor may not see: non-public

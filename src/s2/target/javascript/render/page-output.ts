@@ -24,7 +24,8 @@ export class PageOutput implements Output {
     // start_css sends both kinds of output here, uncleaned, until end_css.
     private capture: string | undefined;
 
-    constructor(private readonly config: SiteConfig, private readonly maxBytes: number) {}
+    // Only HTML pages are cleaned; stylesheets print safe output as it is.
+    constructor(private readonly config: SiteConfig, private readonly maxBytes: number, private readonly clean = true) {}
 
     raw(text: string): void {
         if (this.capture !== undefined) {
@@ -63,7 +64,7 @@ export class PageOutput implements Output {
         if (!this.pending) return;
         const text = this.pending;
         this.pending = "";
-        this.append(htmlCleaner(text, this.config));
+        this.append(this.clean ? htmlCleaner(text, this.config) : text);
     }
 
     private append(text: string): void {

@@ -16,7 +16,6 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { Compiler } from "../compile/compiler";
 import { renderJournal } from "../render/render";
 import { createApp } from "../server/app";
 import { HOST, TestJournals } from "./journal";
@@ -25,27 +24,26 @@ const PERL = "http://localhost:8080";
 const JS = `http://${HOST}`;
 
 let journals: TestJournals;
-let compiler: Compiler;
 let app: ReturnType<typeof createApp>;
-let tools: { normalize(html: string, origins: string[]): string; fetchPage(origin: string, path: string): Promise<{ status: number; html: string }> };
+interface Page { status: number; body: string; type: string; location?: string }
+let tools: { summarize(page: Page, origins: string[]): string; fetchPage(origin: string, path: string): Promise<Page> };
 
 before(async () => {
     journals = new TestJournals();
-    compiler = new Compiler(journals.db);
-    app = createApp(journals.config, journals.db, compiler,
+    app = createApp(journals.config, journals.db, journals.compiler,
         request => renderJournal(journals.db, { config: journals.config, host: request.host }, request));
     tools = await import(path.resolve(__dirname, "../../tools/compare-pages.mjs"));
 });
-after(async () => {
-    compiler.close();
-    await journals.close();
-});
+after(() => journals.close());
 
 async function compare(pagePath: string): Promise<void> {
-    const js = await app.inject({ url: pagePath, headers: { host: HOST } });
+    const response = await app.inject({ url: pagePath, headers: { host: HOST } });
+    const js = {
+        status: response.statusCode, body: response.body, type: String(response.headers["content-type"] ?? ""),
+        location: response.headers.location as string | undefined,
+    };
     const perl = await tools.fetchPage(PERL, pagePath);
-    assert.equal(js.statusCode, perl.status);
-    assert.equal(tools.normalize(js.body, [PERL, JS]), tools.normalize(perl.html, [PERL, JS]));
+    assert.equal(tools.summarize(js, [PERL, JS]), tools.summarize(perl, [PERL, JS]), pagePath);
 }
 
 test("recent pages, in the default style, a theme and a user layer", async () => {
@@ -61,4 +59,9 @@ test("entry pages with comment threads", async () => {
 
 test("an entry page without comments", async () => {
     await compare(`/~s2fix_default/${await journals.ditemid("s2fix_default", "Entry 3:")}.html`);
+});
+
+test("stylesheets, cleaned as CSS", async () => {
+    await compare("/~s2fix_theme/res/14/stylesheet");
+    await compare("/~s2fix_custom/res/16/stylesheet");
 });

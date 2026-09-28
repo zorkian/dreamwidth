@@ -88,5 +88,8 @@ print JSON->new->canonical->pretty->encode(
         strings            => \%strings,
         capBits            => \%LJ::CAP,
         capDefaults        => \%LJ::CAP_DEF,
+        robotBlockingContent => LJ::is_enabled('adult_content')
+        ? [ sort grep { $LJ::CONTENT_FLAGS{$_}{block_robots} } keys %LJ::CONTENT_FLAGS ]
+        : [],
     }
 );

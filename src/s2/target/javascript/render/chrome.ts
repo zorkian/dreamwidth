@@ -49,7 +49,8 @@ const mtimes = new Map<string, number>();
 export interface ChromeRequest {
     readonly site: Site;
     readonly journal: User;
-    readonly view: "recent" | "entry";
+    // The view as the URL names it: "" for recent entries.
+    readonly view: string;
     // The request path and query, for login return URLs.
     readonly requestPath: string;
     readonly showControlStrip: boolean;
@@ -180,7 +181,7 @@ export function createChrome(request: ChromeRequest): Chrome & {
 <script type='text/javascript'>
 jQuery(function(jQ){
     if (jQ("#lj_controlstrip").length == 0) {
-        jQ.getJSON("/${journal.user}/__rpc_controlstrip?user=${journal.user}&host=${site.host}&uri=${pathname}&args=${encodeURIComponent(query)}&view=${request.view === "entry" ? "entry" : ""}", {},
+        jQ.getJSON("/${journal.user}/__rpc_controlstrip?user=${journal.user}&host=${site.host}&uri=${pathname}&args=${encodeURIComponent(query)}&view=${request.view}", {},
             function(data) {
                 jQ("<div></div>").html(data.control_strip).prependTo("body");
             }

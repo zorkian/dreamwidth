@@ -53,6 +53,8 @@ export interface SiteConfig {
     readonly strings: Readonly<Record<string, string>>;
     readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
     readonly capDefaults: Readonly<Record<string, unknown>>;
+    // Adult content levels whose journals and entries ask robots to stay away.
+    readonly robotBlockingContent: readonly string[];
 }
 
 export interface StandardImage {
