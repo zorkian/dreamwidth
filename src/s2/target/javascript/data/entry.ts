@@ -19,6 +19,18 @@ const COLUMNS = `jitemid, anum, posterid, security, allowmask, eventtime, logtim
     DATE_FORMAT(eventtime, '${S2_DATE_FORMAT}') AS alldatepart,
     DATE_FORMAT(logtime, '${S2_DATE_FORMAT}') AS system_alldatepart`;
 
+export interface RecentOptions {
+    readonly itemshow: number;
+    readonly skip: number;
+    readonly maxScrollback: number;
+    readonly tagids?: readonly number[];
+    readonly tagmode?: "and" | "or";
+    // $LJ::TAG_INTERSECTION: an "and" filter on more tags than this matches nothing.
+    readonly tagIntersection: number;
+    readonly security?: string;
+    readonly posterid?: number;
+}
+
 const logpropNames = new WeakMap<Databases, Promise<Map<number, string>>>();
 
 export interface Tag {
@@ -87,15 +99,40 @@ export class Entry {
 
     // DW::Logic::LogItems::recent_items for an anonymous viewer. Returns up to
     // `itemshow` entries after skipping `skip`, newest first.
-    static async recent(db: Databases, journal: User, itemshow: number, skip: number,
-        maxScrollback: number): Promise<Entry[]> {
-        itemshow = Math.min(itemshow, maxScrollback);
-        skip = Math.max(0, Math.min(skip, maxScrollback - itemshow));
+    static async recent(db: Databases, journal: User, options: RecentOptions): Promise<Entry[]> {
+        const { maxScrollback, tagmode, security, posterid } = options;
+        const tagids = tagmode === "and" ? options.tagids?.slice(0, options.tagIntersection) : options.tagids;
+        const itemshow = Math.min(options.itemshow, maxScrollback);
+        const skip = Math.max(0, Math.min(options.skip, maxScrollback - itemshow));
         const sortKey = journal.journaltype === "C" ? "rlogtime" : "revttime";
+
+        let where = "";
+        const params: unknown[] = [journal.userid];
+        if (tagids?.length) {
+            const rows = await journal.cluster(db,
+                "SELECT jitemid, kwid FROM logtagsrecent WHERE journalid = ? AND kwid IN (?)", [journal.userid, tagids]);
+            const counts = new Map<number, number>();
+            for (const row of rows) counts.set(int(row.jitemid), (counts.get(int(row.jitemid)) ?? 0) + 1);
+            const need = tagmode === "and" ? options.tagids!.length : 1;
+            const jitemids = [...counts].filter(([, count]) => count >= need).map(([jitemid]) => jitemid);
+            if (!jitemids.length) return [];
+            where += " AND jitemid IN (?)";
+            params.push(jitemids);
+        }
+        if (security === "public" || security === "private") {
+            where += " AND security = ?";
+            params.push(security);
+        } else if (security === "access") {
+            where += " AND security = 'usemask' AND allowmask = 1";
+        }
+        if (posterid) {
+            where += " AND posterid = ?";
+            params.push(posterid);
+        }
         const rows = await journal.cluster(db,
             `SELECT ${COLUMNS} FROM log2 USE INDEX (${sortKey})
-             WHERE journalid = ? AND ${sortKey} <= 2147483647 AND security = 'public'
-             ORDER BY journalid, ${sortKey} LIMIT ?, ?`, [journal.userid, skip, itemshow]);
+             WHERE journalid = ? AND ${sortKey} <= 2147483647 AND security = 'public'${where}
+             ORDER BY journalid, ${sortKey} LIMIT ?, ?`, [...params, skip, itemshow]);
 
         // Entries at the same time are shown in descending itemid order.
         const sortDate = sortKey === "rlogtime" ? "system_alldatepart" : "alldatepart";

@@ -52,6 +52,8 @@ test("recent pages, in the default style, a theme and a user layer", async () =>
 
 test("an older page of entries", () => compare("/~s2fix_theme/?skip=20"));
 
+test("entries filtered by tag", () => compare("/~s2fix_theme/?tag=number%203,fixture&mode=and"));
+
 test("entry pages with comment threads", async () => {
     await compare(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Entry 25:")}.html`);
     await compare(`/~s2fix_custom/${await journals.ditemid("s2fix_custom", "Entry 4:")}.html`);

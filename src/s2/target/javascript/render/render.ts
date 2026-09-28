@@ -35,11 +35,21 @@ export interface RenderRequest {
     readonly ditemid?: number;
     readonly slug?: { readonly slug: string; readonly date: string };
     readonly args: Readonly<Record<string, string>>;
+    readonly filter: JournalFilter;
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
     readonly layers: readonly CompiledLayer[];
     readonly style: StyleInfo;
+}
+
+// Entry filters from the URL, validated as LJ::User::make_journal does.
+export interface JournalFilter {
+    readonly tags?: readonly string[];
+    readonly tagids?: readonly number[];
+    readonly tagmode?: "and" | "or";
+    // public, access or private.
+    readonly security?: string;
 }
 
 export interface RenderResult {
@@ -66,7 +76,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const output = new PageOutput(site.config, MAX_OUTPUT, !stylesheet);
     const control = showControlStrip(journal);
     const chrome = createChrome({
-        site, journal, view: request.view, requestPath: request.requestPath, showControlStrip: control, users,
+        site, journal, view: request.view, requestPath: request.requestPath, args: request.args, showControlStrip: control, users,
     });
     let page: S2Object | undefined;
     let month: S2Object | undefined;
@@ -121,11 +131,9 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const number = (value?: string) => value !== undefined && /^\d+$/.test(value) ? Number(value) : undefined;
     const args = request.args;
     switch (request.view || "lastn") {
-        case "lastn": {
-            const skip = args.skip !== undefined ? Math.max(0, Math.trunc(Number(args.skip)) || 0) : undefined;
-            page = await RecentPage(pc, skip ?? 0, skip !== undefined, head);
+        case "lastn":
+            if (!request.pathextra) page = await RecentPage(pc, args, request.filter, head);
             break;
-        }
         case "entry": {
             const entry = request.slug
                 ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
