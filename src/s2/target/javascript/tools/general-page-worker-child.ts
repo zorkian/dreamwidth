@@ -39,6 +39,9 @@ function escapeProperty(value:unknown,mode:"plain"|"html"):unknown {
 }
 executeGeneralWorker(channel,generalWorkerFactory(channel,{
     propertyCleaner(){return {clean:noContent};},seesControlStrip:()=>false,
+    subjectHelpers(){return {normalizeImageUrl:noContent,rewriteBlockedHref:noContent,
+        expandSiteUrl:noContent,expandUser:noContent,templateError:noContent,
+        videoError:noContent,markupError:noContent,validStylesheet:noContent};},
     dates:{dayOfWeek(_ctx,date){
         // Exact declared fixture civil day; the native oracle independently
         // runs LJ::day_of_week. This is not the installed calendar provider.

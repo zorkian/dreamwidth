@@ -2,8 +2,8 @@
 
 This is an intermediate implementation checkpoint, not a general-serving milestone.
 It combines reviewed program/recovery, scalar/COP, stop-kind, character-profile and
-initialization-output dependencies. The general subject dependency remains held;
-no held subject or encoding converter implementation is included.
+initialization-output dependencies. The original-source subject dependency was
+later published under an explicit user review waiver, not independent CLEAR.
 
 ## Ready boundaries
 
@@ -77,6 +77,22 @@ checked independently. The Page input/options in that control are fixed test
 facts; the ordinary parent builder must still issue actual source-derived
 options and the original cleaners before serving real journals.
 
+The accepted subject content subpath is staged in the closed worker. The Page
+factory routes truthy Recent and direct Entry subjects through that cleaner,
+with admitted Perl character classes, original bytes and ordered eval effects.
+A source/recovered custom style prints a formatted subject in both page types
+and matches independently constructed native output. Named public helper
+implementations and request authority remain required for subjects that reach
+those branches; an absent helper is never replaced with identity cleaning.
+The native Perl security fix remains a separately deferred decision.
+
+The calendar profile is immutable setup authority. With an issued profile,
+the factory creates exactly one fresh mutable calendar session per request,
+shared by Date day-of-week and Entry logtime operations. The separate fixed
+fixture date operation is only an independently qualified test seam. Installed
+setup must issue and recheck the profile before real requests; no worker-global
+warm Time::Local cache is carried into a new request.
+
 ## Evidence boundary
 
 The maintained tests distinguish actual installed native helpers, actual isolated
@@ -89,10 +105,11 @@ compiled programs, stage roots, SQL fixtures and reports remain local evidence.
 ## Mandatory continuation
 
 A concrete installed general worker and complete source-derived Page/Entry/UserLite
-model and host assembly are still required. Held subject integration, general
-body/metadata/comment/property contexts, installed public hooks, effective language
-and source eval effects, and post-source charset transformation remain unfinished.
-The encoding converter/profile must be independently reviewed before consumption.
+model and host assembly are still required. Subject public helper authority,
+general body/metadata/comment/property contexts, installed public hooks,
+effective language and remaining source eval effects remain unfinished.
+The reviewed encoding converter/profile still needs actual selected-source
+binding and final freshness checks.
 The native request style/scheme/substitution paths also require actual consumer
 wiring. Finally, fresh real-worker closure, ordinary main Recent/Entry GET/HEAD,
 custom source and recovered execution, independent native comparison, browser and

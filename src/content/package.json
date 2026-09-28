@@ -25,6 +25,10 @@
     "./general-contexts": {
       "types": "./dist/general-contexts.d.ts",
       "require": "./dist/general-contexts.js"
+    },
+    "./general-subject": {
+      "types": "./dist/general-subject.d.ts",
+      "require": "./dist/general-subject.js"
     }
   },
   "scripts": {
