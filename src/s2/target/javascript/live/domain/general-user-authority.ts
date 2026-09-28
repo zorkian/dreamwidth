@@ -15,6 +15,7 @@
 import {randomBytes} from "node:crypto";
 import type {PublicUserFacts} from "../data/public-users";
 import type {GeneralPublicSession} from "./general-public-session";
+import {SnapshotError} from "../data/errors";
 import {prepareGeneralUserLite,type GeneralUserLiteModel,type PublicUserLiteOperations} from "./general-user-model";
 import {NativeString} from "../../runtime/native-string";
 import {concatStrings} from "../../runtime/native-string";
@@ -24,13 +25,39 @@ export interface PreparedPublicUser {
     readonly model: GeneralUserLiteModel;
     readonly account: string;
 }
+interface SelectedPosterNode {
+    readonly show:boolean;readonly posterLoaded:boolean;readonly posterSuspended:boolean;
+    readonly posterId:number;readonly posterUsername:NativeString|undefined;
+    readonly children:readonly SelectedPosterNode[];
+}
 /** Handles are issued by this request, never reconstructed from editable S2 fields. */
 export class GeneralUserAuthority {
     private readonly accounts = new Map<string,PublicUserFacts>();
+    private selectedPosters = new Map<string,number>();
     constructor(private readonly session: GeneralPublicSession,
         private readonly operations: PublicUserLiteOperations) {}
+    /** Bind only selected, visible poster names to the source-selected ids. */
+    bindSelectedCommentPosters(page:{readonly roots:readonly SelectedPosterNode[]}):void {
+        const next=new Map(this.selectedPosters);
+        const work=[...page.roots];
+        while(work.length) {
+            const node=work.pop()!;
+            work.push(...node.children);
+            if(!node.show||node.posterSuspended||!node.posterLoaded)continue;
+            const name=node.posterUsername?.bytes().toString("latin1");
+            if(!name||!/^[a-z0-9_]+$/.test(name)||!Number.isSafeInteger(node.posterId)||
+                node.posterId<1)throw new SnapshotError("unavailable");
+            const prior=next.get(name);
+            if(prior!==undefined&&prior!==node.posterId)throw new SnapshotError("unavailable");
+            next.set(name,node.posterId);
+        }
+        this.selectedPosters=next;
+    }
     async load(name: NativeString): Promise<PreparedPublicUser | undefined> {
         const snapshot = await this.session.user(name);
+        const selected=snapshot&&this.selectedPosters.get(snapshot.requestedName);
+        if(selected!==undefined&&snapshot?.user?.userid!==selected)
+            throw new SnapshotError("unavailable");
         if (!snapshot?.user) return undefined;
         const model = prepareGeneralUserLite(snapshot.user,this.operations)!;
         const account = randomBytes(32).toString("hex");

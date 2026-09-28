@@ -79,8 +79,10 @@ test("parent-issued accounts remain request-private and carry the final user wit
     const user:PublicUserFacts={userid:111,username:"public_name",clusterid:0,status:"V",statusvis:"X",journaltype:"I",
         dversion:1,caps:"0",name:NativeString.hostUtf8Bytes("Public"),identity:null};
     const snapshot={requestedName:"public_name",user,fingerprint:"original"};
+    let served=snapshot;
     let current=true,reads=0;
-    const store={async snapshot(){reads++;return snapshot;},async revalidate(value:unknown){assert.equal(value,snapshot);return current;}};
+    const store={async snapshot(){reads++;return served;},async revalidate(value:unknown){
+        assert.ok(value===snapshot||value===served);return current;}};
     const translations={async snapshot():Promise<never>{throw Error("No translation read");},async revalidate(){return true;}};
     const session=new GeneralPublicSession(store,translations,profile,25);
     const operations={displayName:()=>NativeString.hostUtf8Bytes("public_name"),
@@ -134,6 +136,15 @@ test("parent-issued accounts remain request-private and carry the final user wit
     assert.deepEqual(urls,nativeUrls);
     await assert.rejects(parentUserUrl({name:encodeScalar(NativeString.hostUtf8Bytes("public_name")),
         view:encodeScalar(NativeString.hostUtf8Bytes("recent")),userid:111},authority));
+    authority.bindSelectedCommentPosters({roots:[{show:true,posterLoaded:true,
+        posterSuspended:false,posterId:111,posterUsername:NativeString.bytes(Buffer.from("public_name")),
+        children:[]}]});
+    assert.throws(()=>authority.bindSelectedCommentPosters({roots:[{show:true,posterLoaded:true,
+        posterSuspended:false,posterId:111,posterUsername:NativeString.bytes(Buffer.from([0xe9])),
+        children:[]}]}));
+    assert.equal((await authority.load(NativeString.bytes(Buffer.from("public_name"))))?.model[".type"],"UserLite");
+    served={requestedName:"public_name",user:{...user,userid:222},fingerprint:"reused"};
+    await assert.rejects(parentLoadUser({name:encodeScalar(NativeString.bytes(Buffer.from("public_name")))},authority));
     current=false;
     assert.equal(await session.finish(async()=>{throw Error("Stale user must prevent private release");}),false);
 });

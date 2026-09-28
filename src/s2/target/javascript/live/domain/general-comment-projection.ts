@@ -78,6 +78,8 @@ export function generalSelectedComments(snapshot:NativeSelectedSnapshot,
     while(work.length) {
         const {node,dest}=work.pop()!,header=node.header;
         const author=authors.get(header.posterid);
+        if(node.show&&author?.statusvis!=="S"&&author&&
+            !/^[a-z0-9_]+$/.test(author.user))throw new SnapshotError("unavailable");
         const text:RawCommentText|undefined=texts.get(header.jtalkid);
         const selected=node.full||node.subject;
         // Native omits a suspended poster's subject-only text, while a full
