@@ -327,6 +327,8 @@ export class GeneralSelectedText {
         readonly posterLoaded:boolean;readonly posterSuspended:boolean;readonly loaded:boolean;
         readonly subject:NativeString|undefined;readonly body:NativeString|undefined;
         readonly editor:NativeString|undefined;readonly preformatted:NativeString|undefined;
+        readonly importSourceDefined:boolean;readonly editTime:NativeString|undefined;
+        readonly editReason:NativeString|undefined;readonly subjectIcon:NativeString|undefined;
         readonly importedFrom:NativeString|undefined;readonly pictureKeyword:NativeString|undefined;
         readonly adminPost:NativeNumber;
     } {
@@ -344,6 +346,8 @@ export class GeneralSelectedText {
             loaded:comment.body!==null||this.metadataOnlyComments.has(comment),
             subject:converted.subject?.clone(),body:converted.text?.clone(),
             editor:props.editor?.clone(),preformatted:props.opt_preformatted?.clone(),
+            importSourceDefined:props.import_source!==undefined,editTime:props.edit_time?.clone(),
+            editReason:props.edit_reason?.clone(),subjectIcon:props.subjecticon?.clone(),
             importedFrom:props.imported_from?.clone(),pictureKeyword:pictureKeyword?.clone(),
             adminPost:this.commentAdminPost(comment)});
     }
