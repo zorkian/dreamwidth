@@ -33,6 +33,10 @@ import {generalRecentPageFromSource,generalEntryPageFromSource,
     type GeneralRecentPageSourceInput,type GeneralRecentPageOperations,
     type GeneralEntryPageSourceInput,type GeneralEntryPageOperations} from "../domain/general-page-assembly";
 import {generalApprovedRecentInput,generalApprovedEntryInput} from "./general-approved-page-client";
+import {generalRequestCalendar} from "./general-request-calendar";
+import type {GeneralCalendarProfile} from "../domain/general-native-calendar";
+import {generalSubjectAdapter,type GeneralSubjectHelpers} from "./general-subject-adapter";
+import {NativeString as NativePV} from "../../runtime/native-string";
 
 export interface GeneralWorkerPublicBindings {
     readonly users:GeneralUserBindings;
@@ -42,12 +46,19 @@ export interface GeneralWorkerPublicBindings {
         websiteName:unknown):GeneralModel;
     readonly images:GeneralImageCallbacks;
     readonly navigation:GeneralCommentNavigation;
+    /** Present for the installed native calendar; shares this request's cache. */
+    readonly calendar?:ReturnType<typeof generalRequestCalendar>;
 }
 export interface GeneralWorkerFactoryServices {
     readonly propertyCleaner:GeneralInstalledOperations["propertyCleaner"];
     readonly output:GeneralInstalledOperations["output"];
     /** Native LJ::day_of_week result before wrapper +1; no guessed JS calendar. */
-    readonly dates:GeneralDateOperations;
+    readonly calendarProfile?:GeneralCalendarProfile;
+    /** Existing fixed fixtures may supply an independently proved date operation. */
+    readonly dates?:GeneralDateOperations;
+    /** Named installed public helper authority for the accepted cleaner. */
+    subjectHelpers(session:GeneralProgramSession,start:GeneralWorkerStart,
+        bindings:GeneralWorkerPublicBindings):GeneralSubjectHelpers;
     seesControlStrip(start:GeneralWorkerStart):unknown;
     /** Validate named authorized source descriptors, never cast an arbitrary resume graph. */
     /** Fixed fixture adapters may override the installed approved descriptor path. */
@@ -64,12 +75,20 @@ export interface GeneralWorkerFactoryServices {
 /** All constructor/private callback authority is created once for this worker request. */
 export function generalWorkerFactory(channel:GeneralWorkerChannel,
     services:GeneralWorkerFactoryServices):GeneralInstalledOperations {
+    if((services.calendarProfile===undefined)===(services.dates===undefined))
+        throw Error("Exactly one installed calendar profile or fixed date operation is required");
     const users=new GeneralUserBindings(),source=new GeneralStandardImageClient(channel);
     const images=generalImageCallbacks({sourceFacts:()=>source.sourceFacts(),
         translate:key=>source.translate(key),escapeUrl:generalEscapeUrl});
     const navigation=generalCommentNavigation();
-    const dates=generalDateCallbacks(services.dates);
-    const bindings:GeneralWorkerPublicBindings=Object.freeze({users,images,navigation,
+    let sessionForEffects:(()=>GeneralProgramSession)|undefined;
+    const calendar=services.calendarProfile===undefined?undefined:
+        generalRequestCalendar(services.calendarProfile,effect=>{
+            if(!sessionForEffects)throw Error("Calendar used before request Context");
+            sessionForEffects().applyNativeExceptionEffect(effect);
+        });
+    const dates=generalDateCallbacks(calendar?.dates??services.dates!);
+    const bindings:GeneralWorkerPublicBindings=Object.freeze({users,images,navigation,calendar,
         loadUser:(name:NativeString)=>workerLoadUser(channel,users,name),
         prepareUser(lite:GeneralModel,picture:GeneralModel,url:unknown,name:unknown){
             const account=users.account(lite);
@@ -79,7 +98,7 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
             return user;
         }});
     return {
-        builtins(start,page){return {...generalScalarCallbacks({page,
+        builtins(start,page,session){sessionForEffects=session;return {...generalScalarCallbacks({page,
             seesControlStrip:()=>services.seesControlStrip(start)}),
             ...generalUserConstructor(channel,users),...generalModelCallbacks(),
             ...images.callbacks,...navigation.callbacks,...dates};},
@@ -90,6 +109,14 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
             const customtextDefaults={title:session.context.prop._text_module_customtext,
                 url:session.context.prop._text_module_customtext_url,
                 content:session.context.prop._text_module_customtext_content};
+            let subject:ReturnType<typeof generalSubjectAdapter>|undefined;
+            const cleanSubject=(value:NativeString):NativeString=>{
+                subject??=generalSubjectAdapter(session.context,session.outputLimits,
+                    services.subjectHelpers(session,start,bindings),effect=>
+                        session.applyNativeExceptionEffect(effect.kind==="set"?
+                            {kind:"set",message:NativePV.fromFrame(effect.message)}:effect));
+                return subject.clean(value,"subject");
+            };
             if(start.kind==="recent") {
                 const input=services.recentInput?services.recentInput(approved,bindings,session,start):
                     generalApprovedRecentInput(approved,bindings);
@@ -98,7 +125,7 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
                     {...input,page:{...input.page,customtextDefaults}},{...operations,
                         entry(source){
                             const entry=operations.entry(source);
-                            return {...entry,picture(kind){
+                            return {...entry,cleanSubject,picture(kind){
                                 const picture=entry.picture(kind);
                                 // Recent only assigns Image_userpic if native
                                 // entry/default userpic exists. Direct Entry
@@ -109,8 +136,10 @@ export function generalWorkerFactory(channel:GeneralWorkerChannel,
             }
             const input=services.entryInput?services.entryInput(approved,bindings,session,start):
                 generalApprovedEntryInput(approved,bindings);
+            const operations=services.entryOperations(session,start,bindings);
             return generalEntryPageFromSource(session.context,{...input,page:{...input.page,customtextDefaults}},{
-                ...services.entryOperations(session,start,bindings),navigation});
+                ...operations,navigation,
+                entry:{...operations.entry,cleanSubject}});
         },
         beginRendering(session){images.beginRendering(session.context);},
     };

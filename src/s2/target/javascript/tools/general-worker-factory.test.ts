@@ -37,6 +37,7 @@ test("installed factory retains one private navigation authority and requires so
     const factory=generalWorkerFactory(new GeneralWorkerChannel("a".repeat(64)),{
         propertyCleaner(){throw Error("No cleaner substitution");},
         output(){throw Error("No output substitution");},seesControlStrip:()=>false,
+        subjectHelpers(){throw Error("Unvalidated descriptor cannot request subject helpers");},
         dates:{dayOfWeek(){weekdayCalls++;return 1;}},
         recentInput(){throw boundary;},entryInput(_value,value,session,start){
             inputBindings=value;inputSession=session;inputStart=start;return {page:{}} as never;},
@@ -91,6 +92,8 @@ test("actual installed factory has a closed pure-model dependency graph",()=>{
     assert.ok(paths.includes("app/dist/live/domain/general-page-assembly.js"));
     assert.ok(paths.includes("app/dist/live/domain/general-comment-navigation.js"));
     assert.ok(paths.includes("app/dist/live/render/general-date-builtins.js"));
+    assert.ok(paths.includes("app/dist/live/render/general-request-calendar.js"));
+    assert.ok(paths.includes("app/dist/live/domain/general-native-calendar.js"));
     assert.equal(paths.some(file=>/\/live\/data\/|general-selected-text|general-recent-selection|layer-artifact/.test(file)),false);
     console.log("Factory admission-only closed-stage evidence: "+directory);
 });
