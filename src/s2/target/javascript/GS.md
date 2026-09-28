@@ -1,6 +1,6 @@
 # Shared native scalar foundation
 
-The general compiler and recovered-program frontend share private scalar APIs.
+The source compiler and runtime share private scalar APIs.
 This dependency does not yet connect general programs to the ordinary server.
 G2 still needs the active-layer loader, complete public host and page-local
 streaming cleaner, plus an exact byte IPC/HTTP bridge.
@@ -63,7 +63,7 @@ host Number conversion requires an explicit exact range.
 
 `runtime.isContext` checks the installed runtime's private WeakSet brand.
 Prototype forgery and objects with similarly named methods are not Contexts.
-The recovery frontend consumes these APIs after its separate reviewed integration;
+The compiled-source runtime consumes these APIs;
 it does not supply a parallel scalar codec.
 
 ## Profile and artifact identity
@@ -101,6 +101,6 @@ Neither oracle executes stored database code or regenerates candidate expectatio
 The stock regression compiles and instantiates core2 plus all 58 current layouts
 under general scalar lowering, including Venture. It also executes native and JS
 core2/Venture stack helpers (the nested-comment push/count and font generator)
-through the actual source-correspondence producer, and a 2,000-term concat source.
+through the source compiler, and a 2,000-term concat source.
 This is compiler/runtime coverage, not general page/host serving completion.
 The compact builtin oracle calls the actual retained `S2::Builtin::LJ` functions.

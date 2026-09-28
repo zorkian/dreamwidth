@@ -19,14 +19,12 @@ Tests compare logical query fields when multiple keys are present rather than in
 seeded native order.
 
 Compact independent proof executes retained RecentPage with declared synthetic public
-providers, then compares raw compiled native output against source-corresponding and
-missing-source recovered programs using one initialized Context. Initialization changes
+providers, then exercises a source-compiled program using one initialized Context. Initialization changes
 item count to three and persists its mutations. Guarded SQL tests cover sticky/window
 projection, private/suspended no-read, mismatched stored anum and final freshness.
 This is model/session proof, not an ordinary installed-worker or HTTP milestone.
 Installed body/subject cleaners, public helper/resource/hook binding, Entry comments/OG,
-request context and final page postprocessing remain mandatory ongoing work. The held
-subject component is not consumed or replaced with an identity cleaner.
+request context and final page postprocessing remain mandatory ongoing work. The subject component was not consumed at this checkpoint or replaced with an identity cleaner.
 
 Standard images use an explicit request Context during initialization. Native assigns
 CURR_CTX only after s2_context initialization (LJ/S2.pm139), so initialization-time
