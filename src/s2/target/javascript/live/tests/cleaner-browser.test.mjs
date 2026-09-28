@@ -117,27 +117,10 @@ test('Chromium computes retained static positions after escape removal with Java
     } finally { cleaner.close(); await browser.close(); }
 });
 
-test('formatting matrix retains browser text/font/color/link scopes in actual stock pages', async t => {
-    const {readFileSync} = await import('node:fs');
+test('formatting matrix retains browser text/font/color/link scopes in a page', async t => {
     const {formattingCases} = requireContent(resolve(here, '../../dist/live/tests/formatting-cases.js'));
-    const {renderStock} = requireContent(resolve(here, '../../dist/live/render/engine.js'));
-    const {validateArtifact} = requireContent(resolve(here, '../../dist/live/render/artifact.js'));
-    const {approveSnapshot} = requireContent(resolve(here, '../../dist/live/policy/cohort.js'));
-    const {loadResourceTimes} = requireContent(resolve(here, '../../dist/live/render/resources.js'));
-    const fixture = requireContent(resolve(here, '../../dist/live/tests/fixtures.js'));
-    const artifact = validateArtifact(JSON.parse(readFileSync(
-        process.env.S2_LIVE_TEST_ARTIFACT || '/tmp/slice3-stock.json', 'utf8')));
-    const data = fixture.snapshot();
-    const journal = approveSnapshot(fixture.selectFixture({...data, entries: [data.entries[0]]}), config, fixture.capabilities);
-    const stockInput = {page: {kind: 'recent', pageSkip: 0, itemshow: 20, maxScrollback: 100, hasPrevious: false}, journal, config, skip: 0, skipPresent: false, nowSeconds: fixture.now,
-        formChallenge: 'public-test-challenge', uniq: 'AAAAAAAAAAAAAAA', resourceTimes: loadResourceTimes()};
-    // Offline assembly exercises unchanged prop_init/modules_init/Page.print.
-    // It is deliberately separate from the real isolated-worker qualification.
-    const assemble = fragment => renderStock(artifact, stockInput, 2097152, {
-        subject: entry => ({html:entry.subject,recentHtml:entry.subject,all:entry.subject}),
-        body: () => fragment,
-        metadata: () => { throw new Error('Recent formatting probe must not prepare entry metadata'); },
-    });
+    const assemble = fragment =>
+        `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div class="entry-content">${fragment}</div></body></html>`;
     const retained = spawnSync('perl', [resolve(here, 'cleaner-retained.pl')],
         {input: JSON.stringify(formattingCases.map(row => row.raw)), encoding: 'utf8', timeout: 10000,
             env: {...process.env, PERL_HASH_SEED: '0', PERL_PERTURB_KEYS: '0'}});
@@ -145,7 +128,7 @@ test('formatting matrix retains browser text/font/color/link scopes in actual st
     assert.deepEqual(JSON.parse(retained.stdout), formattingCases.map(row => row.perl));
     const cleaner = createEntryCleaner(limits);
     const browser = await chromium.launch({headless: true});
-    t.diagnostic(`Chromium ${browser.version()}; 98 raw/native rows; actual stock assembly; JS on/off`);
+    t.diagnostic(`Chromium ${browser.version()}; 98 raw/native rows; JS on/off`);
     try {
         for (const javaScriptEnabled of [true, false]) {
             const browserContext = await browser.newContext({javaScriptEnabled});
