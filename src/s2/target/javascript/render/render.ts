@@ -12,6 +12,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import type { CompiledLayer } from "../compile/compiler";
+import { S2Error } from "../runtime/s2runtime";
 import type { StyleInfo } from "../compile/styles";
 import type { Databases } from "../data/db";
 import { type Site, User } from "../data/user";
@@ -97,7 +98,13 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             : await RecentPage(pc, request.skip ?? 0, request.skip !== undefined, chrome.resourceHead());
         if (!page) return { status: 404, html: "" };
         s2.printing = true;
-        s2.ctx.runMethod(page, "print()");
+        try {
+            s2.ctx.runMethod(page, "print()");
+        } catch (error) {
+            // s2_run shows the page so far with the style's error after it.
+            if (!(error instanceof S2Error)) throw error;
+            output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
+        }
         return { status: 200, html: output.finish() };
     } finally {
         content.close();
