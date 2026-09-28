@@ -34,6 +34,7 @@ import {generalMysqlDateParts} from "./general-model-date";
 import type {GeneralTextEncoding,ConvertedNativeItem} from "./general-text-encoding";
 import type {GeneralPublicSession} from "./general-public-session";
 import type {GeneralSelectedComment} from "./general-comment-projection";
+import type {GeneralCommentInfoSourceInput} from "./general-comment-info-source";
 
 /** This source bag remains parent-only; only named approved values may be projected. */
 export class GeneralSelectedText {
@@ -351,6 +352,17 @@ export class GeneralSelectedText {
             journalTitle:prop("journaltitle"),journalSubtitle:prop("journalsubtitle"),
             website:Object.freeze({url:prop("url"),name:prop("urlname")}),
             customtext:Object.freeze({title:prop("customtext_title"),url:prop("customtext_url"),content:prop("customtext_content")})});
+    }
+    /** Native reply_count reads a defined logprop before selected log2.replycount. */
+    commentInfoInput(entry:RawEntry,permalink:NativeString,styleArgument:NativeString|undefined,
+        maxComments:number|null):GeneralCommentInfoSourceInput {
+        const props=this.entry(entry).props;
+        return Object.freeze({permalink:permalink.clone(),styleArgument:styleArgument?.clone(),
+            showTalkLinks:this.snapshot.facts.owner.optShowTalkLinks,
+            noComments:props.opt_nocomments?.clone(),
+            noCommentsMaintainer:props.opt_nocomments_maintainer?.clone(),
+            replyCount:props.replycount?.clone()??NativeNumber.integer(BigInt(entry.replycount)),
+            maxComments});
     }
     /** Only fields reached by Entry event_html, not its parent-only property bag. */
     entryFormatting(entry:RawEntry):Pick<GeneralEntryContentInput,
