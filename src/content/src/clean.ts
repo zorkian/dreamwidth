@@ -14,6 +14,7 @@
 
 import { cleanCss } from "./css";
 import { checkIframeEmbed } from "./embed-whitelist";
+import { type Journaltype, externalUser, getSite, journaltype, ljuserDisplay } from "./external-sites";
 import { type StylesheetSettings, cleanLink, cleanMeta } from "./html-cleaner";
 import { markdown } from "./markdown";
 import { canonicalUsername, ehtml, eurl } from "./text";
@@ -42,8 +43,8 @@ export interface UserTagOptions {
 export interface CleanHooks {
     // The user tag for a local account, or undefined if there is none.
     user?(name: string, options: UserTagOptions): string | undefined;
-    // The user tag for an account on another site, or undefined if the site is unknown.
-    externalUser?(name: string, site: string, options: UserTagOptions): string | undefined;
+    // The cached account type of a user on an LJ-based site, by DW::External::Site siteid.
+    externalJournaltype?(name: string, siteid: number): Journaltype | undefined;
 }
 
 export interface CleanOptions {
@@ -83,6 +84,7 @@ export interface CleanOptions {
     extractimages?: boolean;
     suspend_msg?: boolean;
     to_external_site?: boolean;
+    // The crosspost destination, as a DW::External::Site name.
     preserve_lj_tags_for?: string;
     cut_retrieve?: number;
     journal?: string;
@@ -682,20 +684,29 @@ function placeholderImage(site: CleanSite): string {
 
 // LJ::CleanHTML::convert_user_mentions: @user and @user.site become user tags.
 export function convertUserMentions(text: string, link: (user: string, site?: string) => string): string {
-    const tag = (user: string, site?: string) => link(user, site);
-    text = text.replace(/^(@([\w-]+)(?:\.([\w\-.]*[\w-]))?)(?=$|\W)/gm, (_, _all, user, site) => tag(user, site));
+    const tag = (all: string, user: string, site?: string) => {
+        // atproto usernames are domain names, so only the final segment names the site.
+        const atproto = /^(.*)\.([^.]+)$/.exec(all.replaceAll("@", ""));
+        if (atproto && getSite(atproto[2]!)?.servicetype === "atproto") return link(atproto[1]!, atproto[2]);
+        return link(user, site);
+    };
+    text = text.replace(/^(@([\w-]+)(?:\.([\w\-.]*[\w-]))?)(?=$|\W)/gm, (_, all, user, site) => tag(all, user, site));
     return text.replace(/(\\.)|(?<=[^\w/])(@([\w-]+)(?:\.([\w\-.]*[\w-]))?)(?=$|\W)/gm,
-        (_, escaped, _all, user, site) => escaped !== undefined ? (escaped === "\\@" ? "@" : escaped) : tag(user, site));
+        (_, escaped, all, user, site) => escaped !== undefined ? (escaped === "\\@" ? "@" : escaped) : tag(all, user, site));
 }
 
 // LJ::CleanHTML::user_link_html
 function userLinkHtml(user: string | undefined, userSite: string | undefined, options: UserTagOptions, site: CleanSite,
     hooks: CleanHooks, preserveFor?: string): string {
     if (userSite !== undefined && userSite !== site.domain) {
-        if (preserveFor && userSite === preserveFor) return `<lj user="${user}">`;
-        const html = user ? hooks.externalUser?.(user, userSite, options) : undefined;
-        if (html !== undefined) return html;
-        return `<b>[Bad username or site: ${ehtml(user)} @ ${ehtml(userSite)}]</b>`;
+        const ext = externalUser(user ?? "", userSite);
+        if (!ext) return `<b>[Bad username or site: ${ehtml(user)} @ ${ehtml(userSite)}]</b>`;
+        if (preserveFor && ext.site === getSite(preserveFor)) return `<lj user="${user}">`;
+        if (options.textonly) return user!;
+        return ljuserDisplay(ext, {
+            ...options, imgPrefix: site.imgPrefix, type: journaltype(ext, hooks.externalJournaltype),
+            httpsUrl: url => httpsUrl(url, site),
+        });
     }
     if (user) {
         const html = hooks.user?.(user, options);

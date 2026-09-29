@@ -791,10 +791,10 @@ sub asJS {
                 return;
             }
             if ($this->{'funcID'} eq "int(string)") {
-                # cast from string to int by adding zero to it
-                $o->write("Math.floor(");
+                # Perl's int(): numify, then truncate
+                $o->write("Math.trunc(s2.runtime.toNumber(");
                 $this->{'funcArgs'}->asJS($bp, $o, 0);
-                $o->write(" + 0)");
+                $o->write("))");
                 return;
             }
 

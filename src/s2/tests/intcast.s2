@@ -1,0 +1,13 @@
+layerinfo "type" = "core";
+layerinfo "majorversion" = 1;
+layerinfo "name" = "String to int test";
+
+function builtin int(string s) : int;
+
+function main() {
+    var string[] args = ["a", "b", "c"];
+    var string one = "1";
+    println $args[int($one)];
+    println int("12abc") + 1;
+    println int("x") + 1;
+}

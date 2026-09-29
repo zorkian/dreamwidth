@@ -84,7 +84,8 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         }
         await pc.content.preload(db, [body]);
         const style = styleArgs(args);
-        const time = DateTimeUnix(row.datepostUnix);
+        // LJ::mysqldate_to_time reads the date as UTC.
+        const time = DateTimeUnix(Date.parse(`${row.datepost.replace(" ", "T")}Z`) / 1000);
         const parentid = row.parenttalkid ? row.parenttalkid * 256 + entry.anum : 0;
         replyto = s2("Comment", {
             subject: ehtml(subject),

@@ -16,7 +16,7 @@ import {
     type CleanHooks, type CleanSite, canonicalUsername, clean, cleanComment, cleanCss, cleanEvent, cleanSubject,
     cleanSubjectAll, removeLinks, userReferences,
 } from "@dreamwidth/content";
-import type { Databases } from "../data/db";
+import { type Databases, text } from "../data/db";
 import type { Entry } from "../data/entry";
 import { truthy } from "../data/entry";
 import { type Site, User } from "../data/user";
@@ -35,6 +35,8 @@ export class ContentCleaner {
     readonly site: CleanSite;
     // Accounts named in the text being cleaned, loaded by preload().
     private readonly users = new Map<string, User>();
+    // Account types of users on other sites, by "siteid:name", from externaluserinfo.
+    private readonly external = new Map<string, string>();
     private readonly hooks: CleanHooks;
 
     constructor(private readonly pageSite: Site) {
@@ -52,13 +54,19 @@ export class ContentCleaner {
                 return options.textonly ? u.user
                     : ljuserTag(pageSite, u, { noLink: options.noLink, noLjuserClass: options.noLjuserClass });
             },
+            externalJournaltype: (name, siteid) =>
+                this.external.get(`${siteid}:${name}`) as ReturnType<NonNullable<CleanHooks["externalJournaltype"]>>,
         };
     }
 
     // Load the accounts the text mentions, so cleaning can render their user tags.
     async preload(db: Databases, texts: readonly string[]): Promise<void> {
         const names = new Set<string>();
+        const external: [string, number][] = [];
         for (const text of texts) {
+            cleanEvent(text, {}, this.site, {
+                externalJournaltype: (name, siteid) => { external.push([name, siteid]); return undefined; },
+            });
             for (const name of userReferences(hooks => cleanEvent(text, {}, this.site, hooks))) {
                 const canonical = canonicalUsername(name);
                 if (canonical && !this.users.has(canonical)) names.add(canonical);
@@ -67,6 +75,12 @@ export class ContentCleaner {
         for (const name of names) {
             const u = await User.byName(db, name);
             if (u) this.users.set(name, u);
+        }
+        // DW::External::Userinfo::load; unknown types show as personal accounts.
+        for (const [name, siteid] of external) {
+            if (this.external.has(`${siteid}:${name}`)) continue;
+            const [row] = await db.global("SELECT type FROM externaluserinfo WHERE user = ? AND site = ?", [name, siteid]);
+            if (row?.type) this.external.set(`${siteid}:${name}`, text(row.type));
         }
     }
 
