@@ -62,6 +62,7 @@ send them to Perl.
 | `compile/` | Layer-stack lookup, invoking the S2 compiler, compiled-layer cache. |
 | `render/` | S2 object construction, host builtins, running a page. |
 | `runtime/` | The S2 JavaScript runtime that compiled layers call into. |
+| `template/` | A Template Toolkit engine for the site's own templates (site schemes, error pages), as Perl's Template runs them. |
 | `src/content` | HTML/CSS cleaner. Independent of S2; usable elsewhere in the site. |
 
 Configuration comes from a Perl shim that dumps the site's configuration as a
@@ -93,6 +94,9 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   stopped.
 - **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in
   `t/`, each stating its expected output, and extended as bugs are found.
+- **Templates** (`tests/template.test.ts`). The Template Toolkit constructs
+  the site's templates use give what Perl's Template gives, and every
+  template in the repository parses.
 - **Compiler** (`tests/compiler.test.ts`). The programs in `src/s2/tests`,
   compiled to JavaScript and run, give their expected output.
 
