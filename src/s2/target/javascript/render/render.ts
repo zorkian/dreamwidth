@@ -29,7 +29,8 @@ import { EntryPage } from "./entry-page";
 import { DayPage, MonthPage, YearPage } from "./archive-pages";
 import { IconsPage } from "./icons-page";
 import { FriendsPage } from "./reading-page";
-import { ReplyPage } from "./reply-page";
+import { ReplyPage, currentSecret } from "./reply-page";
+import { renderSitePage, templateUser } from "./site-page";
 import {
     type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
@@ -47,6 +48,8 @@ export interface RenderRequest {
     readonly filter: JournalFilter;
     // The visitor's ljuniq cookie identity, for the reply form.
     readonly uniq: string;
+    // The Cookie header, for the visitor's site scheme.
+    readonly cookie: string;
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
@@ -129,6 +132,17 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
+    const view = request.view || "lastn";
+    const entry = view !== "entry" && view !== "reply" ? undefined : request.slug
+        ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
+        : await Entry.byDitemid(db, journal, request.ditemid!);
+    if (entry) await Entry.fill(db, journal, [entry]);
+    if (entry?.isSuspended()) {
+        return renderSitePage({
+            site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
+            secret: await currentSecret(db),
+        }, "error/suspended-entry.tt", { u: templateUser(site, journal) });
+    }
     if (usesSiteviews(site.config, journal, request, s2.ctx)) return PERL_PAGE;
     if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
 
@@ -148,11 +162,6 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         return { status: 200, body: output.finish(), contentType: "text/css" };
     }
 
-    const view = request.view || "lastn";
-    const entry = view !== "entry" && view !== "reply" ? undefined : request.slug
-        ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
-        : await Entry.byDitemid(db, journal, request.ditemid!);
-    if (entry) await Entry.fill(db, journal, [entry]);
     // DW::Logic::AdultContent::interstitial_type: a logged-out visitor is shown
     // a warning first, unless they have confirmed it, which only Perl can tell.
     if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && !(entry && !entry.isPublic())) {

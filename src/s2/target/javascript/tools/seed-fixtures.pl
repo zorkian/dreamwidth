@@ -169,6 +169,11 @@ my $suspended = journal('s2fix_suspended');
 entries( $suspended, 1 );
 $suspended->update_self( { statusvis => 'S' } ) unless $suspended->is_suspended;
 
+# A visible journal with one suspended entry.
+my $suspentry = journal('s2fix_suspentry');
+entries( $suspentry, 2 );
+LJ::Entry->new( $suspentry, jitemid => 1 )->set_prop( statusvis => 'S' );
+
 # Journals Perl explains in its own style: deleted by their owner or, for a
 # community, by an admin; purged; and an OpenID account, which has no journal.
 my $deleted = journal('s2fix_deleted');
