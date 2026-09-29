@@ -514,10 +514,12 @@ export function colorBuiltins(): Record<string, BuiltinFunction> {
         colorString(c);
         return c;
     };
+    // Unset channels read as 0, as undef does in Perl.
+    const n = (v: unknown) => Number(v ?? 0) || 0;
     const updateHsl = (c: S2Object) => {
         if (c.$hslset) return;
         c.$hslset = true;
-        const [h, s, l] = rgbToHsl(c._r, c._g, c._b);
+        const [h, s, l] = rgbToHsl(n(c._r), n(c._g), n(c._b));
         [c.$h, c.$s, c.$l] = [h, s, l].map(v => Math.trunc(v * 255 + 0.5));
     };
     const updateRgb = (c: S2Object) => {
@@ -555,17 +557,21 @@ export function colorBuiltins(): Record<string, BuiltinFunction> {
         },
         _Color__red: channel("_r"), _Color__green: channel("_g"), _Color__blue: channel("_b"),
         _Color__hue: hslChannel("$h"), _Color__saturation: hslChannel("$s"), _Color__lightness: hslChannel("$l"),
-        _Color__inverse: (_ctx, c) => color(255 - c._r, 255 - c._g, 255 - c._b),
+        _Color__inverse: (_ctx, c) => color(255 - n(c._r), 255 - n(c._g), 255 - n(c._b)),
         _Color__average: (_ctx, c, other) => color(...(["_r", "_g", "_b"] as const)
-            .map(key => Math.trunc((c[key] + other[key]) / 2 + 0.5)) as [number, number, number]),
+            .map(key => Math.trunc((n(c[key]) + n(other?.[key])) / 2 + 0.5)) as [number, number, number]),
         _Color__blend: (_ctx, c, other, value) => {
-            const m = Number(value) / 100;
+            const m = n(value) / 100;
             return color(...(["_r", "_g", "_b"] as const)
-                .map(key => Math.trunc(c[key] - (c[key] - other[key]) * m + 0.5)) as [number, number, number]);
+                .map(key => Math.trunc(n(c[key]) - (n(c[key]) - n(other?.[key])) * m + 0.5)) as [number, number, number]);
         },
         _Color__lighter: shade(1),
         _Color__darker: shade(-1),
     };
+    // Perl autovivifies a throwaway hash when a colour method gets no object.
+    for (const [name, fn] of Object.entries(functions)) {
+        functions[name] = (ctx, c, ...rest) => fn(ctx, c ?? {}, ...rest);
+    }
     return functions as Record<string, BuiltinFunction>;
 }
 
