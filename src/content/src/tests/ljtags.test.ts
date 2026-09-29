@@ -91,8 +91,42 @@ for (const [name, input, expected, opts] of markdownCases) {
     test(name, () => assert.equal(md(input, opts), expected));
 }
 
-test("external site user tags", { todo: "DW::External::Site is not ported yet" }, () => {
-    assert.doesNotMatch(md("hi @system.ao3."), /Bad username/);
-    assert.doesNotMatch(md("hi @system.github.com."), /Bad username/);
-    assert.doesNotMatch(md("hi @username.example.com.bsky"), /Bad username/);
-});
+// DW::External::User::ljuser_display
+const ext = (profile: string, badge: string, domain: string, journal: string, user: string, size = 16) =>
+    `<span style='white-space: nowrap;' class='ljuser'><a href='${profile}'><img src='${badge}' alt='[${domain} profile] ' ` +
+    `style='vertical-align: text-bottom; border: 0; padding-right: 1px;' width='${size}' height='${size}'/></a>` +
+    `<a href='${journal}'><b>${user}</b></a></span>`;
+const img = "https://www.dreamwidth.test/img";
+
+const externalCases: [string, string, string, EventOptions?][] = [
+    ["livejournal user tag", '<user name="foo_bar" site="livejournal.com">',
+        ext("http://foo-bar.livejournal.com/profile", `${img}/external/lj-userinfo.gif`, "livejournal.com",
+            "http://foo-bar.livejournal.com/", "foo_bar", 17), {}],
+    ["twitter alias for x", '<lj user="jack" site="twitter">',
+        ext("http://x.com/jack", "http://x.com/favicon.ico", "x.com", "http://x.com/jack", "jack"), {}],
+    ["tumblr subdomain", '<user name="staff" site="tumblr">',
+        ext("http://staff.tumblr.com", "http://www.tumblr.com/favicon.ico", "tumblr.com", "http://staff.tumblr.com", "staff"), {}],
+    ["ao3 mention", "hi @system.ao3.",
+        `<p>hi ${ext("https://www.archiveofourown.org/users/system/profile", "https://archiveofourown.org/favicon.ico",
+            "archiveofourown.org", "https://www.archiveofourown.org/users/system/", "system")}.</p>`],
+    ["github mention", "hi @system.github.com.",
+        `<p>hi ${ext("http://www.github.com/system/", `${img}/profile_icons/github.png`, "github.com",
+            "http://www.github.com/system", "system")}.</p>`],
+    ["bluesky mention with a domain handle", "hi @username.example.com.bsky",
+        `<p>hi ${ext("https://bsky.app/profile/username.example.com", "https://web-cdn.bsky.app/static/favicon-16x16.png",
+            "bsky.app", "https://bsky.app/profile/username.example.com", "username.example.com")}</p>`],
+    ["bsky.social mention", "@foo.bsky.social",
+        `<p>${ext("https://bsky.app/profile/foo.bsky.social", "https://web-cdn.bsky.app/static/favicon-16x16.png",
+            "bsky.social", "https://bsky.app/profile/foo.bsky.social", "foo.bsky.social")}</p>`],
+    ["unlisted domain", '<user name="bob" site="https://www.Example.org/path">',
+        ext("http://www.example.org/users/bob/profile", `${img}/silk/identity/user_other.png`, "example.org",
+            "http://www.example.org/users/bob/", "bob"), {}],
+    ["unknown site", '<user name="bob" site="nosuchsite">', "<b>[Bad username or site: bob @ nosuchsite]</b>", {}],
+    ["hostile external username", `<user name="<b onmouseover='x'>" site="twitter">`,
+        "<b>[Bad username or site: &lt;b onmouseover=&#39;x&#39;&gt; @ twitter]</b>", {}],
+    ["hostile site", '<user name="x" site="&lt;script&gt;.com">', "<b>[Bad username or site: x @ &lt;script&gt;.com]</b>", {}],
+];
+
+for (const [name, input, expected, opts] of externalCases) {
+    test(name, () => assert.equal(md(input, opts), expected));
+}
