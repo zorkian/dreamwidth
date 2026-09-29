@@ -33,6 +33,7 @@ export interface SiteConfig {
     readonly domain: string;
     readonly domainWeb: string;
     readonly userDomain: string;
+    readonly embedModuleDomain: string;
     readonly trustedCssHosts: readonly string[];
     readonly cssProxy: string | null;
     readonly cssCleaner: boolean;
@@ -59,6 +60,18 @@ export interface SiteConfig {
     readonly strings: Readonly<Record<string, string>>;
     readonly capBits: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
     readonly capDefaults: Readonly<Record<string, unknown>>;
+    readonly talkform: {
+        // As LJ::Talk::print_subjecticon_by_id prints them, with %s where extra attributes go.
+        readonly subjecticons: readonly { readonly id: string; readonly html: string }[];
+        readonly editors: { readonly selected: string; readonly items: readonly { value: string; text: string }[] };
+        // DW::Captcha::site_enabled: reply pages then need Perl's request checks.
+        readonly captcha: boolean;
+        readonly maxlengthUser: number;
+        readonly maxlengthPass: number;
+    };
+    // Page::print_trusted's snippets by key, or by "username-key" for the listed usernames.
+    readonly trustedS2: Readonly<Record<string, string>>;
+    readonly trustedS2Usernames: readonly string[];
     // The LJ::is_enabled features journal views check.
     readonly enabled: Readonly<Record<
         "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll", boolean>>;

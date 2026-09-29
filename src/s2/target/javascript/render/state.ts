@@ -23,7 +23,6 @@ export interface Chrome {
     controlStripUserpicCss(full: boolean): string;
     scriptTags(): string;
     quickreplyDiv(page: S2Object): string;
-    replyForm(): string;
     ljuser(userid: number, linkColor: string): string;
     userLink(props: Record<string, unknown>, user: S2Object, key: string): S2Object;
 }

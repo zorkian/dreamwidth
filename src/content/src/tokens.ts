@@ -35,6 +35,11 @@ export function tokenize(html: string): Token[] {
     let name = "";
     let value = "";
     let hasValue = false;
+    let src = html;
+    let tokenizer: Tokenizer;
+    // Whether the tag being read is an iframe, and where its contents start.
+    let literal = false;
+    let literalStart = -1;
 
     const text = (value: string) => {
         const last = tokens.at(-1);
@@ -42,23 +47,29 @@ export function tokenize(html: string): Token[] {
         else tokens.push({ type: "T", text: value });
     };
     const open = (selfClosing: boolean, end: number) => {
-        tokens.push({ type: "S", tag, attrs, order, selfClosing, text: html.slice(tagStart, end + 1) });
+        tokens.push({ type: "S", tag, attrs, order, selfClosing, text: src.slice(tagStart, end + 1) });
+        if (literal) {
+            literalStart = end + 1;
+            tokenizer.pause();
+        }
     };
 
-    const tokenizer = new Tokenizer({ decodeEntities: false }, {
+    const callbacks: ConstructorParameters<typeof Tokenizer>[1] = {
         onopentagname(start, end) {
             tagStart = start - 1;
-            tag = html.slice(start, end).toLowerCase();
+            tag = src.slice(start, end).toLowerCase();
+            // <iframe/> is not an iframe to HTML::Parser.
+            literal = tag === "iframe" && src[end] !== "/";
             attrs = {};
             order = [];
         },
         onattribname(start, end) {
-            name = html.slice(start, end).toLowerCase();
+            name = src.slice(start, end).toLowerCase();
             value = "";
             hasValue = false;
         },
         onattribdata(start, end) {
-            value += html.slice(start, end);
+            value += src.slice(start, end);
             hasValue = true;
         },
         onattribentity(codepoint) {
@@ -75,26 +86,41 @@ export function tokenize(html: string): Token[] {
         onopentagend(end) { open(false, end); },
         onselfclosingtag(end) { open(true, end); },
         onclosetag(start, end) {
-            const closing = html.slice(start, end).toLowerCase();
+            const closing = src.slice(start, end).toLowerCase();
             tokens.push({ type: "E", tag: closing, text: `</${closing}>` });
         },
-        ontext(start, end) { text(html.slice(start, end)); },
+        ontext(start, end) { text(src.slice(start, end)); },
         ontextentity() {},
         oncomment(start, end, offset) {
-            tokens.push({ type: "C", text: html.slice(start - 4, end + offset) });
+            tokens.push({ type: "C", text: src.slice(start - 4, end + offset) });
         },
         oncdata(start, end, offset) {
-            tokens.push({ type: "C", text: html.slice(start - 9, end + offset) });
+            tokens.push({ type: "C", text: src.slice(start - 9, end + offset) });
         },
         ondeclaration(start, end) {
-            tokens.push({ type: "D", text: html.slice(start - 2, end + 1) });
+            tokens.push({ type: "D", text: src.slice(start - 2, end + 1) });
         },
         onprocessinginstruction(start, end) {
-            tokens.push({ type: "PI", text: html.slice(start, end) });
+            tokens.push({ type: "PI", text: src.slice(start, end) });
         },
         onend() {},
-    });
-    tokenizer.write(html);
+    };
+    // HTML::Parser keeps an iframe's contents as text, up to </iframe>.
+    for (;;) {
+        literalStart = -1;
+        tokenizer = new Tokenizer({ decodeEntities: false }, callbacks);
+        tokenizer.write(src);
+        if (literalStart < 0) break;
+        const rest = src.slice(literalStart);
+        const close = /<\/iframe\s*>/i.exec(rest);
+        if (!close) {
+            if (rest) text(rest);
+            break;
+        }
+        if (close.index) text(rest.slice(0, close.index));
+        tokens.push({ type: "E", tag: "iframe", text: "</iframe>" });
+        src = rest.slice(close.index + close[0].length);
+    }
     tokenizer.end();
     return tokens;
 }

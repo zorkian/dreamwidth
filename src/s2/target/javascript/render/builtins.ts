@@ -13,7 +13,7 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import type { BuiltinFunction, Context } from "../runtime/s2runtime";
+import { type BuiltinFunction, type Context, S2Error } from "../runtime/s2runtime";
 import { cleanCss } from "@dreamwidth/content";
 import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2, styleUrl } from "./objects";
 import { tagsText } from "./pages";
@@ -286,10 +286,16 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         },
         _get_page: () => state.page(),
         _get_image: (ctx, name) => image(ctx, String(name)),
-        _set_content_type: () => { throw new Error("set_content_type is not yet implemented"); },
+        _set_content_type: () => { throw new S2Error("set_content_type is not yet implemented"); },
         _Page__print_control_strip: ctx => pout(ctx, state.chrome.controlStrip()),
         _Page__print_script_tags: ctx => pout(ctx, state.chrome.scriptTags()),
-        _Page__print_trusted: () => {},
+        _ReplyForm__print: (ctx, form) => pout(ctx, form.$html),
+        _Page__print_trusted: (ctx, page, key) => {
+            const username = page._journal?._username;
+            const snippet = state.config.trustedS2Usernames.includes(username)
+                ? state.config.trustedS2[`${username}-${key}`] : state.config.trustedS2[key];
+            if (snippet !== undefined) pout(ctx, snippet);
+        },
         _Page__print_hbox_top: () => {}, _Page__print_hbox_bottom: () => {}, _Page__print_vbox: () => {},
         _Page__print_ad_box: () => {}, _Page__print_ad: () => {}, _Entry__print_ebox: () => {},
         _Page__visible_tag_list: (_ctx, _page, limit) => state.visibleTags(Number(limit) || 0),
@@ -451,13 +457,12 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _EntryPage__print_multiform_start: () => {},
         _ItemRange__url_of: (_ctx, range, n) => typeof range.$url_of === "function" ? range.$url_of(Number(n)) : "",
         _Image__set_url: (_ctx, img, url) => { img._url = eurl(url); },
-        _ReplyForm__print: ctx => pout(ctx, state.chrome.replyForm()),
 
         // Siteviews layers only run inside the site scheme.
-        _Siteviews__need_res: () => { throw new Error("Siteviews doesn't work standalone"); },
-        _Siteviews__start_capture: () => { throw new Error("Siteviews doesn't work standalone"); },
-        _Siteviews__end_capture: () => { throw new Error("Siteviews doesn't work standalone"); },
-        _Siteviews__set_content: () => { throw new Error("Siteviews doesn't work standalone"); },
+        _Siteviews__need_res: () => { throw new S2Error("Siteviews doesn't work standalone"); },
+        _Siteviews__start_capture: () => { throw new S2Error("Siteviews doesn't work standalone"); },
+        _Siteviews__end_capture: () => { throw new S2Error("Siteviews doesn't work standalone"); },
+        _Siteviews__set_content: () => { throw new S2Error("Siteviews doesn't work standalone"); },
     };
 
     // set_handler

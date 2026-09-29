@@ -17,6 +17,9 @@ use strict;
 use warnings;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use JSON;
+use DW::Captcha;
+use DW::Formats;
+use LJ::Talk;
 
 my %databases;
 for my $id ( keys %LJ::DBINFO ) {
@@ -48,14 +51,23 @@ for my $name ( keys %LJ::Img::img ) {
 # Site text the journal pages use, in the default language.
 my %strings;
 my $dbr = LJ::get_db_reader();
-for my $prefix (qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. )) {
+for my $prefix (qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. )) {
     my $keys = $dbr->selectcol_arrayref(
         "SELECT itcode FROM ml_items WHERE dmid = 1 AND itcode LIKE ?",
         undef, "$prefix%" );
     $strings{$_} = LJ::Lang::ml($_) for @$keys;
 }
 $strings{$_} = LJ::Lang::ml($_)
-    for map { "widget.cuttag.$_" } qw( collapsed expanded collapseAll expandAll );
+    for ( map { "widget.cuttag.$_" } qw( collapsed expanded collapseAll expandAll ) ),
+    qw( Username Password talk.btn.preview talk.error.quickquote markup.helplink.url markup.helplink.alttext );
+
+# What LJ::Talk::talkform shows every visitor: subject icons (as HTML with a
+# %s for extra attributes) and the formatting choices.
+my $icons = LJ::Talk::get_subjecticons();
+my @subjecticons =
+    map { { id => $_, html => LJ::Talk::print_subjecticon_by_id( $_, '%s' ) } }
+    ( 'none', map { $_->{id} } @{ $icons->{lists}{sm} }, @{ $icons->{lists}{md} } );
+my $editors = DW::Formats::select_items( current => undef, preferred => '' );
 
 print JSON->new->canonical->pretty->encode(
     {
@@ -68,6 +80,7 @@ print JSON->new->canonical->pretty->encode(
         domain             => $LJ::DOMAIN,
         domainWeb          => $LJ::DOMAIN_WEB,
         userDomain         => $LJ::USER_DOMAIN,
+        embedModuleDomain  => $LJ::EMBED_MODULE_DOMAIN // '',
         trustedCssHosts    => [ sort keys %LJ::TRUSTED_CSS_HOST ],
         cssProxy           => $LJ::CSSPROXY,
         cssCleaner         => LJ::is_enabled('css_cleaner') ? JSON::true : JSON::false,
@@ -92,6 +105,16 @@ print JSON->new->canonical->pretty->encode(
         images             => \%images,
         strings            => \%strings,
         capBits            => \%LJ::CAP,
+        talkform           => {
+            subjecticons   => \@subjecticons,
+            editors        => $editors,
+            captcha        => DW::Captcha->site_enabled ? JSON::true : JSON::false,
+            maxlengthUser  => $LJ::USERNAME_MAXLENGTH + 0,
+            maxlengthPass  => $LJ::PASSWORD_MAXLENGTH + 0,
+        },
+        # Snippets styles may print with Page::print_trusted; code values are called once here.
+        trustedS2 => { map { $_ => '' . LJ::conf_test( $LJ::TRUSTED_S2_WHITELIST{$_} ) } keys %LJ::TRUSTED_S2_WHITELIST },
+        trustedS2Usernames => [ sort keys %LJ::TRUSTED_S2_WHITELIST_USERNAMES ],
         capDefaults        => \%LJ::CAP_DEF,
         enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll ) },
         robotBlockingContent => LJ::is_enabled('adult_content')

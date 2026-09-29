@@ -16,6 +16,12 @@ import { htmlCleaner } from "@dreamwidth/content";
 import type { SiteConfig } from "../server/config";
 import type { Output } from "./context";
 
+export class OutputLimitError extends Error {
+    constructor() {
+        super("Page output limit exceeded");
+    }
+}
+
 // Collects printed text. Safe prints are buffered and cleaned together when
 // raw output follows, so a tag split across safe prints is still seen whole.
 export class PageOutput implements Output {
@@ -42,7 +48,7 @@ export class PageOutput implements Output {
             return;
         }
         this.pending += text;
-        if (this.pending.length > this.maxBytes) throw new Error("Page output limit exceeded");
+        if (this.pending.length > this.maxBytes) throw new OutputLimitError();
     }
 
     startCapture(): void {
@@ -69,6 +75,6 @@ export class PageOutput implements Output {
 
     private append(text: string): void {
         this.html += text;
-        if (this.html.length > this.maxBytes) throw new Error("Page output limit exceeded");
+        if (this.html.length > this.maxBytes) throw new OutputLimitError();
     }
 }
