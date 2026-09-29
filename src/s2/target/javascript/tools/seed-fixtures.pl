@@ -169,6 +169,32 @@ my $suspended = journal('s2fix_suspended');
 entries( $suspended, 1 );
 $suspended->update_self( { statusvis => 'S' } ) unless $suspended->is_suspended;
 
+# Journals Perl explains in its own style: deleted by their owner or, for a
+# community, by an admin; purged; and an OpenID account, which has no journal.
+my $deleted = journal('s2fix_deleted');
+unless ( $deleted->is_deleted ) {
+    $deleted->set_prop( delete_reason => 'Moving <elsewhere> & away' );
+    $deleted->set_statusvis('D');
+}
+my $gone = LJ::load_user('s2fix_deletedcomm') || LJ::User->create_community(
+    user                   => 's2fix_deletedcomm',
+    name                   => 'Deleted community',
+    admin_userid           => $commenter->userid,
+    membership             => 'open',
+    postlevel              => 'members',
+    nonmember_posting      => 0,
+    moderated              => 0,
+    journal_adult_settings => 'none',
+) || die "Cannot create s2fix_deletedcomm\n";
+unless ( $gone->is_deleted ) {
+    $gone->set_statusvis('D');
+    LJ::get_cluster_master($gone)->do( "UPDATE userlog SET remoteid = ? WHERE userid = ? AND action = 'accountstatus'",
+        undef, $commenter->userid, $gone->userid );
+}
+my $purged = journal('s2fix_purged');
+$purged->set_statusvis('X') unless $purged->is_expunged;
+LJ::User::load_identity_user( 'O', 'https://openid.example.com/s2fix' ) || die "Cannot create the OpenID account\n";
+
 # Reading pages show entries logged in the last two weeks; move old fixtures
 # forward, keeping their order.
 for my $u ( $default, $themed, $custom, $archive, $community ) {

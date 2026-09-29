@@ -20,7 +20,7 @@ import { Entry, truthy } from "../data/entry";
 import { type Site, User } from "../data/user";
 import { createBuiltins } from "./builtins";
 import { createChrome, viewingStyle } from "./chrome";
-import { journalResources, siteSettings, standardResources } from "./resources";
+import { PAGE_STATS, journalResources, siteSettings, standardResources } from "./resources";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
@@ -217,8 +217,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         styleError(output, error);
     }
     // The journal controller adds LJ::PageStats' container before </body>.
-    const stats = "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
-    return { status: 200, body: output.finish().replace(/<\/body>/i, `${stats}</body>`) };
+    return { status: 200, body: output.finish().replace(/<\/body>/i, `${PAGE_STATS}</body>`) };
 }
 
 // s2_run shows the page so far with whatever stopped the style after it.
