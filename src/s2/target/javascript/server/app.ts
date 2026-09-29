@@ -15,12 +15,14 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
 import { styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
-import { type Databases, int } from "../data/db";
+import { type Databases, int, text } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
 import { type JournalFilter, type RenderRequest, type RenderResult, PERL_PAGE } from "../render/render";
 import type { SiteConfig } from "./config";
-import { randChars } from "../render/reply-page";
+import { currentSecret, randChars } from "../render/reply-page";
+import { deletedJournalVars, renderSitePage, templateUser } from "../render/site-page";
+import type { Stash } from "../template";
 import { determineView } from "./views";
 
 export type Renderer = (request: RenderRequest) => Promise<RenderResult>;
@@ -31,21 +33,32 @@ const S2_VIEWS = new Set(["lastn", "archive", "month", "day", "read", "network",
 // DW::Request::Plack sends every redirect as a 303.
 const redirect = (location: string): RenderResult => ({ status: 303, body: "", location });
 
+export interface Visitor {
+    // The ljuniq cookie identity.
+    readonly uniq: string;
+    // The Cookie header.
+    readonly cookie: string;
+}
+
 // Resolve a journal URL to what a render worker needs, or to a response
 // that needs no rendering.
-// `uniq` is the visitor's ljuniq cookie identity.
 export async function prepare(config: SiteConfig, db: Databases, compiler: Compiler, url: string,
-    host: string, uniq = ""): Promise<RenderRequest | RenderResult> {
+    host: string, visitor: Visitor = { uniq: "", cookie: "" }): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
     const target = journalPath(config, host, parsed.pathname);
     if (!target) return PERL_PAGE;
-    const journal = await User.byName(db, target.user.toLowerCase().replaceAll("-", "_"));
-    if (!journal) return PERL_PAGE;
+    const site = { config, host };
+    const args = Object.fromEntries(parsed.searchParams);
+    const sitePage = async (view: string, vars: Stash, journal?: User, status?: number) => renderSitePage({
+        site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, journal, secret: await currentSecret(db),
+    }, view, vars, status);
+    const username = target.user.toLowerCase().replaceAll("-", "_");
+    const journal = await User.byName(db, username);
+    if (!journal) return sitePage("error/unknown-user.tt", { user: username });
     await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
 
-    const site = { config, host };
     const base = journal.journalBase(site);
-    const args = Object.fromEntries(parsed.searchParams);
+    const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status);
     const view = determineView(target.path, parsed.search, args, base);
     if (!view) return PERL_PAGE;
     if ("redirect" in view) return redirect(view.redirect);
@@ -58,6 +71,9 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         return { status: 200, body, contentType: "text/plain" };
     }
     if (mode && !S2_VIEWS.has(mode)) return PERL_PAGE;
+    if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) {
+        return journalError("error.tt", { message: config.strings["cprod.friendsfriendsinline.text3.v1"] });
+    }
 
     let pathextra = view.pathextra;
     const filtered = /^\/(tag|security)\/(.*)$/s.exec(pathextra ?? "");
@@ -65,7 +81,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         args[filtered[1]!] = durl(filtered[2]!);
         pathextra = undefined;
     }
-    const filter = await journalFilter(config, db, journal, args, base);
+    const filter = await journalFilter(config, db, journal, args, base, journalError);
     if ("status" in filter) return filter;
 
     // The style, as make_journal's get_styleinfo picks it. Stylesheets name
@@ -80,7 +96,10 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         // Style 0 is no style, so a feed's stylesheet keeps the feed style.
         feedStyle = !styleid && hasFeedStyle;
     } else {
-        if (!journal.isVisible()) return PERL_PAGE;
+        if (journal.statusvis === "D") {
+            return journalError("journal/deleted.tt", await deletedJournalVars(db, site, journal), 404);
+        }
+        if (journal.statusvis === "S") return journalError("error/suspended.tt", { u: templateUser(site, journal) });
         const s2id = /^\d+$/.test(args.s2id ?? "") ? Number(args.s2id) : 0;
         if (s2id && (await styleOwner(db, s2id) === journal.userid && Number(journal.getCap(config, "s2styles"))
             || await styleIsPublic(db, s2id))) {
@@ -90,28 +109,36 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
             styleid = 0;
         }
     }
-    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return PERL_PAGE;
-    if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) return PERL_PAGE;
+    if (journal.statusvis === "X") return journalError("error/purged.tt");
+    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) {
+        const [identity] = await db.global("SELECT idtype, identity FROM identitymap WHERE userid = ? LIMIT 1", [journal.userid]);
+        const openid = text(identity?.idtype) === "O" ? text(identity!.identity) : undefined;
+        return journalError("error/openid-user.tt", { u: templateUser(site, journal, openid) });
+    }
+    // Locked, memorial, read-only and renamed journals.
+    if (mode !== "res" && !journal.isVisible()) return PERL_PAGE;
 
     const layers = feedStyle ? await systemLayers(db, config.defaultFeedStyle) : await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
     return {
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
-        args, requestPath: url, host, layers: compiled, style, uniq,
+        args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq,
     };
 }
 
 // make_journal's tag and security filters.
 async function journalFilter(config: SiteConfig, db: Databases, journal: User, args: Record<string, string>,
-    base: string): Promise<JournalFilter | RenderResult> {
+    base: string, error: (view: string, vars: Stash) => Promise<RenderResult>): Promise<JournalFilter | RenderResult> {
     const filter: { -readonly [K in keyof JournalFilter]: JournalFilter[K] } = {};
     if ("tag" in args) {
         if (!args.tag) return redirect(`${base}/tag/`);
-        const tags = config.enabled.tags ? parseTagFilter(args.tag) : undefined;
-        if (!tags) return PERL_PAGE;
+        const tagError = (errmsg: string) => error("error/tagview.tt", { errmsg });
+        if (!config.enabled.tags) return tagError("error.tag.disabled");
+        const tags = parseTagFilter(args.tag);
+        if (!tags) return tagError("error.tag.invalid");
         const kwids = new Map((await publicTags(db, journal)).map(tag => [tag.name, tag.kwid]));
-        if (!tags.every(tag => kwids.has(tag))) return PERL_PAGE;
+        if (!tags.every(tag => kwids.has(tag))) return tagError("error.tag.undef");
         filter.tags = tags;
         filter.tagids = tags.map(tag => kwids.get(tag)!);
         filter.tagmode = args.mode === "and" || args.mode === "all" ? "and" : "or";
@@ -161,7 +188,8 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         const cookie = /(?:^|;\s*)ljuniq=([^;]*)/.exec(request.headers.cookie ?? "");
         const known = /^([a-zA-Z0-9]{15}):(\d+)(.+)$/.exec(cookie ? decodeURIComponent(cookie[1]!) : "")?.[1];
         const uniq = known ?? randChars(15);
-        const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost", uniq);
+        const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost",
+            { uniq, cookie: request.headers.cookie ?? "" });
         const result = "layers" in prepared ? await render(prepared) : prepared;
         if (result.location) reply.header("location", result.location);
         if (!known && "layers" in prepared && prepared.view === "reply") {

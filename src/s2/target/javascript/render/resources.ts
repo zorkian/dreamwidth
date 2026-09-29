@@ -18,13 +18,14 @@ import path from "node:path";
 import type { Site, User } from "../data/user";
 import type { SiteConfig } from "../server/config";
 
-// $LJ::LIB_RES_PRIORITY
-const LIBRARY = 3;
+// $LJ::LIB_RES_PRIORITY, which is also $LJ::SCHEME_RES_PRIORITY.
+export const LIBRARY = 3;
 
-// Journal pages use the foundation group, as LJ::S2::make_journal sets it.
-const ACTIVE_GROUP = "foundation";
+// LJ::PageStats::render, with no plugins configured.
+export const PAGE_STATS =
+    "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
 
-interface NeedOptions {
+export interface NeedOptions {
     readonly group?: string;
     readonly priority?: number;
 }
@@ -34,6 +35,8 @@ const mtimes = new Map<string, number>();
 export class Resources {
     private readonly byPriority: [string, string][][] = [];
     private readonly seen = new Set<string>();
+    // $LJ::ACTIVE_RES_GROUP; journal pages use foundation, as LJ::S2::make_journal sets it.
+    group: string | undefined = "foundation";
 
     constructor(private readonly config: SiteConfig) {}
 
@@ -58,7 +61,7 @@ export class Resources {
             if (!rows) continue;
             order++;
             for (const [group, key] of rows) {
-                if (group !== "all" && group !== ACTIVE_GROUP) continue;
+                if (group !== "all" && group !== (this.group ?? "default")) continue;
                 const match = /^js\/(.+)/.exec(key) ?? /^stc\/(.+\.css)$/.exec(key);
                 if (!match || included.has(match[1]!)) continue;
                 included.add(match[1]!);
@@ -92,21 +95,26 @@ export class Resources {
     }
 }
 
-// LJ::register_standard_resources, for the resources an anonymous journal
-// page can use.
+// LJ::register_standard_resources
 export function standardResources(config: SiteConfig): Resources {
     const res = new Resources(config);
     const lib = { priority: LIBRARY };
     res.need({ ...lib, group: "foundation" }, "js/jquery/jquery-1.8.3.js");
     res.need({ ...lib, group: "foundation" }, "js/foundation/vendor/custom.modernizr.js",
         "js/foundation/foundation/foundation.js", "js/foundation/foundation/foundation.topbar.js", "js/dw/dw-core.js");
+    res.need({ ...lib, group: "jquery" }, "js/jquery/jquery-1.8.3.js", "js/dw/dw-core.js");
     res.need(lib, "js/6alib/core.js", "js/6alib/dom.js", "js/6alib/httpreq.js", "js/livejournal.js");
     res.need({ ...lib, group: "all" }, "stc/lj_base.css");
     if (config.enabled.esn_ajax) res.need(lib, "js/esn.js", "stc/esn.css");
-    res.need({ ...lib, group: "foundation" }, "js/jquery/jquery.ui.core.js", "js/jquery/jquery.ui.widget.js",
-        "js/jquery/jquery.ui.tooltip.js", "js/jquery.ajaxtip.js", "js/jquery/jquery.ui.position.js",
-        "stc/jquery/jquery.ui.core.css", "stc/jquery/jquery.ui.tooltip.css", "js/jquery.hoverIntent.js",
-        "js/jquery.contextualhover.js", "stc/jquery.contextualhover.css");
+    res.need({ ...lib, group: "default" }, "js/6alib/ippu.js", "js/lj_ippu.js", "js/6alib/hourglass.js",
+        "js/contextualhover.js", "stc/contextualhover.css");
+    const popups = ["js/jquery/jquery.ui.core.js", "js/jquery/jquery.ui.widget.js", "js/jquery/jquery.ui.tooltip.js",
+        "js/jquery.ajaxtip.js", "js/jquery/jquery.ui.position.js", "stc/jquery/jquery.ui.core.css",
+        "stc/jquery/jquery.ui.tooltip.css", "js/jquery.hoverIntent.js", "js/jquery.contextualhover.js",
+        "stc/jquery.contextualhover.css"];
+    res.need({ ...lib, group: "jquery" }, ...popups);
+    res.need({ ...lib, group: "foundation" }, ...popups);
+    if (config.isDevServer) res.need(lib, "js/6alib/devel.js");
     return res;
 }
 
@@ -150,16 +158,16 @@ export function journalResources(res: Resources, journal: User, showControlStrip
 }
 
 // The Site settings LJ::res_includes gives scripts.
-export function siteSettings(site: Site, journal: User): string {
+export function siteSettings(site: Site, journal?: User): string {
     const { config } = site;
     const flag = (on: boolean) => on ? 1 : "";
     const settings = {
         cmax_comment: 16000, statprefix: config.statPrefix, user_domain: config.userDomain,
-        currentJournal: journal.user, iconprefix: config.userpicRoot, ctx_popup: 1,
+        currentJournal: journal?.user ?? "", iconprefix: config.userpicRoot, ctx_popup: 1,
         imgprefix: config.imgPrefix, esn_async: flag(config.enabled.esn_ajax), ctx_popup_userhead: 1,
         ctx_popup_icons: 1, media_embed_enabled: flag(config.enabled.embed_module),
         inbox_update_poll: flag(config.enabled.inbox_update_poll), siteroot: config.siteRoot,
-        currentJournalBase: journal.journalBase(site), has_remote: 0,
+        currentJournalBase: journal?.journalBase(site) ?? "", has_remote: 0,
     };
     return `
             <script type="text/javascript">

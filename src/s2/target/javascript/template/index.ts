@@ -15,7 +15,7 @@
 import { Context, Control, type Options, type Stash } from "./runtime";
 
 export { TemplateError } from "./parser";
-export { type Filter, type Options, type Plugin, type Stash, type Value, Context, num, str, truthy } from "./runtime";
+export { type Filter, type Options, type Plugin, type Stash, type Value, Context, isHash, num, str, truthy } from "./runtime";
 
 export class Template {
     // `preProcess` names templates run before each one, as PRE_PROCESS does.

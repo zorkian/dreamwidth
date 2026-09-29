@@ -42,9 +42,12 @@ test("screened comments are hidden", async () => {
     assert.doesNotMatch(page.body, /Screened comment/);
 });
 
-test("suspended journals are not shown", async () => {
-    const recent = await journals.get("/~s2fix_suspended/");
-    assert.equal(recent.status, 501);
-    const entry = await journals.get(`/~s2fix_suspended/${await journals.ditemid("s2fix_suspended", "Entry 1:")}.html`);
-    assert.equal(entry.status, 501);
+test("suspended journals show only the site's notice", async () => {
+    const entry = await journals.ditemid("s2fix_suspended", "Entry 1:");
+    for (const url of ["/~s2fix_suspended/", `/~s2fix_suspended/${entry}.html`]) {
+        const page = await journals.get(url);
+        assert.equal(page.status, 403, url);
+        assert.match(page.body, /<title>Suspended Account<\/title>/);
+        assert.doesNotMatch(page.body, /Entry 1/);
+    }
 });

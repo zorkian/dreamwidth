@@ -20,8 +20,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { JSDOM } from "jsdom";
 
-// Values that differ on every request, keyed by attribute name.
-const VOLATILE = new Set(["lj_form_auth", "chrp1"]);
+// Values that differ on every request, keyed by field name.
+const VOLATILE = new Set(["lj_form_auth", "chrp1", "chal"]);
 const VERBATIM = new Set(["PRE", "TEXTAREA", "SCRIPT", "STYLE"]);
 
 // Perl emits these script settings from hashes in random key order, and the
