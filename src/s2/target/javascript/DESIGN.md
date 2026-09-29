@@ -52,10 +52,20 @@ the site's own siteviews style when asked for (`?style=site`, or
 not show entries or icons; siteviews output is then wrapped in the visitor's
 site scheme. The journal errors Perl shows in the site's style (unknown,
 deleted, suspended, purged and OpenID accounts, suspended entries, bad tag
-and security filters, network pages without the feature, entries the visitor
-cannot see, and pages that do not exist) are rendered with the site's
-Template Toolkit views in the same way. Locked, memorial and read-only
-journals render as usual; renamed ones redirect.
+and security filters, network pages without the feature, and pages that do
+not exist) are rendered with the site's Template Toolkit views in the same
+way. Locked, memorial and read-only journals render as usual; renamed ones
+redirect.
+
+Here this server deliberately differs from Perl: an entry or comment the
+visitor cannot see gets the same response as one that does not exist, a 404
+(which RFC 9110 allows for hiding a forbidden resource) with the same page,
+so no response reveals that something private exists. That covers private
+and locked entries, entries and comments by suspended users, screened and
+deleted comments, and entry URLs with the wrong anum or date, which name no
+entry. Perl instead shows a 403 login page for hidden entries, and renders
+public entries at a URL with the wrong anum. A suspended public entry, whose
+existence was already public, still gets the suspension notice.
 
 Adult content warnings (which depend on what the visitor has confirmed, kept
 by Perl), reply pages on a site that requires captchas, and journal paths
@@ -98,7 +108,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
-  and suspended journals and entries never appear.
+  and suspended journals and entries never appear, and hidden entries and
+  comments answer exactly as missing ones.
 - **Render limits** (`tests/pool.test.ts`). A style that never finishes is
   stopped.
 - **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in

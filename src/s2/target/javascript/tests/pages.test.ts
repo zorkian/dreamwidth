@@ -108,14 +108,7 @@ test("error pages in the site scheme", async () => {
     await compare("/~s2fix_deleted/?skin=lynx");
 });
 
-test("a locked entry, which asks the visitor to log in", async () => {
-    await compare(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Locked entry")}.html`);
-});
-
-test("not-found pages, for an unknown path and a missing entry", async () => {
-    await compare("/~s2fix_theme/nosuchpage/");
-    await compare("/~s2fix_theme/255.html");
-});
+test("a not-found page, for an unknown path", () => compare("/~s2fix_theme/nosuchpage/"));
 
 test("a memorial journal reads as usual, and a renamed one redirects", async () => {
     await compare("/~s2fix_memorial/");
