@@ -20,26 +20,31 @@ export type ViewMatch =
     | { redirect: string }
     | { mode: string; pathextra?: string; ditemid?: number; slug?: string; date?: string };
 
-// `base` is the journal's URL, for redirects. Undefined means no such page.
+// `base` is the journal's URL, for redirects. Undefined means no such page,
+// as are some paths of journals that do not `exist`.
 export function determineView(uri: string, query: string, args: Record<string, string>,
-    base: string): ViewMatch | undefined {
+    base: string, exists = true): ViewMatch | undefined {
     const reply = args.mode === "reply" || !!args.replyto || !!args.edit;
     let match: RegExpExecArray | null;
 
     if (uri === "/favicon.ico") return undefined;
-    if ((match = /^\/tags(.*)/.exec(uri))) return { redirect: `${base}/tag${match[1]}` };
-    if ((match = /^\/calendar(.*)/.exec(uri))) return { redirect: `${base}/archive${match[1]}` };
+    if ((match = /^\/tags(.*)/.exec(uri))) return exists ? { redirect: `${base}/tag${match[1]}` } : undefined;
+    if ((match = /^\/calendar(.*)/.exec(uri))) return exists ? { redirect: `${base}/archive${match[1]}` } : undefined;
 
     if ((match = /^\/(\d+)(\.html?)$/i.exec(uri))) {
         if (match[2] !== ".html") return { redirect: `/${match[1]}.html${query}` };
+        if (!exists) return undefined;
         return { mode: reply ? "reply" : "entry", ditemid: Number(match[1]) };
     }
     if ((match = /^\/(\d\d\d\d\/\d\d\/\d\d)\/([a-z0-9_-]+)\.html$/.exec(uri))) {
+        if (!exists) return undefined;
         return { mode: reply ? "reply" : "entry", slug: match[2], date: match[1] };
     }
     if ((match = /^\/(\d\d\d\d)(?:\/(\d\d)(?:\/(\d\d))?)?(\/?)$/.exec(uri))) {
         const [, year, month, day, slash] = match;
-        if (!slash) return { redirect: `${base}/${year}${month ? `/${month}` : ""}${day ? `/${day}` : ""}/` };
+        if (!slash) {
+            return exists ? { redirect: `${base}/${year}${month ? `/${month}` : ""}${day ? `/${day}` : ""}/` } : undefined;
+        }
         return { mode: day ? "day" : month ? "month" : "archive", pathextra: uri };
     }
     if ((match = /^\/([a-z_]+)?(.*)$/.exec(uri)) && (!match[1] || NAMED_VIEWS.has(match[1]))) {

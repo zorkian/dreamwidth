@@ -20,6 +20,7 @@ use JSON;
 use DW::Captcha;
 use DW::Formats;
 use DW::Logic::MenuNav;
+use DW::Routing;
 use DW::SiteScheme;
 use LJ::Talk;
 
@@ -56,7 +57,8 @@ my $dbr = LJ::get_db_reader();
 for my $prefix (
     qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. ),
     qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
-    qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. )
+    qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. ),
+    qw( /protected.tt. /login.tt. )
     )
 {
     my $keys = $dbr->selectcol_arrayref(
@@ -95,6 +97,14 @@ my @menu = map {
         ]
     }
 } @{ DW::Logic::MenuNav->get_menu_navigation(undef) };
+
+# Paths DW::Controller::Journal gives to DW::Routing's user controllers
+# before the journal views, with any .format suffix removed.
+my @route_patterns = map {
+    "$_->{regex}" =~ /^\(\?\^([ims]*):(.*)\)\z/s
+        or die "Cannot export route $_->{regex}\n";
+    { source => $2, flags => $1 }
+} @{ $DW::Routing::regex_choices{user} };
 
 print JSON->new->canonical->pretty->encode(
     {
@@ -174,6 +184,12 @@ print JSON->new->canonical->pretty->encode(
         trustedS2Usernames => [ sort keys %LJ::TRUSTED_S2_WHITELIST_USERNAMES ],
         capDefaults        => \%LJ::CAP_DEF,
         enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content ) },
+        userRoutes => {
+            paths    => [ sort map { m!^user(/.*)! ? $1 : () } keys %DW::Routing::string_choices ],
+            patterns => \@route_patterns,
+        },
+        # The site's own not-found page picks one of these for its title.
+        notFoundQuips => \@DW::Controller::Dreamwidth::Misc::QUIPS,
         robotBlockingContent => LJ::is_enabled('adult_content')
         ? [ sort grep { $LJ::CONTENT_FLAGS{$_}{block_robots} } keys %LJ::CONTENT_FLAGS ]
         : [],
