@@ -18,8 +18,9 @@ import { styleInfo, styleIsPublic, styleLayers, styleOwner } from "../compile/st
 import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
-import { type JournalFilter, type RenderRequest, type RenderResult, SITE_STYLE_PAGE } from "../render/render";
+import { type JournalFilter, type RenderRequest, type RenderResult, PERL_PAGE } from "../render/render";
 import type { SiteConfig } from "./config";
+import { randChars } from "../render/reply-page";
 import { determineView } from "./views";
 
 export type Renderer = (request: RenderRequest) => Promise<RenderResult>;
@@ -33,8 +34,9 @@ const redirect = (location: string): RenderResult => ({ status: 303, body: "", l
 
 // Resolve a journal URL to what a render worker needs, or to a response
 // that needs no rendering.
+// `uniq` is the visitor's ljuniq cookie identity.
 export async function prepare(config: SiteConfig, db: Databases, compiler: Compiler, url: string,
-    host: string): Promise<RenderRequest | RenderResult> {
+    host: string, uniq = ""): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
     const match = /^\/(?:~|users\/)([\w-]+)(\/.*)?$/.exec(parsed.pathname);
     if (!match) return notFound;
@@ -80,15 +82,15 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     } else if (!journal.isVisible()) {
         return notFound;
     }
-    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return SITE_STYLE_PAGE;
-    if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) return SITE_STYLE_PAGE;
+    if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return PERL_PAGE;
+    if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) return PERL_PAGE;
 
     const layers = await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
     return {
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
-        args, requestPath: url, host, layers: compiled, style,
+        args, requestPath: url, host, layers: compiled, style, uniq,
     };
 }
 
@@ -111,7 +113,7 @@ async function journalFilter(config: SiteConfig, db: Databases, journal: User, a
         const security = (args.security ?? "").toLowerCase();
         if (!security || !Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))
             || !config.enabled.security_filter || !/^(public|access|private|friends)$/.test(security)) {
-            return SITE_STYLE_PAGE;
+            return PERL_PAGE;
         }
         filter.security = security === "friends" ? "access" : security;
     }
@@ -130,9 +132,18 @@ function durl(text: string): string {
 export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer): FastifyInstance {
     const app = Fastify({ logger: false });
     const handler = async (request: any, reply: any) => {
-        const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost");
+        // LJ::UniqCookie::parts_from_value; reply forms give a new visitor one, as Perl's middleware does.
+        const cookie = /(?:^|;\s*)ljuniq=([^;]*)/.exec(request.headers.cookie ?? "");
+        const known = /^([a-zA-Z0-9]{15}):(\d+)(.+)$/.exec(cookie ? decodeURIComponent(cookie[1]!) : "")?.[1];
+        const uniq = known ?? randChars(15);
+        const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost", uniq);
         const result = "layers" in prepared ? await render(prepared) : prepared;
         if (result.location) reply.header("location", result.location);
+        if (!known && "layers" in prepared && prepared.view === "reply") {
+            const now = Math.floor(Date.now() / 1000);
+            reply.header("set-cookie", `ljuniq=${encodeURIComponent(`${uniq}:${now}`)}; path=/; ` +
+                `expires=${new Date((now + 60 * 86400) * 1000).toUTCString()}; SameSite=Lax`);
+        }
         return reply.code(result.status).type(`${result.contentType ?? "text/html"}; charset=utf-8`).send(result.body);
     };
     for (const prefix of ["/~:user", "/users/:user"]) {

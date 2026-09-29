@@ -36,13 +36,21 @@ layers. There is no allowlist of supported styles.
 4. **Compile.** Find the journal's layer stack (core, layout, i18n, theme,
    user) from `s2styles`/`s2stylelayers2`, read each layer's source from
    `s2source_inno`, and compile it with the existing S2 compiler's JavaScript
-   backend. Compiled layers are cached by layer id and modification time.
+   backend. Compiled layers are cached by a hash of their source.
 5. **Render.** Build the S2 objects (`Page`, `Entry`, `Comment`, ...) from the
    loaded data, run the layers' `prop_init`/`print` in the JS runtime with the
    host builtins, and return the HTML.
 
 Entry and comment bodies pass through the content cleaner before S2 sees them,
 exactly where Perl calls `LJ::CleanHTML`.
+
+The views are those `LJ::S2::make_journal` renders with the journal's style:
+recent entries (with tag, security and poster filters), entries (with their
+polls and embedded media), the year,
+month and day archives, tags, icons, reading and network pages, and
+stylesheets, and reply pages. Pages Perl renders in the site's own style
+instead (the siteviews style, and error pages), and reply pages on a site
+that requires captchas, get a 501, so a proxy can send them to Perl.
 
 ## Components
 

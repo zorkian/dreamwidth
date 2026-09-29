@@ -77,6 +77,8 @@ export function normalize(html, origins) {
             .map(({ name: key, value }) => {
                 if (key === "value" && VOLATILE.has(name)) value = "*";
                 if (key === "href") value = sortQuery(value);
+                // LJ::EmbedModule names each iframe with a random suffix.
+                if (key === "name" && node.tagName === "IFRAME") value = value.replace(/_\w{5}$/, "_*");
                 return `${key}=${JSON.stringify(unorigin(value.replace(/\s+/g, " ").trim(), origins))}`;
             })
             .sort();

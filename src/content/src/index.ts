@@ -164,14 +164,14 @@ export function cleanUserbio(text: string, site: CleanSite, hooks?: CleanHooks, 
     }, site, hooks);
 }
 
-// LJ::CleanHTML::clean_embed, for embedded media. Iframes are dropped, as no
-// iframe hosts are trusted here.
-export function cleanEmbed(text: string, site: CleanSite): string {
+// LJ::CleanHTML::clean_embed, for embedded media. Only iframes from trusted
+// sites are kept; `displayAsContent` makes those sites' iframes protocol-relative.
+export function cleanEmbed(text: string, site: CleanSite, displayAsContent = false): string {
     if (!text) return text;
     return clean(text, {
         addbreaks: false, mode: "allow", allow: ["object", "embed"], deny: ["script"], remove: ["script"],
         conditional: ["iframe"], ljcut_disable: true, cleancss: true, noautolinks: true, noexpandembedded: true,
-        formatting: "html", at_mentions: false,
+        rewrite_embed_param: true, force_https_embed: displayAsContent, formatting: "html", at_mentions: false,
     }, site);
 }
 

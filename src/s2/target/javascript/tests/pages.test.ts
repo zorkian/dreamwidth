@@ -69,6 +69,15 @@ test("archive pages for a year, a month and a day", async () => {
     }
 });
 
+test("reply pages, to an entry and to a comment", async () => {
+    const ditemid = await journals.ditemid("s2fix_theme", "Entry 25:");
+    await compare(`/~s2fix_theme/${ditemid}.html?mode=reply`);
+    // The second comment, "Re: top".
+    await compare(`/~s2fix_theme/${ditemid}.html?replyto=${(2 << 8) + ditemid % 256}`);
+});
+
+test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));
+
 test("a community and a reading page", async () => {
     await compare("/~s2fix_comm/");
     await compare("/~s2fix_reader/read");

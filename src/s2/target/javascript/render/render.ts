@@ -24,11 +24,12 @@ import { journalResources, siteSettings, standardResources } from "./resources";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
 import { type S2Object, UserLite } from "./objects";
-import { PageOutput } from "./page-output";
+import { OutputLimitError, PageOutput } from "./page-output";
 import { EntryPage } from "./entry-page";
 import { DayPage, MonthPage, YearPage } from "./archive-pages";
 import { IconsPage } from "./icons-page";
 import { FriendsPage } from "./reading-page";
+import { ReplyPage } from "./reply-page";
 import {
     type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
@@ -44,6 +45,8 @@ export interface RenderRequest {
     readonly slug?: { readonly slug: string; readonly date: string };
     readonly args: Readonly<Record<string, string>>;
     readonly filter: JournalFilter;
+    // The visitor's ljuniq cookie identity, for the reply form.
+    readonly uniq: string;
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
@@ -69,10 +72,9 @@ export interface RenderResult {
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
-// For pages Perl renders in the site's own style (siteviews and error pages).
-export const SITE_STYLE_PAGE: RenderResult = {
-    status: 501, body: "This page is shown in the site's own style, which this server does not render.\n",
-};
+// For pages only Perl renders: those in the site's own style (siteviews and
+// error pages), and reply forms that need its checks on the visitor.
+export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
 
 // What a stylesheet request runs, skipping any the style does not define.
 const STYLESHEET_FUNCTIONS = ["Page::print_contextual_stylesheet()", "Page::print_default_stylesheet()",
@@ -123,7 +125,8 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
     };
 
-    if (usesSiteviews(site.config, journal, request, s2.ctx)) return SITE_STYLE_PAGE;
+    if (usesSiteviews(site.config, journal, request, s2.ctx)) return PERL_PAGE;
+    if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
 
     if (stylesheet) {
         // s2_run calls these with no page, and cleans the whole of what they print as CSS.
@@ -135,8 +138,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
                 if (s2.ctx.hasFunction(name)) s2.ctx.getFunction(name)(s2.ctx, {});
             }
         } catch (error) {
-            if (!(error instanceof S2Error)) throw error;
-            output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
+            styleError(output, error);
         }
         builtin._end_css!(s2.ctx);
         return { status: 200, body: output.finish(), contentType: "text/css" };
@@ -152,6 +154,15 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         case "lastn":
             if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
             break;
+        case "reply": {
+            const entry = request.slug
+                ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
+                : await Entry.byDitemid(db, journal, request.ditemid!);
+            const result = entry ? await ReplyPage(pc, entry, request.uniq) : null;
+            if (result && "response" in result) return result.response;
+            page = result ?? undefined;
+            break;
+        }
         case "tag":
             if (!request.pathextra) page = await TagsPage(pc);
             break;
@@ -194,13 +205,19 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     try {
         s2.ctx.runMethod(page, "print()");
     } catch (error) {
-        // s2_run shows the page so far with the style's error after it.
-        if (!(error instanceof S2Error)) throw error;
-        output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
+        styleError(output, error);
     }
     // The journal controller adds LJ::PageStats' container before </body>.
     const stats = "<div id='statistics' style='text-align: left; font-size:0; line-height:0; height:0; overflow:hidden;'></div>";
     return { status: 200, body: output.finish().replace(/<\/body>/i, `${stats}</body>`) };
+}
+
+// s2_run shows the page so far with whatever stopped the style after it.
+// Errors other than the style's own are also logged, as they may be ours.
+function styleError(output: PageOutput, error: unknown): void {
+    if (error instanceof OutputLimitError || !(error instanceof Error)) throw error;
+    if (!(error instanceof S2Error)) console.error(error);
+    output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
 }
 
 // Whether LJ::User::make_journal and LJ::S2::make_journal would render this

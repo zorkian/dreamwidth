@@ -17,6 +17,7 @@ import type { StyleInfo } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
 import { Entry, activeEntries, dayCounts, truthy } from "../data/entry";
 import { Moods } from "../data/moods";
+import { expandEmbedded } from "./embedded";
 import { type UserTag, publicTags } from "../data/tags";
 import { canonicalUsername } from "@dreamwidth/content";
 import { type Site, User } from "../data/user";
@@ -314,12 +315,15 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
         moodTheme(pc.users.get(entry.posterid) ?? journal)))]);
 
     await pc.content.preload(db, entries.map(entry => entry.event));
+    // Entry text with polls and embedded media in place.
+    const texts = await Promise.all(entries.map(entry => view === "month" ? ""
+        : expandEmbedded(db, pc.content.site, config, entry.journal,
+            pc.content.event(entry, view === "recent" ? styleUrl(pc.args, entry.url(site)) : undefined))));
     const userpicPosition = String(p._userpics_position ?? "");
-    return entries.map(entry => {
+    return entries.map((entry, index) => {
         const posted = entry.journal;
         const poster = pc.users.get(entry.posterid) ?? posted;
         const url = entry.url(site);
-        const styled = styleUrl(pc.args, url);
         const subject = pc.content.subject(entry.subject);
 
         let userpic: S2Object = nullObject("Image");
@@ -364,9 +368,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             link_keyseq: ["edit_entry", "edit_tags", "mem_add", "tell_friend", "watch_comments", "unwatch_comments"],
             metadata: {},
             subject: subject.html,
-            text: view === "month" ? ""
-                : pc.content.event(entry, view === "recent" ? styled : undefined) +
-                    (truthy(p._tags_aware) ? "" : tagsText(p, tags)),
+            text: view === "month" ? "" : texts[index]! + (truthy(p._tags_aware) ? "" : tagsText(p, tags)),
             journal: UserLite(site, posted), poster: UserLite(site, poster),
             new_day: 0, end_day: 0, comments, userpic, permalink_url: url, itemid: entry.ditemid, tags,
             timeformat24: 0, admin_post: 0, dom_id: `entry-${posted.user}-${entry.ditemid}`,
