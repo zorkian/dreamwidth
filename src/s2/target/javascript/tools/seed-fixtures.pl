@@ -24,6 +24,7 @@ use LJ::S2;
 use LJ::S2Theme;
 use LJ::Talk;
 use LJ::Userpic;
+use DW::User::Rename;
 use Compress::Zlib qw( compress crc32 );
 
 die "Devcontainer only\n" unless $LJ::IS_DEV_SERVER;
@@ -199,6 +200,15 @@ unless ( $gone->is_deleted ) {
 my $purged = journal('s2fix_purged');
 $purged->set_statusvis('X') unless $purged->is_expunged;
 LJ::User::load_identity_user( 'O', 'https://openid.example.com/s2fix' ) || die "Cannot create the OpenID account\n";
+
+# A memorial journal, which reads as any other, and a renamed account, which
+# sends visitors on to the journal it became.
+my $memorial = journal('s2fix_memorial');
+entries( $memorial, 2 );
+$memorial->set_statusvis('M') unless $memorial->is_memorial;
+DW::User::Rename->create_redirect_journal( 's2fix_renamed', $default->user )
+    or die "Cannot create s2fix_renamed\n"
+    unless LJ::load_user('s2fix_renamed');
 
 # Reading pages show entries logged in the last two weeks; move old fixtures
 # forward, keeping their order.

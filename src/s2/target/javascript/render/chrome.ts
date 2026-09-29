@@ -179,7 +179,7 @@ export function ljuserTag(site: Site, u: User, options: UserTagOptions = {}): st
         ? staff ? ["comm_staff.png", 16, "site community"] : ["silk/identity/community.png", 16, "community"]
         : u.journaltype === "Y" ? ["silk/identity/feed.png", 16, "syndicated"]
             : staff ? ["silk/identity/user_staff.png", 17, "staff"] : ["silk/identity/user.png", 17, "personal"];
-    const deleted = u.isVisible() ? "" : " text-decoration: line-through;";
+    const deleted = ["V", "M", "L", "O"].includes(u.statusvis) ? "" : " text-decoration: line-through;";
     const style = /^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/.test(options.linkColor ?? "")
         ? ` style='color: ${options.linkColor};'` : "";
     const base = u.journalBase(site);

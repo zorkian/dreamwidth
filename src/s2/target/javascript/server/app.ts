@@ -16,14 +16,14 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
 import { type LayerRef, siteviewsLayers, styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
-import { User } from "../data/user";
+import { User, journalBase } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
 import { type JournalFilter, type RenderRequest, type RenderResult, PERL_PAGE } from "../render/render";
 import type { SiteConfig } from "./config";
 import { currentSecret, randChars } from "../render/reply-page";
 import { viewingStyle } from "../render/chrome";
 import { styleUrl } from "../render/objects";
-import { currentScheme, deletedJournalVars, renderSitePage, templateUser } from "../render/site-page";
+import { currentScheme, deletedJournalVars, notFoundPage, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
 import { determineView } from "./views";
 
@@ -48,26 +48,38 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     host: string, visitor: Visitor = { uniq: "", cookie: "" }): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
     const target = journalPath(config, host, parsed.pathname);
-    if (!target) return PERL_PAGE;
+    if (!target || userRoute(config, parsed.pathname)) return PERL_PAGE;
     const site = { config, host };
     const args = Object.fromEntries(parsed.searchParams);
     // ?style=light shows the site's own pages in its text-only scheme.
     const light = viewingStyle(args) === "light" ? "lynx" : undefined;
-    const sitePage = async (view: string, vars: Stash, journal?: User, status?: number, scheme?: string) => renderSitePage({
+    const siteRequest = async (journal?: User, scheme?: string) => ({
         site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, journal, secret: await currentSecret(db), scheme,
-    }, view, vars, status);
+    });
+    const sitePage = async (view: string, vars: Stash, journal?: User, status?: number, scheme?: string) =>
+        renderSitePage(await siteRequest(journal, scheme), view, vars, status);
+    const notFound = async (journal?: User) => notFoundPage(await siteRequest(journal));
     const username = target.user.toLowerCase().replaceAll("-", "_");
     const journal = await User.byName(db, username);
-    if (!journal) return sitePage("error/unknown-user.tt", { user: username });
-    await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
-
-    const base = journal.journalBase(site);
-    const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status, light);
-    const view = determineView(target.path, parsed.search, args, base);
-    if (!view) return PERL_PAGE;
+    const base = journal ? journal.journalBase(site) : journalBase(site, username);
+    const view = determineView(target.path, parsed.search, args, base, !!journal);
+    if (!view) return notFound();
     if ("redirect" in view) return redirect(view.redirect);
 
     const mode = view.mode;
+    if (!journal) {
+        if (mode === "profile") return PERL_PAGE;
+        if (["info", "update", "robots_txt"].includes(mode)) return notFound();
+        return sitePage("error/unknown-user.tt", { user: username });
+    }
+    await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content", "renamedto"]);
+    const renamedTo = journal.journaltype === "R" && journal.statusvis === "R" ? journal.props.renamedto ?? "" : "";
+    if (renamedTo) {
+        if (/^https?:\/\//.test(renamedTo)) return redirect(renamedTo);
+        const to = await User.byName(db, renamedTo);
+        return redirect(`${to ? to.journalBase(site) : journalBase(site, renamedTo)}${target.path}${parsed.search}`);
+    }
+    const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status, light);
     if (mode === "info") return redirect(`${base}/profile${args.mode === "full" ? "?mode=full" : ""}`);
     if (mode === "update") return redirect(`${config.siteRoot}/entry/${journal.user}/new`);
     if (mode === "robots_txt") {
@@ -93,9 +105,8 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     let styleid = int(journal.props.s2_style);
     const hasFeedStyle = journal.journaltype === "Y" && Object.keys(config.defaultFeedStyle).length > 0;
     let feedStyle = false;
-    if (mode === "res") {
-        const res = /^\/(\d+)\/stylesheet$/.exec(view.pathextra ?? "");
-        if (!res) return PERL_PAGE;
+    const res = mode === "res" ? /^\/(\d+)\/stylesheet$/.exec(view.pathextra ?? "") : null;
+    if (res) {
         styleid = Number(res[1]);
         // Style 0 is no style, so a feed's stylesheet keeps the feed style.
         feedStyle = !styleid && hasFeedStyle;
@@ -119,8 +130,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         const openid = text(identity?.idtype) === "O" ? text(identity!.identity) : undefined;
         return journalError("error/openid-user.tt", { u: templateUser(site, journal, openid) });
     }
-    // Locked, memorial, read-only and renamed journals.
-    if (mode !== "res" && !journal.isVisible()) return PERL_PAGE;
+    if (mode === "res" && !res) return notFound(journal);
 
     // The site's own style, which ?style=site and ?style=light ask for, and
     // entry and icons pages use when the journal's style does not show them.
@@ -142,6 +152,19 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie, siteviews,
     };
 }
+
+// Whether DW::Routing gives this path to a user controller, or to the API,
+// before DW::Controller::Journal looks for a journal view.
+function userRoute(config: SiteConfig, path: string): boolean {
+    const uri = /^(.+?)\.[a-z]+$/.exec(path)?.[1] ?? path;
+    let patterns = routePatterns.get(config);
+    if (!patterns) {
+        patterns = config.userRoutes.patterns.map(pattern => new RegExp(pattern.source, pattern.flags));
+        routePatterns.set(config, patterns);
+    }
+    return /^\/api\/v\d+\/./.test(uri) || config.userRoutes.paths.includes(uri) || patterns.some(pattern => pattern.test(uri));
+}
+const routePatterns = new WeakMap<SiteConfig, RegExp[]>();
 
 // make_journal's tag and security filters.
 // `origin` is where the security filter list links, as Perl's create_url

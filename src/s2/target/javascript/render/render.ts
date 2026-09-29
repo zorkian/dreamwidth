@@ -23,14 +23,14 @@ import { createChrome, viewingStyle } from "./chrome";
 import { PAGE_STATS, journalResources, siteSettings, standardResources } from "./resources";
 import { ContentCleaner } from "./content";
 import { createContext } from "./context";
-import { type S2Object, UserLite } from "./objects";
+import { type S2Object, UserLite, eurl } from "./objects";
 import { OutputLimitError, PageOutput } from "./page-output";
 import { EntryPage } from "./entry-page";
 import { DayPage, MonthPage, YearPage } from "./archive-pages";
 import { IconsPage } from "./icons-page";
 import { FriendsPage } from "./reading-page";
 import { ReplyPage, currentSecret } from "./reply-page";
-import { renderSitePage, renderSiteString, templateUser } from "./site-page";
+import { type SiteRequest, notFoundPage, renderSitePage, renderSiteString, templateUser } from "./site-page";
 import {
     type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
@@ -79,9 +79,13 @@ export interface RenderResult {
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
 // For pages only Perl renders: adult content warnings, which depend on what
-// the visitor has confirmed, reply forms that need its checks on the visitor,
-// and pages for entries the visitor cannot see.
+// the visitor has confirmed, and reply forms that need its checks on the visitor.
 export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
+
+// DW::Controller::Journal's plain error pages, padded so browsers show them.
+export function plainError(status: number, html: string): RenderResult {
+    return { status, body: html + "<!-- xxxxxxxxxxxxxxxxxxxxxxxxxxxx -->\n".repeat(100) };
+}
 
 // The views DW::Controller::Journal checks for adult content.
 const ADULT_VIEWS = new Set(["read", "archive", "month", "day", "tag", "entry", "reply", "lastn"]);
@@ -138,13 +142,23 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
         : await Entry.byDitemid(db, journal, request.ditemid!);
     if (entry) await Entry.fill(db, journal, [entry]);
+    const siteRequest = async (): Promise<SiteRequest> => ({
+        site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
+        secret: await currentSecret(db),
+    });
     if (entry?.isSuspended()) {
-        return renderSitePage({
-            site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
-            secret: await currentSecret(db),
-        }, "error/suspended-entry.tt", { u: templateUser(site, journal) });
+        return renderSitePage(await siteRequest(), "error/suspended-entry.tt", { u: templateUser(site, journal) });
     }
-    if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
+    // LJ::S2::EntryPage_entry, for entries the visitor cannot see, which
+    // include a numbered entry URL with no entry.
+    const poster = entry && (entry.posterid === journal.userid ? journal
+        : (await User.byIds(db, [entry.posterid])).get(entry.posterid));
+    if (poster?.statusvis === "S") {
+        return plainError(403, "<h1>Suspended User</h1><p>The content at this URL is from a suspended user.</p>");
+    }
+    const hidden = entry ? !entry.isPublic() : request.ditemid !== undefined;
+    if (!entry && !hidden && (view === "entry" || view === "reply")) return notFoundPage(await siteRequest());
+    if (!hidden && request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
 
     // LJ::S2::make_journal's switch to the site's own style, which shows
     // no control strip and gives its sections to the site scheme.
@@ -155,6 +169,15 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         control = false;
         if (!siteviews.forced) s2 = createContext(siteviews.layers, site.config, builtins, output, cleaners);
         (s2.ctx.prop as Record<string, unknown>)._SITEVIEWS = { ".type": "Siteviews", _content: sections };
+    }
+    if (hidden) {
+        // Perl's make_journal still adds the journal's resources before showing this page.
+        journalResources(resources, journal, false, !!siteviews);
+        const [path] = request.requestPath.split("?");
+        const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
+        const returnto = `${site.config.protocol}://${request.host.toLowerCase()}${path}${query ? `?${query}` : ""}`;
+        return renderSitePage({ ...await siteRequest(), resources, scheme: siteviews?.scheme }, "protected.tt",
+            { returnto }, 403);
     }
     const pc: PageContext = {
         args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
@@ -179,7 +202,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
 
     // DW::Logic::AdultContent::interstitial_type: a logged-out visitor is shown
     // a warning first, unless they have confirmed it, which only Perl can tell.
-    if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && !(entry && !entry.isPublic())) {
+    if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && journal.isVisible()) {
         const level = entry?.adultContentCalculated() || journal.props.adult_content || "none";
         if (level !== "none") return PERL_PAGE;
     }
@@ -226,7 +249,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             page = entry ? await EntryPage(pc, entry) ?? undefined : undefined;
             break;
     }
-    if (!page) return PERL_PAGE;
+    if (!page) return notFoundPage(await siteRequest());
     if ("errors" in page) {
         // Perl's map takes in the closing tag too.
         const items = [...page.errors as string[], "</ul>"].map(error => `<li>${error}</li>`).join("");

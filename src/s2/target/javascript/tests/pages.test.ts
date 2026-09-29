@@ -26,7 +26,10 @@ const JS = `http://${HOST}`;
 let journals: TestJournals;
 let app: ReturnType<typeof createApp>;
 interface Page { status: number; body: string; type: string; location?: string }
-let tools: { summarize(page: Page, origins: string[]): string; fetchPage(origin: string, path: string): Promise<Page> };
+let tools: {
+    summarize(page: Page, origins: string[], quips: readonly string[]): string;
+    fetchPage(origin: string, path: string): Promise<Page>;
+};
 
 before(async () => {
     journals = new TestJournals();
@@ -43,7 +46,8 @@ async function compare(pagePath: string): Promise<void> {
         location: response.headers.location as string | undefined,
     };
     const perl = await tools.fetchPage(PERL, pagePath);
-    assert.equal(tools.summarize(js, [PERL, JS]), tools.summarize(perl, [PERL, JS]), pagePath);
+    const quips = journals.config.notFoundQuips;
+    assert.equal(tools.summarize(js, [PERL, JS], quips), tools.summarize(perl, [PERL, JS], quips), pagePath);
 }
 
 test("recent pages, in the default style, a theme and a user layer", async () => {
@@ -102,6 +106,20 @@ test("error pages in the site scheme", async () => {
     await compare("/~s2fix_archive/?tag=nosuchtag");
     await compare("/~s2fix_deletedcomm/");
     await compare("/~s2fix_deleted/?skin=lynx");
+});
+
+test("a locked entry, which asks the visitor to log in", async () => {
+    await compare(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Locked entry")}.html`);
+});
+
+test("not-found pages, for an unknown path and a missing entry", async () => {
+    await compare("/~s2fix_theme/nosuchpage/");
+    await compare("/~s2fix_theme/255.html");
+});
+
+test("a memorial journal reads as usual, and a renamed one redirects", async () => {
+    await compare("/~s2fix_memorial/");
+    await compare("/~s2fix_renamed/2026/01/?style=light");
 });
 
 test("pages in the site's own style: a feed's entry, icons, and the light and site views", async () => {

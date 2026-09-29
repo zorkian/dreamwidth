@@ -147,14 +147,16 @@ export class User {
         return db.cluster(this.clusterid, sql, params);
     }
 
-    // LJ::journal_base
     journalBase(site: Site): string {
-        const { config } = site;
-        const rule = config.subdomainRules[this.journaltype] ?? config.subdomainRules.P!;
-        if (rule[0] && !/^_|_$/.test(this.user)) {
-            return `${config.protocol}://${this.user.replaceAll("_", "-")}.${config.domain}`;
-        }
-        if (!rule[1] && config.isDevServer) return `${config.protocol}://${site.host}/~${this.user}`;
-        return `${config.protocol}://${rule[1]}/${this.user}`;
+        return journalBase(site, this.user, this.journaltype);
     }
+}
+
+// LJ::journal_base, which treats a user that does not exist as personal.
+export function journalBase(site: Site, user: string, journaltype = "P"): string {
+    const { config } = site;
+    const rule = config.subdomainRules[journaltype] ?? config.subdomainRules.P!;
+    if (rule[0] && !/^_|_$/.test(user)) return `${config.protocol}://${user.replaceAll("_", "-")}.${config.domain}`;
+    if (!rule[1] && config.isDevServer) return `${config.protocol}://${site.host}/~${user}`;
+    return `${config.protocol}://${rule[1]}/${user}`;
 }

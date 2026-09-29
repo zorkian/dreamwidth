@@ -78,6 +78,14 @@ export interface SiteConfig {
     // The LJ::is_enabled features journal views check.
     readonly enabled: Readonly<Record<
         "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content", boolean>>;
+    // Journal paths DW::Routing's user controllers serve, without any .format
+    // suffix: whole paths, and regular expressions.
+    readonly userRoutes: {
+        readonly paths: readonly string[];
+        readonly patterns: readonly { readonly source: string; readonly flags: string }[];
+    };
+    // Titles for the not-found page, one chosen each time; none for the stock page.
+    readonly notFoundQuips: readonly string[];
     // Adult content levels whose journals and entries ask robots to stay away.
     readonly robotBlockingContent: readonly string[];
     readonly siteTemplates: SiteTemplates;
