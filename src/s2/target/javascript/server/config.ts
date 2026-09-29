@@ -27,6 +27,7 @@ export interface SiteConfig {
     readonly databases: Readonly<Record<string, DatabaseInfo>>;
     readonly clusterPairActive: Readonly<Record<string, string>>;
     readonly defaultStyle: Readonly<Record<string, string>>;
+    readonly defaultFeedStyle: Readonly<Record<string, string>>;
     readonly home: string;
     readonly siteRoot: string;
     readonly protocol: string;
@@ -74,7 +75,7 @@ export interface SiteConfig {
     readonly trustedS2Usernames: readonly string[];
     // The LJ::is_enabled features journal views check.
     readonly enabled: Readonly<Record<
-        "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll", boolean>>;
+        "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content", boolean>>;
     // Adult content levels whose journals and entries ask robots to stay away.
     readonly robotBlockingContent: readonly string[];
 }
