@@ -76,11 +76,16 @@ print JSON->new->canonical->pretty->encode(
         defaultStyle       => $LJ::DEFAULT_STYLE,
         defaultFeedStyle   => $LJ::DEFAULT_FEED_STYLE || {},
         home               => $LJ::HOME,
+        # Where LJ::_file_modtime finds static files, for resource versions.
+        staticDocs         => $LJ::STATDOCS // "$LJ::HOME/htdocs",
         siteRoot           => $LJ::SITEROOT,
         protocol           => $LJ::PROTOCOL,
         domain             => $LJ::DOMAIN,
         domainWeb          => $LJ::DOMAIN_WEB,
         userDomain         => $LJ::USER_DOMAIN,
+        # Subdomains that are not journals; "journal" ones name the journal in the path.
+        subdomainFunction  => { map { $_ => ref $LJ::SUBDOMAIN_FUNCTION{$_} ? 'other' : $LJ::SUBDOMAIN_FUNCTION{$_} }
+            keys %LJ::SUBDOMAIN_FUNCTION },
         embedModuleDomain  => $LJ::EMBED_MODULE_DOMAIN // '',
         trustedCssHosts    => [ sort keys %LJ::TRUSTED_CSS_HOST ],
         cssProxy           => $LJ::CSSPROXY,
