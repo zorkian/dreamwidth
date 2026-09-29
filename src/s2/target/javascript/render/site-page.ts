@@ -43,6 +43,10 @@ export interface SiteRequest {
     // The journal the page is about, which scripts are told of.
     readonly journal?: User;
     readonly secret: Secret;
+    // What the page has already asked for; a new page starts with the standard set.
+    readonly resources?: Resources;
+    // A scheme the request has chosen, ahead of the visitor's.
+    readonly scheme?: string;
 }
 
 const viewCache = new Map<string, Document>();
@@ -54,7 +58,22 @@ let widgetId = 0;
 export function renderSitePage(request: SiteRequest, view: string, vars: Stash, status = 200): RenderResult {
     const page = new SitePage(request);
     page.status = status;
-    return page.render(view, vars);
+    const sections: Stash = {};
+    return page.wrap(page.templateString(view, vars, sections), sections);
+}
+
+// DW::Template::render_string: HTML made elsewhere, in the site scheme.
+export function renderSiteString(request: SiteRequest, content: string, sections: Stash): RenderResult {
+    return new SitePage(request).wrap(content, sections);
+}
+
+// DW::SiteScheme->current, with a scheme the request set taking precedence.
+export function currentScheme(config: SiteConfig, args: Readonly<Record<string, string>>, cookie: string,
+    forced?: string): string {
+    const { schemeList, defaultScheme } = config.siteTemplates;
+    const pref = /(?:^|;\s*)BMLschemepref=([^;]*)/.exec(cookie)?.[1];
+    const chosen = forced || args.skin || args.usescheme || (pref && decodeURIComponent(pref));
+    return chosen && schemeList[chosen] ? chosen : defaultScheme;
 }
 
 class SitePage {
@@ -67,18 +86,18 @@ class SitePage {
 
     constructor(readonly request: SiteRequest) {
         this.config = request.site.config;
-        this.resources = standardResources(this.config);
-        this.resources.group = undefined;
+        if (request.resources) {
+            this.resources = request.resources;
+        } else {
+            this.resources = standardResources(this.config);
+            this.resources.group = undefined;
+        }
     }
 
-    // DW::Template::render_template and render_scheme.
-    render(view: string, vars: Stash): RenderResult {
-        const sections: Stash = {};
-        const content = this.templateString(view, vars, sections);
-        const { schemeList, defaultScheme } = this.config.siteTemplates;
-        const cookie = /(?:^|;\s*)BMLschemepref=([^;]*)/.exec(this.request.cookie)?.[1];
-        const chosen = this.request.args.skin || this.request.args.usescheme || (cookie && decodeURIComponent(cookie));
-        const scheme = chosen && schemeList[chosen] ? chosen : defaultScheme;
+    // DW::Template::render_scheme
+    wrap(content: string, sections: Stash): RenderResult {
+        const { schemeList } = this.config.siteTemplates;
+        const scheme = currentScheme(this.config, this.request.args, this.request.cookie, this.request.scheme);
         const [pathname, query] = this.request.url.split(/\?(.*)/s);
         const body = this.engine("schemes").process("_init.tt", {
             sections, content, get: { ...this.request.args }, resource_group: this.resources.group,

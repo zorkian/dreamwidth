@@ -29,6 +29,8 @@ export class PageOutput implements Output {
     private pending = "";
     // start_css sends both kinds of output here, uncleaned, until end_css.
     private capture: string | undefined;
+    // Output before each open section, outermost first.
+    private readonly sections: string[] = [];
 
     // Only HTML pages are cleaned; stylesheets print safe output as it is.
     constructor(private readonly config: SiteConfig, private readonly maxBytes: number, private readonly clean = true) {}
@@ -49,6 +51,23 @@ export class PageOutput implements Output {
         }
         this.pending += text;
         if (this.pending.length > this.maxBytes) throw new OutputLimitError();
+    }
+
+    // Siteviews::start_capture: output from here goes to a new section.
+    startSection(): void {
+        this.flush();
+        this.sections.push(this.html);
+        this.html = "";
+    }
+
+    // Siteviews::end_capture: the section's output, or "" when none is open.
+    endSection(): string {
+        const outer = this.sections.pop();
+        if (outer === undefined) return "";
+        this.flush();
+        const text = this.html;
+        this.html = outer;
+        return text;
     }
 
     startCapture(): void {
@@ -75,6 +94,8 @@ export class PageOutput implements Output {
 
     private append(text: string): void {
         this.html += text;
-        if (this.html.length > this.maxBytes) throw new OutputLimitError();
+        if (this.html.length + this.sections.reduce((sum, text) => sum + text.length, 0) > this.maxBytes) {
+            throw new OutputLimitError();
+        }
     }
 }

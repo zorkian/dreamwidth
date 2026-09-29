@@ -127,7 +127,8 @@ export function trackingPopup(res: Resources, config: SiteConfig): void {
 }
 
 // LJ::Talk::init_s2journal_js for a logged-out viewer.
-export function journalScripts(res: Resources, options: { lastn?: boolean; noqr?: boolean } = {}): void {
+// `siteskin` pages leave the jQuery UI theme to the site scheme.
+export function journalScripts(res: Resources, options: { lastn?: boolean; noqr?: boolean; siteskin?: boolean } = {}): void {
     const all = { group: "all" };
     res.need(all, "js/jquery/jquery.ui.widget.js", "js/jquery.replyforms.js", "stc/css/components/quick-reply.css",
         "stc/css/components/icon-select.css", "js/jquery.poll.js", "js/journals/jquery.tag-nav.js",
@@ -139,13 +140,14 @@ export function journalScripts(res: Resources, options: { lastn?: boolean; noqr?
         res.need(all, "js/jquery/jquery.ui.core.js", "stc/jquery/jquery.ui.core.css", "js/jquery/jquery.ui.widget.js",
             "js/jquery.quickreply.js", "js/jquery.threadexpander.js");
     }
-    res.need(all, "stc/jquery/jquery.ui.theme.smoothness.css");
+    if (!options.siteskin) res.need(all, "stc/jquery/jquery.ui.theme.smoothness.css");
     if (options.lastn) res.need(all, "js/jquery/jquery.ui.widget.js", "js/jquery.cuttag-ajax.js", "js/jquery.default-editor.js");
 }
 
 // What LJ::S2::make_journal adds once the page is built.
-export function journalResources(res: Resources, journal: User, showControlStrip: boolean): void {
-    res.need({ priority: LIBRARY, group: "foundation" }, "stc/css/foundation/foundation_minimal.css");
+export function journalResources(res: Resources, journal: User, showControlStrip: boolean, siteviews: boolean): void {
+    // The site scheme brings its own Foundation styles.
+    if (!siteviews) res.need({ priority: LIBRARY, group: "foundation" }, "stc/css/foundation/foundation_minimal.css");
     if (showControlStrip) {
         // The control_strip_stylesheet_link hook in DW::Hooks::NavStrip.
         res.need({}, "stc/controlstrip.css", `stc/controlstrip-${journal.props.control_strip_color || "dark"}.css`);

@@ -30,7 +30,7 @@ import { DayPage, MonthPage, YearPage } from "./archive-pages";
 import { IconsPage } from "./icons-page";
 import { FriendsPage } from "./reading-page";
 import { ReplyPage, currentSecret } from "./reply-page";
-import { renderSitePage, templateUser } from "./site-page";
+import { renderSitePage, renderSiteString, templateUser } from "./site-page";
 import {
     type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
     visibleTags,
@@ -50,6 +50,9 @@ export interface RenderRequest {
     readonly uniq: string;
     // The Cookie header, for the visitor's site scheme.
     readonly cookie: string;
+    // The site's own style, used when `forced` or when the journal's style
+    // does not show this view.
+    readonly siteviews?: { readonly layers: readonly CompiledLayer[]; readonly forced: boolean; readonly scheme?: string };
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
@@ -75,9 +78,9 @@ export interface RenderResult {
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
-// For pages only Perl renders: those in the site's own style (siteviews, and
-// its error pages, such as for missing or hidden pages), and reply forms that
-// need its checks on the visitor.
+// For pages only Perl renders: adult content warnings, which depend on what
+// the visitor has confirmed, reply forms that need its checks on the visitor,
+// and pages for entries the visitor cannot see.
 export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
 
 // The views DW::Controller::Journal checks for adult content.
@@ -96,17 +99,18 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     const content = new ContentCleaner(site);
     const users = new Map<number, User>([[journal.userid, journal]]);
     const output = new PageOutput(site.config, MAX_OUTPUT, !stylesheet);
-    const control = showControlStrip(journal);
+    let control = showControlStrip(journal);
     const resources = standardResources(site.config);
     const chrome = createChrome({
-        site, journal, view: request.view, requestPath: request.requestPath, args: request.args, showControlStrip: control,
-        users, resources,
+        site, journal, view: request.view, requestPath: request.requestPath, args: request.args,
+        get showControlStrip() { return control; }, users, resources,
     });
     let page: S2Object | { errors: string[] } | undefined;
     let month: S2Object | undefined;
     let tags: S2Object[] = [];
     const state: RenderState = {
-        site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
+        site, config: site.config, journal, output, resources, chrome, showThreadExpander: false,
+        get showControlStrip() { return control; },
         args: request.args, cleanSite: content.site,
         page: () => page!,
         siteRoot: () => site.config.siteRoot,
@@ -126,11 +130,8 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     };
 
     const cleaners = content.propertyCleaners();
-    const s2 = createContext(request.layers, site.config, createBuiltins(state), output, cleaners);
-    const pc: PageContext = {
-        args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
-        nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(),
-    };
+    const builtins = createBuiltins(state);
+    let s2 = createContext(request.layers, site.config, builtins, output, cleaners);
 
     const view = request.view || "lastn";
     const entry = view !== "entry" && view !== "reply" ? undefined : request.slug
@@ -143,8 +144,22 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             secret: await currentSecret(db),
         }, "error/suspended-entry.tt", { u: templateUser(site, journal) });
     }
-    if (usesSiteviews(site.config, journal, request, s2.ctx)) return PERL_PAGE;
     if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
+
+    // LJ::S2::make_journal's switch to the site's own style, which shows
+    // no control strip and gives its sections to the site scheme.
+    const siteviews = request.siteviews && (request.siteviews.forced || usesSiteviews(site.config, journal, request, s2.ctx))
+        ? request.siteviews : undefined;
+    const sections: Record<string, unknown> = {};
+    if (siteviews) {
+        control = false;
+        if (!siteviews.forced) s2 = createContext(siteviews.layers, site.config, builtins, output, cleaners);
+        (s2.ctx.prop as Record<string, unknown>)._SITEVIEWS = { ".type": "Siteviews", _content: sections };
+    }
+    const pc: PageContext = {
+        args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
+        nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(), siteviews: !!siteviews,
+    };
 
     if (stylesheet) {
         // s2_run calls these with no page, and cleans the whole of what they print as CSS.
@@ -217,13 +232,19 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         const items = [...page.errors as string[], "</ul>"].map(error => `<li>${error}</li>`).join("");
         return { status: 200, body: `Errors occurred processing this page:<ul>${items}` };
     }
-    journalResources(resources, journal, control);
-    page._head_content += siteSettings(site, journal) + resources.includes("stylesheets");
+    journalResources(resources, journal, control, !!siteviews);
+    if (!siteviews) page._head_content += siteSettings(site, journal) + resources.includes("stylesheets");
     s2.printing = true;
     try {
         s2.ctx.runMethod(page, "print()");
     } catch (error) {
         styleError(output, error);
+    }
+    if (siteviews) {
+        return renderSiteString({
+            site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
+            secret: await currentSecret(db), resources, scheme: siteviews.scheme,
+        }, output.finish(), sections);
     }
     // The journal controller adds LJ::PageStats' container before </body>.
     return { status: 200, body: output.finish().replace(/<\/body>/i, `${PAGE_STATS}</body>`) };

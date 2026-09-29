@@ -103,3 +103,11 @@ test("error pages in the site scheme", async () => {
     await compare("/~s2fix_deletedcomm/");
     await compare("/~s2fix_deleted/?skin=lynx");
 });
+
+test("pages in the site's own style: a feed's entry, icons, and the light and site views", async () => {
+    await compare(`/~s2fix_feed/${await journals.ditemid("s2fix_feed", "Feed item")}.html`);
+    await compare("/~s2fix_default/icons");
+    await compare("/~s2fix_theme/?style=light");
+    await compare("/~s2fix_archive/2025/03/10/?style=site");
+    await compare("/~s2fix_archive/security/");
+});
