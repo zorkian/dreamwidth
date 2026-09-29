@@ -58,6 +58,16 @@ LJ::Customize->apply_theme( $themed, LJ::S2Theme->load_by_uniq('blanket/forest')
     if new_journal($themed);
 comments( $themed, $commenter, entries( $themed, 25 ) );
 
+# Entry URLs by name, for a public and a private entry.
+for ( [ 'Entry 25:', 'entry-25' ], [ 'Private entry', 'private-entry' ] ) {
+    my ( $subject, $slug ) = @$_;
+    my $jitemid = LJ::get_cluster_reader($themed)->selectrow_array(
+        'SELECT jitemid FROM logtext2 WHERE journalid = ? AND subject LIKE ?',
+        undef, $themed->userid, "$subject%" );
+    my $entry = LJ::Entry->new( $themed, jitemid => $jitemid );
+    $entry->slug($slug) unless $entry->slug;
+}
+
 # A theme plus a hand-written user layer that overrides functions.
 my $custom = journal('s2fix_custom');
 LJ::Customize->apply_theme( $custom, LJ::S2Theme->load_by_uniq('practicality/alittlefire') )

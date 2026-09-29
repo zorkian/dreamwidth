@@ -58,7 +58,7 @@ for my $prefix (
     qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. ),
     qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
     qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. ),
-    qw( /protected.tt. /login.tt. )
+    qw( /login.tt. )
     )
 {
     my $keys = $dbr->selectcol_arrayref(
