@@ -51,6 +51,15 @@ test("hidden entries and comments are indistinguishable from missing ones", asyn
         [replyto(int(screened!.jtalkid)), replyto(99999)],
     ];
     const bodies = new Set<string>();
+    // A thread link to a hidden comment shows the same entry page as one to no comment.
+    const threads = new Set<string>();
+    for (const id of [int(screened!.jtalkid), 99999].map(talkid => (talkid << 8) + shown % 256)) {
+        const page = await journals.get(`/~s2fix_theme/${shown}.html?thread=${id}`);
+        assert.equal(page.status, 200);
+        assert.doesNotMatch(page.body, /Screened comment/);
+        threads.add(page.body.replace(new RegExp(`(?<!\\d)${id}(?!\\d)`, "g"), "ID").replace(/c0:[^"']+/g, "TOKEN"));
+    }
+    assert.equal(threads.size, 1);
     for (const urls of groups) {
         for (const url of urls) {
             const page = await journals.get(url);

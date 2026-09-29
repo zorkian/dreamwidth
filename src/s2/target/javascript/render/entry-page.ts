@@ -145,8 +145,10 @@ async function loadComments(pc: PageContext, entry: Entry, viewingThread: number
         }
     }
 
+    // A thread whose comment the visitor cannot see shows as one that does not exist.
     let thread = viewingThread >> 8;
-    if (!posts.has(thread)) thread = 0;
+    const root = posts.get(thread);
+    if (!root?.show || pc.users.get(root.posterid)?.statusvis === "S") thread = 0;
     if (!thread && !children.get(0)) return empty;
 
     let pageSize = config.talkPageSize;
