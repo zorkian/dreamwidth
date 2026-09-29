@@ -29,11 +29,13 @@ export interface SiteConfig {
     readonly defaultStyle: Readonly<Record<string, string>>;
     readonly defaultFeedStyle: Readonly<Record<string, string>>;
     readonly home: string;
+    readonly staticDocs: string;
     readonly siteRoot: string;
     readonly protocol: string;
     readonly domain: string;
     readonly domainWeb: string;
     readonly userDomain: string;
+    readonly subdomainFunction: Readonly<Record<string, string>>;
     readonly embedModuleDomain: string;
     readonly trustedCssHosts: readonly string[];
     readonly cssProxy: string | null;

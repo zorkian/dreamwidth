@@ -73,17 +73,19 @@ export class Resources {
         return (lists.get(type) ?? []).map((files, index) => {
             if (!files) return "";
             const href = `${type === "css" ? this.config.statPrefix : this.config.jsPrefix}/??${files.join(",")}` +
-                `?v=${newest.get(type)![index]}`;
+                `?v=${newest.get(type)![index] || ""}`;
             return type === "css"
                 ? `<link rel="stylesheet" type="text/css" href="${href}" />\n`
                 : `<script type="text/javascript" src="${href}"></script>\n`;
         }).join("");
     }
 
+    // LJ::_file_modtime; a missing file adds nothing to the version.
     private modtime(key: string): number {
         let time = mtimes.get(key);
         if (time === undefined) {
-            time = Math.floor(statSync(path.join(this.config.home, "build/static", key)).mtimeMs / 1000);
+            const stat = statSync(path.join(this.config.staticDocs, key), { throwIfNoEntry: false });
+            time = stat ? Math.floor(stat.mtimeMs / 1000) : 0;
             mtimes.set(key, time);
         }
         return time;

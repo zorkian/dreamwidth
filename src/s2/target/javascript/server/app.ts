@@ -37,16 +37,16 @@ const redirect = (location: string): RenderResult => ({ status: 303, body: "", l
 export async function prepare(config: SiteConfig, db: Databases, compiler: Compiler, url: string,
     host: string, uniq = ""): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
-    const match = /^\/(?:~|users\/)([\w-]+)(\/.*)?$/.exec(parsed.pathname);
-    if (!match) return PERL_PAGE;
-    const journal = await User.byName(db, match[1]!.toLowerCase().replaceAll("-", "_"));
+    const target = journalPath(config, host, parsed.pathname);
+    if (!target) return PERL_PAGE;
+    const journal = await User.byName(db, target.user.toLowerCase().replaceAll("-", "_"));
     if (!journal) return PERL_PAGE;
     await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
 
     const site = { config, host };
     const base = journal.journalBase(site);
     const args = Object.fromEntries(parsed.searchParams);
-    const view = determineView(match[2] ?? "/", parsed.search, args, base);
+    const view = determineView(target.path, parsed.search, args, base);
     if (!view) return PERL_PAGE;
     if ("redirect" in view) return redirect(view.redirect);
 
@@ -137,6 +137,23 @@ function durl(text: string): string {
     }
 }
 
+// The journal and path a request is for, as Plack::Middleware::DW::SubdomainFunction
+// and app.psgi find them: a user's subdomain, a "journal" subdomain with the
+// username first in the path, or /~user and /users/user on any host.
+function journalPath(config: SiteConfig, host: string, path: string): { user: string; path: string } | undefined {
+    const domain = config.userDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const sub = domain ? new RegExp(`^([\\w-]{1,25})\\.${domain}$`, "i").exec(host.replace(/:\d+$/, "")) : null;
+    if (sub && sub[1] !== "www") {
+        const func = config.subdomainFunction[sub[1]!];
+        if (func === undefined) return { user: sub[1]!, path: path || "/" };
+        if (func !== "journal") return undefined;
+        const match = /^\/(\w{1,25})(\/.*)?$/.exec(path);
+        return match ? { user: match[1]!, path: match[2] ?? "/" } : undefined;
+    }
+    const match = /^\/(?:~|users\/)([\w-]+)(\/.*)?$/.exec(path);
+    return match ? { user: match[1]!, path: match[2] ?? "/" } : undefined;
+}
+
 export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer): FastifyInstance {
     const app = Fastify({ logger: false });
     const handler = async (request: any, reply: any) => {
@@ -154,9 +171,6 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         }
         return reply.code(result.status).type(`${result.contentType ?? "text/html"}; charset=utf-8`).send(result.body);
     };
-    for (const prefix of ["/~:user", "/users/:user"]) {
-        app.get(prefix, handler);
-        app.get(`${prefix}/*`, handler);
-    }
+    app.get("/*", handler);
     return app;
 }
