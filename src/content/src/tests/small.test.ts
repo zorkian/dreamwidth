@@ -14,7 +14,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanEvent, cleanSubjectAll, ehtml, htmlCleaner } from "../index";
+import { cleanEvent, cleanStylesheet, cleanSubjectAll, ehtml, htmlCleaner } from "../index";
 import { hooks, site, userTag } from "./site";
 
 const event = (text: string) => cleanEvent(text, {}, site, hooks);
@@ -85,4 +85,10 @@ test("invalid markup stops cleaning and shows the source", () => {
     const withUser = `<lj user="test_user"> and some text ${invalid}`;
     assert.equal(event(withUser), `${userTag("test_user")} and some text <marquee><font size="24"></font></marquee>` +
         error(withUser));
+});
+
+// DW::Hooks::ProxyCSSLinks quotes every url() in cleaned stylesheets.
+test("stylesheet urls are quoted", () => {
+    assert.equal(cleanStylesheet("#h { background: url(/img/x.jpg) no-repeat; }\n#g { background: url('a.png'); }\n", site),
+        "#h { background: url(\"/img/x.jpg\") no-repeat; }\n#g { background: url('a.png'); }\n");
 });
