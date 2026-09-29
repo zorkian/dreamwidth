@@ -28,7 +28,6 @@ layers. There is no allowlist of supported styles.
 
 1. **Route.** Map the URL to a journal and a view as
    `DW::Controller::Journal::determine_view` does, including its redirects.
-   Unknown URLs get 404.
 2. **Load.** Look up the journal and the data the view needs from MySQL, using
    Dreamwidth's cluster configuration to find the right database.
 3. **Authorize.** Drop anything an anonymous visitor may not see: non-public
@@ -48,9 +47,11 @@ The views are those `LJ::S2::make_journal` renders with the journal's style:
 recent entries (with tag, security and poster filters), entries (with their
 polls and embedded media), the year,
 month and day archives, tags, icons, reading and network pages, and
-stylesheets, and reply pages. Pages Perl renders in the site's own style
-instead (the siteviews style, and error pages), and reply pages on a site
-that requires captchas, get a 501, so a proxy can send them to Perl.
+stylesheets, and reply pages. Every other response under a journal URL is
+one Perl renders in the site's own style: the siteviews style, adult content
+warnings, and its error pages for missing, hidden or suspended pages. Those,
+and reply pages on a site that requires captchas, get a 501, so a proxy can
+send them to Perl.
 
 ## Components
 

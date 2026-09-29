@@ -54,6 +54,7 @@ export class Entry {
     props: Record<string, string> = {};
     tags: Tag[] = [];
     slug = "";
+    private filled = false;
 
     constructor(readonly journal: User, row: Row) {
         this.jitemid = int(row.jitemid);
@@ -91,6 +92,34 @@ export class Entry {
     // LJ::Entry::reply_count prefers the cached prop.
     replyCount(): number {
         return this.props.replycount !== undefined ? int(this.props.replycount) : this.replycount;
+    }
+
+    // LJ::Entry::adult_content_calculated: none, concepts, explicit or unset.
+    adultContentCalculated(): string | undefined {
+        return this.adultMaintainer() || this.adultPoster();
+    }
+
+    // The entry's level, or else the journal's.
+    adultContent(): string {
+        return this.adultContentCalculated() || this.journal.props.adult_content || "none";
+    }
+
+    // LJ::Entry::adult_content_marker: who set the level adultContent gives.
+    adultMarker(): "community" | "poster" | "journal" {
+        return this.adultMaintainer() ? "community" : this.adultPoster() ? "poster" : "journal";
+    }
+
+    private adultPoster(): string | undefined {
+        const level = this.props.adult_content;
+        return level && /^(?:none|concepts|explicit)$/.test(level) ? level : undefined;
+    }
+
+    // LJ::Entry::adult_content_maintainer: a maintainer may only raise the poster's level.
+    private adultMaintainer(): string | undefined {
+        const level = this.props.adult_content_maintainer, poster = this.adultPoster();
+        if (!level || !/^(?:none|concepts|explicit)$/.test(level)) return undefined;
+        if (level === poster || !poster || poster === "none") return level;
+        return poster === "concepts" && level === "explicit" ? level : undefined;
     }
 
     commentsDisabled(): boolean {
@@ -186,9 +215,11 @@ export class Entry {
         return entry && entry.eventtime.slice(0, 10).replaceAll("-", "/") === date ? entry : null;
     }
 
-    // Load text, props, tags and slugs for entries of one journal.
-    static async fill(db: Databases, journal: User, entries: readonly Entry[]): Promise<void> {
+    // Load text, props, tags and slugs for entries of one journal, once.
+    static async fill(db: Databases, journal: User, all: readonly Entry[]): Promise<void> {
+        const entries = all.filter(entry => !entry.filled);
         if (!entries.length) return;
+        for (const entry of entries) entry.filled = true;
         const byId = new Map(entries.map(entry => [entry.jitemid, entry]));
         const ids = [...byId.keys()];
         const query = (sql: string) => journal.cluster(db, sql, [journal.userid, ids]);

@@ -31,7 +31,7 @@ export async function styleLayers(db: Databases, config: SiteConfig, styleid: nu
     const layers = await ownLayers(db, styleid);
     // A style whose core or layout was deleted falls back to the default.
     if (layers?.some(layer => layer.type === "core") && layers.some(layer => layer.type === "layout")) return layers;
-    return defaultLayers(db, config);
+    return systemLayers(db, config.defaultStyle);
 }
 
 // The userid of a style's owner, if the style exists.
@@ -63,8 +63,10 @@ async function ownLayers(db: Databases, styleid: number): Promise<LayerRef[] | u
     return loadLayers(db, rows.map(row => int(row.s2lid)).filter(Boolean));
 }
 
-async function defaultLayers(db: Databases, config: SiteConfig): Promise<LayerRef[]> {
-    const names = Object.values(config.defaultStyle).filter(Boolean);
+// A style made of system layers named by their redist_uniq, as $LJ::DEFAULT_STYLE
+// and $LJ::DEFAULT_FEED_STYLE give them.
+export async function systemLayers(db: Databases, style: Readonly<Record<string, string>>): Promise<LayerRef[]> {
+    const names = Object.values(style).filter(Boolean);
     const rows = await db.global(
         `SELECT i.s2lid FROM s2info i JOIN s2layers l ON l.s2lid = i.s2lid
          JOIN user u ON u.userid = l.userid AND u.user = 'system'

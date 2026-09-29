@@ -50,6 +50,8 @@ test("recent pages, in the default style, a theme and a user layer", async () =>
     for (const user of ["s2fix_default", "s2fix_theme", "s2fix_custom"]) await compare(`/~${user}/`);
 });
 
+test("a syndicated journal, in the site's feed style", () => compare("/~s2fix_feed/"));
+
 test("an older page of entries", () => compare("/~s2fix_theme/?skip=20"));
 
 test("entries filtered by tag", () => compare("/~s2fix_theme/?tag=number%203,fixture&mode=and"));

@@ -72,9 +72,13 @@ export interface RenderResult {
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
-// For pages only Perl renders: those in the site's own style (siteviews and
-// error pages), and reply forms that need its checks on the visitor.
+// For pages only Perl renders: those in the site's own style (siteviews, and
+// its error pages, such as for missing or hidden pages), and reply forms that
+// need its checks on the visitor.
 export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
+
+// The views DW::Controller::Journal checks for adult content.
+const ADULT_VIEWS = new Set(["read", "archive", "month", "day", "tag", "entry", "reply", "lastn"]);
 
 // What a stylesheet request runs, skipping any the style does not define.
 const STYLESHEET_FUNCTIONS = ["Page::print_contextual_stylesheet()", "Page::print_default_stylesheet()",
@@ -82,7 +86,7 @@ const STYLESHEET_FUNCTIONS = ["Page::print_contextual_stylesheet()", "Page::prin
 
 export async function renderJournal(db: Databases, site: Site, request: RenderRequest): Promise<RenderResult> {
     const journal = await User.byName(db, request.username);
-    if (!journal) return { status: 404, body: "" };
+    if (!journal) return PERL_PAGE;
     await journal.loadProps(db, JOURNAL_PROPS);
 
     const stylesheet = request.view === "res";
@@ -144,20 +148,29 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         return { status: 200, body: output.finish(), contentType: "text/css" };
     }
 
+    const view = request.view || "lastn";
+    const entry = view !== "entry" && view !== "reply" ? undefined : request.slug
+        ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
+        : await Entry.byDitemid(db, journal, request.ditemid!);
+    if (entry) await Entry.fill(db, journal, [entry]);
+    // DW::Logic::AdultContent::interstitial_type: a logged-out visitor is shown
+    // a warning first, unless they have confirmed it, which only Perl can tell.
+    if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && !(entry && !entry.isPublic())) {
+        const level = entry?.adultContentCalculated() || journal.props.adult_content || "none";
+        if (level !== "none") return PERL_PAGE;
+    }
+
     let counts: DayCounts;
     [counts, tags] = await Promise.all([journalDayCounts(pc), visibleTags(pc)]);
     month = latestMonth(pc, counts);
     await preloadNamedUsers(db, request.layers, users);
 
     const args = request.args;
-    switch (request.view || "lastn") {
+    switch (view) {
         case "lastn":
             if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
             break;
         case "reply": {
-            const entry = request.slug
-                ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
-                : await Entry.byDitemid(db, journal, request.ditemid!);
             const result = entry ? await ReplyPage(pc, entry, request.uniq) : null;
             if (result && "response" in result) return result.response;
             page = result ?? undefined;
@@ -185,15 +198,11 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         case "day":
             page = await DayPage(pc, counts, request.pathextra);
             break;
-        case "entry": {
-            const entry = request.slug
-                ? await Entry.bySlug(db, journal, request.slug.slug, request.slug.date)
-                : await Entry.byDitemid(db, journal, request.ditemid!);
+        case "entry":
             page = entry ? await EntryPage(pc, entry) ?? undefined : undefined;
             break;
-        }
     }
-    if (!page) return { status: 404, body: "" };
+    if (!page) return PERL_PAGE;
     if ("errors" in page) {
         // Perl's map takes in the closing tag too.
         const items = [...page.errors as string[], "</ul>"].map(error => `<li>${error}</li>`).join("");

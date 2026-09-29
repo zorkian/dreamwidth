@@ -51,7 +51,7 @@ for my $name ( keys %LJ::Img::img ) {
 # Site text the journal pages use, in the default language.
 my %strings;
 my $dbr = LJ::get_db_reader();
-for my $prefix (qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. )) {
+for my $prefix (qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. )) {
     my $keys = $dbr->selectcol_arrayref(
         "SELECT itcode FROM ml_items WHERE dmid = 1 AND itcode LIKE ?",
         undef, "$prefix%" );
@@ -74,6 +74,7 @@ print JSON->new->canonical->pretty->encode(
         databases          => \%databases,
         clusterPairActive  => \%LJ::CLUSTER_PAIR_ACTIVE,
         defaultStyle       => $LJ::DEFAULT_STYLE,
+        defaultFeedStyle   => $LJ::DEFAULT_FEED_STYLE || {},
         home               => $LJ::HOME,
         siteRoot           => $LJ::SITEROOT,
         protocol           => $LJ::PROTOCOL,
@@ -116,7 +117,7 @@ print JSON->new->canonical->pretty->encode(
         trustedS2 => { map { $_ => '' . LJ::conf_test( $LJ::TRUSTED_S2_WHITELIST{$_} ) } keys %LJ::TRUSTED_S2_WHITELIST },
         trustedS2Usernames => [ sort keys %LJ::TRUSTED_S2_WHITELIST_USERNAMES ],
         capDefaults        => \%LJ::CAP_DEF,
-        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll ) },
+        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content ) },
         robotBlockingContent => LJ::is_enabled('adult_content')
         ? [ sort grep { $LJ::CONTENT_FLAGS{$_}{block_robots} } keys %LJ::CONTENT_FLAGS ]
         : [],

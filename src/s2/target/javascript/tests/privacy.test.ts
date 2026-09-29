@@ -26,10 +26,11 @@ test("recent pages leave out locked and private entries", async () => {
     assert.doesNotMatch(page.body, /Locked entry|Private entry|secret/);
 });
 
-test("locked and private entries are not found", async () => {
+// Perl shows its own pages for these, which this server leaves to it.
+test("locked and private entries are not shown", async () => {
     for (const subject of ["Locked entry", "Private entry"]) {
         const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", subject)}.html`);
-        assert.equal(page.status, 404, subject);
+        assert.equal(page.status, 501, subject);
         assert.doesNotMatch(page.body, /secret/);
     }
 });
@@ -41,9 +42,9 @@ test("screened comments are hidden", async () => {
     assert.doesNotMatch(page.body, /Screened comment/);
 });
 
-test("suspended journals are not found", async () => {
+test("suspended journals are not shown", async () => {
     const recent = await journals.get("/~s2fix_suspended/");
-    assert.equal(recent.status, 404);
+    assert.equal(recent.status, 501);
     const entry = await journals.get(`/~s2fix_suspended/${await journals.ditemid("s2fix_suspended", "Entry 1:")}.html`);
-    assert.equal(entry.status, 404);
+    assert.equal(entry.status, 501);
 });

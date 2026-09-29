@@ -68,7 +68,7 @@ export async function EntryPage(pc: PageContext, entry: Entry): Promise<S2Object
 
     const permalink = entry.url(site);
     let head = page._head_content;
-    const entryAdult = entry.props.adult_content_maintainer || entry.props.adult_content || "";
+    const entryAdult = entry.adultContentCalculated() ?? "";
     if (journal.shouldBlockRobots(config) || config.robotBlockingContent.includes(entryAdult)) head += robotMetaTags();
     head += '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n';
     const go = (dir: string) => styleUrl(args, `${config.protocol}://${site.host}/go`,
