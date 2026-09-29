@@ -146,19 +146,26 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
         secret: await currentSecret(db),
     });
-    if (entry?.isSuspended()) {
-        return renderSitePage(await siteRequest(), "error/suspended-entry.tt", { u: templateUser(site, journal) });
+    // Unlike Perl, an entry or comment the visitor cannot see gets the same
+    // 404 as one that does not exist (RFC 9110, section 15.5.5), so the
+    // response never reveals which. A URL with the wrong anum names no entry.
+    const unavailable = async () => {
+        const [path] = request.requestPath.split("?");
+        const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
+        const returnto = `${site.config.protocol}://${request.host.toLowerCase()}${path}${query ? `?${query}` : ""}`;
+        return renderSitePage({ ...await siteRequest(), scheme: request.siteviews?.scheme }, "error/unavailable.tt",
+            { returnto }, 404);
+    };
+    if (view === "entry" || view === "reply") {
+        const poster = entry && (entry.posterid === journal.userid ? journal
+            : (await User.byIds(db, [entry.posterid])).get(entry.posterid));
+        if (!entry || entry.security !== "public" || poster?.statusvis === "S") return unavailable();
+        // A public entry was already seen to exist, so its suspension is shown.
+        if (entry.isSuspended()) {
+            return renderSitePage(await siteRequest(), "error/suspended-entry.tt", { u: templateUser(site, journal) });
+        }
     }
-    // LJ::S2::EntryPage_entry, for entries the visitor cannot see, which
-    // include a numbered entry URL with no entry.
-    const poster = entry && (entry.posterid === journal.userid ? journal
-        : (await User.byIds(db, [entry.posterid])).get(entry.posterid));
-    if (poster?.statusvis === "S") {
-        return plainError(403, "<h1>Suspended User</h1><p>The content at this URL is from a suspended user.</p>");
-    }
-    const hidden = entry ? !entry.isPublic() : request.ditemid !== undefined;
-    if (!entry && !hidden && (view === "entry" || view === "reply")) return notFoundPage(await siteRequest());
-    if (!hidden && request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
+    if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
 
     // LJ::S2::make_journal's switch to the site's own style, which shows
     // no control strip and gives its sections to the site scheme.
@@ -169,15 +176,6 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         control = false;
         if (!siteviews.forced) s2 = createContext(siteviews.layers, site.config, builtins, output, cleaners);
         (s2.ctx.prop as Record<string, unknown>)._SITEVIEWS = { ".type": "Siteviews", _content: sections };
-    }
-    if (hidden) {
-        // Perl's make_journal still adds the journal's resources before showing this page.
-        journalResources(resources, journal, false, !!siteviews);
-        const [path] = request.requestPath.split("?");
-        const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
-        const returnto = `${site.config.protocol}://${request.host.toLowerCase()}${path}${query ? `?${query}` : ""}`;
-        return renderSitePage({ ...await siteRequest(), resources, scheme: siteviews?.scheme }, "protected.tt",
-            { returnto }, 403);
     }
     const pc: PageContext = {
         args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
@@ -218,9 +216,10 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
             break;
         case "reply": {
-            const result = entry ? await ReplyPage(pc, entry, request.uniq) : null;
-            if (result && "response" in result) return result.response;
-            page = result ?? undefined;
+            const result = await ReplyPage(pc, entry!, request.uniq);
+            if (!result) return unavailable();
+            if ("response" in result) return result.response;
+            page = result;
             break;
         }
         case "tag":

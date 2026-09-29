@@ -30,11 +30,8 @@ interface Parent {
     readonly subject: string;
 }
 
-// ReplyPage's handler_return 403, which the site sends with no page.
-const FORBIDDEN = { response: { status: 403, body: "" } };
-
 // `uniq` identifies the visitor's browser, which the form's auth token is tied to.
-// Null when there is no such page.
+// Null when there is no such page, or none the visitor may see.
 export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
     Promise<S2Object | { response: RenderResult } | null> {
     const { site, journal, db, args } = pc;
@@ -67,16 +64,18 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         const talkid = replytoid >> 8;
         if (replytoid % 256 !== entry.anum) return null;
         const row = (await commentRows(db, journal, entry.jitemid)).get(talkid);
-        const refuse = (status: number, message: string) => ({ response: { status, body: `<p>${message}</p>` } });
-        if (!row || row.state === "D") return refuse(404, "This comment has been deleted; you cannot reply to it.");
-        if (row.state === "S") return FORBIDDEN;
-        if (row.state === "F") return refuse(403, "This thread has been frozen; no more replies are allowed.");
+        // Comments the visitor cannot see are answered as ones that do not exist.
+        if (!row || row.state === "D" || row.state === "S") return null;
+        const poster = row.posterid ? (await User.byIds(db, [row.posterid])).get(row.posterid) : undefined;
+        if (poster?.statusvis === "S") return null;
+        // Frozen threads show as frozen to everyone.
+        if (row.state === "F") {
+            return { response: { status: 403, body: "<p>This thread has been frozen; no more replies are allowed.</p>" } };
+        }
 
         const [texts, props] = await Promise.all([commentTexts(db, journal, [talkid]), commentProps(db, journal, [talkid])]);
         const subject = texts.get(talkid)?.subject ?? "", body = texts.get(talkid)?.body ?? "";
         const cprops = props.get(talkid) ?? {};
-        const poster = row.posterid ? (await User.byIds(db, [row.posterid])).get(row.posterid) : undefined;
-        if (poster?.statusvis === "S") return FORBIDDEN;
         let userpic: S2Object | undefined;
         if (poster) {
             pc.users.set(poster.userid, poster);
