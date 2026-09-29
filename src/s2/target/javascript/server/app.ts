@@ -123,7 +123,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     return {
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
-        args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq,
+        args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie,
     };
 }
 

@@ -48,8 +48,8 @@ recent entries (with tag, security and poster filters), entries (with their
 polls and embedded media), the year,
 month and day archives, tags, icons, reading and network pages, and
 stylesheets, and reply pages. The journal errors Perl shows in the site's
-own style (unknown, deleted, suspended, purged and OpenID accounts, bad tag
-filters, and network pages without the feature) are rendered here with the
+own style (unknown, deleted, suspended, purged and OpenID accounts, suspended
+entries, bad tag filters, and network pages without the feature) are rendered here with the
 site's Template Toolkit views and the visitor's site scheme. The rest of what
 Perl renders in the site's style (the siteviews style, adult content
 warnings, security filter errors), and reply pages on a site that requires
@@ -90,8 +90,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   entries with rich HTML, comments, pagination, filters, the archive views,
   stylesheets, and error pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
-- **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments
-  and suspended journals never appear.
+- **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
+  and suspended journals and entries never appear.
 - **Render limits** (`tests/pool.test.ts`). A style that never finishes is
   stopped.
 - **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in

@@ -197,7 +197,7 @@ export async function RecentPage(pc: PageContext, args: Readonly<Record<string, 
     const shown: S2Object[] = [];
     for (const [index, entry] of entries.slice(stickies.length).entries()) {
         const source = items.filter(item => !stickySet.has(item.ditemid))[index]!;
-        if (posters.get(source.posterid)?.statusvis === "S") continue;
+        if (posters.get(source.posterid)?.statusvis === "S" || source.isSuspended()) continue;
         const date = source.alldatepart.slice(0, 10);
         entry._new_day = 0;
         if (date !== lastdate) {
