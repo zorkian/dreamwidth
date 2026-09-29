@@ -51,3 +51,13 @@ test("suspended journals show only the site's notice", async () => {
         assert.doesNotMatch(page.body, /Entry 1/);
     }
 });
+
+test("a suspended entry is left out of lists and replaced by the site's notice", async () => {
+    const recent = await journals.get("/~s2fix_suspentry/");
+    assert.equal(recent.status, 200);
+    assert.match(recent.body, /Entry 2: caf/);
+    assert.doesNotMatch(recent.body, /Entry 1: caf/);
+    const entry = await journals.get(`/~s2fix_suspentry/${await journals.ditemid("s2fix_suspentry", "Entry 1:")}.html`);
+    assert.equal(entry.status, 403);
+    assert.doesNotMatch(entry.body, /Entry 1: caf/);
+});
