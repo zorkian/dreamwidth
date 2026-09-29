@@ -14,7 +14,9 @@
 
 import { type CleanHooks, type CleanOptions, type CleanSite, clean } from "./clean";
 
-export { type CleanHooks, type CleanOptions, type CleanSite, type UserTagOptions, canonicalUrl, clean, httpsUrl } from "./clean";
+export {
+    type CleanHooks, type CleanOptions, type CleanSite, type UserTagOptions, canonicalUrl, clean, cleanStylesheet, httpsUrl,
+} from "./clean";
 export { cleanCss } from "./css";
 export { type StylesheetSettings, htmlCleaner } from "./html-cleaner";
 export { canonicalUsername, ehtml, eurl } from "./text";

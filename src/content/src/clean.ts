@@ -315,7 +315,7 @@ export function clean(html: string, opts: CleanOptions, site: CleanSite, hooks: 
                 let style = p.textUntil("style");
                 p.skipPast("style");
                 if (site.cssCleaner) {
-                    style = cleanCss(style);
+                    style = cleanStylesheet(style, site);
                     if (site.isDevServer) style = "/* cleaned */\n" + style;
                 }
                 out += `\n<style>\n${style}</style>\n`;
@@ -649,6 +649,13 @@ export function canonicalUrl(url: string, allowAll = false): string {
 }
 
 // LJ::CleanHTML::https_url, without image proxying.
+// CSS::Cleaner, then the css_cleaner_transform hook in DW::Hooks::ProxyCSSLinks,
+// which quotes every url() and upgrades it as https_url does.
+export function cleanStylesheet(css: string, site: CleanSite): string {
+    return cleanCss(css).replace(/\burl\(\s*(['"]?)(.*?)\1\s*\)/gis,
+        (_, quote: string, url: string) => `url(${quote || '"'}${httpsUrl(url, site)}${quote || '"'})`);
+}
+
 export function httpsUrl(url: string, site: CleanSite): string {
     if (/^(?:https:\/\/|\/\/)/.test(url)) return url;
     const domain = /^http:\/\/[^/]*?([^.]+\.\w{2,3})\//.exec(url)?.[1];

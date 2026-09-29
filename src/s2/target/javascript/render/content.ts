@@ -13,7 +13,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import {
-    type CleanHooks, type CleanSite, canonicalUsername, clean, cleanComment, cleanCss, cleanEvent, cleanSubject,
+    type CleanHooks, type CleanSite, canonicalUsername, clean, cleanComment, cleanStylesheet, cleanCss, cleanEvent, cleanSubject,
     cleanSubjectAll, removeLinks, userReferences,
 } from "@dreamwidth/content";
 import { type Databases, text } from "../data/db";
@@ -126,7 +126,7 @@ export class ContentCleaner {
         return {
             html: value => cleanEvent(value, {}, this.site, this.hooks),
             simpleHtml: value => cleanSubject(value, this.site),
-            css: value => cleanCss(value),
+            css: value => cleanStylesheet(value, this.site),
             cssAttribute: value => cleanCss(value),
         };
     }

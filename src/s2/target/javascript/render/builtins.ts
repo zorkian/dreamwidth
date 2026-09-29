@@ -14,7 +14,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import { type BuiltinFunction, type Context, S2Error } from "../runtime/s2runtime";
-import { cleanCss } from "@dreamwidth/content";
+import { cleanStylesheet } from "@dreamwidth/content";
 import { type S2Object, ImageStd, Link, ehtml, eurl, nullObject, s2, styleUrl } from "./objects";
 import { tagsText } from "./pages";
 import type { RenderState } from "./state";
@@ -282,7 +282,7 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _end_css: ctx => {
             if (!cssDepth || --cssDepth !== 0) return;
             const css = state.output.endCapture();
-            pout(ctx, `/* Cleaned CSS: */\n${cleanCss(css)}\n`);
+            pout(ctx, `/* Cleaned CSS: */\n${cleanStylesheet(css, state.cleanSite)}\n`);
         },
         _get_page: () => state.page(),
         _get_image: (ctx, name) => image(ctx, String(name)),
