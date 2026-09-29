@@ -104,7 +104,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     let tags: S2Object[] = [];
     const state: RenderState = {
         site, config: site.config, journal, output, chrome, showControlStrip: control, showThreadExpander: false,
-        args: request.args,
+        args: request.args, cleanSite: content.site,
         page: () => page!,
         siteRoot: () => site.config.siteRoot,
         origin: () => `${site.config.protocol}://${site.host}`,

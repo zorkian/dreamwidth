@@ -13,6 +13,7 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
+import type { CleanSite } from "@dreamwidth/content";
 import type { SiteConfig } from "../server/config";
 import type { Site, User } from "../data/user";
 import type { S2Object } from "./objects";
@@ -35,6 +36,8 @@ export interface RenderState {
     readonly chrome: Chrome;
     readonly showControlStrip: boolean;
     readonly showThreadExpander: boolean;
+    // What the content cleaner needs to know about the site.
+    readonly cleanSite: CleanSite;
     // The query arguments.
     readonly args: Readonly<Record<string, string>>;
     page(): S2Object;
