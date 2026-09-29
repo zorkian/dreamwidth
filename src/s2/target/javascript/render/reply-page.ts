@@ -50,7 +50,7 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         `<link rel="canonical" href="${permalink}${replytoid ? `?thread=${replytoid}#cmt${replytoid}` : ""}" />\n` +
         `\n<script type="text/javascript" src="${config.jsPrefix}/md5.js"></script>\n`;
     trackingPopup(pc.resources, config);
-    journalScripts(pc.resources, { noqr: true });
+    journalScripts(pc.resources, { noqr: true, siteskin: pc.siteviews });
     const entryAdult = entry.adultContentCalculated() ?? "";
     if (journal.shouldBlockRobots(config) || config.robotBlockingContent.includes(entryAdult)) head += robotMetaTags();
     page._entry = s2entry;

@@ -119,7 +119,7 @@ export async function DayPage(pc: PageContext, counts: DayCounts, pathextra: str
     page._entries = [];
     let head = page._head_content;
     if (journal.shouldBlockRobots(site.config)) head += robotMetaTags();
-    journalScripts(pc.resources, { lastn: true });
+    journalScripts(pc.resources, { lastn: true, siteskin: pc.siteviews });
     head += cutTagScript(pc);
 
     const match = /^\/(\d\d\d\d)\/(\d\d)\/(\d\d)\b/.exec(pathextra ?? "");

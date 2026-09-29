@@ -46,6 +46,8 @@ export interface PageContext {
     // Everyone whose name or icon appears on the page, by userid.
     readonly users: Map<number, User>;
     readonly userpics: Map<number, Userpics>;
+    // Whether the page is in the site's own style.
+    readonly siteviews: boolean;
 }
 
 export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "url", "urlname", "customtext_title",
@@ -97,7 +99,7 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object,
         customtext_content: escapeValue(jp.customtext_content || p._text_module_customtext_content, "html", pc.cleaners),
         views_order: ["recent", "archive", "read", "tags", "memories", "userinfo"],
         global_title: ehtml(jp.journaltitle || journal.name), global_subtitle: ehtml(jp.journalsubtitle),
-        show_control_strip: showControlStrip(journal) ? 1 : 0,
+        show_control_strip: !pc.siteviews && showControlStrip(journal) ? 1 : 0,
         // The journal handler asks Page to state the charset first.
         head_content: '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' +
             (discovery ? metaDiscoveryLinks(pc.site, pc.journal, discovery.tags) : "") +
@@ -183,7 +185,7 @@ export async function RecentPage(pc: PageContext, args: Readonly<Record<string, 
     if (journal.shouldBlockRobots(config) || truthy(args.skip)) head += robotMetaTags();
     if (journal.props.icbm) head += `<meta name="ICBM" content="${journal.props.icbm}" />\n`;
     trackingPopup(pc.resources, config);
-    journalScripts(pc.resources, { lastn: true });
+    journalScripts(pc.resources, { lastn: true, siteskin: pc.siteviews });
     head += cutTagScript(pc);
 
     const entries = await entryObjects(pc, [...stickies, ...items.filter(entry => !stickySet.has(entry.ditemid))],
