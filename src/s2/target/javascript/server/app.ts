@@ -14,7 +14,7 @@
 
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
-import { styleInfo, styleIsPublic, styleLayers, styleOwner } from "../compile/styles";
+import { styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
 import { type Databases, int } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
@@ -28,7 +28,6 @@ export type Renderer = (request: RenderRequest) => Promise<RenderResult>;
 // Views rendered by running the S2 style.
 const S2_VIEWS = new Set(["lastn", "archive", "month", "day", "read", "network", "tag", "icons", "entry", "reply", "res"]);
 
-const notFound: RenderResult = { status: 404, body: "Not found\n" };
 // DW::Request::Plack sends every redirect as a 303.
 const redirect = (location: string): RenderResult => ({ status: 303, body: "", location });
 
@@ -39,16 +38,16 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     host: string, uniq = ""): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
     const match = /^\/(?:~|users\/)([\w-]+)(\/.*)?$/.exec(parsed.pathname);
-    if (!match) return notFound;
+    if (!match) return PERL_PAGE;
     const journal = await User.byName(db, match[1]!.toLowerCase().replaceAll("-", "_"));
-    if (!journal) return notFound;
+    if (!journal) return PERL_PAGE;
     await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
 
     const site = { config, host };
     const base = journal.journalBase(site);
     const args = Object.fromEntries(parsed.searchParams);
     const view = determineView(match[2] ?? "/", parsed.search, args, base);
-    if (!view) return notFound;
+    if (!view) return PERL_PAGE;
     if ("redirect" in view) return redirect(view.redirect);
 
     const mode = view.mode;
@@ -58,7 +57,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         const body = `User-Agent: *\n${journal.shouldBlockRobots(config) ? "Disallow: /\n" : ""}`;
         return { status: 200, body, contentType: "text/plain" };
     }
-    if (mode && !S2_VIEWS.has(mode)) return notFound;
+    if (mode && !S2_VIEWS.has(mode)) return PERL_PAGE;
 
     let pathextra = view.pathextra;
     const filtered = /^\/(tag|security)\/(.*)$/s.exec(pathextra ?? "");
@@ -69,23 +68,32 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     const filter = await journalFilter(config, db, journal, args, base);
     if ("status" in filter) return filter;
 
-    // Stylesheets name their style, and are served for suspended journals.
+    // The style, as make_journal's get_styleinfo picks it. Stylesheets name
+    // theirs, and are served for suspended journals.
     let styleid = int(journal.props.s2_style);
-    const s2id = /^\d+$/.test(args.s2id ?? "") ? Number(args.s2id) : 0;
-    if (s2id && (await styleOwner(db, s2id) === journal.userid && Number(journal.getCap(config, "s2styles"))
-        || await styleIsPublic(db, s2id))) {
-        styleid = s2id;
-    } else if (mode === "res") {
+    const hasFeedStyle = journal.journaltype === "Y" && Object.keys(config.defaultFeedStyle).length > 0;
+    let feedStyle = false;
+    if (mode === "res") {
         const res = /^\/(\d+)\/stylesheet$/.exec(view.pathextra ?? "");
-        if (!res) return notFound;
+        if (!res) return PERL_PAGE;
         styleid = Number(res[1]);
-    } else if (!journal.isVisible()) {
-        return notFound;
+        // Style 0 is no style, so a feed's stylesheet keeps the feed style.
+        feedStyle = !styleid && hasFeedStyle;
+    } else {
+        if (!journal.isVisible()) return PERL_PAGE;
+        const s2id = /^\d+$/.test(args.s2id ?? "") ? Number(args.s2id) : 0;
+        if (s2id && (await styleOwner(db, s2id) === journal.userid && Number(journal.getCap(config, "s2styles"))
+            || await styleIsPublic(db, s2id))) {
+            styleid = s2id;
+        } else if (hasFeedStyle) {
+            feedStyle = true;
+            styleid = 0;
+        }
     }
     if (journal.journaltype === "I" && !["read", "res", "icons"].includes(mode)) return PERL_PAGE;
     if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) return PERL_PAGE;
 
-    const layers = await styleLayers(db, config, styleid);
+    const layers = feedStyle ? await systemLayers(db, config.defaultFeedStyle) : await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
     return {
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
@@ -101,9 +109,9 @@ async function journalFilter(config: SiteConfig, db: Databases, journal: User, a
     if ("tag" in args) {
         if (!args.tag) return redirect(`${base}/tag/`);
         const tags = config.enabled.tags ? parseTagFilter(args.tag) : undefined;
-        if (!tags) return notFound;
+        if (!tags) return PERL_PAGE;
         const kwids = new Map((await publicTags(db, journal)).map(tag => [tag.name, tag.kwid]));
-        if (!tags.every(tag => kwids.has(tag))) return notFound;
+        if (!tags.every(tag => kwids.has(tag))) return PERL_PAGE;
         filter.tags = tags;
         filter.tagids = tags.map(tag => kwids.get(tag)!);
         filter.tagmode = args.mode === "and" || args.mode === "all" ? "and" : "or";

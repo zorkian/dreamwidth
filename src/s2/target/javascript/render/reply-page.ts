@@ -51,7 +51,7 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         `\n<script type="text/javascript" src="${config.jsPrefix}/md5.js"></script>\n`;
     trackingPopup(pc.resources, config);
     journalScripts(pc.resources, { noqr: true });
-    const entryAdult = entry.props.adult_content_maintainer || entry.props.adult_content || "";
+    const entryAdult = entry.adultContentCalculated() ?? "";
     if (journal.shouldBlockRobots(config) || config.robotBlockingContent.includes(entryAdult)) head += robotMetaTags();
     page._entry = s2entry;
     page._head_content = head;
@@ -64,14 +64,14 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         const row = (await commentRows(db, journal, entry.jitemid)).get(talkid);
         const refuse = (status: number, message: string) => ({ response: { status, body: `<p>${message}</p>` } });
         if (!row || row.state === "D") return refuse(404, "This comment has been deleted; you cannot reply to it.");
-        if (row.state === "S") return { response: { status: 403, body: "" } };
+        if (row.state === "S") return null;
         if (row.state === "F") return refuse(403, "This thread has been frozen; no more replies are allowed.");
 
         const [texts, props] = await Promise.all([commentTexts(db, journal, [talkid]), commentProps(db, journal, [talkid])]);
         const subject = texts.get(talkid)?.subject ?? "", body = texts.get(talkid)?.body ?? "";
         const cprops = props.get(talkid) ?? {};
         const poster = row.posterid ? (await User.byIds(db, [row.posterid])).get(row.posterid) : undefined;
-        if (poster?.statusvis === "S") return { response: { status: 403, body: "" } };
+        if (poster?.statusvis === "S") return null;
         let userpic: S2Object | undefined;
         if (poster) {
             pc.users.set(poster.userid, poster);

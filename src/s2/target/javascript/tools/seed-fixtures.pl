@@ -100,6 +100,11 @@ HTML
     $archive->modify_caps( [], [3] );
 }
 
+# An entry marked for discretion, which logged-out visitors see behind a link.
+post( $archive, 7, subject => 'Discretion advised', event => body(7), security => 'public',
+    prop_adult_content => 'concepts', year => 2025, mon => 12, day => 21 )
+    unless entry_count($archive) > 6;
+
 # Icons, shown on the journal's own icons page and on its entries.
 unless ( LJ::Userpic->load_user_userpics($archive) ) {
     my $first = userpic( $archive, 100, 100, [ 200, 40, 40 ], 'first, <b>bold</b> keyword',
@@ -141,6 +146,13 @@ unless ($community) {
     }
 }
 $commenter->add_edge( $community, watch => { nonotify => 1 } );
+
+# A syndicated feed, which journal pages show in the site's feed style.
+my $feed = LJ::load_user('s2fix_feed')
+    || LJ::User->create_syndicated( user => 's2fix_feed', feedurl => 'https://example.com/feed.xml',
+    name => 'Fixture feed' )
+    || die "Cannot create s2fix_feed\n";
+post( $feed, 1, subject => 'Feed item', event => body(1), security => 'public' ) unless entry_count($feed);
 
 # A user layer that never finishes printing, for render time limits.
 my $loop = journal('s2fix_loop');

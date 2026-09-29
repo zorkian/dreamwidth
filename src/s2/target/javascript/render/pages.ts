@@ -315,10 +315,18 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
         moodTheme(pc.users.get(entry.posterid) ?? journal)))]);
 
     await pc.content.preload(db, entries.map(entry => entry.event));
-    // Entry text with polls and embedded media in place.
-    const texts = await Promise.all(entries.map(entry => view === "month" ? ""
-        : expandEmbedded(db, pc.content.site, config, entry.journal,
-            pc.content.event(entry, view === "recent" ? styleUrl(pc.args, entry.url(site)) : undefined))));
+    // Entry text with polls and embedded media in place, and adult entries on
+    // lists of entries behind a link, as DW::Logic::AdultContent::transform_post does.
+    const texts = await Promise.all(entries.map(async entry => {
+        if (view === "month") return "";
+        const html = await expandEmbedded(db, pc.content.site, config, entry.journal,
+            pc.content.event(entry, view === "recent" ? styleUrl(pc.args, entry.url(site)) : undefined));
+        const adult = entry.adultContent();
+        if (view !== "recent" || !config.enabled.adult_content || adult === "none") return html;
+        const by = `${entry.adultMarker()}.${entry.journal.journaltype === "C" ? "community" : "personal"}`;
+        const message = config.strings[`contentflag.viewing${adult === "explicit" ? "explicit" : "concepts"}.by${by}`];
+        return message ? `<b>( <a href="${entry.url(site)}">${message}</a> )</b>` : html;
+    }));
     const userpicPosition = String(p._userpics_position ?? "");
     return entries.map((entry, index) => {
         const posted = entry.journal;
@@ -380,7 +388,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             e._security = security;
             e._security_icon = ImageStd(config, p, `security-${security}`);
         }
-        const adult = entry.props.adult_content_maintainer || entry.props.adult_content || posted.props.adult_content;
+        const adult = entry.adultContent();
         if (adult === "explicit") {
             e._adult_content_level = "18";
             e._adult_content_icon = ImageStd(config, p, "adult-18");
