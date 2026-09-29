@@ -13,6 +13,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import { cleanCss } from "./css";
+import { checkIframeEmbed } from "./embed-whitelist";
 import { type StylesheetSettings, cleanLink, cleanMeta } from "./html-cleaner";
 import { markdown } from "./markdown";
 import { canonicalUsername, ehtml, eurl } from "./text";
@@ -54,6 +55,8 @@ export interface CleanOptions {
     deny?: readonly string[];
     remove?: readonly string[];
     conditional?: readonly string[];
+    rewrite_embed_param?: boolean;
+    force_https_embed?: boolean;
     attrstrip?: readonly string[];
     nodwtags?: boolean;
     cuturl?: string;
@@ -198,6 +201,15 @@ export function clean(html: string, opts: CleanOptions, site: CleanSite, hooks: 
                 else startCapture("lj-template", error);
                 continue;
             }
+            if (opts.rewrite_embed_param) {
+                if (tag === "embed" && attr.allowscriptaccess !== undefined && attr.allowscriptaccess !== "never") {
+                    attr.allowscriptaccess = "sameDomain";
+                }
+                if (tag === "param" && count("object") && (attr.name ?? "").toLowerCase() === "allowscriptaccess" &&
+                    attr.value !== "never") {
+                    attr.value = "sameDomain";
+                }
+            }
             if (tag === "span" && (attr.class ?? "").toLowerCase() === "ljuser" && !noexpandEmbedded && !nodwtags) {
                 eatingLjuserSpan = true;
                 ljuserTextNode = "";
@@ -234,10 +246,18 @@ export function clean(html: string, opts: CleanOptions, site: CleanSite, hooks: 
                 p.skipPast(tag);
                 continue;
             }
-            // clean_embed decides which iframes to keep.
-            if (action[tag] === "conditional") {
-                if (!token.selfClosing) p.skipPast(tag);
-                continue;
+            let forceAllow = false;
+            if (action[tag] === "conditional" && tag === "iframe") {
+                const embed = checkIframeEmbed(attr.src);
+                forceAllow = embed.allow;
+                if (opts.force_https_embed && embed.canHttps) attr.src = attr.src!.replace(/^https?:/, "");
+                if (!forceAllow) {
+                    // Perl skips unless the tag has a "/" attribute; HTML::Parser names <iframe/> "iframe/".
+                    if (!token.selfClosing || token.text[token.tag.length + 1] === "/") p.skipPast(tag);
+                    continue;
+                }
+                // Links can target a named frame.
+                delete attr.name;
             }
             if (tag === "meta" && !cleanMeta(attr)) continue;
             if (tag === "link" && !cleanLink(attr, site)) continue;
@@ -397,7 +417,8 @@ export function clean(html: string, opts: CleanOptions, site: CleanSite, hooks: 
                 }
 
                 if (!altOutput) {
-                    let allow = opts.mode === "allow" ? action[tag] !== "deny" : action[tag] === "allow";
+                    let allow = opts.mode !== "allow" ? action[tag] === "allow"
+                        : action[tag] === "conditional" ? forceAllow : action[tag] !== "deny";
                     if (allow && !remove.has(tag)) {
                         if ((TABLE_PARTS.test(tag) && !tablescope.length) ||
                             (/^(?:td|th)$/.test(tag) && !tablescope.at(-1)?.tr) ||
@@ -500,6 +521,11 @@ export function clean(html: string, opts: CleanOptions, site: CleanSite, hooks: 
                     } else if (!allow || (FORM_TAGS.has(tag) && !count("form"))) {
                         out += `&lt;/${tag}&gt;`;
                     }
+                }
+                if (action[tag] === "conditional" && tagstack.at(-1) === tag) {
+                    out += `</${tag}>`;
+                    tagstack.pop();
+                    opencount[tag] = count(tag) - 1;
                 }
             }
         } else if (token.type === "D") {

@@ -60,7 +60,6 @@ export function createChrome(request: ChromeRequest): Chrome & { string(key: str
         ljuser,
         controlStripUserpicCss: () => "",
         quickreplyDiv: () => "",
-        replyForm: () => "",
 
         // views/journal/controlstrip.tt, logged-out branch
         controlStrip() {

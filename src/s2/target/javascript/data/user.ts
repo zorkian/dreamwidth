@@ -61,6 +61,7 @@ export class User {
     readonly moodthemeid: number;
     readonly optShowtalklinks: string;
     readonly optForcemoodtheme: string;
+    readonly optWhocanreply: string;
     readonly props: Record<string, string> = {};
 
     constructor(row: Row) {
@@ -76,6 +77,7 @@ export class User {
         this.moodthemeid = int(row.moodthemeid);
         this.optShowtalklinks = text(row.opt_showtalklinks);
         this.optForcemoodtheme = text(row.opt_forcemoodtheme);
+        this.optWhocanreply = text(row.opt_whocanreply);
     }
 
     static async byName(db: Databases, user: string): Promise<User | null> {

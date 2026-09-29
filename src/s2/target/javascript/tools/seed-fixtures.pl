@@ -77,6 +77,29 @@ unless ( entry_count($archive) ) {
     }
 }
 
+# Embedded media and a poll, which are stored apart from the entry text.
+unless ( entry_count($archive) > 5 ) {
+
+    # Only paid accounts may create polls; paid journals also show active
+    # entries, which fail on MySQL 8, so the journal stays free.
+    $archive->modify_caps( [3], [] );
+    post(
+        $archive, 6,
+        subject => 'Embeds and a poll',
+        event   => <<'HTML',
+<p>A video:</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
+<p>A poll:</p>
+<poll name="Fixture poll" whovote="all" whoview="all">
+<poll-question type="radio">Pick one<poll-item>First</poll-item><poll-item>Second</poll-item></poll-question>
+<poll-question type="text" size="20" maxlength="40">Say something</poll-question>
+</poll>
+HTML
+        security => 'public', year => 2025, mon => 6, day => 1,
+    );
+    $archive->modify_caps( [], [3] );
+}
+
 # Icons, shown on the journal's own icons page and on its entries.
 unless ( LJ::Userpic->load_user_userpics($archive) ) {
     my $first = userpic( $archive, 100, 100, [ 200, 40, 40 ], 'first, <b>bold</b> keyword',

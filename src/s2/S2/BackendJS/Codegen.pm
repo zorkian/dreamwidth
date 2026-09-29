@@ -915,10 +915,10 @@ sub asJS {
             $o->write("s2.runtime.prepareString(");
         }
         elsif ($this->{varReturnType}->equals($S2::Type::INT)) {
-            $o->write("Number(");
+            $o->write("s2.runtime.toNumber(");
         }
         elsif ($this->{varReturnType}->equals($S2::Type::BOOL)) {
-            $o->write("Boolean(Number(");
+            $o->write("Boolean(s2.runtime.toNumber(");
         }
     }
 

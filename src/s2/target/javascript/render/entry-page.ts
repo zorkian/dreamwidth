@@ -39,18 +39,23 @@ interface Post extends CommentRow {
     props?: Record<string, string>;
 }
 
+// LJ::S2::EntryPage_entry: the page's entry, or null when the visitor may not see it.
+export async function pageEntry(pc: PageContext, entry: Entry): Promise<S2Object | null> {
+    await Entry.fill(pc.db, pc.journal, [entry]);
+    if (!entry.isPublic()) return null;
+    const [s2entry] = await entryObjects(pc, [entry], "entry");
+    if (pc.users.get(entry.posterid)?.statusvis === "S") return null;
+    s2entry!._comments._show_postlink &&= pc.args.mode !== "reply" ? 1 : 0;
+    s2entry!._comments._show_readlink &&= pc.args.mode === "reply" ? 1 : 0;
+    return s2entry!;
+}
+
 // null when the visitor may not see the entry.
 export async function EntryPage(pc: PageContext, entry: Entry): Promise<S2Object | null> {
     const { site, journal, db, args } = pc;
     const config = site.config;
-    await Entry.fill(db, journal, [entry]);
-    if (!entry.isPublic()) return null;
-
-    const [s2entry] = await entryObjects(pc, [entry], "entry");
-    const poster = pc.users.get(entry.posterid);
-    if (poster?.statusvis === "S") return null;
-    s2entry!._comments._show_postlink &&= args.mode !== "reply" ? 1 : 0;
-    s2entry!._comments._show_readlink &&= args.mode === "reply" ? 1 : 0;
+    const s2entry = await pageEntry(pc, entry);
+    if (!s2entry) return null;
 
     const page = await Page(pc, "entry", await journalDefaultPic(pc));
     page[".type"] = "EntryPage";

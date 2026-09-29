@@ -204,6 +204,13 @@ export const runtime = {
         if (isObject(value) && value[".isnull"]) return "";
         return String(value);
     },
+    // Perl's numification: a leading number, else 0.
+    toNumber(value: unknown): number {
+        if (typeof value === "number") return value;
+        if (typeof value === "boolean") return value ? 1 : 0;
+        const match = /^\s*[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(String(value ?? ""));
+        return match ? Number(match[0]) : 0;
+    },
     objectToBool(value: unknown): boolean {
         return value !== null && value !== undefined && !(isObject(value) && value[".isnull"]);
     },
