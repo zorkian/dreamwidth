@@ -284,6 +284,14 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
             const css = state.output.endCapture();
             pout(ctx, `/* Cleaned CSS: */\n${cleanStylesheet(css, state.cleanSite)}\n`);
         },
+        // The siteviews style hands sections of its output to the site scheme.
+        _Siteviews__need_res: (_ctx, _self, options, key) => {
+            if (typeof options === "string") state.resources.need({}, options);
+            else state.resources.need(options ?? {}, String(key));
+        },
+        _Siteviews__start_capture: () => state.output.startSection(),
+        _Siteviews__end_capture: () => state.output.endSection(),
+        _Siteviews__set_content: (_ctx, self, area, text) => { self._content[String(area)] = text; },
         _get_page: () => state.page(),
         _get_image: (ctx, name) => image(ctx, String(name)),
         _set_content_type: () => { throw new S2Error("set_content_type is not yet implemented"); },
@@ -457,12 +465,6 @@ export function createBuiltins(state: RenderState): Record<string, BuiltinFuncti
         _EntryPage__print_multiform_start: () => {},
         _ItemRange__url_of: (_ctx, range, n) => typeof range.$url_of === "function" ? range.$url_of(Number(n)) : "",
         _Image__set_url: (_ctx, img, url) => { img._url = eurl(url); },
-
-        // Siteviews layers only run inside the site scheme.
-        _Siteviews__need_res: () => { throw new S2Error("Siteviews doesn't work standalone"); },
-        _Siteviews__start_capture: () => { throw new S2Error("Siteviews doesn't work standalone"); },
-        _Siteviews__end_capture: () => { throw new S2Error("Siteviews doesn't work standalone"); },
-        _Siteviews__set_content: () => { throw new S2Error("Siteviews doesn't work standalone"); },
     };
 
     // set_handler

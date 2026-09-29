@@ -18,6 +18,7 @@ import type { SiteConfig } from "../server/config";
 import type { Site, User } from "../data/user";
 import type { S2Object } from "./objects";
 import type { PageOutput } from "./page-output";
+import type { Resources } from "./resources";
 
 export interface Chrome {
     controlStrip(): string;
@@ -33,6 +34,7 @@ export interface RenderState {
     readonly config: SiteConfig;
     readonly journal: User;
     readonly output: PageOutput;
+    readonly resources: Resources;
     readonly chrome: Chrome;
     readonly showControlStrip: boolean;
     readonly showThreadExpander: boolean;

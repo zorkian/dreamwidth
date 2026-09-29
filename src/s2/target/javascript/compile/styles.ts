@@ -74,6 +74,19 @@ export async function systemLayers(db: Databases, style: Readonly<Record<string,
     return loadLayers(db, rows.map(row => int(row.s2lid)));
 }
 
+// LJ::S2::siteviews_style: the layout with the theme for the nearest site
+// scheme in `schemes` that has one.
+export async function siteviewsLayers(db: Databases, schemes: readonly string[]): Promise<LayerRef[]> {
+    const names = schemes.map(scheme => `siteviews/${scheme}`);
+    const rows = await db.global(
+        `SELECT i.value FROM s2info i JOIN s2layers l ON l.s2lid = i.s2lid
+         JOIN user u ON u.userid = l.userid AND u.user = 'system'
+         WHERE i.infokey = 'redist_uniq' AND i.value IN (?)`, [names]);
+    const found = new Set(rows.map(row => text(row.value)));
+    const theme = names.find(name => found.has(name)) ?? "siteviews/default";
+    return systemLayers(db, { core: "core2", layout: "siteviews/layout", theme });
+}
+
 async function loadLayers(db: Databases, ids: readonly number[]): Promise<LayerRef[]> {
     if (!ids.length) return [];
     const rows = await db.global(

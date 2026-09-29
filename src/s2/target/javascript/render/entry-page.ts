@@ -76,7 +76,7 @@ export async function EntryPage(pc: PageContext, entry: Entry): Promise<S2Object
     head += `<link rel="prev" href="${go("prev")}" />\n<link rel="next" href="${go("next")}" />\n`;
     head += `<link rel="canonical" href="${permalink}${thread ? `?thread=${thread}#cmt${thread}` : ""}" />\n`;
 
-    journalScripts(pc.resources);
+    journalScripts(pc.resources, { siteskin: pc.siteviews });
     const comments = await loadComments(pc, entry, thread);
     const flat = /\bflat\b/.test(args.view ?? ""), topOnly = /\btop-only\b/.test(args.view ?? "");
     // The thread to return to after replying; the thread expander names it.

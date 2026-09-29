@@ -14,14 +14,16 @@
 
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
-import { styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
+import { type LayerRef, siteviewsLayers, styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
 import { User } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
 import { type JournalFilter, type RenderRequest, type RenderResult, PERL_PAGE } from "../render/render";
 import type { SiteConfig } from "./config";
 import { currentSecret, randChars } from "../render/reply-page";
-import { deletedJournalVars, renderSitePage, templateUser } from "../render/site-page";
+import { viewingStyle } from "../render/chrome";
+import { styleUrl } from "../render/objects";
+import { currentScheme, deletedJournalVars, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
 import { determineView } from "./views";
 
@@ -49,8 +51,10 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     if (!target) return PERL_PAGE;
     const site = { config, host };
     const args = Object.fromEntries(parsed.searchParams);
-    const sitePage = async (view: string, vars: Stash, journal?: User, status?: number) => renderSitePage({
-        site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, journal, secret: await currentSecret(db),
+    // ?style=light shows the site's own pages in its text-only scheme.
+    const light = viewingStyle(args) === "light" ? "lynx" : undefined;
+    const sitePage = async (view: string, vars: Stash, journal?: User, status?: number, scheme?: string) => renderSitePage({
+        site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, journal, secret: await currentSecret(db), scheme,
     }, view, vars, status);
     const username = target.user.toLowerCase().replaceAll("-", "_");
     const journal = await User.byName(db, username);
@@ -58,7 +62,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     await journal.loadProps(db, ["s2_style", "opt_blockrobots", "adult_content"]);
 
     const base = journal.journalBase(site);
-    const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status);
+    const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status, light);
     const view = determineView(target.path, parsed.search, args, base);
     if (!view) return PERL_PAGE;
     if ("redirect" in view) return redirect(view.redirect);
@@ -72,7 +76,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     }
     if (mode && !S2_VIEWS.has(mode)) return PERL_PAGE;
     if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) {
-        return journalError("error.tt", { message: config.strings["cprod.friendsfriendsinline.text3.v1"] });
+        return sitePage("error.tt", { message: config.strings["cprod.friendsfriendsinline.text3.v1"] }, journal);
     }
 
     let pathextra = view.pathextra;
@@ -81,7 +85,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         args[filtered[1]!] = durl(filtered[2]!);
         pathextra = undefined;
     }
-    const filter = await journalFilter(config, db, journal, args, base, journalError);
+    const filter = await journalFilter(config, db, journal, args, base, journalError, mode, `${config.protocol}://${host.toLowerCase()}`);
     if ("status" in filter) return filter;
 
     // The style, as make_journal's get_styleinfo picks it. Stylesheets name
@@ -118,18 +122,33 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     // Locked, memorial, read-only and renamed journals.
     if (mode !== "res" && !journal.isVisible()) return PERL_PAGE;
 
-    const layers = feedStyle ? await systemLayers(db, config.defaultFeedStyle) : await styleLayers(db, config, styleid);
+    // The site's own style, which ?style=site and ?style=light ask for, and
+    // entry and icons pages use when the journal's style does not show them.
+    let siteviews: RenderRequest["siteviews"];
+    let siteviewsRefs: LayerRef[] = [];
+    const forced = mode !== "res" && (viewingStyle(args) === "site" || !!light);
+    if (forced || ["entry", "reply", "icons"].includes(mode)) {
+        const scheme = currentScheme(config, args, visitor.cookie, light);
+        siteviewsRefs = await siteviewsLayers(db, config.siteTemplates.schemeList[scheme]!);
+        siteviews = { layers: await compiler.compile(siteviewsRefs), forced, scheme: light };
+    }
+    if (forced) styleid = 0;
+    const layers = forced ? siteviewsRefs
+        : feedStyle ? await systemLayers(db, config.defaultFeedStyle) : await styleLayers(db, config, styleid);
     const [compiled, style] = await Promise.all([compiler.compile(layers), styleInfo(db, config, journal, styleid, layers)]);
     return {
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
-        args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie,
+        args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie, siteviews,
     };
 }
 
 // make_journal's tag and security filters.
+// `origin` is where the security filter list links, as Perl's create_url
+// sends them to the bare path on the requested host.
 async function journalFilter(config: SiteConfig, db: Databases, journal: User, args: Record<string, string>,
-    base: string, error: (view: string, vars: Stash) => Promise<RenderResult>): Promise<JournalFilter | RenderResult> {
+    base: string, error: (view: string, vars: Stash) => Promise<RenderResult>, mode: string,
+    origin: string): Promise<JournalFilter | RenderResult> {
     const filter: { -readonly [K in keyof JournalFilter]: JournalFilter[K] } = {};
     if ("tag" in args) {
         if (!args.tag) return redirect(`${base}/tag/`);
@@ -144,12 +163,20 @@ async function journalFilter(config: SiteConfig, db: Databases, journal: User, a
         filter.tagmode = args.mode === "and" || args.mode === "all" ? "and" : "or";
     }
     if ("security" in args) {
-        // Perl explains a missing or refused security filter on a page in the site's style.
+        // A visitor may list only public entries, and only on recent entries pages.
+        const securityError = (message: string | undefined, showList = false) => error("journal/security.tt", {
+            message,
+            ...showList && mode === "lastn" ? {
+                levels: [{ link: styleUrl(args, `${origin}/security/public`), name_ml: "label.security.public" }], groups: [],
+            } : {},
+        });
         const security = (args.security ?? "").toLowerCase();
-        if (!security || !Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))
-            || !config.enabled.security_filter || !/^(public|access|private|friends)$/.test(security)) {
-            return PERL_PAGE;
+        if (!args.security || args.security === "0") return securityError(undefined, true);
+        if (!Number(config.capDefaults.security_filter) && !Number(journal.getCap(config, "security_filter"))) {
+            return securityError("error.security.nocap2");
         }
+        if (!config.enabled.security_filter) return securityError("error.security.disabled2");
+        if (!/^(public|access|private|friends)$/.test(security)) return securityError("error.security.invalid2", true);
         filter.security = security === "friends" ? "access" : security;
     }
     return filter;
