@@ -15,7 +15,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { type Filter, type Plugin, type Stash, type Value, Template, isHash, num, str, truthy } from "../template";
+import { type Context, type Filter, type Plugin, type Stash, type Value, Template, isHash, num, str, truthy } from "../template";
 import type { Document } from "../template/parser";
 import type { Databases } from "../data/db";
 import { type Site, User } from "../data/user";
@@ -60,6 +60,13 @@ export function renderSitePage(request: SiteRequest, view: string, vars: Stash, 
     page.status = status;
     const sections: Stash = {};
     return page.wrap(page.templateString(view, vars, sections), sections);
+}
+
+// The page app.psgi shows for a 404: the site's own, with a random quip if
+// it has them, or the stock one.
+export function notFoundPage(request: SiteRequest): RenderResult {
+    const quips = request.site.config.notFoundQuips;
+    return renderSitePage(request, "error/404.tt", { quip: quips[Math.floor(Math.random() * quips.length)] }, 404);
 }
 
 // DW::Template::render_string: HTML made elsewhere, in the site scheme.
@@ -121,7 +128,7 @@ class SitePage {
 
     private engine(kind: "views" | "schemes"): Template {
         const dirs = this.config.siteTemplates[kind];
-        const plugins: Record<string, Plugin> = { dw: context => this.dwPlugin(context.stash), form: formPlugin };
+        const plugins: Record<string, Plugin> = { dw: context => this.dwPlugin(context), form: formPlugin };
         if (kind === "schemes") plugins.dw_scheme = () => this.schemePlugin();
         return new Template({
             load: name => {
@@ -146,9 +153,9 @@ class SitePage {
     }
 
     // DW::Template::Plugin
-    private dwPlugin(stash: Stash): Stash {
+    private dwPlugin(context: Context): Stash {
         const { config } = this;
-        stash.site = {
+        context.stash.site = {
             ...config.siteTemplates.constants,
             root: config.siteRoot, imgroot: config.imgPrefix, jsroot: config.jsPrefix,
             shoproot: config.siteTemplates.shopRoot, statroot: config.statPrefix,
@@ -162,6 +169,15 @@ class SitePage {
                 const old = this.scope;
                 if (args.length) this.scope = str(args[0]);
                 return old;
+            },
+            scoped_include: (page: Value, args: Value) => {
+                const saved = this.scope;
+                this.scope = `/${str(page)}`;
+                try {
+                    return context.process(str(page), isHash(args) ? args : {}, true);
+                } finally {
+                    this.scope = saved;
+                }
             },
             form_auth: () => htmlHidden({ name: "lj_form_auth", value: this.formAuthChallenge() }),
             ml: (code: Value, ...args: Value[]) => this.ml(str(code), args.at(-1)),

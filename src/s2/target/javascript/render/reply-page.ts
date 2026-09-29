@@ -22,7 +22,7 @@ import {
     type S2Object, DateTimeUnix, ImageUserpic, UserLite, ehtml, s2, styleArgs, styleOpts, talkargs,
 } from "./objects";
 import { type PageContext, Page, journalDefaultPic, loadUserpics, robotMetaTags } from "./pages";
-import type { RenderResult } from "./render";
+import { type RenderResult, plainError } from "./render";
 import { journalScripts, trackingPopup } from "./resources";
 
 interface Parent {
@@ -30,7 +30,11 @@ interface Parent {
     readonly subject: string;
 }
 
+// ReplyPage's handler_return 403, which the site sends with no page.
+const FORBIDDEN = { response: { status: 403, body: "" } };
+
 // `uniq` identifies the visitor's browser, which the form's auth token is tied to.
+// Null when there is no such page.
 export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
     Promise<S2Object | { response: RenderResult } | null> {
     const { site, journal, db, args } = pc;
@@ -38,8 +42,9 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
     const s2entry = await pageEntry(pc, entry);
     if (!s2entry) return null;
     if (journal.statusvis === "O" || truthy(journal.getCap(config, "readonly"))) {
-        return { response: { status: 403, body: "<h1>Read-Only User</h1><p>This journal is read-only.  You cannot comment in it.</p>" +
-            "<!-- xxxxxxxxxxxxxxxxxxxxxxxxxxxx -->\n".repeat(100) } };
+        return {
+            response: plainError(403, "<h1>Read-Only User</h1><p>This journal is read-only.  You cannot comment in it.</p>"),
+        };
     }
 
     const page = await Page(pc, "reply", await journalDefaultPic(pc));
@@ -64,14 +69,14 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
         const row = (await commentRows(db, journal, entry.jitemid)).get(talkid);
         const refuse = (status: number, message: string) => ({ response: { status, body: `<p>${message}</p>` } });
         if (!row || row.state === "D") return refuse(404, "This comment has been deleted; you cannot reply to it.");
-        if (row.state === "S") return null;
+        if (row.state === "S") return FORBIDDEN;
         if (row.state === "F") return refuse(403, "This thread has been frozen; no more replies are allowed.");
 
         const [texts, props] = await Promise.all([commentTexts(db, journal, [talkid]), commentProps(db, journal, [talkid])]);
         const subject = texts.get(talkid)?.subject ?? "", body = texts.get(talkid)?.body ?? "";
         const cprops = props.get(talkid) ?? {};
         const poster = row.posterid ? (await User.byIds(db, [row.posterid])).get(row.posterid) : undefined;
-        if (poster?.statusvis === "S") return null;
+        if (poster?.statusvis === "S") return FORBIDDEN;
         let userpic: S2Object | undefined;
         if (poster) {
             pc.users.set(poster.userid, poster);

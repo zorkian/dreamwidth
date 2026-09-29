@@ -13,7 +13,7 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import { tmpdir } from "node:os";
@@ -49,13 +49,16 @@ const unorigin = (value, origins) => origins.reduce((text, origin) =>
     text.replaceAll(origin, "ORIGIN").replaceAll(new URL(origin).host, "HOST"), value)
     .replace(/LJWidget_\d+/g, "LJWidget_N");
 
+// The not-found page's title is picked at random from `quips`.
+const unquip = (text, quips) => quips.reduce((out, quip) => out.replaceAll(quip, "QUIP"), text);
+
 // Perl builds some links from a hash, so their query order varies.
 const sortQuery = url => {
     const match = /^([^?#]*)\?([^?#]*&[^#]*)(#.*)?$/.exec(url);
     return match ? `${match[1]}?${match[2].split("&").sort().join("&")}${match[3] ?? ""}` : url;
 };
 
-export function normalize(html, origins) {
+export function normalize(html, origins, quips = []) {
     const document = new JSDOM(html).window.document;
     const lines = [];
     // Widget ids come from a per-process counter in Perl.
@@ -65,7 +68,7 @@ export function normalize(html, origins) {
             let text = verbatim ? sortSiteKeys(node.data) : node.data.replace(/\s+/g, " ").trim();
             // Pages rendered a minute apart.
             if (node.parentNode?.id === "load-time") text = text.replace(/\d+:\d\d [ap]m$/, "TIME");
-            if (text) lines.push(indent + JSON.stringify(unorigin(text, origins)));
+            if (text) lines.push(indent + JSON.stringify(unquip(unorigin(text, origins), quips)));
             return;
         }
         if (node.nodeType === 8) return;
@@ -97,11 +100,11 @@ export function normalize(html, origins) {
 // use to build journal URLs.
 // A response as compared: status, redirect target and the normalized body,
 // or the body as it is for anything but HTML.
-export function summarize(page, origins) {
+export function summarize(page, origins, quips) {
     const html = page.type.startsWith("text/html");
     const location = page.location ? `location ${unorigin(page.location, origins)}\n` : "";
     if (!page.body) return `status ${page.status}\n${location}`;
-    return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins) : unorigin(page.body, origins));
+    return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins, quips) : unorigin(page.body, origins));
 }
 
 // An https origin is fetched from where it is; an http one from this machine,
@@ -125,15 +128,19 @@ export function fetchPage(origin, pagePath, host) {
     });
 }
 
-// Usage: compare-pages.mjs [--host HOST] PERL_ORIGIN JS_ORIGIN PATH...
+// Usage: compare-pages.mjs [--host HOST] [--config FILE] PERL_ORIGIN JS_ORIGIN PATH...
 // A local origin is http://host:port as that server expects in Host; --host
 // sends HOST to the JavaScript server instead, such as a journal's subdomain.
+// --config reads the not-found page's quips from the server's configuration.
 if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
     const argv = process.argv.slice(2);
-    const host = argv[0] === "--host" ? argv.splice(0, 2)[1] : undefined;
+    const options = {};
+    while (/^--(host|config)$/.test(argv[0] ?? "")) options[argv.shift().slice(2)] = argv.shift();
+    const { host, config } = options;
+    const quips = config ? JSON.parse(readFileSync(config, "utf8")).notFoundQuips : [];
     const [perlOrigin, jsOrigin, ...paths] = argv;
     if (!perlOrigin || !jsOrigin || !paths.length) {
-        console.error("Usage: compare-pages.mjs [--host HOST] PERL_ORIGIN JS_ORIGIN PATH...");
+        console.error("Usage: compare-pages.mjs [--host HOST] [--config FILE] PERL_ORIGIN JS_ORIGIN PATH...");
         process.exit(2);
     }
     const directory = mkdtempSync(path.join(tmpdir(), "compare-pages-"));
@@ -142,7 +149,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
         const [perl, js] = await Promise.all([fetchPage(perlOrigin, pagePath), fetchPage(jsOrigin, pagePath, host)]);
         const origins = [perlOrigin, jsOrigin];
         const files = ["perl", "js"].map(side => path.join(directory, side + pagePath.replace(/\W+/g, "_")));
-        for (const [index, page] of [perl, js].entries()) writeFileSync(files[index], summarize(page, origins));
+        for (const [index, page] of [perl, js].entries()) writeFileSync(files[index], summarize(page, origins, quips));
         const diff = spawnSync("diff", ["-u", ...files], { encoding: "utf8" });
         if (diff.status === 0) {
             console.log(`same ${pagePath}`);

@@ -52,12 +52,14 @@ the site's own siteviews style when asked for (`?style=site`, or
 not show entries or icons; siteviews output is then wrapped in the visitor's
 site scheme. The journal errors Perl shows in the site's style (unknown,
 deleted, suspended, purged and OpenID accounts, suspended entries, bad tag
-and security filters, and network pages without the feature) are rendered
-with the site's Template Toolkit views in the same way.
+and security filters, network pages without the feature, entries the visitor
+cannot see, and pages that do not exist) are rendered with the site's
+Template Toolkit views in the same way. Locked, memorial and read-only
+journals render as usual; renamed ones redirect.
 
 Adult content warnings (which depend on what the visitor has confirmed, kept
-by Perl), pages for entries a visitor cannot see, and reply pages on a site
-that requires captchas get a 501, so a proxy can send them to Perl.
+by Perl), reply pages on a site that requires captchas, and journal paths
+that Perl's own controllers serve get a 501, so a proxy can send them to Perl.
 
 ## Components
 
@@ -92,7 +94,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
   entries with rich HTML, comments, pagination, filters, the archive views,
-  stylesheets, siteviews pages, and error pages in the site scheme.
+  stylesheets, siteviews pages, memorial and renamed journals, and error
+  pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
   and suspended journals and entries never appear.

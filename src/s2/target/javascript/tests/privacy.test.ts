@@ -26,12 +26,12 @@ test("recent pages leave out locked and private entries", async () => {
     assert.doesNotMatch(page.body, /Locked entry|Private entry|secret/);
 });
 
-// Perl shows its own pages for these, which this server leaves to it.
 test("locked and private entries are not shown", async () => {
-    for (const subject of ["Locked entry", "Private entry"]) {
-        const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", subject)}.html`);
-        assert.equal(page.status, 501, subject);
-        assert.doesNotMatch(page.body, /secret/);
+    const ditemid = await journals.ditemid("s2fix_theme", "Private entry");
+    for (const url of [`/~s2fix_theme/${ditemid}.html`, `/~s2fix_theme/${ditemid}.html?mode=reply`]) {
+        const page = await journals.get(url);
+        assert.equal(page.status, 403, url);
+        assert.doesNotMatch(page.body, /secret|Private entry/);
     }
 });
 
