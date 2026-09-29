@@ -63,8 +63,10 @@ visitor cannot see gets the same response as one that does not exist, a 404
 so no response reveals that something private exists. That covers private
 and locked entries, entries and comments by suspended users, screened and
 deleted comments, and entry URLs with the wrong anum or date, which name no
-entry. Perl instead shows a 403 login page for hidden entries, and renders
-public entries at a URL with the wrong anum. A suspended public entry, whose
+entry. A thread link to a hidden comment shows the whole entry, as a link to
+a comment that does not exist does. Perl instead shows a 403 login page for
+hidden entries, renders public entries at a URL with the wrong anum, and
+shows a hidden comment's placeholder as the thread. A suspended public entry, whose
 existence was already public, still gets the suspension notice.
 
 Adult content warnings (which depend on what the visitor has confirmed, kept
