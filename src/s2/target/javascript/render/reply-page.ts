@@ -277,13 +277,13 @@ async function screeningLevel(pc: PageContext, entry: Entry): Promise<string> {
 }
 
 // LJ::get_secret, as the newest secret that exists: this server cannot make one.
-async function currentSecret(db: Databases): Promise<{ stime: number; secret: string }> {
+export async function currentSecret(db: Databases): Promise<{ stime: number; secret: string }> {
     const [row] = await db.global("SELECT stime, secret FROM secrets WHERE stime <= UNIX_TIMESTAMP() ORDER BY stime DESC LIMIT 1");
     return { stime: int(row?.stime), secret: text(row?.secret) };
 }
 
 // DW::Auth::Challenge::generate
-function challenge(secret: { stime: number; secret: string }, now: number, goodfor: number, attr: string): string {
+export function challenge(secret: { stime: number; secret: string }, now: number, goodfor: number, attr: string): string {
     const bare = `c0:${secret.stime}:${now - secret.stime}:${goodfor}:${attr}`;
     return `${bare}:${createHash("md5").update(bare + secret.secret).digest("hex")}`;
 }

@@ -19,6 +19,8 @@ BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use JSON;
 use DW::Captcha;
 use DW::Formats;
+use DW::Logic::MenuNav;
+use DW::SiteScheme;
 use LJ::Talk;
 
 my %databases;
@@ -51,7 +53,12 @@ for my $name ( keys %LJ::Img::img ) {
 # Site text the journal pages use, in the default language.
 my %strings;
 my $dbr = LJ::get_db_reader();
-for my $prefix (qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. )) {
+for my $prefix (
+    qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. ),
+    qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
+    qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. )
+    )
+{
     my $keys = $dbr->selectcol_arrayref(
         "SELECT itcode FROM ml_items WHERE dmid = 1 AND itcode LIKE ?",
         undef, "$prefix%" );
@@ -68,6 +75,26 @@ my @subjecticons =
     map { { id => $_, html => LJ::Talk::print_subjecticon_by_id( $_, '%s' ) } }
     ( 'none', map { $_->{id} } @{ $icons->{lists}{sm} }, @{ $icons->{lists}{md} } );
 my $editors = DW::Formats::select_items( current => undef, preferred => '' );
+
+# Site schemes by name, as DW::SiteScheme->get accepts them: every scheme
+# file that names a known scheme.
+my @scheme_dirs = LJ::get_all_directories('schemes');
+my %schemes;
+for my $name ( map { m!/([^/_][^/]*)\.tt$! ? $1 : () } map { glob "$_/*.tt" } @scheme_dirs ) {
+    next unless DW::SiteScheme->get($name)->name eq $name;
+    $schemes{$name} = [ DW::SiteScheme->inheritance($name) ];
+}
+
+# The site menu a logged-out visitor sees.
+my @menu = map {
+    {
+        name  => $_->{name},
+        items => [
+            map { { url => $_->{url}, text => $_->{text}, text_opts => $_->{text_opts} // {} } }
+            grep { $_->{display} } @{ $_->{items} }
+        ]
+    }
+} @{ DW::Logic::MenuNav->get_menu_navigation(undef) };
 
 print JSON->new->canonical->pretty->encode(
     {
@@ -109,6 +136,30 @@ print JSON->new->canonical->pretty->encode(
         talkMaxSubjects    => ( $LJ::TALK_MAX_SUBJECTS || 200 ) + 0,
         talkThreadPoint    => ( $LJ::TALK_THREAD_POINT || 50 ) + 0,
         images             => \%images,
+        # For the site's own Template Toolkit pages: DW::Template's engines and site constants.
+        siteTemplates => {
+            views         => [ LJ::get_all_directories('views') ],
+            schemes       => \@scheme_dirs,
+            schemeList    => \%schemes,
+            defaultScheme => DW::SiteScheme->default,
+            menu          => \@menu,
+            shopRoot      => $LJ::SHOPROOT,
+            isCanary      => $LJ::IS_CANARY ? JSON::true : JSON::false,
+            constants     => {
+                name           => $LJ::SITENAME,
+                nameshort      => $LJ::SITENAMESHORT,
+                nameabbrev     => $LJ::SITENAMEABBREV,
+                company        => $LJ::SITECOMPANY,
+                address        => $LJ::SITEADDRESS,
+                addressline    => $LJ::SITEADDRESSLINE,
+                domain         => $LJ::DOMAIN,
+                domainweb      => $LJ::DOMAIN_WEB,
+                help           => \%LJ::HELPURL,
+                email          => { abuse => $LJ::ABUSE_EMAIL, coppa => $LJ::COPPA_EMAIL, privacy => $LJ::PRIVACY_EMAIL },
+                maxlength_user => $LJ::USERNAME_MAXLENGTH,
+                maxlength_pass => $LJ::PASSWORD_MAXLENGTH,
+            },
+        },
         strings            => \%strings,
         capBits            => \%LJ::CAP,
         talkform           => {

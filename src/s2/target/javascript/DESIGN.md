@@ -47,11 +47,13 @@ The views are those `LJ::S2::make_journal` renders with the journal's style:
 recent entries (with tag, security and poster filters), entries (with their
 polls and embedded media), the year,
 month and day archives, tags, icons, reading and network pages, and
-stylesheets, and reply pages. Every other response under a journal URL is
-one Perl renders in the site's own style: the siteviews style, adult content
-warnings, and its error pages for missing, hidden or suspended pages. Those,
-and reply pages on a site that requires captchas, get a 501, so a proxy can
-send them to Perl.
+stylesheets, and reply pages. The journal errors Perl shows in the site's
+own style (unknown, deleted, suspended, purged and OpenID accounts, bad tag
+filters, and network pages without the feature) are rendered here with the
+site's Template Toolkit views and the visitor's site scheme. The rest of what
+Perl renders in the site's style (the siteviews style, adult content
+warnings, security filter errors), and reply pages on a site that requires
+captchas, get a 501, so a proxy can send them to Perl.
 
 ## Components
 
@@ -60,7 +62,7 @@ send them to Perl.
 | `server/` | Fastify app, config loading, URL routing. |
 | `data/` | Entity classes (`User`, `Entry`, `Comment`, `Userpic`, ...) that mirror their Perl counterparts and own their SQL. |
 | `compile/` | Layer-stack lookup, invoking the S2 compiler, compiled-layer cache. |
-| `render/` | S2 object construction, host builtins, running a page. |
+| `render/` | S2 object construction, host builtins, running a page; pages in the site's own style (`site-page.ts`). |
 | `runtime/` | The S2 JavaScript runtime that compiled layers call into. |
 | `template/` | A Template Toolkit engine for the site's own templates (site schemes, error pages), as Perl's Template runs them. |
 | `src/content` | HTML/CSS cleaner. Independent of S2; usable elsewhere in the site. |
@@ -85,8 +87,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
 - **Page comparisons** (`tests/pages.test.ts`). Fixture journals from
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
-  entries with rich HTML, comments, pagination, filters, the archive views
-  and stylesheets.
+  entries with rich HTML, comments, pagination, filters, the archive views,
+  stylesheets, and error pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments
   and suspended journals never appear.

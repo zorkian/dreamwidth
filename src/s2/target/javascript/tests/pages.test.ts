@@ -94,3 +94,12 @@ test("stylesheets, cleaned as CSS", async () => {
     await compare("/~s2fix_theme/res/14/stylesheet");
     await compare("/~s2fix_custom/res/16/stylesheet");
 });
+
+// Foundation pages load scripts at the end of the body; others use the
+// scheme's older layout, with the search widget and the table login form.
+test("error pages in the site scheme", async () => {
+    await compare("/~no-such-user/");
+    await compare("/~s2fix_archive/?tag=nosuchtag");
+    await compare("/~s2fix_deletedcomm/");
+    await compare("/~s2fix_deleted/?skin=lynx");
+});

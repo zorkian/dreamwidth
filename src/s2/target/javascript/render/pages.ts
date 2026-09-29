@@ -100,7 +100,7 @@ export async function Page(pc: PageContext, view: string, defaultPic: S2Object,
         show_control_strip: showControlStrip(journal) ? 1 : 0,
         // The journal handler asks Page to state the charset first.
         head_content: '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n' +
-            (discovery ? metaDiscoveryLinks(pc, discovery.tags) : "") +
+            (discovery ? metaDiscoveryLinks(pc.site, pc.journal, discovery.tags) : "") +
             `<link rel="help" href="${config.siteRoot}/support/faq" />\n` +
             '<meta property="og:image:width" content="363"/>\n<meta property="og:image:height" content="363"/>\n',
         is_canary: 0, data_link: {}, data_links_order: [], timeformat24: 0,
@@ -244,10 +244,10 @@ export async function RecentPage(pc: PageContext, args: Readonly<Record<string, 
     return page;
 }
 
-// LJ::User::meta_discovery_links with feeds and openid, then Page's own links.
-function metaDiscoveryLinks(pc: PageContext, tags?: readonly string[]): string {
-    const base = pc.journal.journalBase(pc.site);
-    const root = pc.site.config.siteRoot;
+// LJ::User::meta_discovery_links with feeds and openid.
+export function metaDiscoveryLinks(site: Site, journal: User, tags?: readonly string[]): string {
+    const base = journal.journalBase(site);
+    const root = site.config.siteRoot;
     const taglist = tags?.map(eurl).join(",");
     const filtered = taglist
         ? `<link rel="alternate" type="application/rss+xml" title="RSS: filtered by selected tags" href="${base}/data/rss?tag=${taglist}" />\n` +

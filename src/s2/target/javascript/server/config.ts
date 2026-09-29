@@ -80,6 +80,26 @@ export interface SiteConfig {
         "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content", boolean>>;
     // Adult content levels whose journals and entries ask robots to stay away.
     readonly robotBlockingContent: readonly string[];
+    readonly siteTemplates: SiteTemplates;
+}
+
+// What DW::Template's view and site scheme engines need.
+export interface SiteTemplates {
+    // Directories to find templates in, first match first.
+    readonly views: readonly string[];
+    readonly schemes: readonly string[];
+    // Each site scheme's inheritance, starting with itself.
+    readonly schemeList: Readonly<Record<string, readonly string[]>>;
+    readonly defaultScheme: string;
+    // DW::Logic::MenuNav's categories, with the items a logged-out visitor sees.
+    readonly menu: readonly {
+        readonly name: string;
+        readonly items: readonly { readonly url: string; readonly text: string; readonly text_opts: Record<string, string> }[];
+    }[];
+    readonly shopRoot: string;
+    readonly isCanary: boolean;
+    // The site namespace's constants.
+    readonly constants: Readonly<Record<string, unknown>>;
 }
 
 export interface StandardImage {

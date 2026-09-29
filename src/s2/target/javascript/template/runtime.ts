@@ -29,6 +29,8 @@ export interface Options {
     readonly plugins?: Readonly<Record<string, Plugin>>;
     // Extra list methods, as $Template::Stash::LIST_OPS entries.
     readonly listMethods?: Readonly<Record<string, (list: Value[], ...args: Value[]) => Value>>;
+    // Parsed templates by name, to share between renders.
+    readonly cache?: Map<string, Document>;
 }
 
 // Control flow out of loops and templates, carrying the output made before it.
@@ -61,7 +63,7 @@ export function num(value: Value): number {
     return match ? Number(match[0]) : 0;
 }
 
-const isHash = (value: Value): value is Record<string, Value> =>
+export const isHash = (value: Value): value is Record<string, Value> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
 // Template::Stash's pattern for members templates may not read.
@@ -282,10 +284,11 @@ export class Context {
     private readonly visiting: Map<string, Node[]>[] = [];
     // The names of the templates being processed, innermost last.
     readonly components: string[] = [];
-    private readonly cache = new Map<string, Document>();
+    private readonly cache: Map<string, Document>;
 
     constructor(private readonly options: Options, stash: Stash) {
         this.stash = stash;
+        this.cache = options.cache ?? new Map();
     }
 
     // Template::Context::process: localized is INCLUDE, otherwise PROCESS.
