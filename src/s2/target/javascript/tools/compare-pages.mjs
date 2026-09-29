@@ -15,6 +15,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { JSDOM } from "jsdom";
@@ -103,11 +104,16 @@ export function summarize(page, origins) {
     return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins) : unorigin(page.body, origins));
 }
 
-export function fetchPage(origin, pagePath) {
+// An https origin is fetched from where it is; an http one from this machine,
+// sending its host, or `host` in its place.
+export function fetchPage(origin, pagePath, host) {
     const url = new URL(origin);
+    const request = url.protocol === "https:"
+        ? (callback => https.get(new URL(pagePath, origin), callback))
+        : (callback => http.get({ host: "127.0.0.1", port: url.port || 80, path: pagePath,
+            headers: { host: host ?? url.host } }, callback));
     return new Promise((resolve, reject) => {
-        http.get({ host: "127.0.0.1", port: url.port || 80, path: pagePath, headers: { host: url.host } },
-            response => {
+        request(response => {
                 let body = "";
                 response.setEncoding("utf8");
                 response.on("data", chunk => (body += chunk));
@@ -119,18 +125,21 @@ export function fetchPage(origin, pagePath) {
     });
 }
 
-// Usage: compare-pages.mjs PERL_ORIGIN JS_ORIGIN PATH...
-// Origins are http://host:port as the respective server expects in Host.
+// Usage: compare-pages.mjs [--host HOST] PERL_ORIGIN JS_ORIGIN PATH...
+// A local origin is http://host:port as that server expects in Host; --host
+// sends HOST to the JavaScript server instead, such as a journal's subdomain.
 if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
-    const [perlOrigin, jsOrigin, ...paths] = process.argv.slice(2);
+    const argv = process.argv.slice(2);
+    const host = argv[0] === "--host" ? argv.splice(0, 2)[1] : undefined;
+    const [perlOrigin, jsOrigin, ...paths] = argv;
     if (!perlOrigin || !jsOrigin || !paths.length) {
-        console.error("Usage: compare-pages.mjs PERL_ORIGIN JS_ORIGIN PATH...");
+        console.error("Usage: compare-pages.mjs [--host HOST] PERL_ORIGIN JS_ORIGIN PATH...");
         process.exit(2);
     }
     const directory = mkdtempSync(path.join(tmpdir(), "compare-pages-"));
     let failed = 0;
     for (const pagePath of paths) {
-        const [perl, js] = await Promise.all([perlOrigin, jsOrigin].map(origin => fetchPage(origin, pagePath)));
+        const [perl, js] = await Promise.all([fetchPage(perlOrigin, pagePath), fetchPage(jsOrigin, pagePath, host)]);
         const origins = [perlOrigin, jsOrigin];
         const files = ["perl", "js"].map(side => path.join(directory, side + pagePath.replace(/\W+/g, "_")));
         for (const [index, page] of [perl, js].entries()) writeFileSync(files[index], summarize(page, origins));
