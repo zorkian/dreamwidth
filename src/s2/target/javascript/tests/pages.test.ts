@@ -16,6 +16,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { after, before, test } from "node:test";
+import { int } from "../data/db";
+import { User } from "../data/user";
 import { renderJournal } from "../render/render";
 import { createApp } from "../server/app";
 import { HOST, TestJournals } from "./journal";
@@ -109,6 +111,20 @@ test("error pages in the site scheme", async () => {
 });
 
 test("a not-found page, for an unknown path", () => compare("/~s2fix_theme/nosuchpage/"));
+
+test("entries and comments the visitor cannot see, answered as missing ones", async () => {
+    const shown = await journals.ditemid("s2fix_theme", "Entry 25:");
+    const u = (await User.byName(journals.db, "s2fix_theme"))!;
+    const [screened] = await u.cluster(journals.db, `SELECT t.jtalkid FROM talk2 t
+        JOIN talktext2 x USING (journalid, jtalkid) WHERE t.journalid = ? AND t.state = 'S' AND x.body LIKE 'Screened%'`,
+    [u.userid]);
+    const screenedId = (int(screened!.jtalkid) << 8) + shown % 256;
+    await compare(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Private entry")}.html`);
+    await compare("/~s2fix_theme/25600001.html");
+    await compare("/~s2fix_theme/2026/01/28/private-entry.html?mode=reply");
+    await compare(`/~s2fix_theme/${shown}.html?replyto=${screenedId}`);
+    await compare(`/~s2fix_theme/${shown}.html?thread=${screenedId}`);
+});
 
 test("a memorial journal reads as usual, and a renamed one redirects", async () => {
     await compare("/~s2fix_memorial/");

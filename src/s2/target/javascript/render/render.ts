@@ -146,9 +146,9 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
         secret: await currentSecret(db),
     });
-    // Unlike Perl, an entry or comment the visitor cannot see gets the same
-    // 404 as one that does not exist (RFC 9110, section 15.5.5), so the
-    // response never reveals which. A URL with the wrong anum names no entry.
+    // An entry or comment the visitor cannot see gets the same 404 as one
+    // that does not exist (RFC 9110, section 15.5.5), so the response never
+    // reveals which. A URL with the wrong anum or date names no entry.
     const unavailable = async () => {
         const [path] = request.requestPath.split("?");
         const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
