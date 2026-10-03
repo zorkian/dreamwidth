@@ -62,12 +62,10 @@ that does not exist, as on the Perl site: a 404 (which RFC 9110 allows for
 hiding a forbidden resource) with the site's `error/unavailable.tt` page, so
 no response reveals that something private exists. That covers private and
 locked entries, entries and comments by suspended users, screened and
-deleted comments, and entry URLs with the wrong anum, which name no entry. A
-thread link to a hidden comment shows the whole entry, as a link to a comment
-that does not exist does. A suspended public entry, whose existence was
-already public, still gets the suspension notice. One difference from Perl
-is deliberate: an entry's name under the wrong date gets the same page, where
-Perl's routing answers its own 404 only for names that exist.
+deleted comments, and entry URLs with the wrong anum or date, which name no
+entry. A thread link to a hidden comment shows the whole entry, as a link to
+a comment that does not exist does. A suspended public entry, whose existence
+was already public, still gets the suspension notice.
 
 Adult content warnings (which depend on what the visitor has confirmed, kept
 by Perl), reply pages on a site that requires captchas, and journal paths
