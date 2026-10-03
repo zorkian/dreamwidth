@@ -122,6 +122,7 @@ test("entries and comments the visitor cannot see, answered as missing ones", as
     await compare(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Private entry")}.html`);
     await compare("/~s2fix_theme/25600001.html");
     await compare("/~s2fix_theme/2026/01/28/private-entry.html?mode=reply");
+    await compare("/~s2fix_theme/2026/01/27/private-entry.html");
     await compare(`/~s2fix_theme/${shown}.html?replyto=${screenedId}`);
     await compare(`/~s2fix_theme/${shown}.html?thread=${screenedId}`);
 });
