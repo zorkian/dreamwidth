@@ -9,7 +9,7 @@ package S2::Node;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->tabwriteln("--[[-- ${this}::asJS not implemented --]]");
+    die ref($this) . " has no JavaScript code generator";
 }
 
 # This should really be in S2::NodeExpr, but the compiler has
@@ -40,7 +40,9 @@ sub asJS_bool {
     }
 
     if ($s2type->isSimple()) {
+        $o->write("s2.runtime.objectToBool(");
         $this->asJS($bp, $o);
+        $o->write(")");
         return;
     }
 
@@ -86,6 +88,11 @@ sub asJS {
 
     my $isHash = $this->{isHash};
 
+    # General artifacts evaluate key/value expressions as data. Object literal
+    # syntax treats __proto__ specially and cannot represent computed S2 keys.
+    # Keep historical artifact emission stable until its consumers migrate.
+
+
     if ($size == 0) {
         $o->write($isHash ? "{}" : "[]");
         return;
@@ -102,7 +109,7 @@ sub asJS {
             $this->{'keys'}->[$i]->asJS($bp, $o);
             $o->write(": ");
         }
-        $this->{'vals'}->[$i]->asJS($bp, $o);
+        $this->{vals}[$i]->asJS($bp, $o);
         $first = 0;
     }
     $o->writeln("");
@@ -117,6 +124,7 @@ sub asJS {
     my ($this, $bp, $o) = @_;
 
     $this->{'lhs'}{'var'}{'varReturnType'} = undef;
+    local $this->{'lhs'}{'var'}{'lvalue'} = 1 if $this->{'lhs'}{'var'};
     $this->{'lhs'}->asJS($bp, $o);
 
     my $need_notags = $bp->untrusted() && 
@@ -163,6 +171,7 @@ package S2::NodeDeleteStmt;
 sub asJS {
     my ($this, $bp, $o) = @_;
     $o->tabwrite("");
+    local $this->{'var'}{'lvalue'} = 1;
     $this->{'var'}->asJS($bp, $o);
     $o->writeln(" = null;");
 }
@@ -193,7 +202,7 @@ sub asJS {
     my ($this, $bp, $o) = @_;
    
     $o->tabwrite("");
-    $this->{'expr'}->asJS($bp, $o);
+    $this->{expr}->asJS($bp, $o);
     $o->writeln(";");
 }
 
@@ -201,78 +210,70 @@ package S2::NodeForeachStmt;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-
-    my $varname;
+    $o->tabwrite("for (");
     if ($this->{'vardecl'}) {
-        $varname = sub {
-            $o->write($bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
-        };
-    }
-    else {
-        $varname = sub {
-            $this->{'varref'}->asJS($bp, $o);
-        };
-    }
-    
-    my $realexpr = $this->{'listexpr'}->isa('S2::NodeExpr') ?
-                   $this->{'listexpr'}->{expr} :
-                   $this->{'listexpr'};
-
-    # Optimise the foreach (x .. y) idiom to a JS numeric for
-    # FIXME: ...but this doesn't quite work right yet... the loop
-    # variable isn't declared.
-    if ($realexpr->isa('S2::NodeRange')) {
-        my $range = $realexpr;
-        $o->tabwrite("for (");
-        $varname->();
-        $o->write(" = ");
-        $range->{'lhs'}->asJS($bp, $o);    
-        $o->write("; ");
-        $varname->();
-        $o->write(" <= ");
-        $range->{'rhs'}->asJS($bp, $o);
-        $o->write("; ");
-        $varname->();
-        $o->write("++) ");
+        $o->write("let " . $bp->decorateLocal($this->{'vardecl'}->{'nt'}->getName(), $this->{'stmts'}));
     } else {
-        $o->tabwrite("for (");
-
-        # FIXME: Implement foreach loops properly for arrays and strings
-        if ($this->{'isHash'}) {
-            $varname->();
-            $o->write(" in ");
-            $this->{'listexpr'}->asJS($bp, $o);
-        } elsif ($this->{'isString'}) {
-            $varname->();
-            $o->write("");
-            die "Foreach on strings isn't implemented for JS Backend";
-        } else {
-            # HACK: Use part of Perl's stringification of this object
-            # to create a unique identifier to use for the loop variables.
-            my $decorate = $this."";
-            if ($decorate =~ /HASH\(0x(\w+)\)/) {
-                $decorate = $1;
-            }
-            else {
-                die "Unable to generate loop variable thingy ???";
-            }
-            
-            $o->write("___a_${decorate} = ");
-            $this->{'listexpr'}->asJS($bp, $o);
-            
-            $o->write(", ___i_${decorate} = 0, ___a_${decorate}"."[0]; ");
-            $o->write("___i_${decorate} < ___a_${decorate}.length, ");
-            $varname->();
-            $o->write(" = ___a_${decorate}"."[___i_${decorate}]; ___i_${decorate}++");
-        }
-
-#        $this->{'listexpr'}->asJS($bp, $o);
-
-        $o->write(") ");
+        local $this->{'varref'}{'lvalue'} = 1;
+        $this->{'varref'}->asJS($bp, $o);
     }
+    $o->write(" of ");
+    if ($this->{'isHash'}) {
+        $o->write("s2.runtime.hashKeys(");
+    } elsif ($this->{'isString'}) {
+        $o->write("s2.runtime.characters(");
+    } else {
+        $o->write("s2.runtime.asArray(");
+    }
+    $this->{listexpr}->asJS($bp, $o);
+    $o->write(")");
+    $o->write(") ");
 
     $this->{'stmts'}->asJS($bp, $o);
     $o->newline();
+}
+
+package S2::NodeBranchStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    my $keyword = $this->{type} == $S2::TokenKeyword::BREAK ? "break" : "continue";
+    $o->tabwriteln("$keyword;");
+}
+
+package S2::NodeInstanceOf;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->write($this->{exact} ? "s2.runtime.objectInstanceOf(" : "ctx.objectIsa(");
+    $this->{expr}->asJS($bp, $o);
+    $o->write(", " . $bp->quoteString($this->{qClass}) . ")");
+}
+
+package S2::NodeTypeCastOp;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    if ($this->{downcast}) {
+        $o->write("ctx.downcastObject(");
+    }
+    $this->{expr}->asJS($bp, $o);
+    if ($this->{downcast}) {
+        $o->write(", " . $bp->quoteString($this->{toClass}) .
+                  ", $bp->{layerid}, " . ($this->{opline} + 0) . ")");
+    }
+}
+
+package S2::NodePushStmt;
+
+sub asJS {
+    my ($this, $bp, $o) = @_;
+    $o->tabwrite("");
+    local $this->{lhs}{var}{lvalue} = 1 if $this->{lhs}{var};
+    $this->{lhs}->asJS($bp, $o);
+    $o->write($this->{expr}{_is_array} ? ".push(..." : ".push(");
+    $this->{expr}->asJS($bp, $o);
+    $o->writeln(");");
 }
 
 package S2::NodeForStmt;
@@ -400,6 +401,10 @@ package S2::NodeIncExpr;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
+    die "Increment target is not a variable reference"
+        unless $this->{'expr'}{'var'};
+    local $this->{'expr'}{'var'}{'varReturnType'} = undef;
+    local $this->{'expr'}{'var'}{'lvalue'} = 1;
     
     my $plus = $this->{'op'}->getPunct() eq $S2::TokenPunct::INCR->getPunct();
     
@@ -450,8 +455,8 @@ sub asJS {
     } else {
         $o->tabwrite("ctx.print(");
     }
-    $this->{'expr'}->asJS($bp, $o);
-    $o->write(" + \"\\n\"") if $this->{'doNewline'};
+    $this->{expr}->asJS($bp, $o);
+    $o->write(" + \"\\n\"") if $this->{doNewline};
     $o->writeln(");");
 }
 
@@ -461,7 +466,7 @@ sub asJS {
     my ($this, $bp, $o) = @_;
 
     
-    $o->write("Math.floor(") if $this->{'op'} == $S2::TokenPunct::DIV;
+    $o->write("Math.trunc(") if $this->{'op'} == $S2::TokenPunct::DIV;
     $this->{'lhs'}->asJS($bp, $o);
 
     if ($this->{'op'} == $S2::TokenPunct::MULT) {
@@ -558,7 +563,7 @@ package S2::NodeRange;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->write("s2.runtime.makerange(");
+    $o->write("s2.runtime.makeRange(");
     $this->{'lhs'}->asJS($bp, $o);
     $o->write(", ");
     $this->{'rhs'}->asJS($bp, $o);
@@ -698,10 +703,12 @@ sub asJS {
         return;
     }
 
+    # A null object, with its class when one is given. Members can still be
+    # assigned to it, as in Perl, and it stays null.
     if ($type == $NEWNULL) {
-        $o->write("{\".type\": ".
-                  $bp->quoteString($this->{'newClass'}->getIdent()) .
-                  ", \".isnull\":  1}");
+        my $class = $this->{'newClass'}
+            ? "\".type\": " . $bp->quoteString($this->{'newClass'}->getIdent()) . ", " : "";
+        $o->write("{$class\".isnull\": 1}");
         return;
     }
 
@@ -718,6 +725,13 @@ sub asJS {
         return;
     }
 
+    if ($type == $POPFUNC) {
+        $o->write("(");
+        $this->{'subExpr'}->asJS($bp, $o);
+        $o->write(").pop()");
+        return;
+    }
+
     if ($type == $SIZEFUNC) {
         if ($this->{'subType'}->isArrayOf()) {
             $o->write("(");
@@ -728,10 +742,9 @@ sub asJS {
             $this->{'subExpr'}->asJS($bp, $o);
             $o->write(")");
         } elsif ($this->{'subType'}->equals($S2::Type::STRING)) {
-            # JavaScript strings are unicode-aware, so this is easy
-            $o->write("(");
+            $o->write("s2.runtime.stringLength(");
             $this->{'subExpr'}->asJS($bp, $o);
-            $o->write(").length");
+            $o->write(")");
         }
         return;
     }
@@ -744,7 +757,7 @@ sub asJS {
     }
 
     if ($type == $ISNULLFUNC) {
-        $o->write("(not s2.runtime.isDefined(");
+        $o->write("(! s2.runtime.isDefined(");
         $this->{'subExpr'}->asJS($bp, $o);
         $o->write("))");
         return;
@@ -758,11 +771,17 @@ sub asJS {
     if ($type == $OBJ_INTERPOLATE) {
         $o->write("ctx.toString(");
         $this->{'var'}->asJS($bp, $o);
-        $o->write(")");
+        $o->write(", " . $bp->quoteString("$this->{'objint_method'}()") . ")");
         return;
     }
 
     if ($type == $FUNCCALL || $type == $METHCALL) {
+
+        # A builtin that returns no string reads as an empty one, as in Perl.
+        my $ck = $S2::CUR_COMPILER->{'checker'};
+        my $returns = $this->{'funcBuiltin'} && $ck->functionType($this->{'funcID'});
+        my $prepare = $returns && $returns->equals($S2::Type::STRING) && $this->{'funcID'} ne "string(int)";
+        $o->write("s2.runtime.prepareString(") if $prepare;
 
         # builtin functions can be optimized.
         if ($this->{'funcBuiltin'}) {
@@ -772,10 +791,10 @@ sub asJS {
                 return;
             }
             if ($this->{'funcID'} eq "int(string)") {
-                # cast from string to int by adding zero to it
-                $o->write("Math.floor(");
+                # Perl's int(): numify, then truncate
+                $o->write("Math.trunc(s2.runtime.toNumber(");
                 $this->{'funcArgs'}->asJS($bp, $o, 0);
-                $o->write(" + 0)");
+                $o->write("))");
                 return;
             }
 
@@ -796,9 +815,10 @@ sub asJS {
                 $o->write($bp->quoteString($this->{'funcID_noclass'}));
                 $o->write(",$bp->{layerid},");          # The layer itself
                 $o->write($this->{'derefLine'}+0);
-                if ($this->{'var'}->isSuper()) {
-                    $o->write(",true");
-                }
+                # The class the checker resolved: super calls dispatch from
+                # it, and errors about null objects name it.
+                $o->write($this->{'var'}->isSuper() ? ",true" : ",false");
+                $o->write("," . $bp->quoteString($this->{'funcClass'}));
                 $o->write(")");
             } else {
                 $o->write("ctx.getFunction(");
@@ -818,6 +838,7 @@ sub asJS {
         $this->{'funcArgs'}->asJS($bp, $o, 0, 1);
         
         $o->write(")");
+        $o->write(")") if $prepare;
         return;
     }
 
@@ -855,13 +876,14 @@ sub asJS {
     $this->{'nvd'}->asJS($bp, $o);
     if ($this->{'expr'}) {
         $o->write(" = ");
-        $this->{'expr'}->asJS($bp, $o);
+        $this->{expr}->asJS($bp, $o);
     } else {
         # Must initialize the variables otherwise they will have
         # type "null" and we'll have exceptions galore.
         my $t = $this->{'nvd'}->getType();
-        if (! $t->isSimple()) {
-            # FIXME: Arrays must use [] instead of {}
+        if ($t->isArrayOf()) {
+            $o->write(" = []");
+        } elsif ($t->isHashOf()) {
             $o->write(" = {}");
         } elsif ($t->equals($S2::Type::STRING)) {
             $o->write(" = \"\"");
@@ -882,6 +904,10 @@ sub asJS {
     my ($this, $bp, $o) = @_;
     my $first = 1;
 
+    # Perl reads a member or element of undef as undef.
+    my $dot = $this->{'lvalue'} ? "." : "?.";
+    $o->write("((") if $this->{'useAsString'};
+
     if ($this->{varReturnType}) {
         if ($this->{varReturnType} && $this->{varReturnType}->equals($S2::Type::STRING)) {
             # Need to wrap a preparation function around to
@@ -889,10 +915,10 @@ sub asJS {
             $o->write("s2.runtime.prepareString(");
         }
         elsif ($this->{varReturnType}->equals($S2::Type::INT)) {
-            $o->write("Number(");
+            $o->write("s2.runtime.toNumber(");
         }
         elsif ($this->{varReturnType}->equals($S2::Type::BOOL)) {
-            $o->write("Boolean(Number(");
+            $o->write("Boolean(s2.runtime.toNumber(");
         }
     }
 
@@ -904,8 +930,10 @@ sub asJS {
     }
 
     foreach my $lev (@{$this->{'levels'}}) {
-        if (! $first || $this->{'type'} == $OBJECT) {
+        if ($this->{'type'} == $PROPERTY && $first == 0 && $lev == $this->{'levels'}[0]) {
             $o->write(".".$bp->decorateIdent($lev->{'var'}));
+        } elsif (! $first || $this->{'type'} == $OBJECT) {
+            $o->write($dot.$bp->decorateIdent($lev->{'var'}));
         } else {
             my $v = $lev->{'var'};
             if ($first && $this->{'type'} == $LOCAL &&
@@ -921,7 +949,7 @@ sub asJS {
         }
 
         foreach my $d (@{$lev->{'derefs'}}) {
-            $o->write("["); # [ or {
+            $o->write($this->{'lvalue'} ? "[" : "?.[");
             $d->{'expr'}->asJS($bp, $o);
             $o->write("]");
         }
@@ -942,7 +970,7 @@ sub asJS {
     }
 
     if ($this->{'useAsString'}) {
-        $o->write("._as_string");
+        $o->write(")?._as_string ?? \"\")");
     }
 }
 
@@ -963,14 +991,14 @@ package S2::TokenStringLiteral;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->write($bp->quoteString($this->{'text'}));
+    $o->write($bp->quoteString($this->{text}));
 }
 
 package S2::TokenIntegerLiteral;
 
 sub asJS {
     my ($this, $bp, $o) = @_;
-    $o->write($this->{'chars'});
+    $o->write($this->{chars});
 }
 
 1;
