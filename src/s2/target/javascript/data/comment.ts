@@ -12,8 +12,92 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { type Databases, int, text } from "./db";
-import type { User } from "./user";
+import { type Databases, type Row, int, text } from "./db";
+import { Entry } from "./entry";
+import { User } from "./user";
+
+// One comment, as LJ::Comment loads it.
+export class Comment {
+    readonly jtalkid: number;
+    // L for a comment on an entry.
+    readonly nodetype: string;
+    readonly nodeid: number;
+    readonly parenttalkid: number;
+    readonly posterid: number;
+    // A active, S screened, D deleted, F frozen.
+    readonly state: string;
+
+    private constructor(readonly journal: User, row: Row) {
+        this.jtalkid = int(row.jtalkid);
+        this.nodetype = text(row.nodetype);
+        this.nodeid = int(row.nodeid);
+        this.parenttalkid = int(row.parenttalkid);
+        this.posterid = int(row.posterid);
+        this.state = text(row.state) || "A";
+    }
+
+    static async byJtalkid(db: Databases, journal: User, jtalkid: number): Promise<Comment | undefined> {
+        if (!journal.clusterid) return undefined;
+        const [row] = await journal.cluster(db, `SELECT jtalkid, nodetype, nodeid, parenttalkid, posterid, state
+            FROM talk2 WHERE journalid = ? AND jtalkid = ?`, [journal.userid, jtalkid]);
+        return row ? new Comment(journal, row) : undefined;
+    }
+
+    // LJ::Comment::is_active
+    isActive(): boolean {
+        return this.state === "A";
+    }
+
+    // LJ::Comment::is_screened
+    isScreened(): boolean {
+        return this.state === "S";
+    }
+
+    // LJ::Comment::is_deleted
+    isDeleted(): boolean {
+        return this.state === "D";
+    }
+
+    // LJ::Comment::is_frozen
+    isFrozen(): boolean {
+        return this.state === "F";
+    }
+
+    // LJ::Comment::entry
+    entry(db: Databases): Promise<Entry | null> {
+        return Entry.byJitemid(db, this.journal, this.nodeid);
+    }
+
+    // LJ::Comment::poster: undefined for an anonymous comment.
+    async poster(db: Databases): Promise<User | undefined> {
+        return this.posterid ? (await User.byIds(db, [this.posterid])).get(this.posterid) : undefined;
+    }
+
+    // LJ::Comment::parent
+    parent(db: Databases): Promise<Comment | undefined> {
+        return this.parenttalkid ? Comment.byJtalkid(db, this.journal, this.parenttalkid) : Promise.resolve(undefined);
+    }
+
+    // LJ::Comment::visible_to: whether `remote`, who must be logged in, may see
+    // this comment. Screened comments are for the journal's managers, the
+    // commenter, the entry's poster, and the parent comment's poster when a
+    // manager wrote the reply. Deleted comments are left to the caller.
+    async visibleTo(db: Databases, remote: User | null): Promise<boolean> {
+        if (!remote) return false;
+        const entry = await this.entry(db);
+        if (!entry || !await entry.visibleTo(db, remote)) return false;
+        const poster = await this.poster(db);
+        if (this.isScreened()) {
+            const parentPoster = await (await this.parent(db))?.poster(db);
+            const allowed = await remote.canManage(db, this.journal)
+                || remote.equals(poster)
+                || remote.userid === entry.posterid
+                || remote.equals(parentPoster) && !!poster && await poster.canManage(db, this.journal);
+            if (!allowed) return false;
+        }
+        return !poster?.isSuspended();
+    }
+}
 
 export interface CommentRow {
     readonly talkid: number;

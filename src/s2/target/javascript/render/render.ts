@@ -56,6 +56,8 @@ export interface RenderRequest {
     // The path and query as requested, for links back to this page.
     readonly requestPath: string;
     readonly host: string;
+    // The logged-in viewer's userid; null for an anonymous visitor.
+    readonly remoteId: number | null;
     readonly layers: readonly CompiledLayer[];
     readonly style: StyleInfo;
 }
@@ -96,6 +98,7 @@ const STYLESHEET_FUNCTIONS = ["Page::print_contextual_stylesheet()", "Page::prin
 export async function renderJournal(db: Databases, site: Site, request: RenderRequest): Promise<RenderResult> {
     const journal = await User.byName(db, request.username);
     if (!journal) return PERL_PAGE;
+    const remote = request.remoteId ? (await User.byIds(db, [request.remoteId])).get(request.remoteId) ?? null : null;
     await journal.loadProps(db, JOURNAL_PROPS);
 
     const stylesheet = request.view === "res";
@@ -186,7 +189,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         (s2.ctx.prop as Record<string, unknown>)._SITEVIEWS = { ".type": "Siteviews", _content: sections };
     }
     const pc: PageContext = {
-        args: request.args, resources, db, site, journal, ctx: s2.ctx, content, cleaners, style: request.style,
+        args: request.args, resources, db, site, journal, remote, ctx: s2.ctx, content, cleaners, style: request.style,
         nowSeconds: Math.floor(Date.now() / 1000), users, userpics: new Map(), siteviews: !!siteviews,
     };
 

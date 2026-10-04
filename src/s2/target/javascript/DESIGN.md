@@ -21,7 +21,9 @@ layers. There is no allowlist of supported styles.
 - Memcache. All data comes from MySQL.
 - Request defenses: captcha checks on visitors, bans, rate limits, image
   proxying.
-- Logged-in viewers. Pages render as an anonymous visitor sees them.
+- Pages for logged-in viewers, for now. The server tells who a logged-in
+  viewer is and what they may see (see "Viewers and access"), but leaves
+  their pages to Perl.
 - Recovering or reading stored compiled Perl. Everything compiles from S2
   source.
 
@@ -87,9 +89,29 @@ its request state, so this server leaves them to Perl, which repeats the
 whole test when the comment is posted and shows the captcha then if needed.
 The captcha is rendered as DW::Captcha renders hCaptcha's widget.
 
-Journal paths that Perl's own controllers serve, and reply forms needing a
-captcha type other than hCaptcha, get a 501, so a proxy can send them to
-Perl.
+Journal paths that Perl's own controllers serve, reply forms needing a
+captcha type other than hCaptcha, and every request with a logged-in
+session get a 501, so a proxy can send them to Perl.
+
+## Viewers and access
+
+Who the viewer is and what they may see are ported, read-only, ahead of
+pages for logged-in viewers, which are not built yet:
+
+- `data/session.ts` (`Session`, LJ::Session) finds the viewer's session
+  from the master cookie on the main site, or from the journal's signed
+  domain cookie on a journal subdomain, checking its expiry, any IP address
+  it is bound to, the cookie generation, a second factor where the account
+  has one, and the account. Renewing sessions, and sending a visitor without
+  a domain cookie to get one, stay with Perl. Where the site names its
+  trusted proxies with Perl code, the client's address cannot be told, and a
+  session bound to an address is treated as logged in but not acted on.
+- `User` (LJ::User and DW::User: trust masks and groups, community
+  membership, management, privileges, age and account state), `Entry`
+  (`visibleTo`, `visibleComment`), `Comment` (`visibleTo`) and
+  `data/adult-content.ts` (DW::Logic::AdultContent) decide what a viewer may
+  see, reading the database where Perl reads memcached. The adult content
+  pages a viewer has confirmed live only in memcached, so they are not seen.
 
 ## Components
 
@@ -127,6 +149,9 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   stylesheets, siteviews pages, memorial and renamed journals, and error
   pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
+- **Access** (`tests/access.test.ts`). Each kind of viewer against entries
+  at each security level and hidden comments, and sessions from each kind
+  of cookie. A request with a logged-in session is left to Perl.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
   and suspended journals and entries never appear, hidden entries and
   comments answer exactly as missing ones, and adult content needs a login.

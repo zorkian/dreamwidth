@@ -107,6 +107,8 @@ my @route_patterns = map {
     { source => $2, flags => $1 }
 } @{ $DW::Routing::regex_choices{user} };
 
+my $trusted_proxy_is_code = do { no warnings 'once'; ref $LJ::IS_TRUSTED_PROXY eq 'CODE' };
+
 print JSON->new->canonical->pretty->encode(
     {
         databases          => \%databases,
@@ -183,6 +185,11 @@ print JSON->new->canonical->pretty->encode(
             supportEmail    => $LJ::SUPPORT_EMAIL // '',
             maxlengthUser  => $LJ::USERNAME_MAXLENGTH + 0,
             maxlengthPass  => $LJ::PASSWORD_MAXLENGTH + 0,
+        },
+        # How Plack::Middleware::DW::XForwardedFor finds the client's address.
+        remoteIp => {
+            trustXHeaders       => $LJ::TRUST_X_HEADERS ? JSON::true : JSON::false,
+            trustedProxyIsCode  => $trusted_proxy_is_code ? JSON::true : JSON::false,
         },
         # What LJ::Session->trusted_anon_user accepts in an ljtrust cookie.
         trustCookie => {

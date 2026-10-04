@@ -13,6 +13,7 @@
 
 import type { SiteConfig } from "../server/config";
 import { type Databases, type Row, int, text } from "./db";
+import { truthy } from "./entry";
 
 interface PropInfo {
     readonly id: number;
@@ -42,6 +43,38 @@ function propList(db: Databases): Promise<Map<string, PropInfo>> {
     return list;
 }
 
+// A trust group, as DW::User::Edges::WatchTrust::trust_groups gives one.
+export interface TrustGroup {
+    readonly groupnum: number;
+    readonly groupname: string;
+    readonly sortorder: number;
+    readonly isPublic: boolean;
+}
+
+// LJ::check_rel for a one-letter relationship: whether `target` has
+// relationship `type` with `user`, such as A for an administrator or E for
+// a member of a community.
+async function checkRel(db: Databases, user: User, target: User, type: string): Promise<boolean> {
+    const rows = await db.global("SELECT 1 FROM reluser WHERE userid = ? AND targetid = ? AND type = ?",
+        [user.userid, target.userid, type]);
+    return rows.length > 0;
+}
+
+// LJ::calc_age for a YYYY-MM-DD date, in UTC; 0 when unknown.
+function calcAge(date: string): number {
+    const match = /^(\d{4})-(\d\d)-(\d\d)/.exec(date);
+    if (!match) return 0;
+    const [year, month, day] = match.slice(1).map(Number) as [number, number, number];
+    if (!year) return 0;
+    const now = new Date();
+    let age = now.getUTCFullYear() - year;
+    if (month) {
+        if (now.getUTCMonth() + 1 < month) age -= 1;
+        else if (day && now.getUTCMonth() + 1 === month && now.getUTCDate() < day) age -= 1;
+    }
+    return age > 0 ? age : 0;
+}
+
 // The request host, which devcontainer journal URLs are built from.
 export interface Site {
     readonly config: SiteConfig;
@@ -55,6 +88,9 @@ export class User {
     readonly clusterid: number;
     readonly journaltype: string;
     readonly statusvis: string;
+    // The email status: A when validated.
+    readonly status: string;
+    readonly bdate: string;
     readonly dversion: number;
     readonly caps: number;
     readonly defaultpicid: number;
@@ -71,6 +107,8 @@ export class User {
         this.clusterid = int(row.clusterid);
         this.journaltype = text(row.journaltype);
         this.statusvis = text(row.statusvis);
+        this.status = text(row.status);
+        this.bdate = text(row.bdate);
         this.dversion = int(row.dversion);
         this.caps = int(row.caps);
         this.defaultpicid = int(row.defaultpicid);
@@ -110,8 +148,150 @@ export class User {
             || config.robotBlockingContent.includes(this.props.adult_content ?? "");
     }
 
+    // LJ::User::equals
+    equals(other: User | null | undefined): boolean {
+        return !!other && other.userid === this.userid;
+    }
+
+    // LJ::User::is_visible
     isVisible(): boolean {
         return this.statusvis === "V";
+    }
+
+    // LJ::User::is_suspended
+    isSuspended(): boolean {
+        return this.statusvis === "S";
+    }
+
+    // LJ::User::is_locked
+    isLocked(): boolean {
+        return this.statusvis === "L";
+    }
+
+    // LJ::User::is_memorial
+    isMemorial(): boolean {
+        return this.statusvis === "M";
+    }
+
+    // LJ::User::is_readonly
+    isReadonly(config: SiteConfig): boolean {
+        return this.statusvis === "O" || truthy(this.getCap(config, "readonly"));
+    }
+
+    // LJ::User::is_expunged
+    isExpunged(): boolean {
+        return this.statusvis === "X" || this.clusterid === 0;
+    }
+
+    // LJ::User::is_inactive: deleted, expunged or suspended.
+    isInactive(): boolean {
+        return this.statusvis === "D" || this.statusvis === "X" || this.statusvis === "S";
+    }
+
+    // LJ::User::is_validated
+    isValidated(): boolean {
+        return this.status === "A";
+    }
+
+    // LJ::User::is_person
+    isPerson(): boolean {
+        return this.journaltype === "P";
+    }
+
+    // LJ::User::is_identity
+    isIdentity(): boolean {
+        return this.journaltype === "I";
+    }
+
+    // LJ::User::is_community
+    isCommunity(): boolean {
+        return this.journaltype === "C";
+    }
+
+    // LJ::User::is_individual
+    isIndividual(): boolean {
+        return this.isPerson() || this.isIdentity();
+    }
+
+    // DW::User::Edges::WatchTrust::trustmask: the groups this user puts `other`
+    // in, bit 0 being general access, without the reserved and watch bits.
+    async trustmask(db: Databases, other: User): Promise<bigint> {
+        const [row] = await db.global(
+            "SELECT CAST(groupmask AS CHAR) AS groupmask FROM wt_edges WHERE from_userid = ? AND to_userid = ?",
+            [this.userid, other.userid]);
+        return BigInt(text(row?.groupmask) || "0") & ~(7n << 61n);
+    }
+
+    // DW::User::Edges::WatchTrust::trusts
+    async trusts(db: Databases, other: User): Promise<boolean> {
+        if (this.userid === other.userid) return true;
+        return (await this.trustmask(db, other) & 1n) === 1n;
+    }
+
+    // DW::User::Edges::WatchTrust::trust_groups, sorted by sort order and then name.
+    async trustGroups(db: Databases): Promise<TrustGroup[]> {
+        const rows = await db.global(
+            "SELECT groupnum, groupname, sortorder, is_public FROM trust_groups WHERE userid = ?", [this.userid]);
+        return rows.map(row => ({
+            groupnum: int(row.groupnum), groupname: text(row.groupname), sortorder: int(row.sortorder),
+            isPublic: text(row.is_public) === "1",
+        })).sort((a, b) => a.sortorder - b.sortorder
+            || (a.groupname < b.groupname ? -1 : a.groupname > b.groupname ? 1 : 0));
+    }
+
+    // DW::User::Edges::CommMembership::member_of
+    async isMemberOf(db: Databases, community: User): Promise<boolean> {
+        if (!this.isIndividual() || !community.isCommunity()) return false;
+        return checkRel(db, community, this, "E");
+    }
+
+    // LJ::User::trusts_or_has_member
+    async trustsOrHasMember(db: Databases, other: User): Promise<boolean> {
+        return this.isCommunity() ? other.isMemberOf(db, this) : this.trusts(db, other);
+    }
+
+    // LJ::User::can_manage
+    async canManage(db: Databases, target: User): Promise<boolean> {
+        if (this.equals(target)) return true;
+        if (/^[PYR]$/.test(target.journaltype)) return false;
+        return checkRel(db, target, this, "A");
+    }
+
+    // LJ::User::has_priv: whether the user has the privilege, with `arg`
+    // or with "*" when one is given.
+    async hasPriv(db: Databases, priv: string, arg?: string): Promise<boolean> {
+        const rows = await db.global(`SELECT pm.arg FROM priv_map pm JOIN priv_list pl ON pm.prlid = pl.prlid
+            WHERE pm.userid = ? AND pl.privcode = ?`, [this.userid, priv]);
+        if (!rows.length) return false;
+        if (arg === undefined) return true;
+        return rows.some(row => text(row.arg) === arg || text(row.arg) === "*");
+    }
+
+    // LJ::User::best_guess_age: from the age given at signup, else the birthdate.
+    async bestGuessAge(db: Databases): Promise<number> {
+        if (!this.isPerson() && !this.isIdentity()) return 0;
+        await this.loadProps(db, ["init_bdate"]);
+        return calcAge(this.props.init_bdate ?? "") || calcAge(this.bdate);
+    }
+
+    // LJ::User::is_minor: known to be under 18.
+    async isMinor(db: Databases): Promise<boolean> {
+        const age = await this.bestGuessAge(db);
+        return age > 0 && age < 18;
+    }
+
+    // LJ::User::adult_content_calculated. Needs adult_content loaded.
+    adultContentCalculated(): string {
+        return this.props.adult_content || "none";
+    }
+
+    // LJ::User::hide_adult_content: none, concepts or explicit.
+    async hideAdultContent(db: Databases): Promise<string> {
+        await this.loadProps(db, ["hide_adult_content"]);
+        const value = this.props.hide_adult_content ?? "";
+        if (!await this.bestGuessAge(db)) return "concepts";
+        if (await this.isMinor(db) && value !== "concepts") return "explicit";
+        return value || "none";
     }
 
     // LJ::User::preload_props

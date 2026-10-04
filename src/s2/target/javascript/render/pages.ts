@@ -39,6 +39,8 @@ export interface PageContext {
     readonly db: Databases;
     readonly site: Site;
     readonly journal: User;
+    // The logged-in viewer, or null for an anonymous visitor.
+    readonly remote: User | null;
     readonly ctx: Context;
     readonly content: ContentCleaner;
     readonly cleaners: PropertyCleaners;
