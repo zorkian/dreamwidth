@@ -11,8 +11,9 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
+import { Comment } from "./comment";
 import { type Databases, type Row, int, text } from "./db";
-import type { Site, User } from "./user";
+import { type Site, User } from "./user";
 
 const S2_DATE_FORMAT = "%Y %m %d %H %i %s %w";
 const COLUMNS = `jitemid, anum, posterid, security, allowmask, eventtime, logtime, replycount,
@@ -44,6 +45,8 @@ export class Entry {
     readonly posterid: number;
     readonly security: string;
     readonly allowmask: number;
+    // All 61 bits, as trust groups go up to bit 60.
+    readonly allowmaskBits: bigint;
     readonly eventtime: string;
     readonly logtime: string;
     readonly alldatepart: string;
@@ -62,6 +65,7 @@ export class Entry {
         this.posterid = int(row.posterid);
         this.security = text(row.security);
         this.allowmask = int(row.allowmask);
+        this.allowmaskBits = BigInt(text(row.allowmask) || "0");
         this.eventtime = text(row.eventtime);
         this.logtime = text(row.logtime);
         this.alldatepart = text(row.alldatepart);
@@ -80,6 +84,60 @@ export class Entry {
     // Anonymous visitors see only public, unsuspended entries.
     isPublic(): boolean {
         return this.security === "public" && !this.isSuspended();
+    }
+
+    // LJ::Entry::poster
+    async poster(db: Databases): Promise<User | undefined> {
+        return this.posterid === this.journal.userid ? this.journal
+            : (await User.byIds(db, [this.posterid])).get(this.posterid);
+    }
+
+    // LJ::Entry::is_suspended_for
+    async isSuspendedFor(db: Databases, remote: User | null): Promise<boolean> {
+        await Entry.fill(db, this.journal, [this]);
+        if (!this.isSuspended()) return false;
+        if (!remote) return true;
+        if (await remote.hasPriv(db, "canview", "suspended")) return false;
+        return remote.userid !== this.posterid;
+    }
+
+    // LJ::Entry::visible_to. `canview` is the viewall argument, which lets
+    // holders of the canview privilege past the usual rules.
+    async visibleTo(db: Databases, remote: User | null, canview = false): Promise<boolean> {
+        let viewall = false, viewsome = false;
+        if (remote && canview) {
+            viewall = await remote.hasPriv(db, "canview", "*");
+            viewsome = viewall || await remote.hasPriv(db, "canview", "suspended");
+        }
+        if (viewall) return true;
+        if (!viewsome) {
+            if (this.journal.isInactive()) return false;
+            if ((await this.poster(db))?.isSuspended()) return false;
+            if (await this.isSuspendedFor(db, remote)) return false;
+        }
+        if (this.security === "public") return true;
+        if (!remote) return false;
+        if (remote.userid === this.journal.userid) return true;
+        if (this.security !== "usemask" && this.security !== "private") return false;
+        if (!remote.isIndividual()) return false;
+        if (this.security === "private") {
+            return this.journal.isCommunity() && await remote.canManage(db, this.journal);
+        }
+        if (this.journal.isCommunity() && await remote.isMemberOf(db, this.journal)) return true;
+        return (await this.journal.trustmask(db, remote) & this.allowmaskBits) !== 0n;
+    }
+
+    // LJ::Entry::visible_comment: the comment if it is on this entry and `remote`
+    // may see it. Every undefined result must be answered the same way, so that
+    // hidden comments cannot be told from missing ones.
+    async visibleComment(db: Databases, dtalkid: number, remote: User | null): Promise<Comment | undefined> {
+        if (!Number.isInteger(dtalkid) || dtalkid < 0 || dtalkid % 256 !== this.anum) return undefined;
+        const comment = await Comment.byJtalkid(db, this.journal, dtalkid >> 8);
+        if (!comment || comment.nodetype !== "L" || comment.nodeid !== this.jitemid) return undefined;
+        if (comment.isDeleted()) return undefined;
+        if ((await comment.poster(db))?.isSuspended()) return undefined;
+        if (comment.isScreened() && !await comment.visibleTo(db, remote)) return undefined;
+        return comment;
     }
 
     // LJ::Entry::url

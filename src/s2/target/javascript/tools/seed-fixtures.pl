@@ -276,6 +276,92 @@ unless ( LJ::Entry->new( $big, ditemid => $big_entry )->reply_count ) {
     }
 }
 
+# Who may see what, for tests/access.test.ts: a journal's entries at each
+# security level, the users it trusts with and without a custom filter, a
+# community with an admin and a member who posts, hidden comments, a minor,
+# and login sessions.
+my %acc = map { $_ => journal("s2fix_acc_$_") } qw( owner stranger trusted filter minor poster susp );
+my $owner = $acc{owner};
+unless ( entry_count($owner) ) {
+    $owner->create_trust_group( id => 1, groupname => 'Fixture filter' );
+    $owner->add_edge( $acc{trusted}, trust => { mask => 1, nonotify => 1 } );
+    $owner->add_edge( $acc{filter},  trust => { mask => 3, nonotify => 1 } );
+    my $n = 0;
+    post( $owner, ++$n, subject => "Access $_->[0]", event => "Access $_->[0] text", @{ $_->[1] } )
+        for [ public => [ security => 'public' ] ], [ private => [ security => 'private' ] ],
+        [ locked => [ security => 'usemask', allowmask => 1 ] ],
+        [ filtered => [ security => 'usemask', allowmask => 2 ] ],
+        [ explicit => [ security => 'public', prop_adult_content => 'explicit' ] ];
+}
+$acc{minor}->set_prop( init_bdate => sprintf( '%04d-01-01', ( gmtime() )[5] + 1900 - 15 ) );
+my $acc_comm = LJ::load_user('s2fix_acc_comm') || LJ::User->create_community(
+    user                   => 's2fix_acc_comm',
+    name                   => 'Access community',
+    admin_userid           => $acc{trusted}->userid,
+    membership             => 'closed',
+    postlevel              => 'members',
+    nonmember_posting      => 0,
+    moderated              => 0,
+    journal_adult_settings => 'none',
+) || die "Cannot create s2fix_acc_comm\n";
+# A closed community admits members only as a moderated add.
+$acc{poster}->join_community( $acc_comm, 1, 1, moderated_add => 1 ) unless $acc{poster}->member_of($acc_comm);
+unless ( entry_count($acc_comm) ) {
+    my $n = 0;
+    post( $acc_comm, ++$n, user => $acc{poster}->user, usejournal => $acc_comm->user,
+        subject => "Community $_->[0]", event => "Community $_->[0] text", @{ $_->[1] } )
+        for [ public => [ security => 'public' ] ], [ members => [ security => 'usemask', allowmask => 1 ] ];
+}
+
+# Only an administrator may post one for administrators.
+post( $acc_comm, 3, user => $acc{trusted}->user, usejournal => $acc_comm->user, subject => 'Community private',
+    event => 'Community private text', security => 'private' )
+    unless entry_count($acc_comm) > 2;
+my $acc_comment = sub {
+    my ( $u, $subject, $poster, $body ) = @_;
+    my ($jitemid) = LJ::get_cluster_reader($u)->selectrow_array(
+        'SELECT jitemid FROM logtext2 WHERE journalid = ? AND subject = ?', undef, $u->userid, $subject );
+    my $entry = LJ::Entry->new( $u, jitemid => $jitemid );
+    my $err;
+    return LJ::Comment->create( journal => $u, ditemid => $entry->ditemid, poster => $poster,
+        body => $body, err_ref => \$err ) || die "Cannot comment: $err->{msg}\n";
+};
+unless ( LJ::get_cluster_reader($owner)
+    ->selectrow_array( 'SELECT COUNT(*) FROM talk2 WHERE journalid = ?', undef, $owner->userid ) )
+{
+    my $screened = $acc_comment->( $owner, 'Access public', $acc{stranger}, 'Access screened comment' );
+    LJ::Talk::screen_comment( $owner, $screened->nodeid, $screened->jtalkid );
+    my $deleted = $acc_comment->( $owner, 'Access public', $acc{trusted}, 'Access deleted comment' );
+    LJ::get_cluster_master($owner)->do( "UPDATE talk2 SET state = 'D' WHERE journalid = ? AND jtalkid = ?",
+        undef, $owner->userid, $deleted->jtalkid );
+    $acc_comment->( $owner, 'Access public', $acc{susp}, 'Access suspended comment' );
+    my $comm_screened = $acc_comment->( $acc_comm, 'Community public', $acc{stranger}, 'Community screened comment' );
+    LJ::Talk::screen_comment( $acc_comm, $comm_screened->nodeid, $comm_screened->jtalkid );
+}
+
+# Sessions, each on its own account as creating one clears the account's
+# expired ones: valid, bound to another IP address, expired, and for an
+# account suspended after logging in.
+my $session = sub {
+    my ( $u, %opts ) = @_;
+    return if LJ::get_cluster_reader($u)->selectrow_array(
+        'SELECT COUNT(*) FROM sessions WHERE userid = ? AND timeexpire > UNIX_TIMESTAMP() + 86400', undef, $u->userid );
+    LJ::Session->create( $u, exptype => 'long', nolog => 1, %opts ) or die "Cannot create session\n";
+};
+$session->( $acc{trusted} );
+$session->( $acc{filter}, ipfixed => '10.9.8.7' );
+unless ( LJ::get_cluster_reader( $acc{stranger} )
+    ->selectrow_array( 'SELECT COUNT(*) FROM sessions WHERE userid = ?', undef, $acc{stranger}->userid ) )
+{
+    my $expired = LJ::Session->create( $acc{stranger}, exptype => 'long', nolog => 1 );
+    LJ::get_cluster_master( $acc{stranger} )->do( 'UPDATE sessions SET timeexpire = 1 WHERE userid = ? AND sessid = ?',
+        undef, $acc{stranger}->userid, $expired->{sessid} );
+}
+unless ( $acc{susp}->is_suspended ) {
+    $session->( $acc{susp} );
+    $acc{susp}->update_self( { statusvis => 'S' } );
+}
+
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
 my $memorial = journal('s2fix_memorial');

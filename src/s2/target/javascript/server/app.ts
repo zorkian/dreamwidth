@@ -16,6 +16,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Compiler } from "../compile/compiler";
 import { type LayerRef, siteviewsLayers, styleInfo, styleIsPublic, styleLayers, styleOwner, systemLayers } from "../compile/styles";
 import { type Databases, int, text } from "../data/db";
+import { Session } from "../data/session";
 import { User, journalBase } from "../data/user";
 import { publicTags, parseTagFilter } from "../data/tags";
 import { type JournalFilter, type RenderRequest, type RenderResult, PERL_PAGE } from "../render/render";
@@ -40,6 +41,8 @@ export interface Visitor {
     readonly uniq: string;
     // The Cookie header.
     readonly cookie: string;
+    // LJ::get_remote_ip, or undefined when this server cannot tell it.
+    readonly remoteIp?: string;
 }
 
 // Resolve a journal URL to what a render worker needs, or to a response
@@ -49,6 +52,10 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     const parsed = new URL(url, "http://journal");
     const target = journalPath(config, host, parsed.pathname);
     if (!target || userRoute(config, parsed.pathname)) return PERL_PAGE;
+    // Logged-in viewers are identified, but their pages are not built here yet.
+    const session = await Session.fromCookies(db, config,
+        { host, path: parsed.pathname, cookie: visitor.cookie, remoteIp: visitor.remoteIp });
+    if (session) return PERL_PAGE;
     const site = { config, host };
     const args = Object.fromEntries(parsed.searchParams);
     // ?style=light shows the site's own pages in its text-only scheme.
@@ -150,6 +157,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         username: journal.user, view: mode, pathextra, ditemid: view.ditemid, filter,
         slug: view.slug !== undefined ? { slug: view.slug, date: view.date! } : undefined,
         args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie, siteviews,
+        remoteId: null,
     };
 }
 
@@ -165,6 +173,16 @@ function userRoute(config: SiteConfig, path: string): boolean {
     return /^\/api\/v\d+\/./.test(uri) || config.userRoutes.paths.includes(uri) || patterns.some(pattern => pattern.test(uri));
 }
 const routePatterns = new WeakMap<SiteConfig, RegExp[]>();
+
+// LJ::get_remote_ip, as Plack::Middleware::DW::XForwardedFor sets it.
+function remoteIp(config: SiteConfig, request: { ip: string; headers: Record<string, unknown> }): string | undefined {
+    const forwarded = String(request.headers["x-forwarded-for"] ?? "");
+    if (config.remoteIp.trustXHeaders && forwarded) {
+        if (config.remoteIp.trustedProxyIsCode) return undefined;
+        return forwarded.split(/\s*,\s*/)[0];
+    }
+    return request.ip.replace(/^::ffff:/, "");
+}
 
 // make_journal's tag and security filters.
 // `origin` is where the security filter list links, as Perl's create_url
@@ -239,7 +257,7 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         const known = /^([a-zA-Z0-9]{15}):(\d+)(.+)$/.exec(cookie ? decodeURIComponent(cookie[1]!) : "")?.[1];
         const uniq = known ?? randChars(15);
         const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost",
-            { uniq, cookie: request.headers.cookie ?? "" });
+            { uniq, cookie: request.headers.cookie ?? "", remoteIp: remoteIp(config, request) });
         const result = "layers" in prepared ? await render(prepared) : prepared;
         if (result.location) reply.header("location", result.location);
         if (!known && "layers" in prepared && prepared.view === "reply") {

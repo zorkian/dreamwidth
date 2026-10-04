@@ -76,7 +76,11 @@ export interface SiteConfig {
         readonly maxlengthUser: number;
         readonly maxlengthPass: number;
     };
+    // Cookie generations LJ::Session accepts, for the ljtrust and session cookies.
     readonly trustCookie: { readonly generations: readonly string[]; readonly maxAge: number };
+    // $LJ::TRUST_X_HEADERS, and whether $LJ::IS_TRUSTED_PROXY is code, which
+    // only Perl can run.
+    readonly remoteIp: { readonly trustXHeaders: boolean; readonly trustedProxyIsCode: boolean };
     // Page::print_trusted's snippets by key, or by "username-key" for the listed usernames.
     readonly trustedS2: Readonly<Record<string, string>>;
     readonly trustedS2Usernames: readonly string[];
