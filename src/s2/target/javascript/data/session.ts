@@ -13,7 +13,7 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { createHash, createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SiteConfig } from "../server/config";
 import { type Databases, type Row, int, text } from "./db";
 import { User } from "./user";
@@ -83,7 +83,7 @@ export class Session {
             // Locked accounts can't be logged in.
             if (!u || u.isLocked()) continue;
             const sess = await Session.instance(db, u, int(parsed.fields.s));
-            if (!sess || sess.auth !== (parsed.fields.a ?? "")) continue;
+            if (!sess || !sameSecret(sess.auth, parsed.fields.a ?? "")) continue;
             if (!await sess.valid(db, request.remoteIp)) continue;
             if (!oldCookie && sess.loggedinCookieString() !== loggedIn) continue;
             return sess;
@@ -107,7 +107,7 @@ export class Session {
             const sess = await Session.instance(db, u, int(s));
             if (!sess || !await sess.valid(db, request.remoteIp)) continue;
             if (sess.loggedinCookieString() !== loggedIn) continue;
-            if (await domsessSignature(db, t ?? "", sess, domcook) !== g) continue;
+            if (!sameSecret(await domsessSignature(db, t ?? "", sess, domcook), g ?? "")) continue;
             return sess;
         }
         return null;
@@ -152,13 +152,22 @@ export class Session {
 // DW::Auth::TOTP::session_verified: an account with a second factor needs a
 // session that has proven it.
 async function sessionVerified(db: Databases, sess: Session): Promise<boolean> {
-    const [password] = await db.global("SELECT totp_secret FROM password2 WHERE userid = ?", [sess.owner.userid]);
-    const secret = password?.totp_secret;
-    if (secret === null || secret === undefined) return true;
-    const factor = createHash("sha256").update(Buffer.isBuffer(secret) ? secret : String(secret)).digest("hex");
+    // MySQL hashes the stored (encrypted) secret, so it never reaches this process.
+    const [password] = await db.global("SELECT SHA2(totp_secret, 256) AS factor FROM password2 WHERE userid = ?",
+        [sess.owner.userid]);
+    if (password?.factor === null || password?.factor === undefined) return true;
+    const factor = text(password.factor);
     const [proof] = await sess.owner.cluster(db, "SELECT factor, expires FROM mfa_sessions WHERE userid = ? AND sessid = ?",
         [sess.owner.userid, sess.sessid]);
-    return !!proof && int(proof.expires) > Date.now() / 1000 && text(proof.factor) === factor;
+    return !!proof && int(proof.expires) > Date.now() / 1000 && sameSecret(text(proof.factor), factor);
+}
+
+// Equality for auth values and signatures that takes the same time however
+// much of the input matches.
+export function sameSecret(a: string, b: string): boolean {
+    const x = Buffer.from(a);
+    const y = Buffer.from(b);
+    return x.length === y.length && timingSafeEqual(x, y);
 }
 
 // LJ::Session::domsess_signature. A time with no secret signs with an empty
