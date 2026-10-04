@@ -19,7 +19,8 @@ layers. There is no allowlist of supported styles.
 
 - Writes of any kind. The server holds read-only database credentials.
 - Memcache. All data comes from MySQL.
-- Request defenses: captcha, bans, rate limits, image proxying.
+- Request defenses: captcha checks on visitors, bans, rate limits, image
+  proxying.
 - Logged-in viewers. Pages render as an anonymous visitor sees them.
 - Recovering or reading stored compiled Perl. Everything compiles from S2
   source.
@@ -76,8 +77,19 @@ the page asked for, and nothing to click through. On lists of entries, an
 adult entry in a journal that is not flagged shows only a link to its own
 page.
 
-Reply pages on a site that requires captchas, and journal paths that Perl's
-own controllers serve, get a 501, so a proxy can send them to Perl.
+Reply forms show a captcha where Perl's would: when the site has one, and
+the journal asks it of anonymous commenters (unless the browser's ljtrust
+cookie vouches for a recent login to an account in good standing), of
+everyone but those it trusts, or of everyone, or when an entry over 30 days
+old has reached the comment count that requires one. Perl also asks
+commenters past a posting rate or from a banned address; those checks need
+its request state, so this server leaves them to Perl, which repeats the
+whole test when the comment is posted and shows the captcha then if needed.
+The captcha is rendered as DW::Captcha renders hCaptcha's widget.
+
+Journal paths that Perl's own controllers serve, and reply forms needing a
+captcha type other than hCaptcha, get a 501, so a proxy can send them to
+Perl.
 
 ## Components
 

@@ -67,11 +67,16 @@ export interface SiteConfig {
         // As LJ::Talk::print_subjecticon_by_id prints them, with %s where extra attributes go.
         readonly subjecticons: readonly { readonly id: string; readonly html: string }[];
         readonly editors: { readonly selected: string; readonly items: readonly { value: string; text: string }[] };
-        // DW::Captcha::site_enabled: reply pages then need Perl's request checks.
+        // DW::Captcha::site_enabled.
         readonly captcha: boolean;
+        // The captcha implementation's name, such as "hcaptcha"; "" when disabled.
+        readonly captchaType: string;
+        readonly hcaptchaSitekey: string;
+        readonly supportEmail: string;
         readonly maxlengthUser: number;
         readonly maxlengthPass: number;
     };
+    readonly trustCookie: { readonly generations: readonly string[]; readonly maxAge: number };
     // Page::print_trusted's snippets by key, or by "username-key" for the listed usernames.
     readonly trustedS2: Readonly<Record<string, string>>;
     readonly trustedS2Usernames: readonly string[];

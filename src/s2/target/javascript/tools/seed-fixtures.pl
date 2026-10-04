@@ -252,6 +252,11 @@ my $adult_journal = journal('s2fix_adultjournal');
 entries( $adult_journal, 1 );
 $adult_journal->set_prop( adult_content => 'concepts' );
 
+# A journal that asks anonymous commenters for a captcha, when the site has one.
+my $captcha = journal('s2fix_captcha');
+entries( $captcha, 1 );
+$captcha->set_prop( opt_show_captcha_to => 'R' );
+
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
 my $memorial = journal('s2fix_memorial');

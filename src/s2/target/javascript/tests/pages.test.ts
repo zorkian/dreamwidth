@@ -14,12 +14,15 @@
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { int } from "../data/db";
 import { User } from "../data/user";
 import { renderJournal } from "../render/render";
-import { createApp } from "../server/app";
+import { currentSecret } from "../render/reply-page";
+import { createApp, prepare } from "../server/app";
+import type { SiteConfig } from "../server/config";
 import { HOST, TestJournals } from "./journal";
 
 const PERL = "http://localhost:8080";
@@ -84,6 +87,40 @@ test("reply pages, to an entry and to a comment", async () => {
     await compare(`/~s2fix_theme/${ditemid}.html?mode=reply`);
     // The second comment, "Re: top".
     await compare(`/~s2fix_theme/${ditemid}.html?replyto=${(2 << 8) + ditemid % 256}`);
+});
+
+test("a reply page in a journal that asks anonymous commenters for a captcha", async () => {
+    await compare(`/~s2fix_captcha/${await journals.ditemid("s2fix_captcha", "Entry 1:")}.html?mode=reply`);
+});
+
+// The devcontainer's Perl site runs without a captcha, so with one switched on
+// these state what LJ::Talk::Post::require_captcha_test and DW::Captcha give.
+test("with the site's captcha on, reply pages show it where the journal asks", async () => {
+    const config: SiteConfig = { ...journals.config, talkform: {
+        ...journals.config.talkform, captcha: true, captchaType: "hcaptcha", hcaptchaSitekey: "site-key",
+    } };
+    const reply = async (user: string, cookie = "", uniq = "") => {
+        const url = `/~${user}/${await journals.ditemid(user, "Entry 1:")}.html?mode=reply`;
+        const request = await prepare(config, journals.db, journals.compiler, url, HOST, { uniq, cookie });
+        assert.ok("layers" in request, url);
+        const page = await renderJournal(journals.db, { config, host: HOST }, request);
+        assert.equal(page.status, 200, url);
+        return page.body.includes(`<div class="h-captcha" data-sitekey="site-key"></div>`);
+    };
+    assert.equal(await reply("s2fix_default"), false);
+    assert.equal(await reply("s2fix_captcha"), true);
+
+    // A browser recently logged in to an account in good standing is not asked,
+    // as long as its ljtrust cookie is signed for its ljuniq.
+    const reader = (await User.byName(journals.db, "s2fix_reader"))!;
+    const { stime, secret } = await currentSecret(journals.db);
+    const uniq = "abcdefghijklmno";
+    const sig = createHmac("sha1", secret).update(`trust-${reader.userid}-${uniq}-${stime}`).digest("hex");
+    const trust = (sign: string) =>
+        `ljtrust=${encodeURIComponent(`v1:u${reader.userid}:t${stime}:g${sign}//${config.trustCookie.generations[0]}`)}`;
+    assert.equal(await reply("s2fix_captcha", trust(sig), uniq), false);
+    assert.equal(await reply("s2fix_captcha", trust(sig), "zzzzzzzzzzzzzzz"), true);
+    assert.equal(await reply("s2fix_captcha", trust("0".repeat(40)), uniq), true);
 });
 
 test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));
