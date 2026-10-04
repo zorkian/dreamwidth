@@ -217,7 +217,9 @@ npm test
 
 In production, the web22 image builds the server and `startup-prod.sh` runs it
 on port 8091 beside Starman for services that set `DW_JOURNAL_SERVER`
-(web-canary), logging to `/var/log/starman/journal-server.log`.
+(web-canary), logging to `/var/log/starman/journal-server.log`. `/healthz`
+answers load balancer health checks on any host: 200, or 503 while the
+database is unreachable.
 
 `tools/bench.mjs` times pages on both servers; `BENCHMARKS.md` has the method
 and the latest devcontainer results.
