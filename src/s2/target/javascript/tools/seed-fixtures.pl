@@ -18,6 +18,7 @@ use strict;
 use warnings;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use LJ::Comment;
+use LJ::Lang;
 use LJ::Customize;
 use LJ::Protocol;
 use LJ::S2;
@@ -418,6 +419,39 @@ unless ( $closed_profile->has_bio ) {
     $closed_profile->save_profile_accts( { $github => ['hidden-github'] } );
     $commenter->add_edge( $closed_profile, watch => { nonotify => 1 } );
     $closed_profile->join_community( $community, 1, 1 );
+}
+
+# FAQs, made as DW::Controller::Admin::FAQ makes them: a category with one
+# FAQ using every kind of mark-up and one plain FAQ, and a category without FAQs.
+{
+    my $dbh = LJ::get_db_writer();
+    my $faqd = LJ::Lang::get_dom('faq');
+    $dbh->do( 'REPLACE INTO faqcat (faqcat, faqcatname, catorder) VALUES (?, ?, ?)', undef, @$_ )
+        for [ 's2fix', 'Fixture & <questions>', 1 ], [ 's2fix_empty', 'Fixture empty', 2 ];
+    my $faq = sub {
+        my ( $question, $summary, $answer, $sortorder ) = @_;
+        my ($id) = $dbh->selectrow_array( 'SELECT faqid FROM faq WHERE question = ?', undef, $question );
+        return $id if $id;
+        $dbh->do(
+            'INSERT INTO faq (question, summary, answer, faqcat, sortorder, lastmoduserid, lastmodtime)'
+                . ' VALUES (?, ?, ?, ?, ?, ?, NOW())',
+            undef, $question, $summary, $answer, 's2fix', $sortorder, $themed->userid
+        );
+        $id = $dbh->{mysql_insertid};
+        LJ::Lang::set_text( $faqd->{dmid}, $LJ::DEFAULT_LANG, "$id.$_->[0]", $_->[1], { childrenlatest => 1 } )
+            for [ '1question', $question ], [ '2answer', $answer ], [ '3summary', $summary ];
+        return $id;
+    };
+    my $plain = $faq->( 'Fixture plain question', '-', "A plain answer.\nOn two lines.", 20 );
+    $faq->(
+        'How does [[username]] use <fixtures> & cuts?',
+        'A <b>short</b> summary for [[username]].',
+        "Visit [[journalurl]] or [[journalurl:s2fix_theme]], as [[username:s2fix_reader]]. See [[faqtitle:$plain]],"
+            . ' [[gmlitem:Username]], [[faqtitle:999999]], [[username:s2fix_nobody]] and [[bogus]].'
+            . "\n<lj-cut text=\"More\">Under the cut, for <user name=\"s2fix_reader\">.</lj-cut>"
+            . ' Knitting at https://example.com/knit and <a href="https://example.com/knitting">knitting</a>.',
+        10
+    );
 }
 
 # A memorial journal, which reads as any other, and a renamed account, which

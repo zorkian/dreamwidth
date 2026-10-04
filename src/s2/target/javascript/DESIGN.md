@@ -4,7 +4,8 @@
 
 A read-only web server that renders Dreamwidth journal pages from S2 without
 running Perl at request time. Send it a journal URL; it returns the same page
-the Perl site would.
+the Perl site would. It also serves a few of the site's own read-only pages
+to anonymous visitors.
 
 "The same page" means what a reader sees and uses: content, layout and style,
 links, navigation and forms, and no-JS reading. Attribute order, insignificant
@@ -78,6 +79,16 @@ detail an owner keeps from anonymous visitors (birthday, location, contact
 details, other sites' accounts, who subscribes to them, their communities)
 is left out as Perl leaves it out, reading the same settings.
 
+On the site's own host it serves, besides profiles, pages that need no
+session, form or search (`render/static-page.ts`, `render/faq-page.ts`):
+the pages Perl serves from a template alone (`/about`, `/legal/*` and its
+index, `/site/` and `/site/{opensource,bot,brand,policy}`, `/doc/s2`), the
+FAQ index (`/support/faq`), and FAQ entries and categories
+(`/support/faqbrowse?faqid=` or `?faqcat=`, with search terms highlighted),
+in the default language only. FAQ text is read from the database; Perl's
+reader also marks a missing translation item visible, which this server
+does not.
+
 Journal feeds are served as `LJ::Feed::make_feed` serves them to an
 anonymous reader (`render/feed.ts`): RSS and Atom at `/data/rss` and
 `/data/atom`, for the newest public entries or one entry (`?itemid=`), with
@@ -106,7 +117,10 @@ whole test when the comment is posted and shows the captcha then if needed.
 The captcha is rendered as DW::Captcha renders hCaptcha's widget.
 
 Journal paths that Perl's own controllers serve, the icon and comment feeds,
-reply forms needing a captcha type other than hCaptcha, and every request
+reply forms needing a captcha type other than hCaptcha, every other site page
+(the home page, search, FAQ search and popular FAQs, `/support/faqbrowse`
+with neither argument, forms, anything that writes), pages asked for in
+another language (`?uselang=`, or `?lang=` on an FAQ), and every request
 with a logged-in session get a 501, so a proxy can send them to Perl.
 
 ## Viewers and access
@@ -162,8 +176,9 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
   entries with rich HTML, comments, pagination, filters, the archive views,
-  stylesheets, siteviews pages, feeds, profiles, memorial and renamed journals, and error
-  pages in the site scheme.
+  stylesheets, siteviews pages, feeds, profiles, memorial and renamed
+  journals, error pages in the site scheme, and the site's legal, site map
+  and FAQ pages.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Access** (`tests/access.test.ts`). Each kind of viewer against entries
   at each security level and hidden comments, and sessions from each kind

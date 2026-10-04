@@ -89,7 +89,15 @@ export interface SiteConfig {
     // The LJ::is_enabled features journal views check.
     readonly enabled: Readonly<Record<
         "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content"
-        | "infoshow_migrate" | "show-talkleft" | "esn" | "payments" | "directory", boolean>>;
+        | "infoshow_migrate" | "show-talkleft" | "esn" | "payments" | "directory" | "faq_summaries", boolean>>;
+    // The pages under /legal, as DW::Controller::Legal lists them.
+    readonly legalPages: readonly string[];
+    // $LJ::DEFAULT_LANG
+    readonly defaultLang: string;
+    // $LJ::EXAMPLE_USER_ACCOUNT, whom the FAQs address anonymous visitors as.
+    readonly exampleUser: string;
+    // $LJ::MERCH_URL
+    readonly merchUrl: string;
     // %LJ::FORCE_EMPTY_SUBSCRIPTIONS: accounts whose profiles leave out their
     // subscribers and members.
     readonly forceEmptySubscriptions: readonly number[];

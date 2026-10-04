@@ -104,6 +104,11 @@ export class ContentCleaner {
         }, this.site, this.hooks);
     }
 
+    // LJ::CleanHTML::clean_event as the FAQ pages call it, without cuts.
+    faq(text: string): string {
+        return cleanEvent(text, { ljcutDisable: true }, this.site, this.hooks);
+    }
+
     // LJ::CleanHTML::clean_userbio
     userbio(text: string, stripLinks: boolean): string {
         return cleanUserbio(text, this.site, this.hooks, stripLinks);
