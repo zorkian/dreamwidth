@@ -72,6 +72,9 @@ export interface EventOptions {
     removeFonts?: boolean;
     // Return only the text under this cut, counting from 1.
     cutRetrieve?: number;
+    // Text going to another site, such as a feed reader: user tags without
+    // the site's classes, and links left as written.
+    toExternalSite?: boolean;
 }
 
 // LJ::CleanHTML::clean_event
@@ -97,7 +100,7 @@ export function cleanEvent(text: string, opts: EventOptions, site: CleanSite, ho
         cuturl: opts.cuturl, eat: SUBJECT_EAT, mode: "allow", remove: EVENT_REMOVE, cleancss: true, noearlyclose: true,
         textonly: opts.textonly, suspend_msg: opts.suspendMsg, journal: opts.journal, ditemid: opts.ditemid,
         remove_colors: opts.removeColors, remove_sizes: opts.removeSizes, remove_fonts: opts.removeFonts,
-        cut_retrieve: opts.cutRetrieve,
+        cut_retrieve: opts.cutRetrieve, to_external_site: opts.toExternalSite,
     }, site, hooks);
 }
 

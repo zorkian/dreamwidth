@@ -95,6 +95,14 @@ export class ContentCleaner {
         }, this.site, this.hooks);
     }
 
+    // LJ::CleanHTML::clean_event as LJ::Feed calls it, for a reader on
+    // another site; `event` may already be shortened.
+    syndicated(entry: Entry, event: string, cuturl: string | undefined): string {
+        return cleanEvent(event, {
+            editor: entry.props.editor, preformatted: truthy(entry.props.opt_preformatted), cuturl, toExternalSite: true,
+        }, this.site, this.hooks);
+    }
+
     // LJ::Entry::event_text and subject_text, for Open Graph tags.
     metadata(entry: Entry): { subject: string; event: string } {
         return {

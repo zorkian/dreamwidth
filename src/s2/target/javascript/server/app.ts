@@ -24,6 +24,7 @@ import type { SiteConfig } from "./config";
 import { currentSecret, randChars } from "../render/reply-page";
 import { viewingStyle } from "../render/chrome";
 import { styleUrl } from "../render/objects";
+import { renderFeed } from "../render/feed";
 import { currentScheme, deletedJournalVars, notFoundPage, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
 import { determineView } from "./views";
@@ -43,6 +44,8 @@ export interface Visitor {
     readonly cookie: string;
     // LJ::get_remote_ip, or undefined when this server cannot tell it.
     readonly remoteIp?: string;
+    // The If-Modified-Since header.
+    readonly ifModifiedSince?: string;
 }
 
 // Resolve a journal URL to what a render worker needs, or to a response
@@ -93,7 +96,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         const body = `User-Agent: *\n${journal.shouldBlockRobots(config) ? "Disallow: /\n" : ""}`;
         return { status: 200, body, contentType: "text/plain" };
     }
-    if (mode && !S2_VIEWS.has(mode)) return PERL_PAGE;
+    if (mode && !S2_VIEWS.has(mode) && mode !== "data") return PERL_PAGE;
     if (mode === "network" && !Number(journal.getCap(config, "friendsfriendsview"))) {
         return sitePage("error.tt", { message: config.strings["cprod.friendsfriendsinline.text3.v1"] }, journal);
     }
@@ -138,6 +141,11 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         return journalError("error/openid-user.tt", { u: templateUser(site, journal, openid) });
     }
     if (mode === "res" && !res) return notFound(journal);
+    if (mode === "data") {
+        const feed = await renderFeed(db, site, journal,
+            { pathextra: view.pathextra, args, filter, ifModifiedSince: visitor.ifModifiedSince });
+        return feed === "perl" ? PERL_PAGE : feed === "notfound" ? notFound(journal) : feed;
+    }
 
     // The site's own style, which ?style=site and ?style=light ask for, and
     // entry and icons pages use when the journal's style does not show them.
@@ -257,9 +265,11 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         const known = /^([a-zA-Z0-9]{15}):(\d+)(.+)$/.exec(cookie ? decodeURIComponent(cookie[1]!) : "")?.[1];
         const uniq = known ?? randChars(15);
         const prepared = await prepare(config, db, compiler, request.url, request.headers.host ?? "localhost",
-            { uniq, cookie: request.headers.cookie ?? "", remoteIp: remoteIp(config, request) });
+            { uniq, cookie: request.headers.cookie ?? "", remoteIp: remoteIp(config, request),
+                ifModifiedSince: request.headers["if-modified-since"] });
         const result = "layers" in prepared ? await render(prepared) : prepared;
         if (result.location) reply.header("location", result.location);
+        if (result.lastModified) reply.header("last-modified", result.lastModified);
         if (!known && "layers" in prepared && prepared.view === "reply") {
             const now = Math.floor(Date.now() / 1000);
             reply.header("set-cookie", `ljuniq=${encodeURIComponent(`${uniq}:${now}`)}; path=/; ` +

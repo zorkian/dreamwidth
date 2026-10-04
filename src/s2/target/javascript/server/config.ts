@@ -45,6 +45,8 @@ export interface SiteConfig {
     readonly siteName: string;
     readonly siteNameShort: string;
     readonly siteNameAbbrev: string;
+    // $LJ::USER_EMAIL: whether accounts may have a site email alias.
+    readonly userEmail: boolean;
     readonly imgPrefix: string;
     readonly statPrefix: string;
     readonly jsPrefix: string;

@@ -30,6 +30,8 @@ export interface RecentOptions {
     readonly tagIntersection: number;
     readonly security?: string;
     readonly posterid?: number;
+    // "logtime" orders by when entries were posted, as feeds do.
+    readonly order?: "logtime";
 }
 
 const logpropNames = new WeakMap<Databases, Promise<Map<number, string>>>();
@@ -191,7 +193,7 @@ export class Entry {
         const tagids = tagmode === "and" ? options.tagids?.slice(0, options.tagIntersection) : options.tagids;
         const itemshow = Math.min(options.itemshow, maxScrollback);
         const skip = Math.max(0, Math.min(options.skip, maxScrollback - itemshow));
-        const sortKey = journal.journaltype === "C" ? "rlogtime" : "revttime";
+        const sortKey = options.order === "logtime" || journal.journaltype === "C" ? "rlogtime" : "revttime";
 
         let where = "";
         const params: unknown[] = [journal.userid];

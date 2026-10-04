@@ -18,6 +18,7 @@ import http from "node:http";
 import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { parseDocument } from "htmlparser2";
 import { JSDOM } from "jsdom";
 
 // Values that differ on every request, keyed by field name.
@@ -96,15 +97,47 @@ export function normalize(html, origins, quips = []) {
     return lines.map(line => line.includes('property="article:tag"') ? sorted.shift() : line).join("\n") + "\n";
 }
 
+// Feed elements whose text is HTML, compared as normalized HTML.
+const HTML_IN_XML = new Set(["description", "content", "summary"]);
+
+// An RSS or Atom feed as lines of elements, sorted attributes and text, with
+// the HTML in its entries normalized. Perl lists an entry's tags in hash
+// order, so <category> elements are sorted among themselves.
+export function normalizeXml(xml, origins, quips = []) {
+    const walk = (node, depth) => {
+        const indent = "  ".repeat(depth);
+        if (node.type === "text") {
+            const text = node.data.replace(/\s+/g, " ").trim();
+            return text ? [indent + JSON.stringify(unquip(unorigin(text, origins), quips))] : [];
+        }
+        if (node.type !== "tag" && node.type !== "root") return [];
+        const children = node.children ?? [];
+        if (node.type === "root") return children.flatMap(child => walk(child, depth));
+        const attrs = Object.entries(node.attribs)
+            .map(([key, value]) => `${key}=${JSON.stringify(unorigin(value, origins))}`).sort();
+        const head = indent + [node.name, ...attrs].join(" ");
+        if (HTML_IN_XML.has(node.name)) {
+            const html = children.map(child => child.data ?? "").join("");
+            return [head, ...normalize(html, origins, quips).split("\n").filter(Boolean).map(line => `${indent}  ${line}`)];
+        }
+        const blocks = children.map(child => ({ category: child.name === "category", lines: walk(child, depth + 1) }));
+        const sorted = blocks.filter(block => block.category).map(block => block.lines.join("\n")).sort();
+        return [head, ...blocks.flatMap(block => block.category ? sorted.shift().split("\n") : block.lines)];
+    };
+    return walk(parseDocument(xml, { xmlMode: true, decodeEntities: true }), 0).join("\n") + "\n";
+}
+
 // Connect to loopback but send the origin's own Host, which both servers
 // use to build journal URLs.
 // A response as compared: status, redirect target and the normalized body,
 // or the body as it is for anything but HTML.
 export function summarize(page, origins, quips) {
     const html = page.type.startsWith("text/html");
+    const xml = page.type.startsWith("text/xml");
     const location = page.location ? `location ${unorigin(page.location, origins)}\n` : "";
     if (!page.body) return `status ${page.status}\n${location}`;
-    return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins, quips) : unorigin(page.body, origins));
+    return `status ${page.status}\n${location}` + (html ? normalize(page.body, origins, quips)
+        : xml ? normalizeXml(page.body, origins, quips) : unorigin(page.body, origins));
 }
 
 // An https origin is fetched from where it is; an http one from this machine,

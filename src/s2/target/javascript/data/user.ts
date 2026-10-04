@@ -91,6 +91,8 @@ export class User {
     // The email status: A when validated.
     readonly status: string;
     readonly bdate: string;
+    readonly allowContactshow: string;
+    readonly allowInfoshow: string;
     readonly dversion: number;
     readonly caps: number;
     readonly defaultpicid: number;
@@ -109,6 +111,8 @@ export class User {
         this.statusvis = text(row.statusvis);
         this.status = text(row.status);
         this.bdate = text(row.bdate);
+        this.allowContactshow = text(row.allow_contactshow);
+        this.allowInfoshow = text(row.allow_infoshow);
         this.dversion = int(row.dversion);
         this.caps = int(row.caps);
         this.defaultpicid = int(row.defaultpicid);
@@ -278,6 +282,77 @@ export class User {
     async isMinor(db: Databases): Promise<boolean> {
         const age = await this.bestGuessAge(db);
         return age > 0 && age < 18;
+    }
+
+    // LJ::User::is_syndicated
+    isSyndicated(): boolean {
+        return this.journaltype === "Y";
+    }
+
+    // LJ::User::opt_showcontact: who may see contact details, N, Y, R
+    // (logged-in users) or F (trusted users).
+    async optShowcontact(db: Databases): Promise<string> {
+        if (/^[NYRF]$/.test(this.allowContactshow)) return this.allowContactshow;
+        return await this.isMinor(db) ? "F" : "Y";
+    }
+
+    // LJ::User::share_contactinfo
+    async shareContactinfo(db: Databases, remote: User | null): Promise<boolean> {
+        if (this.isSyndicated()) return false;
+        const show = await this.optShowcontact(db);
+        if (show === "N" || show === "R" && !remote) return false;
+        if (show === "F" && !(remote && await this.trusts(db, remote))) return false;
+        return true;
+    }
+
+    // LJ::User::can_have_email_alias
+    canHaveEmailAlias(config: SiteConfig): boolean {
+        return config.userEmail && truthy(this.getCap(config, "useremail"));
+    }
+
+    // LJ::User::opt_whatemailshow: which addresses to show, A (actual), D
+    // (display), L (site alias), B (actual and alias), V (display and
+    // alias) or N (none).
+    async optWhatemailshow(db: Databases, config: SiteConfig): Promise<string> {
+        await this.loadProps(db, ["opt_whatemailshow"]);
+        let value = this.props.opt_whatemailshow ?? "";
+        if (!this.canHaveEmailAlias(config)) value = value.replace(/[BVL]/g, c => ({ B: "A", V: "D", L: "N" })[c]!);
+        return /^[ALBNDV]$/.test(value) ? value : "N";
+    }
+
+    // LJ::User::emails_visible
+    async emailsVisible(db: Databases, config: SiteConfig, remote: User | null): Promise<string[]> {
+        if (this.isIdentity() || this.isSyndicated()) return [];
+        if (!await this.shareContactinfo(db, remote)) return [];
+        const what = await this.optWhatemailshow(db, config);
+        if (what === "N" || await this.hidesContactinfo(db, config)) return [];
+        await this.loadProps(db, ["opt_profileemail", "no_mail_alias"]);
+        const emails: string[] = [];
+        if (what === "A" || what === "B") {
+            const [row] = await db.global("SELECT email FROM email WHERE userid = ?", [this.userid]);
+            if (text(row?.email)) emails.push(text(row!.email));
+        } else if ((what === "D" || what === "V") && this.props.opt_profileemail) {
+            emails.push(this.props.opt_profileemail);
+        }
+        if (/^[BVL]$/.test(what) && !truthy(this.props.no_mail_alias)) emails.push(`${this.user}@${config.userDomain}`);
+        return emails;
+    }
+
+    // LJ::User::emails_visible's rule that some accounts hide their contact
+    // details once inactive for longer than their hide_email_after cap.
+    private async hidesContactinfo(db: Databases, config: SiteConfig): Promise<boolean> {
+        if (config.isDevServer) return false;
+        const hideAfter = Number(this.getCap(config, "hide_email_after")) || 0;
+        if (!hideAfter) return false;
+        const [row] = await this.cluster(db, "SELECT timeactive FROM clustertrack2 WHERE userid = ?", [this.userid]);
+        const active = int(row?.timeactive);
+        return !!active && Date.now() / 1000 - active > hideAfter * 86400;
+    }
+
+    // LJ::User::email_for_feeds. Its opt_mangleemail check is left out, as
+    // there is no such userprop here, so Perl never hides the address for it.
+    async emailForFeeds(db: Databases, config: SiteConfig, remote: User | null): Promise<string | undefined> {
+        return (await this.emailsVisible(db, config, remote))[0];
     }
 
     // LJ::User::adult_content_calculated. Needs adult_content loaded.

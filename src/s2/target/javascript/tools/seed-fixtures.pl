@@ -69,12 +69,23 @@ for ( [ 'Entry 25:', 'entry-25' ], [ 'Private entry', 'private-entry' ] ) {
     $entry->slug($slug) unless $entry->slug;
 }
 
+# Feed settings: the themed journal shows its address to everyone, the
+# user-layer journal syndicates summaries under its own title, and the
+# default-style journal syndicates titles only.
+$themed->update_self( { allow_contactshow => 'Y' } ) unless $themed->{allow_contactshow} eq 'Y';
+$themed->set_prop( opt_whatemailshow => 'A' );
+
 # A theme plus a hand-written user layer that overrides functions.
 my $custom = journal('s2fix_custom');
 LJ::Customize->apply_theme( $custom, LJ::S2Theme->load_by_uniq('practicality/alittlefire') )
     if new_journal($custom);
 user_layer( $custom, $USER_LAYER );
 comments( $custom, $commenter, entries( $custom, 4 ) );
+
+$custom->set_prop( opt_synlevel => 'summary' );
+$custom->set_prop( journaltitle => 'Fixture & <custom> title' );
+$custom->set_prop( journalsubtitle => 'A subtitle' );
+$default->set_prop( opt_synlevel => 'title' );
 
 # Entries spread over years and months, for the archive views.
 my $archive = journal('s2fix_archive');
