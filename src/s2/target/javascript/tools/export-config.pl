@@ -22,6 +22,7 @@ use DW::Formats;
 use DW::Logic::MenuNav;
 use DW::Routing;
 use DW::SiteScheme;
+use LJ::Session;
 use LJ::Talk;
 
 my %databases;
@@ -58,7 +59,7 @@ for my $prefix (
     qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. ),
     qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
     qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. ),
-    qw( /login.tt. )
+    qw( /login.tt. captcha.accessibility. )
     )
 {
     my $keys = $dbr->selectcol_arrayref(
@@ -176,8 +177,17 @@ print JSON->new->canonical->pretty->encode(
             subjecticons   => \@subjecticons,
             editors        => $editors,
             captcha        => DW::Captcha->site_enabled ? JSON::true : JSON::false,
+            # The implementation DW::Captcha->new picks, and what hCaptcha's widget shows.
+            captchaType     => DW::Captcha->site_enabled ? DW::Captcha->new->name : '',
+            hcaptchaSitekey => $LJ::CAPTCHA_HCAPTCHA_SITEKEY // '',
+            supportEmail    => $LJ::SUPPORT_EMAIL // '',
             maxlengthUser  => $LJ::USERNAME_MAXLENGTH + 0,
             maxlengthPass  => $LJ::PASSWORD_MAXLENGTH + 0,
+        },
+        # What LJ::Session->trusted_anon_user accepts in an ljtrust cookie.
+        trustCookie => {
+            generations => [ map { $_ // '' } $LJ::COOKIE_GEN, @LJ::COOKIE_GEN_OKAY ],
+            maxAge      => LJ::Session::TRUST_COOKIE_MAX_AGE() + 0,
         },
         # Snippets styles may print with Page::print_trusted; code values are called once here.
         trustedS2 => { map { $_ => '' . LJ::conf_test( $LJ::TRUSTED_S2_WHITELIST{$_} ) } keys %LJ::TRUSTED_S2_WHITELIST },

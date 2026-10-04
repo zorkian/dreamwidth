@@ -12,17 +12,18 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { createHash, randomInt } from "node:crypto";
+import { createHash, createHmac, randomInt } from "node:crypto";
 import { commentProps, commentRows, commentTexts } from "../data/comment";
 import { type Databases, int, text } from "../data/db";
 import { type Entry, truthy } from "../data/entry";
 import { User } from "../data/user";
+import type { SiteConfig } from "../server/config";
 import { pageEntry } from "./entry-page";
 import {
     type S2Object, DateTimeUnix, ImageUserpic, UserLite, ehtml, s2, styleArgs, styleOpts, talkargs,
 } from "./objects";
 import { type PageContext, Page, journalDefaultPic, loadUserpics, robotMetaTags } from "./pages";
-import { type RenderResult, plainError } from "./render";
+import { PERL_PAGE, type RenderResult, plainError } from "./render";
 import { journalScripts, trackingPopup } from "./resources";
 
 interface Parent {
@@ -30,9 +31,10 @@ interface Parent {
     readonly subject: string;
 }
 
-// `uniq` identifies the visitor's browser, which the form's auth token is tied to.
+// `visitor` is the browser's ljuniq identity, which the form's auth token is
+// tied to, and its Cookie header.
 // Null when there is no such page, or none the visitor may see.
-export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
+export async function ReplyPage(pc: PageContext, entry: Entry, visitor: { uniq: string; cookie: string }):
     Promise<S2Object | { response: RenderResult } | null> {
     const { site, journal, db, args } = pc;
     const config = site.config;
@@ -109,14 +111,77 @@ export async function ReplyPage(pc: PageContext, entry: Entry, uniq: string):
     }
     page._replyto = replyto;
     // ReplyForm::print prints the form, which is made here as it needs the database.
-    page._form = s2("ReplyForm", { $html: await talkform(pc, entry, parent, args.thread || "0", uniq) });
+    const captcha = await captchaHtml(pc, entry, visitor);
+    if (captcha === undefined) return { response: PERL_PAGE };
+    page._form = s2("ReplyForm", { $html: await talkform(pc, entry, parent, args.thread || "0", visitor.uniq, captcha) });
     page._isedit = 0;
     return page;
 }
 
+// DW::Captcha->print for the comment form, when LJ::Talk::Post::require_captcha_test
+// asks an anonymous visitor for one: "" when it does not, and undefined when only
+// Perl can show the captcha. Its rate and IP checks are left to Perl, which runs
+// the whole test again when the comment is posted; a reply page has no comment
+// text to check yet.
+async function captchaHtml(pc: PageContext, entry: Entry, visitor: { uniq: string; cookie: string }):
+    Promise<string | undefined> {
+    const { site: { config }, journal, db } = pc;
+    if (!config.talkform.captcha) return "";
+    const ageDays = (Date.now() - Date.parse(`${entry.logtime.replace(" ", "T")}Z`)) / 86400000;
+    const popular = entry.replycount >= (Number(journal.getCap(config, "maxcomments-before-captcha")) || 0) && ageDays > 30;
+    const showTo = journal.props.opt_show_captcha_to;
+    const needed = popular || showTo === "F" || showTo === "A"
+        || showTo === "R" && !await trustedAnonUser(db, config, visitor);
+    if (!needed) return "";
+    if (config.talkform.captchaType !== "hcaptcha") return undefined;
+    const contact = (config.strings["captcha.accessibility.contact"] ?? "")
+        .replace(/\[\[email\]\]/g, config.talkform.supportEmail);
+    return `<div class='captcha'><script src="https://js.hcaptcha.com/1/api.js" async defer></script>` +
+        `<div class="h-captcha" data-sitekey="${ehtml(config.talkform.hcaptchaSitekey)}"></div>` +
+        `<p style='clear:both'>${contact}</p></div>`;
+}
+
+// LJ::Session->trusted_anon_user: whether the browser's ljtrust cookie, signed
+// for its ljuniq, vouches for a recent login to an account in good standing.
+async function trustedAnonUser(db: Databases, config: SiteConfig, visitor: { uniq: string; cookie: string }):
+    Promise<boolean> {
+    const raw = /(?:^|;\s*)ljtrust=([^;]*)/.exec(visitor.cookie)?.[1];
+    if (!raw || !visitor.uniq) return false;
+    let value: string;
+    try {
+        value = decodeURIComponent(raw);
+    } catch {
+        return false;
+    }
+    const [cookie = "", gen = ""] = value.split("//");
+    const parts = cookie.split(":");
+    while (parts.length && parts.at(-1) === "") parts.pop();
+    const fields: Record<string, string> = {};
+    for (const part of parts) {
+        const match = /^([vutg])(.+)$/.exec(part);
+        if (!match) return false;
+        fields[match[1]!] = match[2]!;
+    }
+    let decodedGen = gen;
+    try {
+        decodedGen = decodeURIComponent(gen.replaceAll("+", " "));
+    } catch { /* LJ::durl leaves malformed escapes as they are */ }
+    if (!config.trustCookie.generations.some(ok => gen === ok || decodedGen === ok)) return false;
+    const { v, u, t, g } = fields;
+    if (Number(v) !== 1 || !/^\d+$/.test(u ?? "") || !Number(u) || !/^\d+$/.test(t ?? "") || !Number(t)) return false;
+    const now = Math.floor(Date.now() / 1000);
+    if (Number(t) > now || now - Number(t) > config.trustCookie.maxAge) return false;
+    const [secret] = await db.global("SELECT secret FROM secrets WHERE stime = ?", [Number(t)]);
+    if (!secret) return false;
+    const sig = createHmac("sha1", text(secret.secret)).update(`trust-${u}-${visitor.uniq}-${t}`).digest("hex");
+    if (!g || g !== sig) return false;
+    const [user] = await db.global("SELECT statusvis, status, journaltype FROM user WHERE userid = ?", [Number(u)]);
+    return !!user && text(user.statusvis) === "V" && text(user.status) === "A" && /^[PI]$/.test(text(user.journaltype));
+}
+
 // LJ::Talk::talkform for a logged-out viewer, through the site's form helpers.
 async function talkform(pc: PageContext, entry: Entry, parent: Parent | undefined, thread: string,
-    uniq: string): Promise<string> {
+    uniq: string, captcha: string): Promise<string> {
     const { site, journal, db, args } = pc;
     const config = site.config;
     const string = (key: string, vars: Record<string, string> = {}) =>
@@ -254,7 +319,7 @@ ${editors.items.map(e => `<option value="${e.value}"${e.value === editors.select
 
 <div class="qr-body">${label("body", string(".opt.message2"), "invisible")}<textarea wrap="soft" id="body" class="text" name="body" rows="10" cols="80"></textarea></div>
 
-<div id="talkform-misc"></div>
+<div id="talkform-misc">${captcha ? `<br />${captcha}` : ""}</div>
 
 <div class="qr-footer">
 <input type='submit' name="submitpost" value="${string(".opt.submit")}" id="submitpost" class="submit" />  &nbsp;<input type='submit' name="submitpreview" value="${string("talk.btn.preview")}" id="submitpview" class="submit" /><input type='hidden' name="previewplaceholder" value="1" id="previewplaceholder" />`;

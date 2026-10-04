@@ -78,7 +78,7 @@ export interface RenderResult {
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
-// For pages only Perl renders: reply forms that need its checks on the visitor.
+// For pages only Perl renders: reply forms with a captcha only Perl can show.
 export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
 
 // DW::Controller::Journal's plain error pages, padded so browsers show them.
@@ -174,7 +174,6 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
                 { returnto, errors: [["", notice]] }, 403);
         }
     }
-    if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
 
     // LJ::S2::make_journal's switch to the site's own style, which shows
     // no control strip and gives its sections to the site scheme.
@@ -218,7 +217,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
             if (!request.pathextra) page = await RecentPage(pc, args, request.filter);
             break;
         case "reply": {
-            const result = await ReplyPage(pc, entry!, request.uniq);
+            const result = await ReplyPage(pc, entry!, { uniq: request.uniq, cookie: request.cookie });
             if (!result) return unavailable();
             if ("response" in result) return result.response;
             page = result;

@@ -54,7 +54,7 @@ export interface PageContext {
 export const JOURNAL_PROPS = ["s2_style", "journaltitle", "journalsubtitle", "url", "urlname", "customtext_title",
     "customtext_url", "customtext_content", "opt_blockrobots", "icbm", "control_strip_display",
     "control_strip_color", "sticky_entry", "timezone", "adult_content", "use_journalstyle_entry_page",
-    "use_journalstyle_icons_page"];
+    "use_journalstyle_icons_page", "opt_show_captcha_to"];
 
 const props = (pc: PageContext) => pc.ctx.prop as Record<string, any>;
 
