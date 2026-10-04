@@ -257,6 +257,25 @@ my $captcha = journal('s2fix_captcha');
 entries( $captcha, 1 );
 $captcha->set_prop( opt_show_captcha_to => 'R' );
 
+# A long journal with a long comment thread on its newest entry, for
+# tools/bench.mjs: 220 entries, and 100 threads of three comments each.
+my $big = journal('s2fix_big');
+LJ::Customize->apply_theme( $big, LJ::S2Theme->load_by_uniq('blanket/forest') )
+    if new_journal($big);
+my $big_entry = entries( $big, 220 );
+unless ( LJ::Entry->new( $big, ditemid => $big_entry )->reply_count ) {
+    my $err;
+    my $make = sub {
+        LJ::Comment->create( journal => $big, ditemid => $big_entry, poster => $commenter,
+            err_ref => \$err, @_ ) or die "Cannot comment: $err->{msg}\n";
+    };
+    for my $n ( 1 .. 100 ) {
+        my $top   = $make->( subject => "Thread $n", body => "Thread $n starts <b>here</b>" );
+        my $reply = $make->( body => "A reply in thread $n", parenttalkid => $top->jtalkid );
+        $make->( body => "A nested reply in thread $n", parenttalkid => $reply->jtalkid );
+    }
+}
+
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
 my $memorial = journal('s2fix_memorial');

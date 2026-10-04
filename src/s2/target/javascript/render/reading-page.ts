@@ -85,13 +85,12 @@ export async function FriendsPage(pc: PageContext, view: "read" | "network", pat
         return page;
     }
 
-    for (const friend of watched.values()) {
-        await friend.user.loadProps(db, ["adult_content"]);
-        pc.users.set(friend.user.userid, friend.user);
-    }
-    for (const posted of new Set(items.map(entry => entry.journal))) {
-        await Entry.fill(db, posted, items.filter(entry => entry.journal === posted));
-    }
+    for (const friend of watched.values()) pc.users.set(friend.user.userid, friend.user);
+    // Only the journals with entries on the page.
+    await Promise.all([...new Set(items.map(entry => entry.journal))].map(posted => Promise.all([
+        posted.loadProps(db, ["adult_content"]),
+        Entry.fill(db, posted, items.filter(entry => entry.journal === posted)),
+    ])));
     const posterIds = [...new Set(items.map(entry => entry.posterid))].filter(id => !pc.users.has(id));
     for (const [id, user] of await User.byIds(db, posterIds)) pc.users.set(id, user);
 

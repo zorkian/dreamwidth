@@ -12,7 +12,7 @@
 // the same terms as Perl itself. For a copy of the license, please reference
 // 'perldoc perlartistic' or 'perldoc perlgpl'.
 
-import { type Databases, int, text } from "./db";
+import { type Databases, type Row, int, text } from "./db";
 import type { User } from "./user";
 
 export interface Userpic {
@@ -35,13 +35,28 @@ export class Userpics {
         private readonly keywordByMapid: Map<number, string>,
     ) {}
 
-    static async load(db: Databases, user: User): Promise<Userpics> {
-        const [pics, maps] = await Promise.all([
-            user.cluster(db, `SELECT picid, width, height, description, comment, state FROM userpic2
-                WHERE userid = ? AND state <> 'X'`, [user.userid]),
-            user.cluster(db, `SELECT m.mapid, m.picid, m.redirect_mapid, k.keyword FROM userpicmap3 m
-                LEFT JOIN userkeywords k ON k.userid = m.userid AND k.kwid = m.kwid WHERE m.userid = ?`, [user.userid]),
-        ]);
+    // Each user's icons, with two queries for each cluster the users are on.
+    static async loadAll(db: Databases, users: readonly User[]): Promise<Map<number, Userpics>> {
+        const byCluster = new Map<number, User[]>();
+        for (const user of users) byCluster.set(user.clusterid, [...byCluster.get(user.clusterid) ?? [], user]);
+        const loaded = new Map<number, Userpics>();
+        await Promise.all([...byCluster].map(async ([clusterid, members]) => {
+            const ids = members.map(user => user.userid);
+            const [pics, maps] = await Promise.all([
+                db.cluster(clusterid, `SELECT userid, picid, width, height, description, comment, state FROM userpic2
+                    WHERE userid IN (?) AND state <> 'X'`, [ids]),
+                db.cluster(clusterid, `SELECT m.userid, m.mapid, m.picid, m.redirect_mapid, k.keyword FROM userpicmap3 m
+                    LEFT JOIN userkeywords k ON k.userid = m.userid AND k.kwid = m.kwid WHERE m.userid IN (?)`, [ids]),
+            ]);
+            for (const user of members) {
+                loaded.set(user.userid, Userpics.build(user, pics.filter(row => int(row.userid) === user.userid),
+                    maps.filter(row => int(row.userid) === user.userid)));
+            }
+        }));
+        return loaded;
+    }
+
+    private static build(user: User, pics: readonly Row[], maps: readonly Row[]): Userpics {
         const byKeyword = new Map<string, number>();
         const keywords = new Map<number, string[]>();
         const keywordByMapid = new Map<number, string>();
