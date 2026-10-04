@@ -75,11 +75,16 @@ test("hidden entries and comments are indistinguishable from missing ones", asyn
 test("adult content shows a login page, with nothing to click through", async () => {
     const explicit = `/~s2fix_adult/${await journals.ditemid("s2fix_adult", "Explicit entry")}.html`;
     const concepts = `/~s2fix_archive/${await journals.ditemid("s2fix_archive", "Discretion advised")}.html`;
-    for (const url of [concepts, explicit, "/~s2fix_adultjournal/"]) {
-        const page = await journals.get(url);
+    for (const [url, notice] of [
+        [concepts, "The journal owner has marked this content as needing viewer discretion. Log in to view it."],
+        [explicit, "The journal owner has marked this content as adult content (18+). Log in to view it."],
+        ["/~s2fix_adultjournal/", "The journal owner has marked this content as needing viewer discretion. Log in to view it."],
+    ]) {
+        const page = await journals.get(url!);
         assert.equal(page.status, 403, url);
+        assert.ok(page.body.includes(notice!), url);
         assert.ok(page.body.includes(`name="returnto" value="http://${HOST}${url}"`), url);
-        assert.doesNotMatch(page.body, /Paragraph with|\/journal\/adult_|I want to view/, url);
+        assert.doesNotMatch(page.body, /Paragraph with|\/journal\/adult_|I want to view|about to view/, url);
     }
     // An unflagged journal's page shows its other entries, and only a link to the flagged one.
     const recent = await journals.get("/~s2fix_adult/");

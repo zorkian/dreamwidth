@@ -32,7 +32,7 @@ import { FriendsPage } from "./reading-page";
 import { ReplyPage, currentSecret } from "./reply-page";
 import { type SiteRequest, notFoundPage, renderSitePage, renderSiteString, templateUser } from "./site-page";
 import {
-    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, adultNotice, journalDayCounts, latestMonth,
+    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth,
     showControlStrip, visibleTags,
 } from "./pages";
 import type { RenderState } from "./state";
@@ -169,7 +169,7 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
     if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && journal.isVisible()) {
         const level = entry ? entry.adultContent() : journal.props.adult_content || "none";
         if (level !== "none") {
-            const notice = adultNotice(site.config, journal, level, entry ? entry.adultMarker() : "journal");
+            const notice = adultLoginNotice(journal, level, entry ? entry.adultMarker() : "journal");
             return renderSitePage({ ...await siteRequest(), scheme: request.siteviews?.scheme }, "login.tt",
                 { returnto, errors: [["", notice]] }, 403);
         }
@@ -280,6 +280,15 @@ function styleError(output: PageOutput, error: unknown): void {
     if (error instanceof OutputLimitError || !(error instanceof Error)) throw error;
     if (!(error instanceof S2Error)) console.error(error);
     output.raw(`<b>Error running style:</b> ${error.message.replaceAll("\n", "<br />\n")}`);
+}
+
+// What the login page says about adult content in `journal` flagged at
+// `level` by `marker`. Perl has no such page, so its text is the server's own.
+function adultLoginNotice(journal: User, level: string, marker: "community" | "poster" | "journal"): string {
+    const who = journal.journaltype !== "C" ? "The journal owner"
+        : marker === "poster" ? "The poster" : "A community administrator";
+    const what = level === "explicit" ? "as adult content (18+)" : "as needing viewer discretion";
+    return `${who} has marked this content ${what}. Log in to view it.`;
 }
 
 // Whether LJ::User::make_journal and LJ::S2::make_journal would render this
