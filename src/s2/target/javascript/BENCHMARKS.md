@@ -90,6 +90,7 @@ The journal server reads everything from MySQL, where Perl reads much from
 memcached, so the stylesheet is the one page where it makes more queries
 than Perl (13 to 2): the journal, its properties and its style's layers,
 names and modification times. The reading page makes one set of queries for
-each watched journal with entries on the page, as Perl's does; the
+each watched journal with entries on the page, as Perl's does, and a
+content filter's checks are made once per journal, not per entry; the
 journal's own icons and the posters' icons are loaded with two queries for
 each database cluster.

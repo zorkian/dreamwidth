@@ -25,6 +25,8 @@ use LJ::S2;
 use LJ::S2Theme;
 use LJ::Talk;
 use LJ::Userpic;
+use DW::Pay;
+use DW::User::ContentFilters;
 use DW::User::Rename;
 use Compress::Zlib qw( compress crc32 );
 use Digest::SHA;
@@ -170,6 +172,21 @@ unless ($community) {
     }
 }
 $commenter->add_edge( $community, watch => { nonotify => 1 } );
+
+# A paid reader's public filter, which applies only for paid accounts: the
+# community's maintainer posts, one tag, and nothing marked adult.
+my $filterer = journal('s2fix_filterer');
+unless ( $filterer->content_filters( name => 'Fixture filter' ) ) {
+    # 99 months is permanent.
+    DW::Pay::add_paid_time( $filterer, 'seed', 99 ) or die DW::Pay::error_text() . "\n"
+        unless $filterer->is_paid;
+    $filterer->add_edge( $_, watch => { nonotify => 1 } ) for $themed, $archive, $community;
+    $filterer->create_content_filter( name => 'Fixture filter', public => 1 );
+    my $filter = $filterer->content_filters( name => 'Fixture filter' );
+    $filter->add_row( userid => $community->userid, postertype => 'maintainer' );
+    $filter->add_row( userid => $themed->userid, tags => [ $themed->get_keyword_id('number 3') ] );
+    $filter->add_row( userid => $archive->userid, adultcontent => 'sfw' );
+}
 
 # A syndicated feed, which journal pages show in the site's feed style.
 my $feed = LJ::load_user('s2fix_feed')

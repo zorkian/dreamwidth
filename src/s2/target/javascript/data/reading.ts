@@ -52,39 +52,60 @@ export class ContentFilter {
         return String(userid) in this.data;
     }
 
-    // DW::User::ContentFilters::Filter::show_entry
-    async showEntry(db: Databases, config: SiteConfig, entry: Entry): Promise<boolean> {
-        if (!await isPaid(db, config, this.owner)) return true;
-        const journal = entry.journal;
+    private paid?: Promise<boolean>;
+    private readonly staff = new Map<number, Promise<{ admins: Set<number>; moderators: Set<number> }>>();
+
+    // DW::User::ContentFilters::Filter::show_entry, for one journal's entries at once.
+    async showEntries(db: Databases, config: SiteConfig, journal: User, entries: readonly Entry[]): Promise<Set<Entry>> {
+        this.paid ??= isPaid(db, config, this.owner);
+        if (!await this.paid) return new Set(entries);
         const opts = (this.data[String(journal.userid)] ?? {}) as Record<string, Thawed>;
-        if (journal.journaltype === "C" && opts.postertype && opts.postertype !== "any") {
-            const [admins, moderators] = await Promise.all(["A", "M"].map(type =>
-                db.global("SELECT targetid FROM reluser WHERE userid = ? AND type = ?", [journal.userid, type])));
-            const isAdmin = admins!.some(row => int(row.targetid) === entry.posterid);
-            const isModerator = moderators!.some(row => int(row.targetid) === entry.posterid);
-            if (opts.postertype === "maintainer" && !isAdmin) return false;
-            if (opts.postertype === "moderator" && !(isAdmin || isModerator)) return false;
-        }
-        if (opts.adultcontent && opts.adultcontent !== "any") {
-            await Entry.fill(db, journal, [entry]);
-            const level = entry.props.adult_content_maintainer || entry.props.adult_content || journal.props.adult_content;
-            if (level) {
-                if (opts.adultcontent === "nonexplicit" && level === "explicit") return false;
-                if (opts.adultcontent === "sfw" && level !== "none") return false;
-            }
-        }
         const tagids = Array.isArray(opts.tags) ? opts.tags.map(Number) : [];
-        if (tagids.length) {
-            const mode = String(opts.tagmode || "any_of");
-            if (!["none_of", "any_of", "all_of"].includes(mode)) return false;
-            await Entry.fill(db, journal, [entry]);
-            const tags = new Set(entry.tags.map(tag => tag.kwid));
-            const matched = tagids.filter(id => tags.has(id)).length;
-            if (mode === "all_of") return matched === tagids.length;
-            if (mode === "any_of") return matched > 0;
-            return matched === 0;
+        const adult = opts.adultcontent && opts.adultcontent !== "any" ? String(opts.adultcontent) : undefined;
+        if (adult || tagids.length) await Entry.fill(db, journal, entries);
+        const postertype = journal.journaltype === "C" && opts.postertype && opts.postertype !== "any"
+            ? String(opts.postertype) : undefined;
+        const staff = postertype ? await this.communityStaff(db, journal) : undefined;
+        return new Set(entries.filter(entry => {
+            if (staff) {
+                const isAdmin = staff.admins.has(entry.posterid);
+                if (postertype === "maintainer" && !isAdmin) return false;
+                if (postertype === "moderator" && !(isAdmin || staff.moderators.has(entry.posterid))) return false;
+            }
+            if (adult) {
+                const level = entry.props.adult_content_maintainer || entry.props.adult_content
+                    || journal.props.adult_content;
+                if (level) {
+                    if (adult === "nonexplicit" && level === "explicit") return false;
+                    if (adult === "sfw" && level !== "none") return false;
+                }
+            }
+            if (tagids.length) {
+                const mode = String(opts.tagmode || "any_of");
+                if (!["none_of", "any_of", "all_of"].includes(mode)) return false;
+                const tags = new Set(entry.tags.map(tag => tag.kwid));
+                const matched = tagids.filter(id => tags.has(id)).length;
+                if (mode === "all_of") return matched === tagids.length;
+                if (mode === "any_of") return matched > 0;
+                return matched === 0;
+            }
+            return true;
+        }));
+    }
+
+    // The community's maintainers and moderators, for can_manage_other and can_moderate.
+    private communityStaff(db: Databases, community: User) {
+        let staff = this.staff.get(community.userid);
+        if (!staff) {
+            staff = db.global("SELECT type, targetid FROM reluser WHERE userid = ? AND type IN ('A', 'M')",
+                [community.userid]).then(rows => {
+                const of = (type: string) => new Set(rows.filter(row => text(row.type) === type)
+                    .map(row => int(row.targetid)));
+                return { admins: of("A"), moderators: of("M") };
+            });
+            this.staff.set(community.userid, staff);
         }
-        return true;
+        return staff;
     }
 }
 
@@ -131,15 +152,18 @@ export async function watchItems(db: Databases, config: SiteConfig, u: User, opt
         const friend = buffer.shift()!;
         watched.set(friend.user.userid, friend);
         const log = await recentLog(db, friend.user, maxAge, lastmax);
-        const found: typeof items = [];
+        let found: typeof items = [];
         for (const item of log) {
             // get_log2_recent_user checks the count it was given but never lowers it.
             if (!itemsleft) break;
             if (item.rlogtime > lastmax) break;
             if (item.entry.security !== "public") continue;
             if (security && security !== "public") continue;
-            if (filter && !await filter.showEntry(db, config, item.entry)) continue;
             found.push(item);
+        }
+        if (filter && found.length) {
+            const shown = await filter.showEntries(db, config, friend.user, found.map(item => item.entry));
+            found = found.filter(item => shown.has(item.entry));
         }
         if (found.length) {
             items.push(...found);
