@@ -217,9 +217,11 @@ npm test
 
 In production, the web22 image builds the server and `startup-prod.sh` runs it
 on port 8091 beside Starman for services that set `DW_JOURNAL_SERVER`
-(web-canary), logging to `/var/log/starman/journal-server.log`. `/healthz`
-answers load balancer health checks on any host: 200, or 503 while the
-database is unreachable.
+(web-canary), logging to `/var/log/starman/journal-server.log`. 
+`/admin/healthy` answers health checks on any host in the format
+DW::Controller::Admin::StatusCheck uses, checking the databases this server
+reads and its render workers, each within two seconds. Unlike Perl's, a
+failure answers 503, so a load balancer can act on it.
 
 `tools/bench.mjs` times pages on both servers; `BENCHMARKS.md` has the method
 and the latest devcontainer results.

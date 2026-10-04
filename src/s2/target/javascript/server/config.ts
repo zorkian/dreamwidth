@@ -26,6 +26,8 @@ export interface DatabaseInfo {
 export interface SiteConfig {
     readonly databases: Readonly<Record<string, DatabaseInfo>>;
     readonly clusterPairActive: Readonly<Record<string, string>>;
+    // @LJ::CLUSTERS
+    readonly clusters: readonly number[];
     readonly defaultStyle: Readonly<Record<string, string>>;
     readonly defaultFeedStyle: Readonly<Record<string, string>>;
     readonly home: string;

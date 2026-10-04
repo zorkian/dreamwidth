@@ -118,6 +118,7 @@ print JSON->new->canonical->pretty->encode(
     {
         databases          => \%databases,
         clusterPairActive  => \%LJ::CLUSTER_PAIR_ACTIVE,
+        clusters           => [ map { $_ + 0 } @LJ::CLUSTERS ],
         defaultStyle       => $LJ::DEFAULT_STYLE,
         defaultFeedStyle   => $LJ::DEFAULT_FEED_STYLE || {},
         home               => $LJ::HOME,

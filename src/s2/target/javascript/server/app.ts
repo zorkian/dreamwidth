@@ -30,6 +30,7 @@ import { renderProfile } from "../render/profile-page";
 import { renderStaticPage } from "../render/static-page";
 import { currentScheme, deletedJournalVars, notFoundPage, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
+import { healthy } from "./health";
 import { determineView } from "./views";
 
 export type Renderer = (request: RenderRequest) => Promise<RenderResult>;
@@ -290,7 +291,8 @@ function journalPath(config: SiteConfig, host: string, path: string): { user: st
     return match ? { user: match[1]!, path: match[2] ?? "/" } : undefined;
 }
 
-export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer): FastifyInstance {
+export function createApp(config: SiteConfig, db: Databases, compiler: Compiler, render: Renderer,
+    pingRenderer: () => Promise<boolean>): FastifyInstance {
     const app = Fastify({ logger: false });
     const handler = async (request: any, reply: any) => {
         // LJ::UniqCookie::parts_from_value; reply forms give a new visitor one, as Perl's middleware does.
@@ -310,15 +312,10 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         }
         return reply.code(result.status).type(`${result.contentType ?? "text/html"}; charset=utf-8`).send(result.body);
     };
-    // For load balancer health checks, on any host: 503 while the database is unreachable.
-    app.get("/healthz", async (_request, reply) => {
-        try {
-            await db.global("SELECT 1");
-        } catch (error) {
-            console.error(error);
-            return reply.code(503).type("text/plain; charset=utf-8").send("database unavailable\n");
-        }
-        return reply.type("text/plain; charset=utf-8").send("ok\n");
+    // On any host, since load balancers check by address.
+    app.get("/admin/healthy", async (_request, reply) => {
+        const { status, body } = await healthy(config, db, pingRenderer);
+        return reply.code(status).type("text/plain; charset=utf-8").send(body);
     });
     app.get("/*", handler);
     return app;

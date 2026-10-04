@@ -19,7 +19,8 @@ import { type RenderRequest, renderJournal } from "./render";
 const config = workerData as SiteConfig;
 const db = new Databases(config);
 
-parentPort!.on("message", async (request: RenderRequest) => {
+parentPort!.on("message", async (request: RenderRequest | "ping") => {
+    if (request === "ping") return parentPort!.postMessage({ pong: true });
     try {
         const result = await renderJournal(db, { config, host: request.host }, request);
         parentPort!.postMessage({ result });

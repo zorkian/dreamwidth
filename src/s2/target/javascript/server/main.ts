@@ -37,7 +37,7 @@ const config = readConfig(values.config);
 const db = new Databases(config);
 const compiler = new Compiler(db);
 const pool = new RenderPool(config, Number(values.workers), Number(values.timeout) * 1000);
-const app = createApp(config, db, compiler, request => pool.render(request));
+const app = createApp(config, db, compiler, request => pool.render(request), () => pool.ping());
 app.listen({ port: Number(values.port), host: values.host }).then(() => {
     console.log(`Journal server listening on ${values.host}:${values.port}`);
 });
