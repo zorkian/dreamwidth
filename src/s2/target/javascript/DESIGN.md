@@ -70,6 +70,12 @@ entry. A thread link to a hidden comment shows the whole entry, as a link to
 a comment that does not exist does. A suspended public entry, whose existence
 was already public, still gets the suspension notice.
 
+Journal feeds are served as `LJ::Feed::make_feed` serves them to an
+anonymous reader (`render/feed.ts`): RSS and Atom at `/data/rss` and
+`/data/atom`, for the newest public entries or one entry (`?itemid=`), with
+tag filters, the journal's syndication level, the full_rss cap, polls and
+embedded media, and Last-Modified with 304 replies.
+
 Adult content is a deliberate difference from Perl. Perl asks a visitor to
 confirm before showing a journal or entry flagged for discretion or as 18+,
 and remembers the answer. This server serves only anonymous visitors, and an
@@ -77,7 +83,9 @@ anonymous visitor must log in to see adult content: every page Perl would put
 behind that confirmation gets a 403 with the site's login page, returning to
 the page asked for, and nothing to click through. On lists of entries, an
 adult entry in a journal that is not flagged shows only a link to its own
-page.
+page. In a feed, where Perl carries adult entries in full, each one is an item
+that links to the entry and says to log in, with none of its subject, text
+or tags.
 
 Reply forms show a captcha where Perl's would: when the site has one, and
 the journal asks it of anonymous commenters (unless the browser's ljtrust
@@ -89,9 +97,9 @@ its request state, so this server leaves them to Perl, which repeats the
 whole test when the comment is posted and shows the captcha then if needed.
 The captcha is rendered as DW::Captcha renders hCaptcha's widget.
 
-Journal paths that Perl's own controllers serve, reply forms needing a
-captcha type other than hCaptcha, and every request with a logged-in
-session get a 501, so a proxy can send them to Perl.
+Journal paths that Perl's own controllers serve, the icon and comment feeds,
+reply forms needing a captcha type other than hCaptcha, and every request
+with a logged-in session get a 501, so a proxy can send them to Perl.
 
 ## Viewers and access
 
@@ -146,7 +154,7 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
   entries with rich HTML, comments, pagination, filters, the archive views,
-  stylesheets, siteviews pages, memorial and renamed journals, and error
+  stylesheets, siteviews pages, feeds, memorial and renamed journals, and error
   pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Access** (`tests/access.test.ts`). Each kind of viewer against entries

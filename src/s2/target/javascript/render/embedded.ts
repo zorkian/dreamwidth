@@ -57,18 +57,10 @@ async function embedTag(db: Databases, site: CleanSite, config: SiteConfig, jour
     if (!config.enabled.embed_module) return "";
     const moduleid = Number(attrs.id);
 
-    const rows = await journal.cluster(db,
-        "SELECT content, linktext, url FROM embedcontent WHERE moduleid = ? AND userid = ?", [moduleid, journal.userid]);
-    const row: Row | undefined = rows[0];
-    let content = "";
-    if (row?.content) {
-        // Stored compressed behind a "C-" marker.
-        const raw = row.content as Buffer;
-        content = raw.subarray(0, 2).toString("latin1") === "C-" ? gunzipSync(raw.subarray(2)).toString("utf8") : text(raw);
-    }
-    content = cleanEmbed(content, site);
-    const linktext = row ? text(row.linktext) : undefined;
-    const url = row && row.url !== null ? text(row.url) : undefined;
+    const module = await moduleContent(db, journal, moduleid);
+    const content = cleanEmbed(module.content, site);
+    const linktext = module.found ? module.linktext : undefined;
+    const url = module.url;
 
     let [width, height, widthUnit, heightUnit] = [0, 0, "", ""];
     if (!(attrs.width && attrs.height)) {
@@ -134,6 +126,40 @@ async function sessionlessAuthToken(db: Databases, uri: string, vars: Record<str
 }
 
 // LJ::Poll::render in results mode, which is what a logged-out viewer gets.
+// LJ::Poll::clean_poll
+function cleanPollText(value: string, site: CleanSite): string {
+    return /[<>]/.test(value) ? clean(value, {
+        addbreaks: false, mode: "deny", eat: ["head", "title", "style", "layer", "iframe", "applet", "object"],
+        allow: ["a", "b", "i", "u", "strong", "em", "img"], remove: ["bgsound", "embed", "object", "caption", "link", "font"],
+    }, site) : value;
+}
+
+// LJ::Poll::name, cleaned as LJ::Feed shows it; undefined for a poll with no name.
+export async function pollName(db: Databases, site: CleanSite, pollid: number): Promise<string | undefined> {
+    const [owner] = await db.global("SELECT journalid FROM pollowner WHERE pollid = ?", [pollid]);
+    const journal = owner ? (await User.byIds(db, [int(owner.journalid)])).get(int(owner.journalid)) : undefined;
+    if (!journal?.clusterid) return undefined;
+    const [poll] = await journal.cluster(db, "SELECT name FROM poll2 WHERE pollid = ? AND journalid = ?",
+        [pollid, journal.userid]);
+    const name = text(poll?.name);
+    return name ? cleanPollText(name, site) : undefined;
+}
+
+// LJ::EmbedModule::module_content: an embed's stored content, uncleaned.
+export async function moduleContent(db: Databases, journal: User, moduleid: number):
+    Promise<{ content: string; linktext?: string; url?: string; found: boolean }> {
+    const [row] = await journal.cluster(db,
+        "SELECT content, linktext, url FROM embedcontent WHERE moduleid = ? AND userid = ?", [moduleid, journal.userid]);
+    if (!row) return { content: "", found: false };
+    let content = "";
+    if (row.content) {
+        // Stored compressed behind a "C-" marker.
+        const raw = row.content as Buffer;
+        content = raw.subarray(0, 2).toString("latin1") === "C-" ? gunzipSync(raw.subarray(2)).toString("utf8") : text(raw);
+    }
+    return { content, linktext: text(row.linktext), url: row.url !== null ? text(row.url) : undefined, found: true };
+}
+
 async function renderPoll(db: Databases, site: CleanSite, config: SiteConfig, pollid: number): Promise<string> {
     const [owner] = await db.global("SELECT journalid FROM pollowner WHERE pollid = ?", [pollid]);
     const journal = owner ? (await User.byIds(db, [int(owner.journalid)])).get(int(owner.journalid)) : undefined;
@@ -151,10 +177,7 @@ async function renderPoll(db: Databases, site: CleanSite, config: SiteConfig, po
         query("SELECT pollqid, value FROM pollresult2 WHERE pollid = ? AND journalid = ?"),
         query("SELECT COUNT(DISTINCT userid) AS n FROM pollresult2 WHERE pollid = ? AND journalid = ?"),
     ]);
-    const cleanPoll = (value: string) => /[<>]/.test(value) ? clean(value, {
-        addbreaks: false, mode: "deny", eat: ["head", "title", "style", "layer", "iframe", "applet", "object"],
-        allow: ["a", "b", "i", "u", "strong", "em", "img"], remove: ["bgsound", "embed", "object", "caption", "link", "font"],
-    }, site) : value;
+    const cleanPoll = (value: string) => cleanPollText(value, site);
     const whovote = text(poll.whovote), isanon = text(poll.isanon);
     const whoview = text(poll.whoview) === "none" ? "none_others2" : text(poll.whoview);
     const canView = text(poll.whoview) === "all";

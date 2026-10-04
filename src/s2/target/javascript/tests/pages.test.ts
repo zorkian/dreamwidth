@@ -113,6 +113,16 @@ test("reply pages with the site's captcha, where the journal asks for it and not
     assert.match(forged, /h-captcha/);
 });
 
+test("feeds, as RSS and Atom, at each syndication level", async () => {
+    // Cut, with the owner's address; summaries under the journal's own title; titles only.
+    for (const path of ["/~s2fix_theme/data/rss", "/~s2fix_theme/data/atom", "/~s2fix_custom/data/atom",
+        "/~s2fix_default/data/rss", "/~s2fix_comm/data/rss"]) {
+        await compare(path);
+    }
+    // One entry, with a poll and embedded media, from a journal with an icon.
+    await compare(`/~s2fix_archive/data/rss?itemid=${await journals.ditemid("s2fix_archive", "Embeds and a poll")}`);
+});
+
 test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));
 
 test("a community and a reading page", async () => {

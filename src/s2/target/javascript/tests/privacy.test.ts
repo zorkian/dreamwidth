@@ -94,6 +94,24 @@ test("adult content shows a login page, with nothing to click through", async ()
     assert.ok(recent.body.includes(`<a href="http://${HOST}${explicit}">`));
 });
 
+test("feeds carry only public entries, and adult ones only as a link to log in", async () => {
+    for (const url of ["/~s2fix_theme/data/rss", "/~s2fix_theme/data/atom"]) {
+        const feed = await journals.get(url);
+        assert.equal(feed.status, 200, url);
+        assert.match(feed.body, /Entry 25/);
+        assert.doesNotMatch(feed.body, /Locked entry|Private entry|secret/, url);
+    }
+    const explicit = await journals.ditemid("s2fix_adult", "Explicit entry");
+    for (const url of ["/~s2fix_adult/data/rss", "/~s2fix_adult/data/atom"]) {
+        const feed = await journals.get(url);
+        assert.equal(feed.status, 200, url);
+        assert.match(feed.body, /example\.com\/1(?!\d)/, url);
+        assert.equal(feed.body.match(/Log in to read this entry/g)?.length, 1, url);
+        assert.ok(feed.body.includes(`${explicit}.html`), url);
+        assert.doesNotMatch(feed.body, /Explicit entry|example\.com\/4(?!\d)|cell 4/, url);
+    }
+});
+
 test("screened comments are hidden", async () => {
     const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Entry 25:")}.html`);
     assert.equal(page.status, 200);

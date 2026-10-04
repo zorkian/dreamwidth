@@ -69,7 +69,8 @@ for my $prefix (
 }
 $strings{$_} = LJ::Lang::ml($_)
     for ( map { "widget.cuttag.$_" } qw( collapsed expanded collapseAll expandAll ) ),
-    qw( Username Password talk.btn.preview talk.error.quickquote markup.helplink.url markup.helplink.alttext );
+    qw( Username Password talk.btn.preview talk.error.quickquote markup.helplink.url markup.helplink.alttext ),
+    qw( setting.xpost.option.footer.vars.comment_image.alt );
 
 # What LJ::Talk::talkform shows every visitor: subject icons (as HTML with a
 # %s for extra attributes) and the formatting choices.
@@ -135,6 +136,8 @@ print JSON->new->canonical->pretty->encode(
         siteName           => $LJ::SITENAME,
         siteNameShort      => $LJ::SITENAMESHORT,
         siteNameAbbrev     => $LJ::SITENAMEABBREV,
+        # Whether accounts may have a site email alias.
+        userEmail          => $LJ::USER_EMAIL ? JSON::true : JSON::false,
         imgPrefix          => $LJ::IMGPREFIX,
         statPrefix         => $LJ::STATPREFIX,
         jsPrefix           => $LJ::JSPREFIX,

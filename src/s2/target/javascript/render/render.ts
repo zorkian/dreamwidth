@@ -76,6 +76,7 @@ export interface RenderResult {
     readonly body: string;
     readonly contentType?: string;
     readonly location?: string;
+    readonly lastModified?: string;
 }
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
