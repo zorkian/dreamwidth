@@ -147,6 +147,8 @@ test("a community and a reading page", async () => {
     await compare("/~s2fix_reader/read");
 });
 
+test("a paid reader's content filter", () => compare("/~s2fix_filterer/read/Fixture+filter"));
+
 test("tags and icons pages", async () => {
     await compare("/~s2fix_theme/tag/");
     await compare("/~s2fix_archive/icons?sortorder=keyword");
