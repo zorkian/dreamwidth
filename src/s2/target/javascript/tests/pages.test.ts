@@ -131,6 +131,15 @@ test("profiles: a personal journal showing all it may, a community and an OpenID
     await compare(`/profile?userid=${int(openid!.userid)}&t=I`);
 });
 
+test("the site's own pages: a legal page, the site map, and the FAQ with its mark-up", async () => {
+    await compare("/legal/tos");
+    await compare("/site/");
+    await compare("/support/faq");
+    const [faq] = await journals.db.global("SELECT faqid FROM faq WHERE question LIKE 'How does [[username]]%'");
+    await compare(`/support/faqbrowse?faqid=${int(faq!.faqid)}&q=visit`);
+    await compare("/support/faqbrowse?faqcat=s2fix");
+});
+
 test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));
 
 test("a community and a reading page", async () => {

@@ -23,6 +23,7 @@ use DW::Formats;
 use DW::Logic::MenuNav;
 use DW::Routing;
 use DW::SiteScheme;
+use LJ::Hooks;
 use LJ::Session;
 use LJ::Talk;
 
@@ -61,7 +62,8 @@ for my $prefix (
     qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
     qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. ),
     qw( /login.tt. captcha.accessibility. /profile/main.tt. /profile/logic.tt. lastupdated. time.ago. date.month. ),
-    qw( statusvis_message. entryform.security number.punctuation profile.service. )
+    qw( statusvis_message. entryform.security number.punctuation profile.service. /legal/ /site/ /misc/about.tt. ),
+    qw( /doc/s2/ /support/faq.tt. /support/faqbrowse.tt. cc.imgalt )
     )
 {
     my $keys = $dbr->selectcol_arrayref(
@@ -205,7 +207,22 @@ print JSON->new->canonical->pretty->encode(
         trustedS2 => { map { $_ => '' . LJ::conf_test( $LJ::TRUSTED_S2_WHITELIST{$_} ) } keys %LJ::TRUSTED_S2_WHITELIST },
         trustedS2Usernames => [ sort keys %LJ::TRUSTED_S2_WHITELIST_USERNAMES ],
         capDefaults        => \%LJ::CAP_DEF,
-        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content infoshow_migrate show-talkleft esn payments directory ) },
+        enabled => {
+            map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false }
+                qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content infoshow_migrate ),
+            qw( show-talkleft esn payments directory faq_summaries )
+        },
+        # The pages under /legal, as DW::Controller::Legal lists them.
+        legalPages => do {
+            my @pages = qw( tos privacy );
+            LJ::Hooks::run_hook( 'modify_legal_index', \@pages );
+            \@pages;
+        },
+        defaultLang => $LJ::DEFAULT_LANG,
+        # $LJ::EXAMPLE_USER_ACCOUNT, whom the FAQs address anonymous visitors as.
+        exampleUser => $LJ::EXAMPLE_USER_ACCOUNT // '',
+        # $LJ::MERCH_URL
+        merchUrl => $LJ::MERCH_URL // '',
         # Accounts whose profiles leave out their subscribers and members.
         forceEmptySubscriptions => [ map { $_ + 0 } keys %LJ::FORCE_EMPTY_SUBSCRIPTIONS ],
         # $LJ::MAX_WT_EDGES_LOAD

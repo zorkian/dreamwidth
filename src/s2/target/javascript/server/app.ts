@@ -25,7 +25,9 @@ import { currentSecret, randChars } from "../render/reply-page";
 import { viewingStyle } from "../render/chrome";
 import { styleUrl } from "../render/objects";
 import { renderFeed } from "../render/feed";
+import { renderFaqBrowse, renderFaqIndex } from "../render/faq-page";
 import { renderProfile } from "../render/profile-page";
+import { renderStaticPage } from "../render/static-page";
 import { currentScheme, deletedJournalVars, notFoundPage, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
 import { determineView } from "./views";
@@ -72,7 +74,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         renderSitePage(await siteRequest(journal, scheme), view, vars, status);
     const notFound = async (journal?: User) => notFoundPage(await siteRequest(journal));
     // DW::Controller::Journal hands /profile to DW::Controller::Profile.
-    const profile = (user: string) =>
+    const profile = async (user: string) => args.uselang ? PERL_PAGE :
         renderProfile(db, { site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, host, journal: user });
     const username = target.user.toLowerCase().replaceAll("-", "_");
     const journal = await User.byName(db, username);
@@ -189,10 +191,15 @@ async function siteRoute(db: Databases, site: { config: SiteConfig; host: string
     visitor: Visitor): Promise<RenderResult> {
     const parsed = new URL(url, "http://site");
     const args = Object.fromEntries(parsed.searchParams);
+    // Pages in a language other than the default are left to Perl.
+    if (args.uselang) return PERL_PAGE;
     if (parsed.pathname === "/profile") {
         return renderProfile(db, { site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, host: site.host });
     }
-    return PERL_PAGE;
+    const request = { site, url, path: parsed.pathname, args, cookie: visitor.cookie, uniq: visitor.uniq };
+    if (parsed.pathname === "/support/faq") return renderFaqIndex(db, request);
+    if (parsed.pathname === "/support/faqbrowse") return await renderFaqBrowse(db, request) ?? PERL_PAGE;
+    return await renderStaticPage(db, request) ?? PERL_PAGE;
 }
 
 // Whether DW::Routing gives this path to a user controller, or to the API,
