@@ -14,6 +14,7 @@
 
 import type { Context } from "../runtime/s2runtime";
 import type { StyleInfo } from "../compile/styles";
+import type { SiteConfig } from "../server/config";
 import { type Databases, int, text } from "../data/db";
 import { Entry, activeEntries, dayCounts, truthy } from "../data/entry";
 import { Moods } from "../data/moods";
@@ -298,6 +299,13 @@ export function tagsText(props: Record<string, unknown>, tags: readonly S2Object
     return `<div class='ljtags'>${String(props._text_tags ?? "").replace("#", list)}</div>`;
 }
 
+// The contentflag notice for content in `journal` flagged at `level` by `marker`
+// (the journal, the poster or the community).
+export function adultNotice(config: SiteConfig, journal: User, level: string, marker: string): string | undefined {
+    const type = journal.journaltype === "C" ? "community" : "personal";
+    return config.strings[`contentflag.viewing${level === "explicit" ? "explicit" : "concepts"}.by${marker}.${type}`];
+}
+
 // Entry_from_entryobj for each entry, loading posters, icons and moods together.
 // Recent pages link cuts to the entry; month pages show no entry text. Entries
 // on a reading page come from other journals than the page's.
@@ -325,8 +333,7 @@ export async function entryObjects(pc: PageContext, entries: readonly Entry[],
             pc.content.event(entry, view === "recent" ? styleUrl(pc.args, entry.url(site)) : undefined));
         const adult = entry.adultContent();
         if (view !== "recent" || !config.enabled.adult_content || adult === "none") return html;
-        const by = `${entry.adultMarker()}.${entry.journal.journaltype === "C" ? "community" : "personal"}`;
-        const message = config.strings[`contentflag.viewing${adult === "explicit" ? "explicit" : "concepts"}.by${by}`];
+        const message = adultNotice(config, entry.journal, adult, entry.adultMarker());
         return message ? `<b>( <a href="${entry.url(site)}">${message}</a> )</b>` : html;
     }));
     const userpicPosition = String(p._userpics_position ?? "");

@@ -240,6 +240,18 @@ unless ( LJ::get_cluster_reader($active)
     LJ::Talk::screen_comment( $active, $by_subject->('Entry 1:') >> 8, $screened->jtalkid );
 }
 
+# Adult content: an explicit entry in a journal that is not flagged, and a
+# journal flagged for discretion.
+my $adult = journal('s2fix_adult');
+unless ( entry_count($adult) ) {
+    entries( $adult, 1 );
+    post( $adult, 4, subject => 'Explicit entry', event => body(4), security => 'public',
+        prop_adult_content => 'explicit' );
+}
+my $adult_journal = journal('s2fix_adultjournal');
+entries( $adult_journal, 1 );
+$adult_journal->set_prop( adult_content => 'concepts' );
+
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
 my $memorial = journal('s2fix_memorial');

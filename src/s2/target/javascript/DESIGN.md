@@ -67,9 +67,17 @@ entry. A thread link to a hidden comment shows the whole entry, as a link to
 a comment that does not exist does. A suspended public entry, whose existence
 was already public, still gets the suspension notice.
 
-Adult content warnings (which depend on what the visitor has confirmed, kept
-by Perl), reply pages on a site that requires captchas, and journal paths
-that Perl's own controllers serve get a 501, so a proxy can send them to Perl.
+Adult content is a deliberate difference from Perl. Perl asks a visitor to
+confirm before showing a journal or entry flagged for discretion or as 18+,
+and remembers the answer. This server serves only anonymous visitors, and an
+anonymous visitor must log in to see adult content: every page Perl would put
+behind that confirmation gets a 403 with the site's login page, returning to
+the page asked for, and nothing to click through. On lists of entries, an
+adult entry in a journal that is not flagged shows only a link to its own
+page.
+
+Reply pages on a site that requires captchas, and journal paths that Perl's
+own controllers serve, get a 501, so a proxy can send them to Perl.
 
 ## Components
 
@@ -108,8 +116,8 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
-  and suspended journals and entries never appear, and hidden entries and
-  comments answer exactly as missing ones.
+  and suspended journals and entries never appear, hidden entries and
+  comments answer exactly as missing ones, and adult content needs a login.
 - **Render limits** (`tests/pool.test.ts`). A style that never finishes is
   stopped.
 - **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in

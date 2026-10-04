@@ -32,8 +32,8 @@ import { FriendsPage } from "./reading-page";
 import { ReplyPage, currentSecret } from "./reply-page";
 import { type SiteRequest, notFoundPage, renderSitePage, renderSiteString, templateUser } from "./site-page";
 import {
-    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, journalDayCounts, latestMonth, showControlStrip,
-    visibleTags,
+    type DayCounts, JOURNAL_PROPS, type PageContext, RecentPage, TagsPage, adultNotice, journalDayCounts, latestMonth,
+    showControlStrip, visibleTags,
 } from "./pages";
 import type { RenderState } from "./state";
 
@@ -78,8 +78,7 @@ export interface RenderResult {
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
 
-// For pages only Perl renders: adult content warnings, which depend on what
-// the visitor has confirmed, and reply forms that need its checks on the visitor.
+// For pages only Perl renders: reply forms that need its checks on the visitor.
 export const PERL_PAGE: RenderResult = { status: 501, body: "This page is rendered by the Perl site.\n" };
 
 // DW::Controller::Journal's plain error pages, padded so browsers show them.
@@ -146,16 +145,15 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         site, url: request.requestPath, args: request.args, cookie: request.cookie, uniq: request.uniq, journal,
         secret: await currentSecret(db),
     });
+    // Where a login form on this page returns to, as LJ::create_url keeps it.
+    const [path] = request.requestPath.split("?");
+    const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
+    const returnto = `${site.config.protocol}://${request.host.toLowerCase()}${path}${query ? `?${query}` : ""}`;
     // An entry or comment the visitor cannot see gets the same 404 as one
     // that does not exist (RFC 9110, section 15.5.5), so the response never
     // reveals which. A URL with the wrong anum or date names no entry.
-    const unavailable = async () => {
-        const [path] = request.requestPath.split("?");
-        const query = Object.keys(request.args).sort().map(key => `${eurl(key)}=${eurl(request.args[key])}`).join("&");
-        const returnto = `${site.config.protocol}://${request.host.toLowerCase()}${path}${query ? `?${query}` : ""}`;
-        return renderSitePage({ ...await siteRequest(), scheme: request.siteviews?.scheme }, "error/unavailable.tt",
-            { returnto }, 404);
-    };
+    const unavailable = async () => renderSitePage({ ...await siteRequest(), scheme: request.siteviews?.scheme },
+        "error/unavailable.tt", { returnto }, 404);
     if (view === "entry" || view === "reply") {
         const poster = entry && (entry.posterid === journal.userid ? journal
             : (await User.byIds(db, [entry.posterid])).get(entry.posterid));
@@ -163,6 +161,17 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         // A public entry was already seen to exist, so its suspension is shown.
         if (entry.isSuspended()) {
             return renderSitePage(await siteRequest(), "error/suspended-entry.tt", { u: templateUser(site, journal) });
+        }
+    }
+    // Unlike Perl, which asks for a confirmation, adult content on the views
+    // DW::Logic::AdultContent::interstitial_type covers needs a login. The
+    // 403 keeps the login page from standing in for the content.
+    if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && journal.isVisible()) {
+        const level = entry ? entry.adultContent() : journal.props.adult_content || "none";
+        if (level !== "none") {
+            const notice = adultNotice(site.config, journal, level, entry ? entry.adultMarker() : "journal");
+            return renderSitePage({ ...await siteRequest(), scheme: request.siteviews?.scheme }, "login.tt",
+                { returnto, errors: [["", notice]] }, 403);
         }
     }
     if (request.view === "reply" && site.config.talkform.captcha) return PERL_PAGE;
@@ -196,13 +205,6 @@ export async function renderJournal(db: Databases, site: Site, request: RenderRe
         }
         builtin._end_css!(s2.ctx);
         return { status: 200, body: output.finish(), contentType: "text/css" };
-    }
-
-    // DW::Logic::AdultContent::interstitial_type: a logged-out visitor is shown
-    // a warning first, unless they have confirmed it, which only Perl can tell.
-    if (site.config.enabled.adult_content && ADULT_VIEWS.has(view) && journal.isVisible()) {
-        const level = entry?.adultContentCalculated() || journal.props.adult_content || "none";
-        if (level !== "none") return PERL_PAGE;
     }
 
     let counts: DayCounts;
