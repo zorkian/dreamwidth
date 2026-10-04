@@ -148,3 +148,21 @@ test("a logged-in viewer's page is left to Perl", async () => {
     const stranger = await user("stranger");
     assert.ok("layers" in await visit(masterCookie(stranger, await sessionRow(stranger, false))));
 });
+
+test("an account with a second factor is logged in only by a session that has proven it", async () => {
+    const totp = (await User.byName(journals.db, "s2fix_acc_totp"))!;
+    const rows = await totp.cluster(journals.db, `SELECT s.sessid, s.auth, m.expires > UNIX_TIMESTAMP() AS proven
+        FROM sessions s LEFT JOIN mfa_sessions m USING (userid, sessid)
+        WHERE s.userid = ? AND s.timeexpire > UNIX_TIMESTAMP() ORDER BY s.sessid`, [totp.userid]);
+    const visit = async (row: typeof rows[number]) => prepare(journals.config, journals.db, journals.compiler,
+        "/~s2fix_acc_owner/", HOST, { uniq: "", remoteIp: "127.0.0.1",
+            cookie: masterCookie(totp, { sessid: int(row.sessid), auth: text(row.auth) }) });
+    const proven = rows.filter(row => row.proven !== null && int(row.proven) === 1);
+    const unproven = rows.filter(row => row.proven === null || int(row.proven) === 0);
+    // One proof still current; one that has expired and one never made.
+    assert.equal(proven.length, 1);
+    assert.equal(unproven.length, 2);
+    const loggedIn = await visit(proven[0]!);
+    assert.ok("status" in loggedIn && loggedIn.status === 501);
+    for (const row of unproven) assert.ok("layers" in await visit(row), `session ${int(row.sessid)}`);
+});
