@@ -310,6 +310,16 @@ export function createApp(config: SiteConfig, db: Databases, compiler: Compiler,
         }
         return reply.code(result.status).type(`${result.contentType ?? "text/html"}; charset=utf-8`).send(result.body);
     };
+    // For load balancer health checks, on any host: 503 while the database is unreachable.
+    app.get("/healthz", async (_request, reply) => {
+        try {
+            await db.global("SELECT 1");
+        } catch (error) {
+            console.error(error);
+            return reply.code(503).type("text/plain; charset=utf-8").send("database unavailable\n");
+        }
+        return reply.type("text/plain; charset=utf-8").send("ok\n");
+    });
     app.get("/*", handler);
     return app;
 }
