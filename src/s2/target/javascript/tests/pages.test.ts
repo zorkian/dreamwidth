@@ -123,6 +123,14 @@ test("feeds, as RSS and Atom, at each syndication level", async () => {
     await compare(`/~s2fix_archive/data/rss?itemid=${await journals.ditemid("s2fix_archive", "Embeds and a poll")}`);
 });
 
+test("profiles: a personal journal showing all it may, a community and an OpenID account", async () => {
+    await compare("/~s2fix_profile/profile");
+    await compare("/~s2fix_comm/profile?mode=full");
+    const [openid] = await journals.db.global("SELECT userid FROM identitymap WHERE identity = ?",
+        ["https://openid.example.com/s2fix"]);
+    await compare(`/profile?userid=${int(openid!.userid)}&t=I`);
+});
+
 test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));
 
 test("a community and a reading page", async () => {

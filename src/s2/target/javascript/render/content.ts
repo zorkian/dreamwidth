@@ -14,6 +14,7 @@
 
 import {
     type CleanHooks, type CleanSite, canonicalUsername, clean, cleanComment, cleanStylesheet, cleanCss, cleanEvent, cleanSubject,
+    cleanUserbio,
     cleanSubjectAll, removeLinks, userReferences,
 } from "@dreamwidth/content";
 import { type Databases, text } from "../data/db";
@@ -101,6 +102,11 @@ export class ContentCleaner {
         return cleanEvent(event, {
             editor: entry.props.editor, preformatted: truthy(entry.props.opt_preformatted), cuturl, toExternalSite: true,
         }, this.site, this.hooks);
+    }
+
+    // LJ::CleanHTML::clean_userbio
+    userbio(text: string, stripLinks: boolean): string {
+        return cleanUserbio(text, this.site, this.hooks, stripLinks);
     }
 
     // LJ::Entry::event_text and subject_text, for Open Graph tags.

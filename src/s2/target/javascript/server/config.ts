@@ -88,7 +88,17 @@ export interface SiteConfig {
     readonly trustedS2Usernames: readonly string[];
     // The LJ::is_enabled features journal views check.
     readonly enabled: Readonly<Record<
-        "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content", boolean>>;
+        "tags" | "security_filter" | "esn_ajax" | "embed_module" | "inbox_update_poll" | "adult_content"
+        | "infoshow_migrate" | "show-talkleft" | "esn" | "payments" | "directory", boolean>>;
+    // %LJ::FORCE_EMPTY_SUBSCRIPTIONS: accounts whose profiles leave out their
+    // subscribers and members.
+    readonly forceEmptySubscriptions: readonly number[];
+    // $LJ::MAX_WT_EDGES_LOAD
+    readonly maxWtEdgesLoad: number;
+    // Country names by code, and the type of the codes table naming each
+    // country's regions, as DW::Countries and %LJ::COUNTRIES_WITH_REGIONS give them.
+    readonly countries: Readonly<Record<string, string>>;
+    readonly countriesWithRegions: Readonly<Record<string, string>>;
     // Journal paths DW::Routing's user controllers serve, without any .format
     // suffix: whole paths, and regular expressions.
     readonly userRoutes: {

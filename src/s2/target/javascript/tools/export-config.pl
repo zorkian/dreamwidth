@@ -18,6 +18,7 @@ use warnings;
 BEGIN { require "$ENV{LJHOME}/cgi-bin/ljlib.pl"; }
 use JSON;
 use DW::Captcha;
+use DW::Countries;
 use DW::Formats;
 use DW::Logic::MenuNav;
 use DW::Routing;
@@ -59,7 +60,8 @@ for my $prefix (
     qw( userlinkbar. talk.curname_ s2theme. web.controlstrip.status. poll. /journal/talkform.tt. contentflag. ),
     qw( sitescheme. menunav. widget.search. tropo. error /error/ /journal/deleted.tt. /components/login.tt. ),
     qw( web.controlstrip.login. cprod.friendsfriendsinline. lynx.nav. label.security. /journal/security.tt. ),
-    qw( /login.tt. captcha.accessibility. )
+    qw( /login.tt. captcha.accessibility. /profile/main.tt. /profile/logic.tt. lastupdated. time.ago. date.month. ),
+    qw( statusvis_message. entryform.security number.punctuation profile.service. )
     )
 {
     my $keys = $dbr->selectcol_arrayref(
@@ -203,7 +205,15 @@ print JSON->new->canonical->pretty->encode(
         trustedS2 => { map { $_ => '' . LJ::conf_test( $LJ::TRUSTED_S2_WHITELIST{$_} ) } keys %LJ::TRUSTED_S2_WHITELIST },
         trustedS2Usernames => [ sort keys %LJ::TRUSTED_S2_WHITELIST_USERNAMES ],
         capDefaults        => \%LJ::CAP_DEF,
-        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content ) },
+        enabled => { map { $_ => LJ::is_enabled($_) ? JSON::true : JSON::false } qw( tags security_filter esn_ajax embed_module inbox_update_poll adult_content infoshow_migrate show-talkleft esn payments directory ) },
+        # Accounts whose profiles leave out their subscribers and members.
+        forceEmptySubscriptions => [ map { $_ + 0 } keys %LJ::FORCE_EMPTY_SUBSCRIPTIONS ],
+        # $LJ::MAX_WT_EDGES_LOAD
+        maxWtEdgesLoad => ( $LJ::MAX_WT_EDGES_LOAD || 50000 ) + 0,
+        # Country names by code, as DW::Countries->load_legacy gives them, and
+        # the countries whose regions have names in the codes table.
+        countries => do { my %c; DW::Countries->load_legacy( \%c ); \%c },
+        countriesWithRegions => { map { $_ => $LJ::COUNTRIES_WITH_REGIONS{$_}{type} } keys %LJ::COUNTRIES_WITH_REGIONS },
         userRoutes => {
             paths    => [ sort map { m!^user(/.*)! ? $1 : () } keys %DW::Routing::string_choices ],
             patterns => \@route_patterns,
