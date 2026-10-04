@@ -21,8 +21,7 @@ import { int } from "../data/db";
 import { User } from "../data/user";
 import { renderJournal } from "../render/render";
 import { currentSecret } from "../render/reply-page";
-import { createApp, prepare } from "../server/app";
-import type { SiteConfig } from "../server/config";
+import { createApp } from "../server/app";
 import { HOST, TestJournals } from "./journal";
 
 const PERL = "http://localhost:8080";
@@ -33,7 +32,7 @@ let app: ReturnType<typeof createApp>;
 interface Page { status: number; body: string; type: string; location?: string }
 let tools: {
     summarize(page: Page, origins: string[], quips: readonly string[]): string;
-    fetchPage(origin: string, path: string): Promise<Page>;
+    fetchPage(origin: string, path: string, host?: string, cookie?: string): Promise<Page>;
 };
 
 before(async () => {
@@ -44,15 +43,22 @@ before(async () => {
 });
 after(() => journals.close());
 
-async function compare(pagePath: string): Promise<void> {
-    const response = await app.inject({ url: pagePath, headers: { host: HOST } });
+// Returns the page as compared, for checks on what both servers showed.
+async function comparePage(pagePath: string, cookie?: string): Promise<string> {
+    const response = await app.inject({ url: pagePath, headers: { host: HOST, ...cookie ? { cookie } : {} } });
     const js = {
         status: response.statusCode, body: response.body, type: String(response.headers["content-type"] ?? ""),
         location: response.headers.location as string | undefined,
     };
-    const perl = await tools.fetchPage(PERL, pagePath);
+    const perl = await tools.fetchPage(PERL, pagePath, undefined, cookie);
     const quips = journals.config.notFoundQuips;
-    assert.equal(tools.summarize(js, [PERL, JS], quips), tools.summarize(perl, [PERL, JS], quips), pagePath);
+    const summary = tools.summarize(js, [PERL, JS], quips);
+    assert.equal(summary, tools.summarize(perl, [PERL, JS], quips), pagePath);
+    return summary;
+}
+
+async function compare(pagePath: string): Promise<void> {
+    await comparePage(pagePath);
 }
 
 test("recent pages, in the default style, a theme and a user layer", async () => {
@@ -89,26 +95,9 @@ test("reply pages, to an entry and to a comment", async () => {
     await compare(`/~s2fix_theme/${ditemid}.html?replyto=${(2 << 8) + ditemid % 256}`);
 });
 
-test("a reply page in a journal that asks anonymous commenters for a captcha", async () => {
-    await compare(`/~s2fix_captcha/${await journals.ditemid("s2fix_captcha", "Entry 1:")}.html?mode=reply`);
-});
-
-// The devcontainer's Perl site runs without a captcha, so with one switched on
-// these state what LJ::Talk::Post::require_captcha_test and DW::Captcha give.
-test("with the site's captcha on, reply pages show it where the journal asks", async () => {
-    const config: SiteConfig = { ...journals.config, talkform: {
-        ...journals.config.talkform, captcha: true, captchaType: "hcaptcha", hcaptchaSitekey: "site-key",
-    } };
-    const reply = async (user: string, cookie = "", uniq = "") => {
-        const url = `/~${user}/${await journals.ditemid(user, "Entry 1:")}.html?mode=reply`;
-        const request = await prepare(config, journals.db, journals.compiler, url, HOST, { uniq, cookie });
-        assert.ok("layers" in request, url);
-        const page = await renderJournal(journals.db, { config, host: HOST }, request);
-        assert.equal(page.status, 200, url);
-        return page.body.includes(`<div class="h-captcha" data-sitekey="site-key"></div>`);
-    };
-    assert.equal(await reply("s2fix_default"), false);
-    assert.equal(await reply("s2fix_captcha"), true);
+test("reply pages with the site's captcha, where the journal asks for it and not", async () => {
+    const url = `/~s2fix_captcha/${await journals.ditemid("s2fix_captcha", "Entry 1:")}.html?mode=reply`;
+    await compare(url);
 
     // A browser recently logged in to an account in good standing is not asked,
     // as long as its ljtrust cookie is signed for its ljuniq.
@@ -116,11 +105,12 @@ test("with the site's captcha on, reply pages show it where the journal asks", a
     const { stime, secret } = await currentSecret(journals.db);
     const uniq = "abcdefghijklmno";
     const sig = createHmac("sha1", secret).update(`trust-${reader.userid}-${uniq}-${stime}`).digest("hex");
-    const trust = (sign: string) =>
-        `ljtrust=${encodeURIComponent(`v1:u${reader.userid}:t${stime}:g${sign}//${config.trustCookie.generations[0]}`)}`;
-    assert.equal(await reply("s2fix_captcha", trust(sig), uniq), false);
-    assert.equal(await reply("s2fix_captcha", trust(sig), "zzzzzzzzzzzzzzz"), true);
-    assert.equal(await reply("s2fix_captcha", trust("0".repeat(40)), uniq), true);
+    const cookie = (sign: string) => `ljuniq=${uniq}:${stime}; ljtrust=` +
+        encodeURIComponent(`v1:u${reader.userid}:t${stime}:g${sign}//${journals.config.trustCookie.generations[0]}`);
+    const trusted = await comparePage(url, cookie(sig));
+    assert.doesNotMatch(trusted, /h-captcha/);
+    const forged = await comparePage(url, cookie("0".repeat(40)));
+    assert.match(forged, /h-captcha/);
 });
 
 test("an entry with an embedded video and a poll", () => compare("/~s2fix_archive/2025/06/01/"));

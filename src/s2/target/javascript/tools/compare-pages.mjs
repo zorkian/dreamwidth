@@ -108,13 +108,14 @@ export function summarize(page, origins, quips) {
 }
 
 // An https origin is fetched from where it is; an http one from this machine,
-// sending its host, or `host` in its place.
-export function fetchPage(origin, pagePath, host) {
+// sending its host, or `host` in its place. `cookie` is sent as the Cookie header.
+export function fetchPage(origin, pagePath, host, cookie) {
     const url = new URL(origin);
+    const cookies = cookie ? { cookie } : {};
     const request = url.protocol === "https:"
-        ? (callback => https.get(new URL(pagePath, origin), callback))
+        ? (callback => https.get(new URL(pagePath, origin), { headers: cookies }, callback))
         : (callback => http.get({ host: "127.0.0.1", port: url.port || 80, path: pagePath,
-            headers: { host: host ?? url.host } }, callback));
+            headers: { host: host ?? url.host, ...cookies } }, callback));
     return new Promise((resolve, reject) => {
         request(response => {
                 let body = "";
@@ -128,25 +129,28 @@ export function fetchPage(origin, pagePath, host) {
     });
 }
 
-// Usage: compare-pages.mjs [--host HOST] [--config FILE] PERL_ORIGIN JS_ORIGIN PATH...
+// Usage: compare-pages.mjs [--host HOST] [--config FILE] [--cookie COOKIE] PERL_ORIGIN JS_ORIGIN PATH...
 // A local origin is http://host:port as that server expects in Host; --host
 // sends HOST to the JavaScript server instead, such as a journal's subdomain.
 // --config reads the not-found page's quips from the server's configuration.
+// --cookie sends a Cookie header to both.
 if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
     const argv = process.argv.slice(2);
     const options = {};
-    while (/^--(host|config)$/.test(argv[0] ?? "")) options[argv.shift().slice(2)] = argv.shift();
-    const { host, config } = options;
+    while (/^--(host|config|cookie)$/.test(argv[0] ?? "")) options[argv.shift().slice(2)] = argv.shift();
+    const { host, config, cookie } = options;
     const quips = config ? JSON.parse(readFileSync(config, "utf8")).notFoundQuips : [];
     const [perlOrigin, jsOrigin, ...paths] = argv;
     if (!perlOrigin || !jsOrigin || !paths.length) {
-        console.error("Usage: compare-pages.mjs [--host HOST] [--config FILE] PERL_ORIGIN JS_ORIGIN PATH...");
+        console.error("Usage: compare-pages.mjs [--host HOST] [--config FILE] [--cookie COOKIE] PERL_ORIGIN JS_ORIGIN PATH...");
         process.exit(2);
     }
     const directory = mkdtempSync(path.join(tmpdir(), "compare-pages-"));
     let failed = 0;
     for (const pagePath of paths) {
-        const [perl, js] = await Promise.all([fetchPage(perlOrigin, pagePath), fetchPage(jsOrigin, pagePath, host)]);
+        const [perl, js] = await Promise.all([
+            fetchPage(perlOrigin, pagePath, undefined, cookie), fetchPage(jsOrigin, pagePath, host, cookie),
+        ]);
         const origins = [perlOrigin, jsOrigin];
         const files = ["perl", "js"].map(side => path.join(directory, side + pagePath.replace(/\W+/g, "_")));
         for (const [index, page] of [perl, js].entries()) writeFileSync(files[index], summarize(page, origins, quips));
