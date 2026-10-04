@@ -71,6 +71,24 @@ test("hidden entries and comments are indistinguishable from missing ones", asyn
     assert.equal(bodies.size, 1);
 });
 
+// Unlike Perl, which asks for a confirmation, adult content needs a login.
+test("adult content shows a login page, with nothing to click through", async () => {
+    const explicit = `/~s2fix_adult/${await journals.ditemid("s2fix_adult", "Explicit entry")}.html`;
+    const concepts = `/~s2fix_archive/${await journals.ditemid("s2fix_archive", "Discretion advised")}.html`;
+    for (const url of [concepts, explicit, "/~s2fix_adultjournal/"]) {
+        const page = await journals.get(url);
+        assert.equal(page.status, 403, url);
+        assert.ok(page.body.includes(`name="returnto" value="http://${HOST}${url}"`), url);
+        assert.doesNotMatch(page.body, /Paragraph with|\/journal\/adult_|I want to view/, url);
+    }
+    // An unflagged journal's page shows its other entries, and only a link to the flagged one.
+    const recent = await journals.get("/~s2fix_adult/");
+    assert.equal(recent.status, 200);
+    assert.match(recent.body, /example\.com\/1"/);
+    assert.doesNotMatch(recent.body, /example\.com\/4"|\/journal\/adult_/);
+    assert.ok(recent.body.includes(`<a href="http://${HOST}${explicit}">`));
+});
+
 test("screened comments are hidden", async () => {
     const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Entry 25:")}.html`);
     assert.equal(page.status, 200);
