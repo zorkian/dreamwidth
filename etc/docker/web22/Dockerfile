@@ -27,10 +27,15 @@ RUN git -C $LJHOME fetch && \
 
 RUN $LJHOME/bin/build-static.sh
 
+# The journal server, which startup-prod.sh runs beside Starman when
+# DW_JOURNAL_SERVER is set. It uses the content package's compiled output.
+RUN cd $LJHOME/src/content && npm ci && npm run build && \
+    cd $LJHOME/src/s2/target/javascript && npm ci && npm run build && npm prune --omit=dev
+
 # Copy in support scripts that are useful.
 ADD scripts/ /opt/
 
-EXPOSE 8080/tcp
+EXPOSE 8080/tcp 8091/tcp
 
 # Kick off the startup script, which does some healthcheck and then starts
 # Starman if things look good.

@@ -166,3 +166,8 @@ test("an account with a second factor is logged in only by a session that has pr
     assert.ok("status" in loggedIn && loggedIn.status === 501);
     for (const row of unproven) assert.ok("layers" in await visit(row), `session ${int(row.sessid)}`);
 });
+
+test("the server's database connections refuse writes", async () => {
+    await assert.rejects(journals.db.global("UPDATE user SET name = name WHERE user = 's2fix_reader'"),
+        /READ ONLY transaction/);
+});

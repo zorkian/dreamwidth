@@ -18,7 +18,8 @@ layers. There is no allowlist of supported styles.
 
 ## Non-goals
 
-- Writes of any kind. The server holds read-only database credentials.
+- Writes of any kind. Its database connections are read-only sessions, so MySQL
+  refuses any write.
 - Memcache. All data comes from MySQL.
 - Request defenses: captcha checks on visitors, bans, rate limits, image
   proxying.
@@ -213,6 +214,10 @@ perl tools/seed-fixtures.pl          # once, in the devcontainer
 npm test
 (cd ../../../content && npm ci && npm run build && npm test)
 ```
+
+In production, the web22 image builds the server and `startup-prod.sh` runs it
+on port 8091 beside Starman for services that set `DW_JOURNAL_SERVER`
+(web-canary), logging to `/var/log/starman/journal-server.log`.
 
 `tools/bench.mjs` times pages on both servers; `BENCHMARKS.md` has the method
 and the latest devcontainer results.
