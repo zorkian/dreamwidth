@@ -64,6 +64,8 @@ export class Databases {
             charset: "latin1", dateStrings: true, supportBigNumbers: true, connectionLimit: 8,
             typeCast: (field, next) => TEXT_TYPES.has(field.type) ? field.buffer() : next(),
         });
+        // Writes stay with Perl; MySQL refuses any that reach these connections.
+        pool.pool.on("connection", connection => connection.query("SET SESSION TRANSACTION READ ONLY"));
         this.pools.set(id, pool);
         return pool;
     }
