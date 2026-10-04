@@ -26,6 +26,7 @@ use LJ::Talk;
 use LJ::Userpic;
 use DW::User::Rename;
 use Compress::Zlib qw( compress crc32 );
+use Digest::SHA;
 
 die "Devcontainer only\n" unless $LJ::IS_DEV_SERVER;
 
@@ -357,6 +358,22 @@ unless ( LJ::get_cluster_reader( $acc{stranger} )
     LJ::get_cluster_master( $acc{stranger} )->do( 'UPDATE sessions SET timeexpire = 1 WHERE userid = ? AND sessid = ?',
         undef, $acc{stranger}->userid, $expired->{sessid} );
 }
+# An account with a second factor, and three sessions: one that has proven
+# it, one whose proof has expired, and one that never proved it.
+my $totp = journal('s2fix_acc_totp');
+my $totp_secret = 'fixture-encrypted-totp-secret';
+LJ::get_db_writer()->do( 'UPDATE password2 SET totp_secret = ? WHERE userid = ?', undef, $totp_secret, $totp->userid );
+unless ( LJ::get_cluster_reader($totp)->selectrow_array(
+    'SELECT COUNT(*) FROM sessions WHERE userid = ? AND timeexpire > UNIX_TIMESTAMP() + 86400', undef, $totp->userid ) )
+{
+    my $factor = Digest::SHA::sha256_hex($totp_secret);
+    for my $expires ( time() + 86400 * 3650, 1, undef ) {
+        my $sess = LJ::Session->create( $totp, exptype => 'long', nolog => 1 ) or die "Cannot create session\n";
+        LJ::get_cluster_master($totp)->do( 'REPLACE INTO mfa_sessions (userid, sessid, factor, expires) VALUES (?, ?, ?, ?)',
+            undef, $totp->userid, $sess->{sessid}, $factor, $expires ) if defined $expires;
+    }
+}
+
 unless ( $acc{susp}->is_suspended ) {
     $session->( $acc{susp} );
     $acc{susp}->update_self( { statusvis => 'S' } );
