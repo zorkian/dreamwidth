@@ -390,6 +390,36 @@ unless ( $acc{susp}->is_suspended ) {
     $acc{susp}->update_self( { statusvis => 'S' } );
 }
 
+# Profiles: one showing anonymous visitors all it can, and one keeping from
+# them all it can, including who subscribes to it and its communities.
+my ($github) = LJ::get_db_reader()->selectrow_array("SELECT service_id FROM profile_services WHERE name = 'github'");
+my $open_profile = journal('s2fix_profile');
+unless ( $open_profile->has_bio ) {
+    $open_profile->update_self( { name => 'Profile <Fixture> & Co', bdate => '1990-03-10', allow_contactshow => 'Y' } );
+    $open_profile->set_prop( $_->[0] => $_->[1] )
+        for [ opt_sharebday => 'A' ], [ opt_showbday => 'F' ], [ opt_showlocation => 'Y' ], [ city => 'Springfield' ],
+        [ state => 'IL' ], [ country => 'US' ], [ url => 'example.com/home' ], [ urlname => 'My <home> page' ],
+        [ opt_whatemailshow => 'A' ];
+    $open_profile->set_bio(qq{A <b>bold</b> bio mentioning <user name="s2fix_reader">.\nSecond line.});
+    $open_profile->set_interests( [ 'fixture knitting', 'fixture shared' ] );
+    $commenter->set_interests( ['fixture shared'] );
+    $open_profile->save_profile_accts( { $github => ['fixture-github'] } );
+    # Websites show once an account is ten days old.
+    LJ::get_db_writer()->do( 'UPDATE userusage SET timecreate = timecreate - INTERVAL 30 DAY WHERE userid = ?',
+        undef, $open_profile->userid );
+}
+my $closed_profile = journal('s2fix_closedprofile');
+unless ( $closed_profile->has_bio ) {
+    $closed_profile->update_self( { bdate => '1985-07-04', allow_contactshow => 'F' } );
+    $closed_profile->set_prop( $_->[0] => $_->[1] )
+        for [ opt_sharebday => 'R' ], [ opt_showbday => 'F' ], [ opt_showlocation => 'F' ], [ city => 'Hiddenville' ],
+        [ country => 'US' ], [ opt_whatemailshow => 'A' ], [ opt_hidefriendofs => 1 ], [ opt_hidememberofs => 1 ];
+    $closed_profile->set_bio('A public bio.');
+    $closed_profile->save_profile_accts( { $github => ['hidden-github'] } );
+    $commenter->add_edge( $closed_profile, watch => { nonotify => 1 } );
+    $closed_profile->join_community( $community, 1, 1 );
+}
+
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
 my $memorial = journal('s2fix_memorial');

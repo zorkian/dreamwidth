@@ -329,7 +329,9 @@ export class Context {
         try {
             return this.nodes(body);
         } catch (error) {
-            if (error instanceof Control && error.kind === "return" && document) return error.output;
+            // Template::Context::process stops a RETURN at the template or
+            // BLOCK it was in.
+            if (error instanceof Control && error.kind === "return") return error.output;
             throw error;
         } finally {
             if (document) this.visiting.pop();

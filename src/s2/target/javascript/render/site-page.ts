@@ -74,6 +74,43 @@ export function renderSiteString(request: SiteRequest, content: string, sections
     return new SitePage(request).wrap(content, sections);
 }
 
+// LJ::Lang::ml for a full string code, with [[name]] values and
+// [[?num|singular|plural]] forms.
+export function mlText(config: SiteConfig, code: string, vars: Value = {}): string {
+    const text = config.strings[code];
+    if (text === undefined) return `[missing string ${code}]`;
+    const values = isHash(vars) ? vars : {};
+    return text.replace(/\[\[\?([\w-]+)\|(.+?)\]\]/g, (_, name, words) => words.split("|")[num(values[name]) === 1 ? 0 : 1] ?? "")
+        .replace(/\[\[([^[]+?)\]\]/g, (_, name) => str(values[name]));
+}
+
+// LJ::img: one of the site's standard images, as an <img>, or as an image
+// input when `type` is "input".
+export function imgTag(config: SiteConfig, name: string, type = "", attrs?: Value): string {
+    let extra = "", alt = "";
+    if (isHash(attrs)) {
+        const rest = { ...attrs };
+        if ("alt" in rest) {
+            alt = ehtml(rest.alt);
+            delete rest.alt;
+        }
+        extra = Object.entries(rest).map(([key, value]) => ` ${key}="${ehtml(str(value) || "")}"`).join("");
+    } else if (attrs !== undefined && attrs !== null && str(attrs) !== "") {
+        extra = ` id="${str(attrs)}"`;
+    }
+    const image = config.images[name];
+    alt ||= image?.alt ?? "";
+    if (type === "") {
+        return `<img src="${config.imgPrefix}${image?.src ?? ""}" width="${image?.width ?? ""}" height="${image?.height ?? ""}" ` +
+            `alt="${alt}" title="${alt}" border='0'${extra} />`;
+    }
+    if (type === "input") {
+        return `<input type="image" src="${config.imgPrefix}${image?.src ?? ""}" width="${image?.width ?? ""}" ` +
+            `height="${image?.height ?? ""}" title="${alt}" alt="${alt}" border='0'${extra} />`;
+    }
+    return "<b>XXX</b>";
+}
+
 // DW::SiteScheme->current, with a scheme the request set taking precedence.
 export function currentScheme(config: SiteConfig, args: Readonly<Record<string, string>>, cookie: string,
     forced?: string): string {
@@ -145,11 +182,7 @@ class SitePage {
     // LJ::Lang::ml, through DW::Template::Filters::ml's arguments.
     ml(code: string, vars: Value): string {
         if (code.startsWith(".") && this.scope) code = this.scope + code;
-        const text = this.config.strings[code];
-        if (text === undefined) return `[missing string ${code}]`;
-        const values = isHash(vars) ? vars : {};
-        return text.replace(/\[\[\?([\w-]+)\|(.+?)\]\]/g, (_, name, words) => words.split("|")[num(values[name]) === 1 ? 0 : 1] ?? "")
-            .replace(/\[\[([^[]+?)\]\]/g, (_, name) => str(values[name]));
+        return mlText(this.config, code, vars);
     }
 
     // DW::Template::Plugin
@@ -181,6 +214,7 @@ class SitePage {
             },
             form_auth: () => htmlHidden({ name: "lj_form_auth", value: this.formAuthChallenge() }),
             ml: (code: Value, ...args: Value[]) => this.ml(str(code), args.at(-1)),
+            img: (name: Value, type: Value, attrs: Value) => imgTag(config, str(name), str(type), attrs),
         };
     }
 

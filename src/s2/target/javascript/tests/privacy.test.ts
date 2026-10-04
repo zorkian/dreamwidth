@@ -112,6 +112,15 @@ test("feeds carry only public entries, and adult ones only as a link to log in",
     }
 });
 
+test("a profile leaves out what its owner keeps from anonymous visitors", async () => {
+    const page = await journals.get("/~s2fix_closedprofile/profile");
+    assert.equal(page.status, 200);
+    assert.match(page.body, /A public bio/);
+    // Birthday, location, address, other sites' accounts, subscribers and the
+    // communities it belongs to (its subscriptions stay public).
+    assert.doesNotMatch(page.body, /1985|Hiddenville|s2fix_closedprofile<\/span>|hidden-github|Subscribers|Member Of/);
+});
+
 test("screened comments are hidden", async () => {
     const page = await journals.get(`/~s2fix_theme/${await journals.ditemid("s2fix_theme", "Entry 25:")}.html`);
     assert.equal(page.status, 200);

@@ -25,6 +25,7 @@ import { currentSecret, randChars } from "../render/reply-page";
 import { viewingStyle } from "../render/chrome";
 import { styleUrl } from "../render/objects";
 import { renderFeed } from "../render/feed";
+import { renderProfile } from "../render/profile-page";
 import { currentScheme, deletedJournalVars, notFoundPage, renderSitePage, templateUser } from "../render/site-page";
 import type { Stash } from "../template";
 import { determineView } from "./views";
@@ -54,12 +55,13 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     host: string, visitor: Visitor = { uniq: "", cookie: "" }): Promise<RenderRequest | RenderResult> {
     const parsed = new URL(url, "http://journal");
     const target = journalPath(config, host, parsed.pathname);
-    if (!target || userRoute(config, parsed.pathname)) return PERL_PAGE;
+    if (target ? userRoute(config, parsed.pathname) : !isSiteHost(config, host)) return PERL_PAGE;
     // Logged-in viewers are identified, but their pages are not built here yet.
     const session = await Session.fromCookies(db, config,
         { host, path: parsed.pathname, cookie: visitor.cookie, remoteIp: visitor.remoteIp });
     if (session) return PERL_PAGE;
     const site = { config, host };
+    if (!target) return siteRoute(db, site, url, visitor);
     const args = Object.fromEntries(parsed.searchParams);
     // ?style=light shows the site's own pages in its text-only scheme.
     const light = viewingStyle(args) === "light" ? "lynx" : undefined;
@@ -69,6 +71,9 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
     const sitePage = async (view: string, vars: Stash, journal?: User, status?: number, scheme?: string) =>
         renderSitePage(await siteRequest(journal, scheme), view, vars, status);
     const notFound = async (journal?: User) => notFoundPage(await siteRequest(journal));
+    // DW::Controller::Journal hands /profile to DW::Controller::Profile.
+    const profile = (user: string) =>
+        renderProfile(db, { site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, host, journal: user });
     const username = target.user.toLowerCase().replaceAll("-", "_");
     const journal = await User.byName(db, username);
     const base = journal ? journal.journalBase(site) : journalBase(site, username);
@@ -78,7 +83,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
 
     const mode = view.mode;
     if (!journal) {
-        if (mode === "profile") return PERL_PAGE;
+        if (mode === "profile") return profile(username);
         if (["info", "update", "robots_txt"].includes(mode)) return notFound();
         return sitePage("error/unknown-user.tt", { user: username });
     }
@@ -90,6 +95,7 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         return redirect(`${to ? to.journalBase(site) : journalBase(site, renamedTo)}${target.path}${parsed.search}`);
     }
     const journalError = (view: string, vars: Stash = {}, status?: number) => sitePage(view, vars, journal, status, light);
+    if (mode === "profile") return profile(journal.user);
     if (mode === "info") return redirect(`${base}/profile${args.mode === "full" ? "?mode=full" : ""}`);
     if (mode === "update") return redirect(`${config.siteRoot}/entry/${journal.user}/new`);
     if (mode === "robots_txt") {
@@ -167,6 +173,26 @@ export async function prepare(config: SiteConfig, db: Databases, compiler: Compi
         args, requestPath: url, host, layers: compiled, style, uniq: visitor.uniq, cookie: visitor.cookie, siteviews,
         remoteId: null,
     };
+}
+
+// Whether `host` is the site's own, rather than a journal's or a special subdomain.
+function isSiteHost(config: SiteConfig, host: string): boolean {
+    const name = host.replace(/:\d+$/, "").toLowerCase();
+    if (name === config.domainWeb.toLowerCase() || name === config.domain.toLowerCase()) return true;
+    // A devcontainer serves everything from its own host.
+    return config.isDevServer && !config.userDomain;
+}
+
+// The site's own pages this server renders for anonymous visitors; anything
+// else on the site's host is left to Perl.
+async function siteRoute(db: Databases, site: { config: SiteConfig; host: string }, url: string,
+    visitor: Visitor): Promise<RenderResult> {
+    const parsed = new URL(url, "http://site");
+    const args = Object.fromEntries(parsed.searchParams);
+    if (parsed.pathname === "/profile") {
+        return renderProfile(db, { site, url, args, cookie: visitor.cookie, uniq: visitor.uniq, host: site.host });
+    }
+    return PERL_PAGE;
 }
 
 // Whether DW::Routing gives this path to a user controller, or to the API,

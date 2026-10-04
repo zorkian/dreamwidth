@@ -70,6 +70,14 @@ entry. A thread link to a hidden comment shows the whole entry, as a link to
 a comment that does not exist does. A suspended public entry, whose existence
 was already public, still gets the suspension notice.
 
+Profiles are served as `DW::Controller::Profile` and
+`DW::Logic::ProfilePage` show them to an anonymous visitor
+(`render/profile-page.ts`), at a journal's `/profile` and at the site's
+`/profile?user=` and `/profile?userid=...&t=I` for OpenID accounts. Every
+detail an owner keeps from anonymous visitors (birthday, location, contact
+details, other sites' accounts, who subscribes to them, their communities)
+is left out as Perl leaves it out, reading the same settings.
+
 Journal feeds are served as `LJ::Feed::make_feed` serves them to an
 anonymous reader (`render/feed.ts`): RSS and Atom at `/data/rss` and
 `/data/atom`, for the newest public entries or one entry (`?itemid=`), with
@@ -154,7 +162,7 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   `tools/seed-fixtures.pl`, rendered by both Perl and this server, compared as
   normalized DOM. They cover the site default style, a theme, a user layer,
   entries with rich HTML, comments, pagination, filters, the archive views,
-  stylesheets, siteviews pages, feeds, memorial and renamed journals, and error
+  stylesheets, siteviews pages, feeds, profiles, memorial and renamed journals, and error
   pages in the site scheme.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Access** (`tests/access.test.ts`). Each kind of viewer against entries

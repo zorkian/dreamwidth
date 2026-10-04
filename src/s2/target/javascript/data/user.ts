@@ -75,6 +75,25 @@ function calcAge(date: string): number {
     return age > 0 ? age : 0;
 }
 
+// Net::OpenID::VerifiedIdentity::DisplayOfURL
+function displayOfUrl(url: string, devMode: boolean): string {
+    const match = /^https?:\/\/([^/]+)(\/.*)?$/.exec(url);
+    if (!match) return url;
+    let host = match[1]!.toLowerCase();
+    const path = match[2] ?? "";
+    if (devMode) host = host.replace(/^dev\./, "").replace(/:\d+/, "");
+    host = host.replace(/:.+/, "").replace(/^www\./i, "");
+    if (path.length <= 1) return host;
+    const user = /^\/~([^/]+)\/?$/.exec(path) ?? /^\/(?:users?|members?)\/([^/]+)\/?$/.exec(path);
+    if (user) return `${user[1]} [${host}]`;
+    const profile = /^profile\.(.+)/i.exec(host);
+    if (profile) {
+        const name = /^\/([^/]+)\/?$/.exec(path);
+        if (name) return `${name[1]} [${profile[1]}]`;
+    }
+    return url;
+}
+
 // The request host, which devcontainer journal URLs are built from.
 export interface Site {
     readonly config: SiteConfig;
@@ -353,6 +372,218 @@ export class User {
     // there is no such userprop here, so Perl never hides the address for it.
     async emailForFeeds(db: Databases, config: SiteConfig, remote: User | null): Promise<string | undefined> {
         return (await this.emailsVisible(db, config, remote))[0];
+    }
+
+    // LJ::User::identity: an OpenID account's type and identifier.
+    async identity(db: Databases): Promise<{ typeid: string; value: string } | undefined> {
+        if (!this.isIdentity()) return undefined;
+        if (this.identityRow === undefined) {
+            const [row] = await db.global("SELECT idtype, identity FROM identitymap WHERE userid = ? LIMIT 1", [this.userid]);
+            this.identityRow = row ? { typeid: text(row.idtype), value: text(row.identity) } : null;
+        }
+        return this.identityRow ?? undefined;
+    }
+    private identityRow?: { typeid: string; value: string } | null;
+
+    // Load the identities of the OpenID accounts among `users`, for displayName.
+    static async loadIdentities(db: Databases, users: readonly User[]): Promise<void> {
+        const need = users.filter(u => u.isIdentity() && u.identityRow === undefined);
+        if (!need.length) return;
+        const rows = await db.global("SELECT userid, idtype, identity FROM identitymap WHERE userid IN (?)",
+            [need.map(u => u.userid)]);
+        const byId = new Map(rows.map(row => [int(row.userid), { typeid: text(row.idtype), value: text(row.identity) }]));
+        for (const u of need) u.identityRow = byId.get(u.userid) ?? null;
+    }
+
+    // LJ::User::display_name: the username, or for an OpenID account a short
+    // form of its URL. The identity must be loaded with identity() first.
+    displayName(config: SiteConfig): string {
+        if (!this.isIdentity()) return this.user;
+        const id = this.identityRow;
+        if (!id) return "[ERR:unknown_identity]";
+        if (id.typeid !== "O") return "";
+        return displayOfUrl(id.value, config.isDevServer)
+            .replace(/%([\dA-Fa-f]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    }
+
+    // LJ::User::profile_url
+    profileUrl(site: Site, full = false): string {
+        if (this.isIdentity()) {
+            return `${site.config.siteRoot}/profile?userid=${this.userid}&t=I${full ? "&mode=full" : ""}`;
+        }
+        return `${this.journalBase(site)}/profile${full ? "?mode=full" : ""}`;
+    }
+
+    // LJ::User::url: the website the account names, with a scheme.
+    async url(db: Databases): Promise<string | undefined> {
+        await this.loadProps(db, ["url"]);
+        let url = this.props.url;
+        if (this.isIdentity() && !url) {
+            const id = await this.identity(db);
+            if (id?.typeid === "O") url = id.value;
+        }
+        if (!url) return undefined;
+        return /^https?:\/\//.test(url) ? url : `http://${url}`;
+    }
+
+    // LJ::User::timecreate and timeupdate, from userusage.
+    async usage(db: Databases): Promise<{ timecreate: number; timeupdate: number }> {
+        const [row] = await db.global(`SELECT UNIX_TIMESTAMP(timecreate) AS c, UNIX_TIMESTAMP(timeupdate) AS u
+            FROM userusage WHERE userid = ?`, [this.userid]);
+        return { timecreate: int(row?.c), timeupdate: int(row?.u) };
+    }
+
+    // LJ::Community::get_comm_settings: membership and posting level.
+    async getCommSettings(db: Databases): Promise<{ membership: string; postlevel: string }> {
+        const [row] = await db.global("SELECT membership, postlevel FROM community WHERE userid = ?", [this.userid]);
+        return { membership: text(row?.membership), postlevel: text(row?.postlevel) };
+    }
+
+    // The counts on a profile: LJ::User::num_comments_received and
+    // num_comments_posted, number_of_posts, support_points_count,
+    // LJ::Memories::count, and the number of tags ($u->tags).
+    async counts(db: Databases): Promise<{ received: number; posted: number; entries: number; supportPoints: number;
+        memories: number; tags: number }> {
+        const one = async (rows: Promise<Row[]>) => int((await rows)[0]?.n);
+        const [received, posted, entries, supportPoints, memories, tags] = await Promise.all([
+            one(this.cluster(db, "SELECT COUNT(*) AS n FROM talk2 WHERE journalid = ?", [this.userid])),
+            one(this.cluster(db, "SELECT COUNT(*) AS n FROM talkleft WHERE userid = ?", [this.userid])),
+            one(this.cluster(db, "SELECT COUNT(*) AS n FROM log2 WHERE journalid = ?", [this.userid])),
+            one(db.global("SELECT totpoints AS n FROM supportpointsum WHERE userid = ?", [this.userid])),
+            one(this.cluster(db, "SELECT COUNT(*) AS n FROM memorable2 WHERE userid = ?", [this.userid])),
+            one(this.cluster(db, "SELECT COUNT(*) AS n FROM usertags WHERE journalid = ?", [this.userid])),
+        ]);
+        return { received, posted, entries, supportPoints, memories, tags };
+    }
+
+    // LJ::User::opt_sharebday: who may see the birthday, A, F, N or R.
+    async optSharebday(db: Databases): Promise<string> {
+        await this.loadProps(db, ["opt_sharebday"]);
+        if (/^[AFNR]$/.test(this.props.opt_sharebday ?? "")) return this.props.opt_sharebday!;
+        return await this.isMinor(db) ? "F" : "A";
+    }
+
+    // LJ::User::can_share_bday
+    async canShareBday(db: Databases, remote: User | null): Promise<boolean> {
+        const share = await this.optSharebday(db);
+        if (share === "N" || share === "R" && !remote) return false;
+        if (share === "F" && !(remote && await this.trusts(db, remote))) return false;
+        return true;
+    }
+
+    // LJ::User::opt_showbday: which part of the birthday to show, D (day),
+    // F (full), N (none) or Y (year); undefined for an account whose old
+    // allow_infoshow setting says to show it.
+    async optShowbday(db: Databases, config: SiteConfig): Promise<string | undefined> {
+        const legacy = this.infoshowLegacy(config);
+        if (legacy !== false) return legacy;
+        await this.loadProps(db, ["opt_showbday"]);
+        if (this.infoshowMigratesToNo(config)) return "N";
+        return /^[DFNY]$/.test(this.props.opt_showbday ?? "") ? this.props.opt_showbday : "D";
+    }
+
+    // LJ::User::opt_showlocation: N, Y, R or F, or undefined as optShowbday.
+    async optShowlocation(db: Databases, config: SiteConfig): Promise<string | undefined> {
+        const legacy = this.infoshowLegacy(config);
+        if (legacy !== false) return legacy;
+        await this.loadProps(db, ["opt_showlocation"]);
+        if (this.infoshowMigratesToNo(config)) return "N";
+        if (/^[NYRF]$/.test(this.props.opt_showlocation ?? "")) return this.props.opt_showlocation;
+        return await this.isMinor(db) ? "F" : "Y";
+    }
+
+    // Without infoshow_migrate, an account not yet migrated takes its
+    // settings from allow_infoshow; false when that does not apply.
+    private infoshowLegacy(config: SiteConfig): string | undefined | false {
+        if (config.enabled.infoshow_migrate || this.allowInfoshow === " ") return false;
+        return this.allowInfoshow === "Y" ? undefined : "N";
+    }
+
+    // LJ::User::_lazy_migrate_infoshow would set both settings to N for an
+    // account whose allow_infoshow is not Y; this server reads the result
+    // without making the change.
+    private infoshowMigratesToNo(config: SiteConfig): boolean {
+        return config.enabled.infoshow_migrate && this.allowInfoshow !== " " && !!this.allowInfoshow
+            && this.allowInfoshow !== "Y";
+    }
+
+    // LJ::User::bday_string: the parts of the birthday the viewer may see.
+    async bdayString(db: Databases, config: SiteConfig, remote: User | null): Promise<string> {
+        const [year = "", month = "", day = ""] = (this.bdate || "").split("-");
+        const share = await this.canShareBday(db, remote);
+        const show = await this.optShowbday(db, config);
+        const set = (value: string) => Number(value) > 0;
+        let out = "";
+        if (share && show === "F" && set(day) && set(month) && set(year)) out = this.bdate;
+        else if (share && (show === "D" || show === "F") && set(day) && set(month)) out = `${month}-${day}`;
+        else if (share && (show === "Y" || show === "F") && set(year)) out = year;
+        return out.replace(/^0000-/, "");
+    }
+
+    // LJ::User::can_show_location
+    async canShowLocation(db: Databases, config: SiteConfig, remote: User | null): Promise<boolean> {
+        const show = await this.optShowlocation(db, config);
+        if (show === "N" || show === "R" && !remote) return false;
+        if (show === "F" && !(remote && await this.trusts(db, remote))) return false;
+        return true;
+    }
+
+    // LJ::User::bio: the raw bio, if the account has one.
+    async bio(db: Databases): Promise<string | undefined> {
+        const [has] = await db.global("SELECT has_bio FROM user WHERE userid = ?", [this.userid]);
+        if (text(has?.has_bio) !== "Y") return undefined;
+        const [row] = await this.cluster(db, "SELECT bio FROM userbio WHERE userid = ?", [this.userid]);
+        return row ? text(row.bio) : undefined;
+    }
+
+    // LJ::User::get_interests: [intid, name, count], by name.
+    async interests(db: Databases): Promise<[number, string, number][]> {
+        const table = this.isCommunity() ? "comminterests" : "userinterests";
+        const ids = (await db.global(`SELECT intid FROM ${table} WHERE userid = ?`, [this.userid])).map(row => int(row.intid));
+        if (!ids.length) return [];
+        const [names, counts] = await Promise.all([
+            db.global("SELECT kwid, keyword FROM sitekeywords WHERE kwid IN (?)", [ids]),
+            db.global("SELECT intid, intcount FROM interests WHERE intid IN (?)", [ids]),
+        ]);
+        const count = new Map(counts.map(row => [int(row.intid), int(row.intcount)]));
+        return names.map(row => [int(row.kwid), text(row.keyword), count.get(int(row.kwid)) ?? 0] as [number, string, number])
+            .sort((a, b) => a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0);
+    }
+
+    // DW::User::Edges::WatchTrust::Loader::_wt_userids: who this user watches
+    // or trusts, or with `reverse`, who watches or trusts them.
+    async wtUserids(db: Databases, config: SiteConfig, mode: "watch" | "trust", reverse = false): Promise<number[]> {
+        const bit = mode === "watch" ? "1<<61" : "1";
+        const [from, to] = reverse ? ["to_userid", "from_userid"] : ["from_userid", "to_userid"];
+        const rows = await db.global(`SELECT ${to} AS id FROM wt_edges WHERE ${from} = ? AND groupmask & ${bit}
+            LIMIT ${Math.trunc(config.maxWtEdgesLoad) || 50000}`, [this.userid]);
+        return rows.map(row => int(row.id));
+    }
+
+    // LJ::load_rel_user: the targets of this user's one-letter relationship.
+    async relUserids(db: Databases, type: string): Promise<number[]> {
+        return (await db.global("SELECT targetid FROM reluser WHERE userid = ? AND type = ?", [this.userid, type]))
+            .map(row => int(row.targetid));
+    }
+
+    // LJ::load_rel_target: who has this one-letter relationship with this user.
+    async relTargetUserids(db: Databases, type: string): Promise<number[]> {
+        return (await db.global("SELECT userid FROM reluser WHERE targetid = ? AND type = ?", [this.userid, type]))
+            .map(row => int(row.userid));
+    }
+
+    // DW::Pay::get_current_account_status and get_account_expiration_time:
+    // the account's cap class, and when its paid time ends (-1 for none).
+    async paidStatus(db: Databases, config: SiteConfig): Promise<{ typeid: string; expires: number }> {
+        const [row] = await db.global(`SELECT IFNULL(expiretime, 0) - UNIX_TIMESTAMP() AS expiresin, typeid, permanent
+            FROM dw_paidstatus WHERE userid = ?`, [this.userid]);
+        const expiresin = int(row?.expiresin), permanent = truthy(row?.permanent);
+        const isDefault = !row || !(permanent || expiresin > 0);
+        const typeid = isDefault
+            ? Object.keys(config.capBits).find(bit => truthy(config.capBits[bit]?._account_default)) ?? ""
+            : String(int(row!.typeid));
+        const expires = !row || permanent ? -1 : expiresin > 0 ? Math.floor(Date.now() / 1000) + expiresin : 0;
+        return { typeid, expires };
     }
 
     // LJ::User::adult_content_calculated. Needs adult_content loaded.

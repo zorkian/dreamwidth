@@ -26,6 +26,11 @@ export async function expandEmbedded(db: Databases, site: CleanSite, config: Sit
     return replaceAsync(html, /(<(?:lj|site)-embed[^>]+\/>)/g, match => embedTag(db, site, config, journal, match[1]!));
 }
 
+// LJ::EmbedModule::expand_entry: embedded media as their frames.
+export function expandEmbeds(db: Databases, site: CleanSite, config: SiteConfig, journal: User, html: string): Promise<string> {
+    return replaceAsync(html, /(<(?:lj|site)-embed[^>]+\/>)/g, match => embedTag(db, site, config, journal, match[1]!));
+}
+
 async function replaceAsync(html: string, pattern: RegExp, replace: (match: RegExpMatchArray) => Promise<string>):
     Promise<string> {
     const matches = [...html.matchAll(pattern)];
