@@ -40,7 +40,8 @@ layers. There is no allowlist of supported styles.
 4. **Compile.** Find the journal's layer stack (core, layout, i18n, theme,
    user) from `s2styles`/`s2stylelayers2`, read each layer's source from
    `s2source_inno`, and compile it with the existing S2 compiler's JavaScript
-   backend. Compiled layers are cached by a hash of their source.
+   backend. Compiled layers are cached by a hash of their source for the life
+   of the process; layers change rarely, so the cache is not trimmed.
 5. **Render.** Build the S2 objects (`Page`, `Entry`, `Comment`, ...) from the
    loaded data, run the layers' `prop_init`/`print` in the JS runtime with the
    host builtins, and return the HTML.
@@ -178,17 +179,19 @@ a wrong page, private data would leak, or unsafe HTML would get through.
   normalized DOM. They cover the site default style, a theme, a user layer,
   entries with rich HTML, comments, pagination, filters, the archive views,
   stylesheets, siteviews pages, feeds, profiles, memorial and renamed
-  journals, error pages in the site scheme, and the site's legal, site map
-  and FAQ pages.
+  journals, error pages in the site scheme, the site's legal, site map
+  and FAQ pages, and a paid reader's content filter.
   `tools/compare-pages.mjs` runs the same comparison for any page.
 - **Access** (`tests/access.test.ts`). Each kind of viewer against entries
   at each security level and hidden comments, and sessions from each kind
-  of cookie. A request with a logged-in session is left to Perl.
+  of cookie. A request with a logged-in session is left to Perl, and the
+  database connections refuse writes.
 - **Privacy** (`tests/privacy.test.ts`). Non-public entries, screened comments,
   and suspended journals and entries never appear, hidden entries and
   comments answer exactly as missing ones, and adult content needs a login.
-- **Render limits** (`tests/pool.test.ts`). A style that never finishes is
-  stopped.
+- **Render limits and status** (`tests/pool.test.ts`). A style that never
+  finishes is stopped, and `/admin/healthy` fails while a database or the
+  render workers do not answer.
 - **Cleaner** (`src/content/src/tests`). Ported from the Perl cleaner tests in
   `t/`, each stating its expected output, and extended as bugs are found.
 - **Templates** (`tests/template.test.ts`). The Template Toolkit constructs
@@ -217,7 +220,7 @@ npm test
 
 In production, the web22 image builds the server and `startup-prod.sh` runs it
 on port 8091 beside Starman for services that set `DW_JOURNAL_SERVER`
-(web-canary), logging to `/var/log/starman/journal-server.log`. 
+(web-canary), logging to `/var/log/starman/journal-server.log`.
 `/admin/healthy` answers health checks on any host in the format
 DW::Controller::Admin::StatusCheck uses, checking the databases this server
 reads and its render workers, each within two seconds. Unlike Perl's, a
