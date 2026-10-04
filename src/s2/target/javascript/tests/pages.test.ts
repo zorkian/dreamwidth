@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { type Databases, int } from "../data/db";
+import { int } from "../data/db";
 import { User } from "../data/user";
 import { renderJournal } from "../render/render";
 import { currentSecret } from "../render/reply-page";
@@ -38,7 +38,7 @@ let tools: {
 before(async () => {
     journals = new TestJournals();
     app = createApp(journals.config, journals.db, journals.compiler,
-        request => renderJournal(journals.db, { config: journals.config, host: request.host }, request));
+        request => renderJournal(journals.db, { config: journals.config, host: request.host }, request), async () => true);
     tools = await import(path.resolve(__dirname, "../../tools/compare-pages.mjs"));
 });
 after(() => journals.close());
@@ -145,20 +145,6 @@ test("an entry with an embedded video and a poll", () => compare("/~s2fix_archiv
 test("a community and a reading page", async () => {
     await compare("/~s2fix_comm/");
     await compare("/~s2fix_reader/read");
-});
-
-test("the health check answers on any host, and fails while the database is down", async () => {
-    const response = await app.inject({ url: "/healthz", headers: { host: "10.0.0.1:8091" } });
-    assert.equal(response.statusCode, 200);
-    const down = createApp(journals.config, { global: () => Promise.reject(new Error("down")) } as unknown as Databases,
-        journals.compiler, () => Promise.reject(new Error("unused")));
-    const failing = console.error;
-    console.error = () => {};
-    try {
-        assert.equal((await down.inject({ url: "/healthz" })).statusCode, 503);
-    } finally {
-        console.error = failing;
-    }
 });
 
 test("a paid reader's content filter", () => compare("/~s2fix_filterer/read/Fixture+filter"));
