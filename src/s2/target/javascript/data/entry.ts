@@ -257,12 +257,12 @@ function logpropList(db: Databases): Promise<Map<number, string>> {
 }
 
 // DW::Logic::LogItems::active_entries: the jitemids of the ten entries with
-// the newest visible comments.
+// the newest visible comments, among the newest 500 such comments.
 export async function activeEntries(db: Databases, journal: User): Promise<number[]> {
     const rows = await journal.cluster(db,
-        `SELECT nodeid FROM talk2 WHERE journalid = ? AND state NOT IN ('D', 'S')
-         GROUP BY nodeid ORDER BY MAX(jtalkid) DESC LIMIT 10`, [journal.userid]);
-    return rows.map(row => int(row.nodeid));
+        `SELECT nodeid FROM talk2 FORCE INDEX (PRIMARY) WHERE journalid = ? AND state NOT IN ('D', 'S')
+         ORDER BY jtalkid DESC LIMIT 500`, [journal.userid]);
+    return [...new Set(rows.map(row => int(row.nodeid)))].slice(0, 10);
 }
 
 // LJ::User::get_daycounts for a logged-out viewer: [year, month, day, count]

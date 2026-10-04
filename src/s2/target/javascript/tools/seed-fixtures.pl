@@ -91,8 +91,8 @@ unless ( entry_count($archive) ) {
 # Embedded media and a poll, which are stored apart from the entry text.
 unless ( entry_count($archive) > 5 ) {
 
-    # Only paid accounts may create polls; paid journals also show active
-    # entries, which fail on MySQL 8, so the journal stays free.
+    # Only paid accounts may create polls, so the journal is paid just while
+    # posting one.
     $archive->modify_caps( [3], [] );
     post(
         $archive, 6,
@@ -210,6 +210,35 @@ unless ( $gone->is_deleted ) {
 my $purged = journal('s2fix_purged');
 $purged->set_statusvis('X') unless $purged->is_expunged;
 LJ::User::load_identity_user( 'O', 'https://openid.example.com/s2fix' ) || die "Cannot create the OpenID account\n";
+
+# A paid journal, whose pages list the entries with the newest comments: one
+# comment on each of twelve entries out of posting order, one on a private
+# entry, and a newer screened one, which does not count.
+my $active = journal('s2fix_active');
+$active->modify_caps( [3], [] ) unless $active->get_cap('activeentries');
+entries( $active, 12 );
+unless ( LJ::get_cluster_reader($active)
+    ->selectrow_array( 'SELECT COUNT(*) FROM talk2 WHERE journalid = ?', undef, $active->userid ) )
+{
+    my %jitemids = reverse @{ LJ::get_cluster_reader($active)->selectcol_arrayref(
+        'SELECT jitemid, subject FROM logtext2 WHERE journalid = ?',
+        { Columns => [ 1, 2 ] }, $active->userid ) };
+    my $by_subject = sub {
+        my ($prefix) = @_;
+        my ($subject) = grep { /^\Q$prefix\E/ } keys %jitemids;
+        return $jitemids{$subject} * 256 + LJ::Entry->new( $active, jitemid => $jitemids{$subject} )->anum;
+    };
+    my $err;
+    my $comment = sub {
+        my ( $ditemid, $body, $poster ) = @_;
+        LJ::Comment->create( journal => $active, ditemid => $ditemid, poster => $poster || $commenter,
+            body => $body, err_ref => \$err ) or die "Cannot comment: $err->{msg}\n";
+    };
+    $comment->( $by_subject->("Entry $_:"), "A comment on entry $_" ) for 5, 1, 9, 12, 3, 7, 11, 2, 8, 4, 10, 6;
+    $comment->( $by_subject->('Private entry'), 'A comment on a private entry', $active );
+    my $screened = $comment->( $by_subject->('Entry 1:'), 'A screened comment' );
+    LJ::Talk::screen_comment( $active, $by_subject->('Entry 1:') >> 8, $screened->jtalkid );
+}
 
 # A memorial journal, which reads as any other, and a renamed account, which
 # sends visitors on to the journal it became.
