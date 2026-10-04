@@ -273,10 +273,9 @@ export async function journalDefaultPic(pc: PageContext): Promise<S2Object> {
 }
 
 export async function loadUserpics(pc: PageContext, userids: readonly number[]): Promise<void> {
-    for (const id of new Set(userids)) {
-        const user = pc.users.get(id);
-        if (user && !pc.userpics.has(id)) pc.userpics.set(id, await Userpics.load(pc.db, user));
-    }
+    const users = [...new Set(userids)].filter(id => !pc.userpics.has(id)).map(id => pc.users.get(id))
+        .filter((user): user is User => !!user);
+    for (const [id, pics] of await Userpics.loadAll(pc.db, users)) pc.userpics.set(id, pics);
 }
 
 // The cut tag labels recent and day pages give their scripts.

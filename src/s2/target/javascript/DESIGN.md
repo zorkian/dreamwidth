@@ -157,3 +157,6 @@ perl tools/seed-fixtures.pl          # once, in the devcontainer
 npm test
 (cd ../../../content && npm ci && npm run build && npm test)
 ```
+
+`tools/bench.mjs` times pages on both servers; `BENCHMARKS.md` has the method
+and the latest devcontainer results.
