@@ -16,6 +16,7 @@ import { createHash, createHmac, randomInt } from "node:crypto";
 import { commentProps, commentRows, commentTexts } from "../data/comment";
 import { type Databases, int, text } from "../data/db";
 import { type Entry, truthy } from "../data/entry";
+import { sameSecret } from "../data/session";
 import { User } from "../data/user";
 import type { SiteConfig } from "../server/config";
 import { pageEntry } from "./entry-page";
@@ -174,7 +175,7 @@ async function trustedAnonUser(db: Databases, config: SiteConfig, visitor: { uni
     const [secret] = await db.global("SELECT secret FROM secrets WHERE stime = ?", [Number(t)]);
     if (!secret) return false;
     const sig = createHmac("sha1", text(secret.secret)).update(`trust-${u}-${visitor.uniq}-${t}`).digest("hex");
-    if (!g || g !== sig) return false;
+    if (!g || !sameSecret(g, sig)) return false;
     const [user] = await db.global("SELECT statusvis, status, journaltype FROM user WHERE userid = ?", [Number(u)]);
     return !!user && text(user.statusvis) === "V" && text(user.status) === "A" && /^[PI]$/.test(text(user.journaltype));
 }
