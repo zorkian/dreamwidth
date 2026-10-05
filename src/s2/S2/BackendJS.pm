@@ -6,7 +6,7 @@ package S2::BackendJS;
 use strict;
 use S2::Indenter;
 use S2::BackendJS::Codegen;
-use Carp;
+use Scalar::Util qw(refaddr);
 
 # $opts:
 #    'docs' - set to true to produce code to register
@@ -22,6 +22,8 @@ sub new {
         'untrusted' => $untrusted,
         'package' => '',
         'opts' => $opts || {},        
+        'scope_ids' => {},
+        'next_scope_id' => 0,
     };
     bless $this, $class;
 }
@@ -38,6 +40,7 @@ sub output {
     my ($this, $o) = @_;
     my $io = new S2::Indenter $o, 4;
 
+    $io->writeln("s2.assertABI(1);");
     $io->writeln("var $this->{layerid} = s2.makeLayer();");
     my $nodes = $this->{'layer'}->getNodes();
     foreach my $n (@$nodes) {
@@ -46,26 +49,17 @@ sub output {
 #    $io->writeln("return l");
 }
 
-# JavaScript has function-level scope while S2 has block-level
-# scope. Therefore we must decorate all local variables with
-# a scope identifier to ensure there are no collisions between
-# blocks.
+# S2 block scopes need distinct names in the generated JavaScript. Assign
+# identifiers in output traversal order; Perl reference addresses vary by run.
+sub scopeID {
+    my ( $this, $scope ) = @_;
+    my $address = refaddr($scope);
+    return $this->{scope_ids}{$address} //= ++$this->{next_scope_id};
+}
+
 sub decorateLocal {
     my ($this, $varname, $scope) = @_;
-    
-    # HACK: Use part of Perl's stringification of the
-    # owning block to decorate the variable name. Should
-    # do something better later.
-    my $decorate;
-    my $block = $scope."";
-    if ($block =~ /HASH\(0x(\w+)\)/) {
-        $decorate = $1;
-    }
-    else {
-        croak "Unable to decorate $varname in $block";
-    }
-
-    return "__".$decorate."_".$varname;
+    return "__" . $this->scopeID($scope) . "_" . $varname;
 }
 
 # To avoid conflict with JavaScript's reserved words, all
@@ -87,6 +81,10 @@ sub quoteStringInner {
     my $s = shift;
     $s =~ s/([\\\"])/\\$1/g;
     $s =~ s/\n/\\n/g;
+    $s =~ s/\r/\\r/g;
+    $s =~ s/\t/\\t/g;
+    $s =~ s/\x{2028}/\\u2028/g;
+    $s =~ s/\x{2029}/\\u2029/g;
     return $s;
 }
 

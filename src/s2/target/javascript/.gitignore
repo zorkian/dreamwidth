@@ -1,0 +1,5 @@
+node_modules/
+dist/
+artifacts/
+# Written by tools/export-config.pl; holds database credentials.
+/config.json
