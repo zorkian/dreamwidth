@@ -9,6 +9,11 @@
                     "containerPort": 8080,
                     "hostPort": 8080,
                     "protocol": "tcp"
+                },
+                {
+                    "containerPort": 8091,
+                    "hostPort": 8091,
+                    "protocol": "tcp"
                 }
             ],
             "essential": true,
@@ -20,6 +25,10 @@
                 {
                     "name": "DW_LOKI_SERVICE",
                     "value": "web-canary"
+                },
+                {
+                    "name": "DW_JOURNAL_SERVER",
+                    "value": "1"
                 }
             ],
             "mountPoints": [

@@ -67,6 +67,13 @@ use Net::Subnet;
             path => "$LJ::HOME/var/blobstore",
         },
     );
+
+    # Dev-only: hCaptcha's published test keys, never real ones, so comment
+    # forms show a captcha as in production. The bypass keeps the anonymous
+    # page-view captcha gate from redirecting every page.
+    $CAPTCHA_HCAPTCHA_SITEKEY = '10000000-ffff-ffff-ffff-000000000001';
+    $CAPTCHA_HCAPTCHA_SECRET  = '0x0000000000000000000000000000000000000000';
+    $CAPTCHA_BYPASS_REGEX     = qr/^/;
 }
 
 1;

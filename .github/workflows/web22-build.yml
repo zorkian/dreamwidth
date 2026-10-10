@@ -16,6 +16,7 @@ on:
       - schemes/**
       - ext/dw-nonfree/schemes/**
       - src/s2/**
+      - src/content/**
       - etc/docker/web22/**
   workflow_dispatch:
 

@@ -135,12 +135,12 @@ sub useAsString {
 }
 
 sub isHashElement {
-    my $this = 0;
+    my $this = shift;
 
     return 0 unless @{$this->{'levels'}};
     my $l = $this->{'levels'}->[-1];
-    return 0 unless @$l;
-    my $d = $l->[-1];
+    return 0 unless @{$l->{'derefs'}};
+    my $d = $l->{'derefs'}->[-1];
     return $d->{'type'} eq "{";
 }
 

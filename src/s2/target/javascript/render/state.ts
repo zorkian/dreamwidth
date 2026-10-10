@@ -1,0 +1,54 @@
+// state.ts
+//
+// What builtins need while a page renders: the page itself, the site chrome
+// Perl adds around S2, and data loaded before rendering for builtins that
+// would otherwise query the database.
+//
+// Authors:
+//      Dreamwidth contributors
+//
+// Copyright (c) 2026 by Dreamwidth Studios, LLC.
+//
+// This program is free software; you may redistribute it and/or modify it under
+// the same terms as Perl itself. For a copy of the license, please reference
+// 'perldoc perlartistic' or 'perldoc perlgpl'.
+
+import type { CleanSite } from "@dreamwidth/content";
+import type { SiteConfig } from "../server/config";
+import type { Site, User } from "../data/user";
+import type { S2Object } from "./objects";
+import type { PageOutput } from "./page-output";
+import type { Resources } from "./resources";
+
+export interface Chrome {
+    controlStrip(): string;
+    controlStripUserpicCss(full: boolean): string;
+    scriptTags(): string;
+    quickreplyDiv(page: S2Object): string;
+    ljuser(userid: number, linkColor: string): string;
+    userLink(props: Record<string, unknown>, user: S2Object, key: string): S2Object;
+}
+
+export interface RenderState {
+    readonly site: Site;
+    readonly config: SiteConfig;
+    readonly journal: User;
+    readonly output: PageOutput;
+    readonly resources: Resources;
+    readonly chrome: Chrome;
+    readonly showControlStrip: boolean;
+    readonly showThreadExpander: boolean;
+    // What the content cleaner needs to know about the site.
+    readonly cleanSite: CleanSite;
+    // The query arguments.
+    readonly args: Readonly<Record<string, string>>;
+    page(): S2Object;
+    siteRoot(): string;
+    // The scheme and host pages are served from.
+    origin(): string;
+    userBase(user: string): string | undefined;
+    userLite(user: string): S2Object | undefined;
+    visibleTags(limit: number): S2Object[];
+    latestMonth(): S2Object;
+    journalCurrentDateTime(): S2Object;
+}

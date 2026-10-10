@@ -24,6 +24,29 @@ MAX_REQUESTS=${DW_STARMAN_MAX_REQUESTS:-100}
 # --disable-keepalive: prefork workers pin to idle keep-alive conns behind the pooling ALB.
 perl $LJHOME/bin/starman --port 8080 --workers "$WORKERS" --max-requests "$MAX_REQUESTS" --disable-keepalive --preload-app --log /var/log/starman --daemonize
 
+# The journal server on port 8091, if this service runs it. Failures here are
+# logged and leave Starman serving as usual.
+if [ -n "$DW_JOURNAL_SERVER" ]; then
+    (
+        set +xe
+        JS=$LJHOME/src/s2/target/javascript
+        LOG=/var/log/starman/journal-server.log
+        mkdir -p /run/journal-server
+        umask 077
+        # The exported config holds database passwords.
+        until perl -I$LJHOME/extlib/ $JS/tools/export-config.pl >/run/journal-server/config.json 2>>$LOG; do
+            echo "export-config.pl failed; retrying in 60s" >>$LOG
+            sleep 60
+        done
+        while true; do
+            node $JS/dist/server/main.js --config /run/journal-server/config.json \
+                --host 0.0.0.0 --port 8091 --workers 2 >>$LOG 2>&1
+            echo "journal server exited ($?); restarting in 5s" >>$LOG
+            sleep 5
+        done
+    ) &
+fi
+
 # Sleep a few seconds to ensure things get up and running
 sleep 5
 
