@@ -159,6 +159,7 @@ const GOOD = [
     "http://www.sbs.com.au/yourlanguage//player/embed/id/163111",
     "//scratch.mit.edu/projects/embed/144290094/?autostart=false",
     "http://www.scribd.com/embeds/123123/content?start_page=1&view_mode=list&access_key=",
+    "https://sendvid.com/embed/gctqv3f8",
     "http://www.slideshare.net/slideshow/embed_code/12312312",
     "https://api.smugmug.com/services/embed/10385063342_c6j9ncH?width=360&height=640&albumId=250921912&albumKey=BqhhKn",
     "http://w.soundcloud.com/player/?url=http%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F23318382&show_artwork=true",
@@ -192,6 +193,7 @@ const BAD = [
     "http://player.vimeo.com/video/123abc?title=0&byline=0&portrait=0", "https://vine.co/v/bjHh0zHdgZT/embed/postcard",
     "https://vine.co/v/bjHh0zHdgZT/embed", "https://vine.co/v/abc/embed/simple",
     "http://commons.wikimedia.org/wiki/File:1903_Burnley_Ironworks_company_steam_engine_in_use.ogv?withJS=MediaWiki:MwEmbed.js",
+    "https://sendvid.com/gctqv3f8",
 ];
 
 test("trusted embed urls are allowed", () => {

@@ -105,6 +105,7 @@ const HOST_PATH_MATCH = new Map<string, [RegExp, boolean]>([
     ["www.sbs.com.au", [/\/player\/embed\//, false]],
     ["scratch.mit.edu", [/^\/projects\/embed\//, true]],
     ["www.scribd.com", [/^\/embeds\//, true]],
+    ["sendvid.com", [/^\/embed\//, true]],
     ["www.slideshare.net", [/^\/slideshow\/embed_code\//, true]],
     ["api.smugmug.com", [/^\/services\/embed\/\w+$/, true]],
     ["w.soundcloud.com", [/^\/player\//, true]],
